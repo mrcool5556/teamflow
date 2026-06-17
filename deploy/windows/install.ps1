@@ -39,7 +39,7 @@ Write-Host "Setting up database..."
 pnpm db:setup
 
 if ($InstallPath) {
-  Write-Host "Install path mode: $InstallPath (copy not automated yet — run from repo or set TEAMFLOW_HOME)"
+  Write-Host "Install path mode: $InstallPath (copy not automated yet - run from repo or set TEAMFLOW_HOME)"
 }
 
 Write-Host ""
