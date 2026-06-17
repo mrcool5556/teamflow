@@ -1,0 +1,15 @@
+---
+description: Teamflow project conventions for AI assistants
+globs:
+  - "**/*"
+---
+
+Before editing Teamflow code:
+
+1. Read `docs/STATUS.md` for current build state
+2. Read `docs/AI_CONTEXT.md` for architecture and locked decisions
+3. Read the relevant `docs/steps/NN-*.md` for the area you are changing
+
+After completing work, update `docs/STATUS.md` and the step doc.
+
+Deployment: Setup A (Windows native) and Setup B (Proxmox LXC) — Docker is not the primary path.

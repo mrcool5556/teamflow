@@ -1,0 +1,12 @@
+{
+  "mcpServers": {
+    "teamflow": {
+      "command": "node",
+      "args": ["../../apps/mcp/dist/index.js"],
+      "env": {
+        "TEAMFLOW_URL": "http://localhost:3000",
+        "TEAMFLOW_TOKEN_FILE": "../../data/mcp-pat.txt"
+      }
+    }
+  }
+}
