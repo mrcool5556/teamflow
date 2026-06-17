@@ -31,7 +31,7 @@ if ($parent -and -not (Test-Path $parent)) {
 
 if (Test-Path $InstallPath) {
   if (Test-Path (Join-Path $InstallPath ".git")) {
-    Write-Host "Already cloned at $InstallPath — running update + install steps instead."
+    Write-Host "Already cloned at $InstallPath - running update + install steps instead."
     Set-Location $InstallPath
     git fetch origin
     git checkout $Branch
