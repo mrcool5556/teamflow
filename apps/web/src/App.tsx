@@ -45,6 +45,7 @@ import { ChangeHistoryPanel } from "./components/ChangeHistoryPanel";
 import { GoToRefBar } from "./components/GoToRefBar";
 import { IssueDrawer } from "./components/IssueDrawer";
 import { RoadmapPanel } from "./components/RoadmapPanel";
+import { UndoToast } from "./components/UndoToast";
 import { useChangeHistory } from "./hooks/useChangeHistory";
 import {
   normalizeRefInput,

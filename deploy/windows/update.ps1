@@ -5,6 +5,7 @@ param(
 )
 
 $ErrorActionPreference = "Stop"
+. (Join-Path $PSScriptRoot "_common.ps1")
 $RepoRoot = Resolve-Path (Join-Path $PSScriptRoot "..\..")
 
 Write-Host "Teamflow update" -ForegroundColor Cyan
@@ -38,18 +39,17 @@ if ($Branch) {
 }
 
 if (-not (Get-Command pnpm -ErrorAction SilentlyContinue)) {
-  corepack enable
-  corepack prepare pnpm@9.15.0 --activate
+  Ensure-Pnpm
 }
 
 Write-Host "Installing dependencies..."
-pnpm install
+Invoke-Pnpm install
 
 Write-Host "Building..."
-pnpm build
+Invoke-Pnpm build
 
 Write-Host "Running migrations..."
-pnpm db:migrate
+Invoke-Pnpm db:migrate
 
 Write-Host ""
 Write-Host "Update complete." -ForegroundColor Green
