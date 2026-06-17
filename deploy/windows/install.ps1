@@ -4,6 +4,7 @@ param(
 )
 
 $ErrorActionPreference = "Stop"
+. (Join-Path $PSScriptRoot "_common.ps1")
 $RepoRoot = Resolve-Path (Join-Path $PSScriptRoot "..\..")
 
 Write-Host "Teamflow Windows install" -ForegroundColor Cyan
@@ -12,12 +13,6 @@ Write-Host "Repo: $RepoRoot"
 if (-not (Get-Command node -ErrorAction SilentlyContinue)) {
   Write-Host "Node.js not found. Install Node 20+ (winget install OpenJS.NodeJS.LTS)" -ForegroundColor Red
   exit 1
-}
-
-if (-not (Get-Command pnpm -ErrorAction SilentlyContinue)) {
-  Write-Host "Enabling pnpm via corepack..."
-  corepack enable
-  corepack prepare pnpm@9.15.0 --activate
 }
 
 Set-Location $RepoRoot
@@ -30,13 +25,13 @@ if (-not (Test-Path ".env")) {
 (Get-Content ".env") -replace "^PORT=.*", "PORT=$Port" | Set-Content ".env"
 
 Write-Host "Installing dependencies..."
-pnpm install
+Invoke-Pnpm install
 
 Write-Host "Building..."
-pnpm build
+Invoke-Pnpm build
 
 Write-Host "Setting up database..."
-pnpm db:setup
+Invoke-Pnpm db:setup
 
 if ($InstallPath) {
   Write-Host "Install path mode: $InstallPath (copy not automated yet - run from repo or set TEAMFLOW_HOME)"
