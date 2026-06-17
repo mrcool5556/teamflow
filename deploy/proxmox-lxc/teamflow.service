@@ -1,0 +1,16 @@
+[Unit]
+Description=Teamflow issue tracker
+After=network.target postgresql.service
+Wants=postgresql.service
+
+[Service]
+Type=simple
+User=teamflow
+WorkingDirectory=/opt/teamflow
+EnvironmentFile=/opt/teamflow/.env
+ExecStart=/usr/bin/node /opt/teamflow/apps/server/dist/index.js
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

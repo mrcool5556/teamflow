@@ -1,0 +1,313 @@
+import type {
+  ApiError,
+  ApiTokenCreated,
+  BoardRowPublic,
+  CommentPublic,
+  CreateCommentInput,
+  CreateIssueInput,
+  CreateProjectInput,
+  CreateTeamInput,
+  CreateTokenInput,
+  IssuePublic,
+  IssueStatusPublic,
+  ListIssuesInput,
+  LoginInput,
+  ProjectPublic,
+  RegisterInput,
+  ResolvedRef,
+  TeamPublic,
+  TeamMemberPublic,
+  UpdateIssueInput,
+  UpdateBoardRowInput,
+  UserPublic,
+} from "@teamflow/core";
+import type { UserProfile, UserProfileExport, UserProfilePatch } from "@teamflow/core";
+
+export type TeamflowClientOptions = {
+  baseUrl: string;
+  token?: string;
+  fetchImpl?: typeof fetch;
+};
+
+export class TeamflowApiError extends Error {
+  status: number;
+  code?: string;
+
+  constructor(message: string, status: number, code?: string) {
+    super(message);
+    this.name = "TeamflowApiError";
+    this.status = status;
+    this.code = code;
+  }
+}
+
+export class TeamflowClient {
+  private baseUrl: string;
+  private token?: string;
+  private fetchImpl: typeof fetch;
+
+  constructor(options: TeamflowClientOptions) {
+    this.baseUrl = options.baseUrl.replace(/\/$/, "");
+    this.token = options.token;
+    this.fetchImpl =
+      options.fetchImpl ??
+      ((input, init) => fetch(input, init));
+  }
+
+  setToken(token?: string) {
+    this.token = token;
+  }
+
+  private async request<T>(
+    path: string,
+    init: RequestInit = {},
+  ): Promise<T> {
+    const headers = new Headers(init.headers);
+    headers.set("Content-Type", "application/json");
+    if (this.token) {
+      headers.set("Authorization", `Bearer ${this.token}`);
+    }
+
+    const response = await this.fetchImpl(`${this.baseUrl}${path}`, {
+      ...init,
+      headers,
+    });
+
+    if (!response.ok) {
+      let payload: ApiError = { error: response.statusText };
+      const contentType = response.headers.get("content-type") ?? "";
+      if (contentType.includes("application/json")) {
+        try {
+          payload = (await response.json()) as ApiError;
+        } catch {
+          // ignore
+        }
+      }
+      throw new TeamflowApiError(
+        payload.error ?? response.statusText,
+        response.status,
+        payload.code,
+      );
+    }
+
+    if (response.status === 204) {
+      return undefined as T;
+    }
+
+    return (await response.json()) as T;
+  }
+
+  register(input: RegisterInput) {
+    return this.request<{ user: UserPublic; token: string }>("/auth/register", {
+      method: "POST",
+      body: JSON.stringify(input),
+    });
+  }
+
+  login(input: LoginInput) {
+    return this.request<{ user: UserPublic; token: string }>("/auth/login", {
+      method: "POST",
+      body: JSON.stringify(input),
+    });
+  }
+
+  me() {
+    return this.request<{ user: UserPublic }>("/auth/me");
+  }
+
+  getProfile() {
+    return this.request<{ profile: UserProfile }>("/auth/profile");
+  }
+
+  saveProfile(profile: UserProfile) {
+    return this.request<{ profile: UserProfile }>("/auth/profile", {
+      method: "PUT",
+      body: JSON.stringify(profile),
+    });
+  }
+
+  patchProfile(patch: UserProfilePatch) {
+    return this.request<{ profile: UserProfile }>("/auth/profile", {
+      method: "PATCH",
+      body: JSON.stringify(patch),
+    });
+  }
+
+  exportProfile() {
+    return this.request<UserProfileExport>("/auth/profile/export");
+  }
+
+  importProfile(payload: unknown) {
+    return this.request<{ profile: UserProfile }>("/auth/profile/import", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    });
+  }
+
+  createToken(input: CreateTokenInput) {
+    return this.request<ApiTokenCreated>("/auth/tokens", {
+      method: "POST",
+      body: JSON.stringify(input),
+    });
+  }
+
+  listTeams() {
+    return this.request<{ teams: TeamPublic[] }>("/teams");
+  }
+
+  createTeam(input: CreateTeamInput) {
+    return this.request<{ team: TeamPublic }>("/teams", {
+      method: "POST",
+      body: JSON.stringify(input),
+    });
+  }
+
+  listProjects(teamId?: string) {
+    const query = teamId ? `?teamId=${teamId}` : "";
+    return this.request<{ projects: ProjectPublic[] }>(`/projects${query}`);
+  }
+
+  createProject(input: CreateProjectInput) {
+    return this.request<{ project: ProjectPublic }>("/projects", {
+      method: "POST",
+      body: JSON.stringify(input),
+    });
+  }
+
+  listStatuses(teamId: string) {
+    return this.request<{ statuses: IssueStatusPublic[] }>(
+      `/teams/${teamId}/statuses`,
+    );
+  }
+
+  listRowStatuses(rowId: string) {
+    return this.request<{ statuses: IssueStatusPublic[] }>(
+      `/rows/${rowId}/statuses`,
+    );
+  }
+
+  createStatus(rowId: string, input: { name: string; type?: string }) {
+    return this.request<{ status: IssueStatusPublic }>(
+      `/rows/${rowId}/statuses`,
+      {
+        method: "POST",
+        body: JSON.stringify(input),
+      },
+    );
+  }
+
+  updateStatus(
+    statusId: string,
+    input: { name?: string; position?: number },
+  ) {
+    return this.request<{ status: IssueStatusPublic }>(`/statuses/${statusId}`, {
+      method: "PATCH",
+      body: JSON.stringify(input),
+    });
+  }
+
+  deleteStatus(statusId: string) {
+    return this.request<void>(`/statuses/${statusId}`, { method: "DELETE" });
+  }
+
+  listRows(teamId: string) {
+    return this.request<{ rows: BoardRowPublic[] }>(`/teams/${teamId}/rows`);
+  }
+
+  listTeamMembers(teamId: string) {
+    return this.request<{ members: TeamMemberPublic[] }>(
+      `/teams/${teamId}/members`,
+    );
+  }
+
+  createRow(teamId: string, input: { name: string }) {
+    return this.request<{ row: BoardRowPublic }>(`/teams/${teamId}/rows`, {
+      method: "POST",
+      body: JSON.stringify(input),
+    });
+  }
+
+  updateRow(rowId: string, input: UpdateBoardRowInput) {
+    return this.request<{ row: BoardRowPublic }>(`/rows/${rowId}`, {
+      method: "PATCH",
+      body: JSON.stringify(input),
+    });
+  }
+
+  deleteRow(rowId: string) {
+    return this.request<void>(`/rows/${rowId}`, { method: "DELETE" });
+  }
+
+  listIssues(filters: ListIssuesInput = {}) {
+    const params = new URLSearchParams();
+    for (const [key, value] of Object.entries(filters)) {
+      if (value) params.set(key, value);
+    }
+    const query = params.toString();
+    return this.request<{ issues: IssuePublic[] }>(
+      `/issues${query ? `?${query}` : ""}`,
+    );
+  }
+
+  getIssue(id: string) {
+    return this.request<{ issue: IssuePublic; comments: CommentPublic[] }>(
+      `/issues/${id}`,
+    );
+  }
+
+  createIssue(input: CreateIssueInput) {
+    return this.request<{ issue: IssuePublic }>("/issues", {
+      method: "POST",
+      body: JSON.stringify(input),
+    });
+  }
+
+  updateIssue(id: string, input: UpdateIssueInput) {
+    return this.request<{ issue: IssuePublic }>(`/issues/${id}`, {
+      method: "PATCH",
+      body: JSON.stringify(input),
+    });
+  }
+
+  completeIssue(id: string) {
+    return this.request<{ issue: IssuePublic }>(`/issues/${id}/complete`, {
+      method: "POST",
+    });
+  }
+
+  deleteIssue(id: string) {
+    return this.request<void>(`/issues/${id}`, { method: "DELETE" });
+  }
+
+  restoreIssue(id: string) {
+    return this.request<{ issue: IssuePublic }>(`/issues/${id}/restore`, {
+      method: "POST",
+    });
+  }
+
+  addComment(issueId: string, input: CreateCommentInput) {
+    return this.request<{ comment: CommentPublic }>(
+      `/issues/${issueId}/comments`,
+      {
+        method: "POST",
+        body: JSON.stringify(input),
+      },
+    );
+  }
+
+  deleteComment(issueId: string, commentId: string) {
+    return this.request<void>(`/issues/${issueId}/comments/${commentId}`, {
+      method: "DELETE",
+    });
+  }
+
+  resolveRef(teamId: string, ref: string) {
+    const query = encodeURIComponent(ref);
+    return this.request<{
+      resolved: ResolvedRef;
+      issue?: IssuePublic;
+      row?: BoardRowPublic;
+      status?: IssueStatusPublic;
+    }>(`/teams/${teamId}/resolve?ref=${query}`);
+  }
+}

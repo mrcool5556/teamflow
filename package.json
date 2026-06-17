@@ -1,0 +1,19 @@
+{
+  "name": "teamflow",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Self-hosted team issue tracker with MCP and CLI for AI assistants",
+  "scripts": {
+    "dev": "pnpm --parallel -r --filter @teamflow/server --filter @teamflow/web dev",
+    "build": "pnpm -r build",
+    "db:generate": "pnpm --filter @teamflow/db generate",
+    "db:migrate": "pnpm --filter @teamflow/db migrate",
+    "db:seed": "pnpm --filter @teamflow/db seed",
+    "db:setup": "pnpm db:migrate && pnpm db:seed",
+    "typecheck": "pnpm -r typecheck"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "packageManager": "pnpm@9.15.0"
+}

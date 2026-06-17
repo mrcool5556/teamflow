@@ -1,0 +1,14 @@
+node_modules/
+dist/
+build/
+.env
+.env.local
+*.db
+*.db-journal
+data/
+*.log
+.turbo/
+coverage/
+
+# Machine-specific (IPs, SSH keys, passwords)
+docs/CONNECTIONS.md
