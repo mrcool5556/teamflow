@@ -3,9 +3,9 @@ export type RoadmapStatus = "done" | "focus" | "planned" | "gap" | "partial";
 export type RoadmapItem = {
   id: string;
   title: string;
-  notes?: string;
   status: RoadmapStatus;
   priority?: number;
+  notes?: string;
   tags?: string[];
 };
 
@@ -23,17 +23,28 @@ export type RoadmapIdeaGroup = {
   items: RoadmapItem[];
 };
 
+type DeployStep = {
+  step: string;
+  label: string;
+  detail: string;
+};
+
+type ShippedItem = {
+  date: string;
+  title: string;
+};
+
 export const ROADMAP_META = {
   title: "Teamflow plan",
   updated: "2026-06-17",
-  tagline: "What ships next, what already works, and what’s on the backlog.",
+  tagline: "What ships next, what already works, and what is on the backlog.",
 };
 
 export const ROADMAP_FOCUS: RoadmapItem[] = [
   {
     id: "deploy",
     title: "Windows deploy validation",
-    notes: "Smoke-test install.ps1 + single-port production on a real machine.",
+    notes: "Smoke-test install.ps1 and single-port production on a real machine.",
     status: "done",
     priority: 1,
     tags: ["deploy", "ops"],
@@ -49,7 +60,7 @@ export const ROADMAP_FOCUS: RoadmapItem[] = [
   {
     id: "discord",
     title: "Discord bot integration",
-    notes: "Slash commands, ticket → issue, post back ref links. See ideas for v1 scope.",
+    notes: "Slash commands, ticket-to-issue, and post back ref links. See ideas for v1 scope.",
     status: "focus",
     priority: 3,
     tags: ["integrations"],
@@ -60,7 +71,7 @@ export const ROADMAP_POLISH: RoadmapItem[] = [
   {
     id: "column-header",
     title: "Column header size jump on first card",
-    notes: "Empty-column remove button caused layout shift — reserved slot added.",
+    notes: "Empty-column remove button caused layout shift; reserved slot added.",
     status: "done",
     tags: ["ui", "board"],
   },
@@ -73,14 +84,14 @@ export const ROADMAP_POLISH: RoadmapItem[] = [
   },
   {
     id: "clickable-links",
-    title: "Clickable URLs in comments & description",
+    title: "Clickable URLs in comments and description",
     notes: "Paste-to-shorten banner; raw URLs link automatically when posted.",
     status: "done",
     tags: ["rich-text"],
   },
   {
     id: "bulk-restore",
-    title: "Bulk delete → 7-day restore",
+    title: "Bulk delete to 7-day restore",
     notes: "Single-issue restore works; bulk deletes in history cannot restore yet.",
     status: "gap",
     tags: ["history"],
@@ -88,30 +99,51 @@ export const ROADMAP_POLISH: RoadmapItem[] = [
   {
     id: "timer-ui",
     title: "Timer UI redesign",
-    notes: "Timer works; layout/visual polish still wanted.",
+    notes: "Timer works; layout and visual polish still wanted.",
     status: "planned",
     tags: ["ui", "timer"],
   },
   {
     id: "api-reload",
     title: "API hot-reload on Windows",
-    notes: "tsx watch hung; dev uses plain tsx — manual API restart after server edits.",
+    notes: "tsx watch hung; dev uses plain tsx, so restart the API manually after server edits.",
     status: "gap",
     tags: ["dev"],
   },
   {
     id: "column-drag",
-    title: "Column drag-reorder (⋮⋮ on headers)",
-    notes: "PATCH status position; horizontal drag; header + cards move together.",
+    title: "Column drag-reorder",
+    notes: "PATCH status position; horizontal drag; header and cards move together.",
     status: "done",
     tags: ["board"],
   },
   {
     id: "delete-immediate",
     title: "Delete commits to API immediately",
-    notes: "Undo calls restore; fixes card reappearing on refresh during undo window.",
+    notes: "Undo calls restore; fixes card reappearing on refresh during the undo window.",
     status: "done",
     tags: ["history"],
+  },
+  {
+    id: "undo-toast-import",
+    title: "Undo toast import",
+    status: "done",
+    notes: "The app renders the existing UndoToast component for pending delete recovery.",
+    tags: ["build"],
+  },
+  {
+    id: "roadmap-data",
+    title: "Roadmap data source",
+    status: "done",
+    notes: "RoadmapPanel has typed local data for production builds.",
+    tags: ["build", "ui"],
+  },
+  {
+    id: "service-docs",
+    title: "Service install polish",
+    status: "gap",
+    notes: "NSSM remains optional and must be installed separately before service registration.",
+    tags: ["ops"],
   },
 ];
 
@@ -132,7 +164,7 @@ export const ROADMAP_ACCOUNTS: RoadmapCheck[] = [
     id: "new-pc-login",
     label: "Same account on a new PC",
     status: "partial",
-    note: "Works when you use the same hosted URL + login. Local pnpm dev is per-machine.",
+    note: "Works when you use the same hosted URL and login. Local pnpm dev is per-machine.",
   },
   {
     id: "team-switch",
@@ -142,7 +174,7 @@ export const ROADMAP_ACCOUNTS: RoadmapCheck[] = [
   },
   {
     id: "invites-gap",
-    label: "Join teammate’s team",
+    label: "Join teammate's team",
     status: "gap",
     note: "Each register still creates a new solo team until invites ship.",
   },
@@ -162,7 +194,7 @@ export const ROADMAP_ACCOUNTS: RoadmapCheck[] = [
     id: "profile-export",
     label: "Profile export/import",
     status: "done",
-    note: "UI prefs only — not issues or board data.",
+    note: "UI prefs only; not issues or board data.",
   },
   {
     id: "db-backup",
@@ -182,19 +214,19 @@ export const ROADMAP_IDEAS: RoadmapIdeaGroup[] = [
   {
     id: "discord",
     title: "Discord bot",
-    summary: "Talk to Teamflow from Discord — create/query issues, ticket threads, ref links back.",
+    summary: "Talk to Teamflow from Discord: create/query issues, ticket threads, and ref links back.",
     items: [
       { id: "d-slash", title: "Slash commands (/issue, /create, /link)", status: "planned" },
-      { id: "d-ticket", title: "Ticket thread → issue", status: "planned" },
+      { id: "d-ticket", title: "Ticket thread to issue", status: "planned" },
       { id: "d-postback", title: "Post ?ref= links on create/update", status: "planned" },
-      { id: "d-auth", title: "Bot token + PAT per guild → team mapping", status: "planned" },
+      { id: "d-auth", title: "Bot token and PAT per guild to team mapping", status: "planned" },
     ],
   },
   {
     id: "members",
-    title: "Invites & members",
+    title: "Invites and members",
     items: [
-      { id: "m-invite", title: "Invite link / code → join team", status: "planned" },
+      { id: "m-invite", title: "Invite link / code to join team", status: "planned" },
       { id: "m-list", title: "Members list in Settings", status: "planned" },
       { id: "m-invite-only", title: "Optional invite-only registration", status: "planned" },
     ],
@@ -207,7 +239,7 @@ export const ROADMAP_IDEAS: RoadmapIdeaGroup[] = [
       { id: "a-comment-img", title: "Attach / paste images in comments", status: "planned" },
       { id: "a-desc-img", title: "Attach / paste images in description", status: "planned" },
       { id: "a-row", title: "Upload on row (v2)", status: "planned" },
-      { id: "a-trash", title: "Soft delete + 7-day bin + permanent delete", status: "planned" },
+      { id: "a-trash", title: "Soft delete plus 7-day bin plus permanent delete", status: "planned" },
     ],
   },
   {
@@ -227,17 +259,17 @@ export const ROADMAP_IDEAS: RoadmapIdeaGroup[] = [
       { id: "p2-webhooks", title: "Outbound webhooks", status: "planned" },
       { id: "p2-labels", title: "Labels UI", status: "planned" },
       { id: "p2-mywork", title: "\"My work\" view", status: "planned" },
-      { id: "p2-import", title: "Markdown import (headings → issues)", status: "planned" },
+      { id: "p2-import", title: "Markdown import (headings to issues)", status: "planned" },
       { id: "p2-row-height", title: "Row max height slider in Settings", status: "planned" },
       { id: "p2-team-name", title: "Editable team name", status: "planned" },
     ],
   },
   {
     id: "ui-style",
-    title: "Settings — UI style & theming",
+    title: "Settings: UI style and theming",
     summary: "Beyond dark/light and color presets: rounded corners, custom UI/text colors, softer window chrome.",
     items: [
-      { id: "ui-chrome", title: "Window / layout style packs (not only hard industrial)", status: "planned" },
+      { id: "ui-chrome", title: "Window / layout style packs", status: "planned" },
       { id: "ui-radius", title: "Rounded corners toggle or level", status: "planned" },
       { id: "ui-colors", title: "Custom UI colors (surface, border, accent, panel)", status: "planned" },
       { id: "ui-text", title: "Custom text colors (primary, muted, links)", status: "planned" },
@@ -246,7 +278,7 @@ export const ROADMAP_IDEAS: RoadmapIdeaGroup[] = [
   },
   {
     id: "board-colors",
-    title: "Row & column colors",
+    title: "Row and column colors",
     summary: "Row color exists in Edit menu; column header color per status still to build.",
     items: [
       { id: "bc-row", title: "Row color (Row Edit menu)", status: "done" },
@@ -256,44 +288,52 @@ export const ROADMAP_IDEAS: RoadmapIdeaGroup[] = [
   },
   {
     id: "linear-migration",
-    title: "Linear → Teamflow migration",
+    title: "Linear to Teamflow migration",
     summary: "76 AxiomRP issues imported to Custom Scripts row via scripts/import-from-linear.mjs (idempotent).",
     items: [
-      { id: "lm-import", title: "Import script + linear-export.json snapshot", status: "done" },
+      { id: "lm-import", title: "Import script plus linear-export.json snapshot", status: "done" },
       { id: "lm-comments", title: "Import Linear comments", status: "planned" },
       { id: "lm-parent-backfill", title: "Backfill parent links from Parent: AXI-* metadata", status: "planned" },
-      { id: "lm-assignees", title: "Invite team + map real assignees (not Demo User only)", status: "planned" },
-      { id: "lm-axiom-row", title: "Dedicated AxiomRP row (vs Custom Scripts)", status: "planned" },
+      { id: "lm-assignees", title: "Invite team plus map real assignees", status: "planned" },
+      { id: "lm-axiom-row", title: "Dedicated AxiomRP row", status: "planned" },
       { id: "lm-subissues", title: "Sub-issues: parentId, drawer UI, hidden from board", status: "planned" },
+    ],
+  },
+  {
+    id: "operations",
+    title: "Operations",
+    summary: "Keep single-machine hosting simple before adding heavier deployment targets.",
+    items: [
+      { id: "health-check", title: "Add a documented health check endpoint", status: "planned" },
+      { id: "scheduled-backup", title: "Scheduled database backups", status: "planned" },
     ],
   },
 ];
 
-export const ROADMAP_SHIPPED: { date: string; title: string }[] = [
+export const ROADMAP_SHIPPED: ShippedItem[] = [
   { date: "2026-06", title: "Kanban: per-row columns, drag, assignees, timers, row colors" },
-  { date: "2026-06", title: "Settings + live preview + profile sync" },
-  { date: "2026-06", title: "Undo toast + change history panel" },
+  { date: "2026-06", title: "Settings plus live preview plus profile sync" },
+  { date: "2026-06", title: "Undo toast plus change history panel" },
   { date: "2026-06", title: "Issue drawer: edit, comments, status, priority, due, timer" },
-  { date: "2026-06", title: "Immutable refs (ENG-*, row_*, col_*), resolve API, copy buttons" },
-  { date: "2026-06", title: "Ref links in text + share URLs + ?ref= deep links" },
+  { date: "2026-06", title: "Immutable refs, resolve API, copy buttons, share URLs" },
   { date: "2026-06", title: "Row/column search, multi-assignees, row Edit menu" },
-  { date: "2026-06", title: "Column scroll cap (--board-row-max-height)" },
-  { date: "2026-06", title: "Multi-select bulk edit (Ctrl/Shift, bulk toolbar)" },
-  { date: "2026-06", title: "Drawer polish: rich description, links, shorten URL, 7-day restore, scroll" },
-  { date: "2026-06", title: "Column header layout stability on first card" },
-  { date: "2026-06", title: "Column drag-reorder (⋮⋮ grip on column headers)" },
-  { date: "2026-06", title: "Delete: immediate API soft-delete + undo restore" },
-  { date: "2026-06", title: "Linear import script (76 AxiomRP → Custom Scripts row)" },
-  { date: "2026-06", title: "Plan view + global Cursor MCP (teamflow)" },
+  { date: "2026-06", title: "Multi-select bulk edit" },
+  { date: "2026-06", title: "Column drag-reorder" },
+  { date: "2026-06", title: "Delete: immediate API soft-delete plus undo restore" },
+  { date: "2026-06", title: "Linear import script" },
+  { date: "2026-06", title: "Windows deploy scripts and SQLite seed data" },
 ];
 
-export const ROADMAP_DEPLOY_STEPS = [
-  { step: "Now", label: "Local dev", detail: "pnpm dev — data stays on this machine" },
-  { step: "Next", label: "Windows install.ps1 or Proxmox LXC", detail: "One URL for the team" },
-  { step: "Then", label: "Relay (optional)", detail: "Remote access to your server" },
-  { step: "Always", label: "Backup teamflow.db", detail: "That file is your project" },
+export const ROADMAP_DEPLOY_STEPS: DeployStep[] = [
+  { step: "Now", label: "Local dev", detail: "pnpm dev; data stays on this machine." },
+  { step: "Next", label: "Windows install.ps1 or Proxmox LXC", detail: "One URL for the team." },
+  { step: "Then", label: "Relay (optional)", detail: "Remote access to your server." },
+  { step: "Always", label: "Backup teamflow.db", detail: "That file is your project." },
 ];
 
-export function countByStatus(items: { status: RoadmapStatus }[], status: RoadmapStatus) {
+export function countByStatus(
+  items: Array<{ status: RoadmapStatus }>,
+  status: RoadmapStatus,
+) {
   return items.filter((item) => item.status === status).length;
 }

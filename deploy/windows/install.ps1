@@ -28,10 +28,11 @@ Write-Host "Installing dependencies..."
 Invoke-Pnpm install
 
 Write-Host "Building..."
-Invoke-Pnpm build
+Invoke-Pnpm -r build
 
 Write-Host "Setting up database..."
-Invoke-Pnpm db:setup
+Invoke-Pnpm --filter "@teamflow/db" migrate
+Invoke-Pnpm --filter "@teamflow/db" seed
 
 if ($InstallPath) {
   Write-Host "Install path mode: $InstallPath (copy not automated yet - run from repo or set TEAMFLOW_HOME)"

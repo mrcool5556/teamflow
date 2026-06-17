@@ -38,18 +38,14 @@ if ($Branch) {
   git pull
 }
 
-if (-not (Get-Command pnpm -ErrorAction SilentlyContinue)) {
-  Ensure-Pnpm
-}
-
 Write-Host "Installing dependencies..."
 Invoke-Pnpm install
 
 Write-Host "Building..."
-Invoke-Pnpm build
+Invoke-Pnpm -r build
 
 Write-Host "Running migrations..."
-Invoke-Pnpm db:migrate
+Invoke-Pnpm --filter "@teamflow/db" migrate
 
 Write-Host ""
 Write-Host "Update complete." -ForegroundColor Green
