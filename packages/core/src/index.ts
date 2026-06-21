@@ -24,6 +24,7 @@ export const registerSchema = z.object({
   email: z.string().email(),
   name: z.string().min(1).max(120),
   password: z.string().min(8).max(128),
+  inviteToken: z.string().min(1).optional(),
 });
 
 export const loginSchema = z.object({
@@ -46,11 +47,34 @@ export const createTeamSchema = z.object({
     .regex(/^[A-Z0-9]+$/, "Team key must be uppercase letters and numbers"),
 });
 
+export const createTeamInviteSchema = z.object({
+  role: z.enum(TEAM_ROLES).default("member"),
+  expiresInDays: z.number().int().min(1).max(365).optional(),
+  maxUses: z.union([z.literal(1), z.null()]).optional().default(1),
+});
+
 export const createProjectSchema = z.object({
   teamId: z.string().uuid(),
   name: z.string().min(1).max(120),
   description: z.string().max(5000).optional(),
 });
+
+export const boardColorSchema = z
+  .string()
+  .regex(/^#[0-9A-Fa-f]{6}$/)
+  .nullable();
+
+export const ROW_COLOR_PRESETS = [
+  "#ff5500",
+  "#00d8ff",
+  "#a855f7",
+  "#22c55e",
+  "#eab308",
+  "#f43f5e",
+  "#3b82f6",
+] as const;
+
+export const BOARD_COLOR_PRESETS = ROW_COLOR_PRESETS;
 
 export const createIssueSchema = z.object({
   teamId: z.string().uuid(),
@@ -78,6 +102,7 @@ export const updateIssueSchema = z.object({
   timerActiveAt: z.string().datetime().nullable().optional(),
   timerElapsedSec: z.number().int().min(0).optional(),
   timerTargetSec: z.number().int().min(0).nullable().optional(),
+  color: boardColorSchema.optional(),
 });
 
 export const listIssuesSchema = z.object({
@@ -102,10 +127,15 @@ export const updateStatusSchema = z
   .object({
     name: z.string().min(1).max(80).optional(),
     position: z.number().int().min(0).optional(),
+    color: boardColorSchema.optional(),
   })
-  .refine((data) => data.name !== undefined || data.position !== undefined, {
-    message: "No updates provided",
-  });
+  .refine(
+    (data) =>
+      data.name !== undefined ||
+      data.position !== undefined ||
+      data.color !== undefined,
+    { message: "No updates provided" },
+  );
 
 export const createBoardRowSchema = z.object({
   name: z.string().min(1).max(80),
@@ -116,22 +146,8 @@ export const updateBoardRowSchema = z.object({
   position: z.number().int().min(0).optional(),
   assigneeId: z.string().uuid().nullable().optional(),
   assigneeIds: z.array(z.string().uuid()).optional(),
-  color: z
-    .string()
-    .regex(/^#[0-9A-Fa-f]{6}$/)
-    .nullable()
-    .optional(),
+  color: boardColorSchema.optional(),
 });
-
-export const ROW_COLOR_PRESETS = [
-  "#ff5500",
-  "#00d8ff",
-  "#a855f7",
-  "#22c55e",
-  "#eab308",
-  "#f43f5e",
-  "#3b82f6",
-] as const;
 
 export const createLabelSchema = z.object({
   teamId: z.string().uuid(),
@@ -149,6 +165,7 @@ export type UpdateIssueInput = z.infer<typeof updateIssueSchema>;
 export type UpdateBoardRowInput = z.infer<typeof updateBoardRowSchema>;
 export type ListIssuesInput = z.infer<typeof listIssuesSchema>;
 export type CreateTeamInput = z.infer<typeof createTeamSchema>;
+export type CreateTeamInviteInput = z.infer<typeof createTeamInviteSchema>;
 export type CreateProjectInput = z.infer<typeof createProjectSchema>;
 export type CreateCommentInput = z.infer<typeof createCommentSchema>;
 export type CreateTokenInput = z.infer<typeof createTokenSchema>;
@@ -184,6 +201,7 @@ export type IssueStatusPublic = {
   name: string;
   type: string;
   position: number;
+  color: string | null;
 };
 
 /** Map a status in one row to the best matching column in another row (by type, then position). */
@@ -214,6 +232,34 @@ export type TeamMemberPublic = {
   name: string;
   email: string;
   role: TeamRole;
+};
+
+export type TeamInvitePublic = {
+  id: string;
+  teamId: string;
+  token: string;
+  role: TeamRole;
+  expiresAt: string;
+  createdAt: string;
+  createdByName: string;
+  revoked: boolean;
+  expired: boolean;
+  maxUses: number | null;
+  useCount: number;
+  exhausted: boolean;
+};
+
+export type TeamInvitePreview = {
+  team: Pick<TeamPublic, "id" | "name" | "key">;
+  role: TeamRole;
+  expired: boolean;
+  revoked: boolean;
+  exhausted: boolean;
+  alreadyMember: boolean;
+};
+
+export type AuthConfigPublic = {
+  inviteOnly: boolean;
 };
 
 export type AssigneePublic = {
@@ -258,6 +304,7 @@ export type IssuePublic = {
   completedAt: string | null;
   createdAt: string;
   updatedAt: string;
+  color: string | null;
 };
 
 export type CommentPublic = {

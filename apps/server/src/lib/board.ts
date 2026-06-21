@@ -20,6 +20,7 @@ export function mapIssueStatus(
     name: status.name,
     type: status.type,
     position: status.position,
+    color: status.color,
   };
 }
 

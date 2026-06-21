@@ -12,6 +12,7 @@ import { client } from "../api";
 import { IssueTimer } from "./IssueTimer";
 import { DescriptionEditor } from "./DescriptionEditor";
 import { MultiAssigneePicker } from "./MultiAssigneePicker";
+import { BoardColorPicker } from "./BoardColorPicker";
 import { RefCopyButton } from "./RefCopyButton";
 import { RichText } from "./RichText";
 import { LinkPasteOffer } from "./LinkPasteOffer";
@@ -315,6 +316,18 @@ export function IssueDrawer({
               ))}
             </select>
           </label>
+
+          <div className="issue-drawer-field">
+            <span className="issue-drawer-label">Card color</span>
+            <BoardColorPicker
+              color={issue.color}
+              onSelect={(color) => {
+                void patchIssue({ color });
+              }}
+              title="Card color"
+              hint="Left accent on the board card."
+            />
+          </div>
 
           {rows.length > 1 && (
             <label className="issue-drawer-field">

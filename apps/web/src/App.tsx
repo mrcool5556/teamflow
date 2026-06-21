@@ -8,22 +8,9 @@ import type {
   TeamPublic,
   UserPublic,
   UserProfile,
-  ColorPreset,
-  ThemeMode,
   UpdateIssueInput,
 } from "@teamflow/core";
 import {
-  BOARD_COLUMN_WIDTH_STEP,
-  COLOR_PRESETS,
-  DEFAULT_BOARD_COLUMN_WIDTH,
-  DEFAULT_CARD_MIN_HEIGHT,
-  MAX_BOARD_COLUMN_WIDTH,
-  MAX_CARD_MIN_HEIGHT,
-  MIN_BOARD_COLUMN_WIDTH,
-  MIN_CARD_MIN_HEIGHT,
-  THEME_MODES,
-  clampBoardColumnWidth,
-  clampCardMinHeight,
   createDefaultUserProfile,
   mergeUserProfile,
 } from "@teamflow/core";
@@ -45,6 +32,10 @@ import { ChangeHistoryPanel } from "./components/ChangeHistoryPanel";
 import { GoToRefBar } from "./components/GoToRefBar";
 import { IssueDrawer } from "./components/IssueDrawer";
 import { RoadmapPanel } from "./components/RoadmapPanel";
+import { CreateTeamSection } from "./components/CreateTeamSection";
+import { AdvancedProfileSettingsSection } from "./components/AdvancedProfileSettingsSection";
+import { AppearanceSettingsSection } from "./components/AppearanceSettingsSection";
+import { TeamSettingsSection } from "./components/TeamSettingsSection";
 import { UndoToast } from "./components/UndoToast";
 import { useChangeHistory } from "./hooks/useChangeHistory";
 import {
@@ -57,6 +48,13 @@ import {
   syncRefInLocation,
   takePendingRef,
 } from "./lib/refLinks";
+import {
+  hasPendingInvite,
+  readInviteFromLocation,
+  stashPendingInvite,
+  syncInviteInLocation,
+  takePendingInvite,
+} from "./lib/inviteLinks";
 
 type View = "login" | "board" | "settings" | "roadmap";
 
@@ -92,6 +90,7 @@ export function App() {
   const [refNavActive, setRefNavActive] = useState(false);
   const refNavTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const pendingRefHandledRef = useRef(false);
+  const pendingInviteHandledRef = useRef(false);
   const {
     history: changeHistory,
     pending: pendingUndo,
@@ -181,34 +180,72 @@ export function App() {
     }
   }, []);
 
-  const loadProfile = useCallback(async () => {
-    try {
-      const { profile: serverProfile } = await client.getProfile();
-      const { profile: next, migrated } = mergeWithLegacyDefaults(serverProfile);
-      applyUserProfile(next);
-      setProfile(next);
-      if (migrated) {
-        await client.saveProfile(next);
-        clearLegacyLocalProfile();
-      }
-    } catch {
-      const { profile: fallback } = mergeWithLegacyDefaults(createDefaultUserProfile());
-      applyUserProfile(fallback);
-      setProfile(fallback);
-    }
-  }, []);
-
   const bootstrap = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
       const { user: me } = await client.me();
       setUser(me);
-      await loadProfile();
+
+      let profileState = createDefaultUserProfile();
+      try {
+        const { profile: serverProfile } = await client.getProfile();
+        const { profile: next, migrated } = mergeWithLegacyDefaults(serverProfile);
+        profileState = next;
+        applyUserProfile(next);
+        setProfile(next);
+        if (migrated) {
+          await client.saveProfile(next);
+          clearLegacyLocalProfile();
+        }
+      } catch {
+        const { profile: fallback } = mergeWithLegacyDefaults(createDefaultUserProfile());
+        profileState = fallback;
+        applyUserProfile(fallback);
+        setProfile(fallback);
+      }
+
+      let joinedTeamId: string | null = null;
+      if (!pendingInviteHandledRef.current) {
+        const pendingInvite = takePendingInvite() ?? readInviteFromLocation();
+        if (pendingInvite) {
+          pendingInviteHandledRef.current = true;
+          try {
+            const { team, alreadyMember } = await client.acceptInvite(pendingInvite);
+            syncInviteInLocation(null);
+            joinedTeamId = team.id;
+            setRefNotice(
+              alreadyMember
+                ? `Already on team ${team.key} — ${team.name}`
+                : `Joined team ${team.key} — ${team.name}`,
+            );
+          } catch (err) {
+            setError(err instanceof Error ? err.message : "Failed to accept invite");
+          }
+        }
+      }
+
       const { teams: nextTeams } = await client.listTeams();
       setTeams(nextTeams);
-      const activeTeam = nextTeams[0]?.id ?? null;
+
+      const savedTeamId = profileState.ui?.lastTeamId ?? null;
+      const activeTeam =
+        (joinedTeamId && nextTeams.some((team) => team.id === joinedTeamId)
+          ? joinedTeamId
+          : null) ??
+        (savedTeamId && nextTeams.some((team) => team.id === savedTeamId)
+          ? savedTeamId
+          : null) ??
+        nextTeams[0]?.id ??
+        null;
+
       setTeamId(activeTeam);
+      if (activeTeam && activeTeam !== savedTeamId) {
+        const withTeam = mergeUserProfile(profileState, { ui: { lastTeamId: activeTeam } });
+        setProfile(withTeam);
+        applyUserProfile(withTeam);
+        void client.patchProfile({ ui: { lastTeamId: activeTeam } });
+      }
       if (activeTeam) await loadBoard(activeTeam);
       setView("board");
     } catch {
@@ -218,12 +255,75 @@ export function App() {
     } finally {
       setLoading(false);
     }
-  }, [loadBoard, loadProfile]);
+  }, [loadBoard]);
+
+  const switchTeam = useCallback(
+    async (nextTeamId: string) => {
+      if (!nextTeamId) return;
+      setTeamId(nextTeamId);
+      setSelectedIssue(null);
+      updateProfile(mergeUserProfile(profile, { ui: { lastTeamId: nextTeamId } }));
+      await loadBoard(nextTeamId);
+    },
+    [loadBoard, profile, updateProfile],
+  );
+
+  async function refreshTeamsAndSwitch(teamIdToSelect: string) {
+    const { teams: nextTeams } = await client.listTeams();
+    setTeams(nextTeams);
+    await switchTeam(teamIdToSelect);
+  }
+
+  async function handleTeamCreated(newTeamId: string, switchToNew: boolean) {
+    const { teams: nextTeams } = await client.listTeams();
+    setTeams(nextTeams);
+    if (switchToNew || !teamId) {
+      await refreshTeamsAndSwitch(newTeamId);
+    }
+  }
+
+  async function handleTeamLeft(leftTeamId: string) {
+    const { teams: nextTeams } = await client.listTeams();
+    setTeams(nextTeams);
+    if (teamId === leftTeamId) {
+      const fallback = nextTeams[0]?.id ?? null;
+      setTeamId(fallback);
+      setSelectedIssue(null);
+      setRows([]);
+      setIssues([]);
+      setStatuses([]);
+      setMembers([]);
+      if (fallback) {
+        await switchTeam(fallback);
+      }
+    }
+  }
+
+  async function handleTeamDeleted(deletedTeamId: string) {
+    const { teams: nextTeams } = await client.listTeams();
+    setTeams(nextTeams);
+    if (teamId === deletedTeamId) {
+      const fallback = nextTeams[0]?.id ?? null;
+      setTeamId(fallback);
+      setSelectedIssue(null);
+      setRows([]);
+      setIssues([]);
+      setStatuses([]);
+      setMembers([]);
+      if (fallback) {
+        await switchTeam(fallback);
+      }
+    }
+  }
 
   useEffect(() => {
     const ref = readRefFromLocation();
     if (ref && !getStoredUser()) {
       stashPendingRef(ref);
+    }
+    const invite = readInviteFromLocation();
+    if (invite && !getStoredUser()) {
+      stashPendingInvite(invite);
     }
   }, []);
 
@@ -292,7 +392,13 @@ export function App() {
     setLoading(true);
     setError(null);
     try {
-      const result = await client.register({ name, email, password });
+      const inviteToken = takePendingInvite() ?? readInviteFromLocation() ?? undefined;
+      const result = await client.register({
+        name,
+        email,
+        password,
+        inviteToken,
+      });
       setSession(result.token, result.user);
       setUser(result.user);
       await bootstrap();
@@ -621,6 +727,27 @@ export function App() {
     }
   }
 
+  async function updateStatusColor(status: IssueStatusPublic, color: string | null) {
+    try {
+      const { status: updated } = await client.updateStatus(status.id, { color });
+      setStatuses((prev) => prev.map((item) => (item.id === updated.id ? updated : item)));
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to update column color");
+    }
+  }
+
+  async function updateIssueColor(issue: IssuePublic, color: string | null) {
+    try {
+      const { issue: updated } = await client.updateIssue(issue.id, { color });
+      setIssues((prev) => prev.map((item) => (item.id === updated.id ? updated : item)));
+      if (selectedIssue?.id === updated.id) {
+        setSelectedIssue(updated);
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to update card color");
+    }
+  }
+
   function updateIssueTimer(
     issue: IssuePublic,
     patch: {
@@ -929,6 +1056,7 @@ export function App() {
   function logout() {
     clearSession();
     pendingRefHandledRef.current = false;
+    pendingInviteHandledRef.current = false;
     setUser(null);
     setView("login");
   }
@@ -986,6 +1114,9 @@ export function App() {
               onRenameStatus={
                 settingsOpen ? () => {} : (status, name) => void renameStatus(status, name)
               }
+              onUpdateStatusColor={
+                settingsOpen ? () => {} : (status, color) => void updateStatusColor(status, color)
+              }
               onRemoveRow={settingsOpen ? () => {} : removeRow}
               onRemoveColumn={settingsOpen ? () => {} : removeColumn}
               onAddColumn={settingsOpen ? () => {} : addColumn}
@@ -1013,6 +1144,9 @@ export function App() {
               }
               onUpdateRowColor={
                 settingsOpen ? () => {} : (row, color) => void updateRowColor(row, color)
+              }
+              onUpdateIssueColor={
+                settingsOpen ? () => {} : (issue, color) => void updateIssueColor(issue, color)
               }
               onUpdateIssueTimer={settingsOpen ? () => {} : updateIssueTimer}
               highlightedIssueId={settingsOpen ? null : highlightedIssueId}
@@ -1052,21 +1186,24 @@ export function App() {
           {!overlayOpen && (
             <GoToRefBar disabled={!teamId || loading} onGo={(ref) => void goToRef(ref)} />
           )}
-          {teams.length > 1 && (
-            <select
-              value={teamId ?? ""}
-              onChange={(e) => {
-                const next = e.target.value;
-                setTeamId(next);
-                void loadBoard(next);
-              }}
-            >
-              {teams.map((team) => (
-                <option key={team.id} value={team.id}>
-                  {team.key} — {team.name}
-                </option>
-              ))}
-            </select>
+          {teams.length > 0 && (
+            <label className="topbar-team-switch">
+              <span className="sr-only">Workspace</span>
+              <select
+                aria-label="Workspace"
+                value={teamId ?? ""}
+                disabled={!teamId || loading}
+                onChange={(e) => {
+                  void switchTeam(e.target.value);
+                }}
+              >
+                {teams.map((team) => (
+                  <option key={team.id} value={team.id}>
+                    {team.key} — {team.name}
+                  </option>
+                ))}
+              </select>
+            </label>
           )}
           <button
             type="button"
@@ -1105,149 +1242,42 @@ export function App() {
           <aside className="settings-sidebar panel settings">
             <h2>Settings</h2>
             <p className="settings-copy settings-lead">
-              Your profile is saved to your account. Changes preview live on the right.
+              Appearance is above. Expand Advanced for board layout and profile backup.
             </p>
 
-          <section className="settings-section">
-            <h3>Appearance</h3>
-            <label>
-              Theme
-              <select
-                value={profile.appearance.theme}
-                onChange={(e) => {
-                  updateProfile(
-                    mergeUserProfile(profile, {
-                      appearance: { theme: e.target.value as ThemeMode },
-                    }),
-                  );
-                }}
-              >
-                {THEME_MODES.map((mode) => (
-                  <option key={mode} value={mode}>
-                    {mode === "dark" ? "Dark" : "Light"}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <label>
-              Color scheme
-              <select
-                value={profile.appearance.colorPreset}
-                onChange={(e) => {
-                  updateProfile(
-                    mergeUserProfile(profile, {
-                      appearance: { colorPreset: e.target.value as ColorPreset },
-                    }),
-                  );
-                }}
-              >
-                {COLOR_PRESETS.map((preset) => (
-                  <option key={preset} value={preset}>
-                    {preset.charAt(0).toUpperCase() + preset.slice(1)}
-                  </option>
-                ))}
-              </select>
-            </label>
-          </section>
+          <AppearanceSettingsSection profile={profile} onProfileChange={updateProfile} />
 
-          <section className="settings-section">
-            <h3>Board</h3>
-            <p className="settings-copy">
-              Column width and card height apply to every row on your board.
-            </p>
-            <label className="settings-range">
-              Column width
-              <div className="settings-range-row">
-                <input
-                  type="range"
-                  min={MIN_BOARD_COLUMN_WIDTH}
-                  max={MAX_BOARD_COLUMN_WIDTH}
-                  step={BOARD_COLUMN_WIDTH_STEP}
-                  value={profile.board.columnWidth}
-                  onChange={(e) => {
-                    updateProfile(
-                      mergeUserProfile(profile, {
-                        board: {
-                          columnWidth: clampBoardColumnWidth(Number(e.target.value)),
-                        },
-                      }),
-                    );
-                  }}
-                />
-                <span className="settings-range-value">{profile.board.columnWidth}px</span>
-              </div>
-            </label>
-            <label className="settings-range">
-              Card min height
-              <div className="settings-range-row">
-                <input
-                  type="range"
-                  min={MIN_CARD_MIN_HEIGHT}
-                  max={MAX_CARD_MIN_HEIGHT}
-                  step={4}
-                  value={profile.board.cardMinHeight}
-                  onChange={(e) => {
-                    updateProfile(
-                      mergeUserProfile(profile, {
-                        board: {
-                          cardMinHeight: clampCardMinHeight(Number(e.target.value)),
-                        },
-                      }),
-                    );
-                  }}
-                />
-                <span className="settings-range-value">{profile.board.cardMinHeight}px</span>
-              </div>
-            </label>
-            <button
-              type="button"
-              className="ghost"
-              onClick={() => {
-                updateProfile(
-                  mergeUserProfile(profile, {
-                    board: {
-                      columnWidth: DEFAULT_BOARD_COLUMN_WIDTH,
-                      cardMinHeight: DEFAULT_CARD_MIN_HEIGHT,
-                    },
-                  }),
-                );
-              }}
-            >
-              Reset board layout defaults
-            </button>
-          </section>
+          <AdvancedProfileSettingsSection
+            profile={profile}
+            onProfileChange={updateProfile}
+            profileImportText={profileImportText}
+            onProfileImportTextChange={setProfileImportText}
+            profileMessage={profileMessage}
+            onExportProfile={exportProfileFile}
+            onImportProfile={importProfileFile}
+          />
 
-          <section className="settings-section">
-            <h3>Profile backup &amp; sharing</h3>
-            <p className="settings-copy">
-              Download your profile JSON or paste one from another user. Import replaces
-              your saved appearance and board preferences.
-            </p>
-            <div className="row settings-actions">
-              <button type="button" onClick={() => void exportProfileFile()}>
-                Export profile
-              </button>
-            </div>
-            <label>
-              Import profile JSON
-              <textarea
-                className="profile-import"
-                rows={6}
-                value={profileImportText}
-                onChange={(e) => setProfileImportText(e.target.value)}
-                placeholder='Paste exported profile JSON here…'
-              />
-            </label>
-            <button
-              type="button"
-              className="ghost"
-              disabled={!profileImportText.trim()}
-              onClick={() => void importProfileFile()}
-            >
-              Import profile
-            </button>
-            {profileMessage && <p className="settings-hint">{profileMessage}</p>}
-          </section>
+          <CreateTeamSection
+            onMessage={setProfileMessage}
+            onTeamCreated={(newTeamId, switchToNew) =>
+              void handleTeamCreated(newTeamId, switchToNew)
+            }
+          />
+
+          {teamId ? (
+            <TeamSettingsSection
+              teamId={teamId}
+              teamName={teams.find((team) => team.id === teamId)?.name ?? "Team"}
+              teamKey={teams.find((team) => team.id === teamId)?.key ?? "TEAM"}
+              members={members}
+              currentUserId={user?.id ?? null}
+              onMembersChange={setMembers}
+              onMessage={setProfileMessage}
+              onTeamJoined={(joinedTeamId) => void refreshTeamsAndSwitch(joinedTeamId)}
+              onTeamLeft={(leftTeamId) => void handleTeamLeft(leftTeamId)}
+              onTeamDeleted={(deletedTeamId) => void handleTeamDeleted(deletedTeamId)}
+            />
+          ) : null}
 
           <section className="settings-section">
             <h3>Personal access tokens</h3>
@@ -1356,6 +1386,17 @@ function LoginScreen({
   const [name, setName] = useState("Demo User");
   const [email, setEmail] = useState("demo@teamflow.local");
   const [password, setPassword] = useState("changeme123");
+  const [inviteOnly, setInviteOnly] = useState(false);
+  const pendingInvite = hasPendingInvite();
+
+  useEffect(() => {
+    void client
+      .getAuthConfig()
+      .then((config) => setInviteOnly(config.inviteOnly))
+      .catch(() => setInviteOnly(false));
+  }, []);
+
+  const registerBlocked = inviteOnly && !pendingInvite;
 
   return (
     <div className="login-shell">
@@ -1363,6 +1404,16 @@ function LoginScreen({
         <p className="eyebrow">TEAMFLOW</p>
         <h1>Team task board</h1>
         <p className="muted">Self-hosted issues with MCP for AI assistants.</p>
+
+        {pendingInvite ? (
+          <p className="hint invite-login-hint">
+            You have a team invite — log in or register to join.
+          </p>
+        ) : inviteOnly ? (
+          <p className="hint invite-login-hint">
+            Registration is invite-only. Open an invite link before creating an account.
+          </p>
+        ) : null}
 
         <div className="tabs">
           <button
@@ -1375,6 +1426,7 @@ function LoginScreen({
           <button
             type="button"
             className={mode === "register" ? "active" : ""}
+            disabled={registerBlocked}
             onClick={() => setMode("register")}
           >
             Register
@@ -1404,7 +1456,7 @@ function LoginScreen({
 
         <button
           type="button"
-          disabled={loading}
+          disabled={loading || (mode === "register" && registerBlocked)}
           onClick={() =>
             mode === "login"
               ? onLogin(email, password)

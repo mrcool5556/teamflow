@@ -33,15 +33,21 @@ export const userProfileAppearanceSchema = z.object({
   colorPreset: z.enum(COLOR_PRESETS).default("default"),
 });
 
+export const userProfileUiSchema = z.object({
+  lastTeamId: z.string().uuid().nullable().optional(),
+});
+
 export const userProfileSchema = z.object({
   version: z.literal(USER_PROFILE_VERSION),
   appearance: userProfileAppearanceSchema.default({}),
   board: userProfileBoardSchema,
+  ui: userProfileUiSchema.default({}),
 });
 
 export const userProfilePatchSchema = z.object({
   appearance: userProfileAppearanceSchema.partial().optional(),
   board: userProfileBoardSchema.partial().optional(),
+  ui: userProfileUiSchema.partial().optional(),
 });
 
 export const userProfileExportSchema = z.object({
@@ -86,6 +92,7 @@ export function createDefaultUserProfile(): UserProfile {
       cardMinHeight: DEFAULT_CARD_MIN_HEIGHT,
       rowHeadersVisible: {},
     },
+    ui: {},
   });
 }
 
@@ -106,6 +113,10 @@ export function mergeUserProfile(
         ...current.board.rowHeadersVisible,
         ...patch.board?.rowHeadersVisible,
       },
+    },
+    ui: {
+      ...current.ui,
+      ...patch.ui,
     },
   });
 }
@@ -134,6 +145,10 @@ export function parseUserProfile(input: unknown): UserProfile {
           },
         }
       : defaults.board;
+  const ui =
+    typeof raw.ui === "object" && raw.ui
+      ? { ...defaults.ui, ...(raw.ui as object) }
+      : defaults.ui;
 
   return userProfileSchema.parse({
     version: USER_PROFILE_VERSION,
@@ -143,6 +158,7 @@ export function parseUserProfile(input: unknown): UserProfile {
       columnWidth: clampBoardColumnWidth(board.columnWidth),
       cardMinHeight: clampCardMinHeight(board.cardMinHeight),
     },
+    ui,
   });
 }
 

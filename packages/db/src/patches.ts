@@ -83,7 +83,59 @@ export function applySchemaPatches(sqlite: Database.Database) {
   migrateStatusesToRows(sqlite);
   migrateEntityKeys(sqlite);
   ensureExtendedTables(sqlite);
+  ensureColorColumns(sqlite);
+  ensureTeamInvitesTable(sqlite);
   purgeExpiredDeletedIssues(sqlite);
+}
+
+function ensureTeamInvitesTable(sqlite: Database.Database) {
+  sqlite.exec(`
+    CREATE TABLE IF NOT EXISTS team_invites (
+      id TEXT PRIMARY KEY,
+      team_id TEXT NOT NULL REFERENCES teams(id) ON DELETE CASCADE,
+      token TEXT NOT NULL UNIQUE,
+      role TEXT NOT NULL DEFAULT 'member',
+      created_by_user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      expires_at TEXT NOT NULL,
+      revoked_at TEXT,
+      created_at TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+  `);
+  sqlite.exec(
+    `CREATE UNIQUE INDEX IF NOT EXISTS team_invites_token_unique ON team_invites(token)`,
+  );
+
+  const cols = sqlite
+    .prepare("PRAGMA table_info(team_invites)")
+    .all() as { name: string }[];
+  if (!cols.some((col) => col.name === "max_uses")) {
+    sqlite.exec(`ALTER TABLE team_invites ADD COLUMN max_uses INTEGER`);
+    console.log("Added team_invites.max_uses column");
+  }
+  if (!cols.some((col) => col.name === "use_count")) {
+    sqlite.exec(
+      `ALTER TABLE team_invites ADD COLUMN use_count INTEGER NOT NULL DEFAULT 0`,
+    );
+    console.log("Added team_invites.use_count column");
+  }
+}
+
+function ensureColorColumns(sqlite: Database.Database) {
+  const statusCols = sqlite
+    .prepare("PRAGMA table_info(issue_statuses)")
+    .all() as { name: string }[];
+  if (!statusCols.some((col) => col.name === "color")) {
+    sqlite.exec(`ALTER TABLE issue_statuses ADD COLUMN color TEXT`);
+    console.log("Added issue_statuses.color column");
+  }
+
+  const issueCols = sqlite
+    .prepare("PRAGMA table_info(issues)")
+    .all() as { name: string }[];
+  if (!issueCols.some((col) => col.name === "color")) {
+    sqlite.exec(`ALTER TABLE issues ADD COLUMN color TEXT`);
+    console.log("Added issues.color column");
+  }
 }
 
 const DELETED_ISSUE_RETENTION_DAYS = 7;

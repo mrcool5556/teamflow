@@ -59,6 +59,7 @@ export async function mapIssue(
     completedAt: issue.completedAt,
     createdAt: issue.createdAt,
     updatedAt: issue.updatedAt,
+    color: issue.color,
   };
 }
 

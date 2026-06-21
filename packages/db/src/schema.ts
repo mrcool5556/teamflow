@@ -74,6 +74,31 @@ export const teamMembers = sqliteTable(
   (table) => [uniqueIndex("team_user_unique").on(table.teamId, table.userId)],
 );
 
+export const teamInvites = sqliteTable(
+  "team_invites",
+  {
+    id: text("id")
+      .primaryKey()
+      .$defaultFn(() => crypto.randomUUID()),
+    teamId: text("team_id")
+      .notNull()
+      .references(() => teams.id, { onDelete: "cascade" }),
+    token: text("token").notNull().unique(),
+    role: text("role").notNull().default("member"),
+    createdByUserId: text("created_by_user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    expiresAt: text("expires_at").notNull(),
+    revokedAt: text("revoked_at"),
+    maxUses: integer("max_uses"),
+    useCount: integer("use_count").notNull().default(0),
+    createdAt: text("created_at")
+      .notNull()
+      .default(sql`(datetime('now'))`),
+  },
+  (table) => [uniqueIndex("team_invites_token_unique").on(table.token)],
+);
+
 export const projects = sqliteTable("projects", {
   id: text("id")
     .primaryKey()
@@ -104,6 +129,7 @@ export const issueStatuses = sqliteTable(
     name: text("name").notNull(),
     type: text("type").notNull(),
     position: integer("position").notNull(),
+    color: text("color"),
   },
   (table) => [uniqueIndex("issue_statuses_team_key_unique").on(table.teamId, table.key)],
 );
@@ -164,6 +190,7 @@ export const issues = sqliteTable("issues", {
   timerTargetSec: integer("timer_target_sec"),
   completedAt: text("completed_at"),
   deletedAt: text("deleted_at"),
+  color: text("color"),
   createdAt: text("created_at")
     .notNull()
     .default(sql`(datetime('now'))`),
