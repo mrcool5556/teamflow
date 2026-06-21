@@ -36,7 +36,7 @@ type ShippedItem = {
 
 export const ROADMAP_META = {
   title: "Teamflow plan",
-  updated: "2026-06-17",
+  updated: "2026-06-21",
   tagline: "What ships next, what already works, and what is on the backlog.",
 };
 
@@ -53,7 +53,7 @@ export const ROADMAP_FOCUS: RoadmapItem[] = [
     id: "invites",
     title: "Team invites",
     notes: "Join an existing team instead of every register creating an isolated workspace.",
-    status: "focus",
+    status: "done",
     priority: 2,
     tags: ["accounts", "teams"],
   },
@@ -169,14 +169,14 @@ export const ROADMAP_ACCOUNTS: RoadmapCheck[] = [
   {
     id: "team-switch",
     label: "Team switcher in header",
-    status: "partial",
-    note: "Shows when user belongs to multiple teams.",
+    status: "done",
+    note: "Workspace dropdown when you belong to multiple teams.",
   },
   {
     id: "invites-gap",
     label: "Join teammate's team",
-    status: "gap",
-    note: "Each register still creates a new solo team until invites ship.",
+    status: "done",
+    note: "Invite links, members list, and join-by-paste in Settings.",
   },
   {
     id: "projects-api",
@@ -226,9 +226,14 @@ export const ROADMAP_IDEAS: RoadmapIdeaGroup[] = [
     id: "members",
     title: "Invites and members",
     items: [
-      { id: "m-invite", title: "Invite link / code to join team", status: "planned" },
-      { id: "m-list", title: "Members list in Settings", status: "planned" },
-      { id: "m-invite-only", title: "Optional invite-only registration", status: "planned" },
+      { id: "m-invite", title: "Invite link / code to join team", status: "done" },
+      { id: "m-list", title: "Members list in Settings", status: "done" },
+      {
+        id: "m-invite-only",
+        title: "Optional invite-only registration",
+        status: "partial",
+        notes: "Set TEAMFLOW_INVITE_ONLY=true on the server.",
+      },
     ],
   },
   {
@@ -321,7 +326,7 @@ export const ROADMAP_SHIPPED: ShippedItem[] = [
   { date: "2026-06", title: "Column drag-reorder" },
   { date: "2026-06", title: "Delete: immediate API soft-delete plus undo restore" },
   { date: "2026-06", title: "Linear import script" },
-  { date: "2026-06", title: "Windows deploy scripts and SQLite seed data" },
+  { date: "2026-06", title: "Team invites, workspace switcher, single-use links" },
 ];
 
 export const ROADMAP_DEPLOY_STEPS: DeployStep[] = [

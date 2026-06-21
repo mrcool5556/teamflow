@@ -9,6 +9,7 @@ import {
   createIssueSchema,
   createProjectSchema,
   createStatusSchema,
+  createTeamInviteSchema,
   createTeamSchema,
   createTokenSchema,
   loginSchema,
@@ -59,6 +60,18 @@ import {
   userHasTeamAccess,
 } from "./lib/issues.js";
 import {
+  acceptTeamInvite,
+  assertInviteAcceptable,
+  createTeamInvite,
+  getInvitePreview,
+  isInviteOnlyRegistration,
+  listTeamInvites,
+  revokeTeamInvite,
+  userIsTeamAdmin,
+} from "./lib/invites.js";
+import { leaveTeam, removeTeamMember } from "./lib/members.js";
+import { deleteTeam, createTeamForUser, getOrCreatePersonalWorkspace } from "./lib/teams.js";
+import {
   buildProfileExport,
   getUserProfile,
   patchUserProfile,
@@ -96,10 +109,30 @@ async function requireAuth(c: Context) {
   return { auth };
 }
 
+app.get("/auth/config", (c) => {
+  return c.json({ inviteOnly: isInviteOnlyRegistration() });
+});
+
 app.post("/auth/register", async (c) => {
   const body = registerSchema.safeParse(await c.req.json());
   if (!body.success) {
     return c.json({ error: body.error.issues[0]?.message ?? "Invalid input" }, 400);
+  }
+
+  const inviteOnly = isInviteOnlyRegistration();
+  if (inviteOnly && !body.data.inviteToken) {
+    return c.json({ error: "Registration requires a valid invite link" }, 403);
+  }
+
+  if (body.data.inviteToken) {
+    try {
+      await assertInviteAcceptable(db, body.data.inviteToken);
+    } catch (err) {
+      return c.json(
+        { error: err instanceof Error ? err.message : "Invalid invite" },
+        400,
+      );
+    }
   }
 
   const existing = await db
@@ -122,12 +155,7 @@ app.post("/auth/register", async (c) => {
     passwordHash,
   });
 
-  const workspaceId = crypto.randomUUID();
-  await db.insert(schema.workspaces).values({
-    id: workspaceId,
-    name: `${body.data.name}'s Workspace`,
-    slug: `ws-${userId.slice(0, 8)}`,
-  });
+  const workspaceId = await getOrCreatePersonalWorkspace(db, userId, body.data.name);
 
   const teamId = crypto.randomUUID();
   await db.insert(schema.teams).values({
@@ -144,6 +172,17 @@ app.post("/auth/register", async (c) => {
   });
 
   await createDefaultBoardRow(db, teamId);
+
+  if (body.data.inviteToken) {
+    try {
+      await acceptTeamInvite(db, body.data.inviteToken, userId);
+    } catch (err) {
+      return c.json(
+        { error: err instanceof Error ? err.message : "Failed to accept invite" },
+        400,
+      );
+    }
+  }
 
   const [user] = await db
     .select()
@@ -338,41 +377,44 @@ app.post("/teams", async (c) => {
     return c.json({ error: body.error.issues[0]?.message ?? "Invalid input" }, 400);
   }
 
-  const [membership] = await db
-    .select({ workspaceId: schema.teams.workspaceId })
-    .from(schema.teamMembers)
-    .innerJoin(schema.teams, eq(schema.teamMembers.teamId, schema.teams.id))
-    .where(eq(schema.teamMembers.userId, result.auth.userId))
+  const [user] = await db
+    .select({ name: schema.users.name })
+    .from(schema.users)
+    .where(eq(schema.users.id, result.auth.userId))
     .limit(1);
 
-  const workspaceId = membership?.workspaceId;
-  if (!workspaceId) {
-    return c.json({ error: "No workspace found" }, 400);
-  }
-
-  const teamId = crypto.randomUUID();
-  await db.insert(schema.teams).values({
-    id: teamId,
-    workspaceId,
+  const team = await createTeamForUser(db, {
+    userId: result.auth.userId,
+    userName: user?.name ?? "User",
     name: body.data.name,
     key: body.data.key,
   });
 
-  await db.insert(schema.teamMembers).values({
-    teamId,
-    userId: result.auth.userId,
-    role: "admin",
-  });
-
-  await createDefaultBoardRow(db, teamId);
-
-  const [team] = await db
-    .select()
-    .from(schema.teams)
-    .where(eq(schema.teams.id, teamId))
-    .limit(1);
+  await createDefaultBoardRow(db, team.id);
 
   return c.json({ team }, 201);
+});
+
+app.delete("/teams/:teamId", async (c) => {
+  const result = await requireAuth(c);
+  if ("error" in result) return result.error;
+  requireWrite(result.auth);
+
+  const teamId = c.req.param("teamId");
+
+  try {
+    await deleteTeam(db, teamId, result.auth.userId);
+    return c.body(null, 204);
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "Failed to delete team";
+    const status =
+      message === "Admin access required"
+        ? 403
+        : message === "Team not found"
+          ? 404
+          : 400;
+    return c.json({ error: message }, status);
+  }
 });
 
 app.get("/teams/:teamId/statuses", async (c) => {
@@ -505,6 +547,13 @@ app.patch("/statuses/:statusId", async (c) => {
       .where(eq(schema.issueStatuses.id, statusId));
   }
 
+  if (body.data.color !== undefined) {
+    await db
+      .update(schema.issueStatuses)
+      .set({ color: body.data.color })
+      .where(eq(schema.issueStatuses.id, statusId));
+  }
+
   if (body.data.position !== undefined) {
     const rowStatuses = await db
       .select()
@@ -615,6 +664,126 @@ app.get("/teams/:teamId/members", async (c) => {
     .where(eq(schema.teamMembers.teamId, teamId));
 
   return c.json({ members });
+});
+
+app.delete("/teams/:teamId/members/:memberId", async (c) => {
+  const result = await requireAuth(c);
+  if ("error" in result) return result.error;
+  requireWrite(result.auth);
+
+  const teamId = c.req.param("teamId");
+  const memberId = c.req.param("memberId");
+
+  try {
+    if (memberId === "me") {
+      await leaveTeam(db, teamId, result.auth.userId);
+    } else {
+      await removeTeamMember(db, teamId, memberId, result.auth.userId);
+    }
+    return c.body(null, 204);
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "Failed to remove member";
+    const status =
+      message === "Team access denied" || message === "Admin access required" ? 403 : 400;
+    return c.json({ error: message }, status);
+  }
+});
+
+app.get("/teams/:teamId/invites", async (c) => {
+  const result = await requireAuth(c);
+  if ("error" in result) return result.error;
+
+  const teamId = c.req.param("teamId");
+  if (!(await userHasTeamAccess(db, result.auth.userId, teamId))) {
+    return c.json({ error: "Team access denied" }, 403);
+  }
+  if (!(await userIsTeamAdmin(db, result.auth.userId, teamId))) {
+    return c.json({ error: "Admin access required" }, 403);
+  }
+
+  const invites = await listTeamInvites(db, teamId);
+  return c.json({ invites });
+});
+
+app.post("/teams/:teamId/invites", async (c) => {
+  const result = await requireAuth(c);
+  if ("error" in result) return result.error;
+  requireWrite(result.auth);
+
+  const teamId = c.req.param("teamId");
+  if (!(await userHasTeamAccess(db, result.auth.userId, teamId))) {
+    return c.json({ error: "Team access denied" }, 403);
+  }
+  if (!(await userIsTeamAdmin(db, result.auth.userId, teamId))) {
+    return c.json({ error: "Admin access required" }, 403);
+  }
+
+  const body = createTeamInviteSchema.safeParse(await c.req.json().catch(() => ({})));
+  if (!body.success) {
+    return c.json({ error: body.error.issues[0]?.message ?? "Invalid input" }, 400);
+  }
+
+  const invite = await createTeamInvite(db, {
+    teamId,
+    createdByUserId: result.auth.userId,
+    role: body.data.role,
+    expiresInDays: body.data.expiresInDays,
+    maxUses: body.data.maxUses,
+  });
+
+  return c.json({ invite }, 201);
+});
+
+app.delete("/teams/:teamId/invites/:inviteId", async (c) => {
+  const result = await requireAuth(c);
+  if ("error" in result) return result.error;
+  requireWrite(result.auth);
+
+  const teamId = c.req.param("teamId");
+  const inviteId = c.req.param("inviteId");
+  if (!(await userHasTeamAccess(db, result.auth.userId, teamId))) {
+    return c.json({ error: "Team access denied" }, 403);
+  }
+  if (!(await userIsTeamAdmin(db, result.auth.userId, teamId))) {
+    return c.json({ error: "Admin access required" }, 403);
+  }
+
+  const invite = await revokeTeamInvite(db, teamId, inviteId);
+  if (!invite) return c.json({ error: "Invite not found" }, 404);
+
+  return c.body(null, 204);
+});
+
+app.get("/invites/:token", async (c) => {
+  const token = c.req.param("token");
+  const authHeader = c.req.header("Authorization");
+  let userId: string | undefined;
+  if (authHeader?.startsWith("Bearer ")) {
+    const auth = await resolveAuth(db, authHeader);
+    userId = auth?.userId;
+  }
+
+  const preview = await getInvitePreview(db, token, userId);
+  if (!preview) return c.json({ error: "Invite not found" }, 404);
+
+  return c.json({ preview });
+});
+
+app.post("/invites/:token/accept", async (c) => {
+  const result = await requireAuth(c);
+  if ("error" in result) return result.error;
+  requireWrite(result.auth);
+
+  const token = c.req.param("token");
+  try {
+    const outcome = await acceptTeamInvite(db, token, result.auth.userId);
+    return c.json(outcome);
+  } catch (err) {
+    return c.json(
+      { error: err instanceof Error ? err.message : "Failed to accept invite" },
+      400,
+    );
+  }
 });
 
 app.get("/teams/:teamId/resolve", async (c) => {
@@ -1150,6 +1319,9 @@ app.patch("/issues/:id", async (c) => {
   if (body.data.timerTargetSec !== undefined) {
     updates.timerTargetSec = body.data.timerTargetSec;
   }
+  if (body.data.color !== undefined) {
+    updates.color = body.data.color;
+  }
 
   await db.update(schema.issues).set(updates).where(eq(schema.issues.id, id));
 
@@ -1403,6 +1575,7 @@ const apiPathPrefixes = [
   "/health",
   "/auth",
   "/teams",
+  "/invites",
   "/projects",
   "/issues",
   "/statuses",

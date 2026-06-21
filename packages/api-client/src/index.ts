@@ -15,6 +15,8 @@ import type {
   ProjectPublic,
   RegisterInput,
   ResolvedRef,
+  TeamInvitePreview,
+  TeamInvitePublic,
   TeamPublic,
   TeamMemberPublic,
   UpdateIssueInput,
@@ -111,6 +113,10 @@ export class TeamflowClient {
     });
   }
 
+  getAuthConfig() {
+    return this.request<{ inviteOnly: boolean }>("/auth/config");
+  }
+
   me() {
     return this.request<{ user: UserPublic }>("/auth/me");
   }
@@ -162,6 +168,10 @@ export class TeamflowClient {
     });
   }
 
+  deleteTeam(teamId: string) {
+    return this.request<void>(`/teams/${teamId}`, { method: "DELETE" });
+  }
+
   listProjects(teamId?: string) {
     const query = teamId ? `?teamId=${teamId}` : "";
     return this.request<{ projects: ProjectPublic[] }>(`/projects${query}`);
@@ -198,7 +208,7 @@ export class TeamflowClient {
 
   updateStatus(
     statusId: string,
-    input: { name?: string; position?: number },
+    input: { name?: string; position?: number; color?: string | null },
   ) {
     return this.request<{ status: IssueStatusPublic }>(`/statuses/${statusId}`, {
       method: "PATCH",
@@ -217,6 +227,55 @@ export class TeamflowClient {
   listTeamMembers(teamId: string) {
     return this.request<{ members: TeamMemberPublic[] }>(
       `/teams/${teamId}/members`,
+    );
+  }
+
+  removeTeamMember(teamId: string, memberId: string) {
+    return this.request<void>(`/teams/${teamId}/members/${memberId}`, {
+      method: "DELETE",
+    });
+  }
+
+  leaveTeam(teamId: string) {
+    return this.request<void>(`/teams/${teamId}/members/me`, {
+      method: "DELETE",
+    });
+  }
+
+  listTeamInvites(teamId: string) {
+    return this.request<{ invites: TeamInvitePublic[] }>(
+      `/teams/${teamId}/invites`,
+    );
+  }
+
+  createTeamInvite(
+    teamId: string,
+    input: {
+      role?: "admin" | "member" | "viewer";
+      expiresInDays?: number;
+      maxUses?: 1 | null;
+    } = {},
+  ) {
+    return this.request<{ invite: TeamInvitePublic }>(`/teams/${teamId}/invites`, {
+      method: "POST",
+      body: JSON.stringify(input),
+    });
+  }
+
+  revokeTeamInvite(teamId: string, inviteId: string) {
+    return this.request<void>(`/teams/${teamId}/invites/${inviteId}`, {
+      method: "DELETE",
+    });
+  }
+
+  previewInvite(token: string) {
+    return this.request<{ preview: TeamInvitePreview }>(`/invites/${encodeURIComponent(token)}`);
+  }
+
+  acceptInvite(token: string) {
+    return this.request<{ team: TeamPublic; alreadyMember: boolean }>(
+      `/invites/${encodeURIComponent(token)}/accept`,
+      { method: "POST", body: "{}" },
     );
   }
 
