@@ -35,6 +35,7 @@ import { RoadmapPanel } from "./components/RoadmapPanel";
 import { CreateTeamSection } from "./components/CreateTeamSection";
 import { AdvancedProfileSettingsSection } from "./components/AdvancedProfileSettingsSection";
 import { AppearanceSettingsSection } from "./components/AppearanceSettingsSection";
+import { DiscordBotSettingsSection } from "./components/DiscordBotSettingsSection";
 import { TeamSettingsSection } from "./components/TeamSettingsSection";
 import { UndoToast } from "./components/UndoToast";
 import { useChangeHistory } from "./hooks/useChangeHistory";
@@ -1263,6 +1264,16 @@ export function App() {
               void handleTeamCreated(newTeamId, switchToNew)
             }
           />
+
+          {teamId ? (
+            <DiscordBotSettingsSection
+              teamId={teamId}
+              isAdmin={
+                members.find((member) => member.userId === user?.id)?.role === "admin"
+              }
+              onMessage={setProfileMessage}
+            />
+          ) : null}
 
           {teamId ? (
             <TeamSettingsSection

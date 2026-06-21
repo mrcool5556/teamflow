@@ -85,6 +85,7 @@ export function applySchemaPatches(sqlite: Database.Database) {
   ensureExtendedTables(sqlite);
   ensureColorColumns(sqlite);
   ensureTeamInvitesTable(sqlite);
+  ensureTeamDiscordSettingsTable(sqlite);
   purgeExpiredDeletedIssues(sqlite);
 }
 
@@ -117,6 +118,34 @@ function ensureTeamInvitesTable(sqlite: Database.Database) {
       `ALTER TABLE team_invites ADD COLUMN use_count INTEGER NOT NULL DEFAULT 0`,
     );
     console.log("Added team_invites.use_count column");
+  }
+}
+
+function ensureTeamDiscordSettingsTable(sqlite: Database.Database) {
+  sqlite.exec(`
+    CREATE TABLE IF NOT EXISTS team_discord_settings (
+      team_id TEXT PRIMARY KEY REFERENCES teams(id) ON DELETE CASCADE,
+      guild_id TEXT,
+      allowed_role_ids TEXT NOT NULL DEFAULT '[]',
+      ticket_channel_ids TEXT NOT NULL DEFAULT '[]',
+      allow_discord_administrators INTEGER NOT NULL DEFAULT 0,
+      updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+  `);
+  sqlite.exec(`
+    CREATE UNIQUE INDEX IF NOT EXISTS team_discord_settings_guild_unique
+    ON team_discord_settings(guild_id)
+    WHERE guild_id IS NOT NULL AND guild_id != ''
+  `);
+
+  const cols = sqlite
+    .prepare("PRAGMA table_info(team_discord_settings)")
+    .all() as { name: string }[];
+  if (!cols.some((col) => col.name === "allow_discord_administrators")) {
+    sqlite.exec(
+      `ALTER TABLE team_discord_settings ADD COLUMN allow_discord_administrators INTEGER NOT NULL DEFAULT 0`,
+    );
+    console.log("Added team_discord_settings.allow_discord_administrators column");
   }
 }
 

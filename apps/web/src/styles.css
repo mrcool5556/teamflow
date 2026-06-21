@@ -2056,6 +2056,10 @@ select {
   font-size: 0.85rem;
 }
 
+.settings-hint--warn {
+  color: var(--danger, #e5534b);
+}
+
 .settings-actions {
   margin-bottom: 0.75rem;
 }

@@ -60,8 +60,8 @@ export const ROADMAP_FOCUS: RoadmapItem[] = [
   {
     id: "discord",
     title: "Discord bot integration",
-    notes: "Slash commands, ticket-to-issue, and post back ref links. See ideas for v1 scope.",
-    status: "focus",
+    notes: "Slash commands, ticket threads, share links. See docs/discord-bot.md.",
+    status: "done",
     priority: 3,
     tags: ["integrations"],
   },
@@ -216,10 +216,15 @@ export const ROADMAP_IDEAS: RoadmapIdeaGroup[] = [
     title: "Discord bot",
     summary: "Talk to Teamflow from Discord: create/query issues, ticket threads, and ref links back.",
     items: [
-      { id: "d-slash", title: "Slash commands (/issue, /create, /link)", status: "planned" },
-      { id: "d-ticket", title: "Ticket thread to issue", status: "planned" },
-      { id: "d-postback", title: "Post ?ref= links on create/update", status: "planned" },
-      { id: "d-auth", title: "Bot token and PAT per guild to team mapping", status: "planned" },
+      { id: "d-slash", title: "Slash commands (/issue, /create, /link)", status: "done" },
+      { id: "d-ticket", title: "Ticket thread to issue", status: "done" },
+      { id: "d-postback", title: "Post ?ref= links on create/update", status: "done" },
+      {
+        id: "d-auth",
+        title: "Bot token and PAT per guild to team mapping",
+        status: "partial",
+        notes: "Settings UI for guild link, allowed roles, ticket channels; env for bot token + PAT.",
+      },
     ],
   },
   {
@@ -326,7 +331,7 @@ export const ROADMAP_SHIPPED: ShippedItem[] = [
   { date: "2026-06", title: "Column drag-reorder" },
   { date: "2026-06", title: "Delete: immediate API soft-delete plus undo restore" },
   { date: "2026-06", title: "Linear import script" },
-  { date: "2026-06", title: "Team invites, workspace switcher, single-use links" },
+  { date: "2026-06", title: "Discord bot v1 (slash commands, tickets, share links)" },
 ];
 
 export const ROADMAP_DEPLOY_STEPS: DeployStep[] = [

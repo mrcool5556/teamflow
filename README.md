@@ -56,6 +56,16 @@ MCP runs **locally** on your machine. It calls the Teamflow HTTP API (localhost 
 
 Create a PAT in the web UI under **Settings → API tokens**. Full details: [docs/MCP.md](docs/MCP.md)
 
+## Discord bot
+
+Slash commands (`/issue`, `/create`, `/link`), ticket threads → issues, and `?ref=` share links.
+
+```powershell
+pnpm --filter @teamflow/discord-bot dev
+```
+
+Setup: [docs/discord-bot.md](docs/discord-bot.md)
+
 ## Documentation
 
 | Doc | Purpose |
@@ -63,14 +73,14 @@ Create a PAT in the web UI under **Settings → API tokens**. Full details: [doc
 | [docs/STATUS.md](docs/STATUS.md) | **Start here** — what is done vs pending |
 | [docs/AI_CONTEXT.md](docs/AI_CONTEXT.md) | Architecture and conventions for AI assistants |
 | [docs/steps/00-overview.md](docs/steps/00-overview.md) | Build phases and step order |
-| [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md) | Deployment index |
+| [docs/discord-bot.md](docs/discord-bot.md) | Discord bot setup and slash commands |
 | [AGENTS.md](AGENTS.md) | Rules for AI agents working on this repo |
 
 ## Project layout (target)
 
 ```
 teamflow/
-  apps/          server, web, mcp, cli
+  apps/          server, web, mcp, cli, discord-bot
   packages/      core, db, api-client
   deploy/        windows, proxmox-lxc, relay
   docs/          living documentation
