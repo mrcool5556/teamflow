@@ -17,6 +17,7 @@ import {
   updateBoardRowSchema,
   updateIssueSchema,
   updateStatusSchema,
+  updateTeamDiscordSettingsSchema,
   userProfilePatchSchema,
   userProfileSchema,
   parseUserProfileImport,
@@ -78,6 +79,11 @@ import {
   saveUserProfile,
 } from "./lib/profile.js";
 import { resolveTeamRefDetailed } from "./lib/refs.js";
+import {
+  getDiscordGuildConfig,
+  getTeamDiscordSettings,
+  updateTeamDiscordSettings,
+} from "./lib/discord.js";
 
 const db = createDb();
 const app = new Hono();
@@ -752,6 +758,66 @@ app.delete("/teams/:teamId/invites/:inviteId", async (c) => {
   if (!invite) return c.json({ error: "Invite not found" }, 404);
 
   return c.body(null, 204);
+});
+
+app.get("/teams/:teamId/discord-settings", async (c) => {
+  const result = await requireAuth(c);
+  if ("error" in result) return result.error;
+
+  const teamId = c.req.param("teamId");
+  if (!(await userHasTeamAccess(db, result.auth.userId, teamId))) {
+    return c.json({ error: "Team access denied" }, 403);
+  }
+
+  const settings = await getTeamDiscordSettings(db, teamId);
+  return c.json({ settings });
+});
+
+app.patch("/teams/:teamId/discord-settings", async (c) => {
+  const result = await requireAuth(c);
+  if ("error" in result) return result.error;
+  requireWrite(result.auth);
+
+  const teamId = c.req.param("teamId");
+  if (!(await userHasTeamAccess(db, result.auth.userId, teamId))) {
+    return c.json({ error: "Team access denied" }, 403);
+  }
+
+  const body = updateTeamDiscordSettingsSchema.safeParse(await c.req.json().catch(() => ({})));
+  if (!body.success) {
+    return c.json({ error: body.error.issues[0]?.message ?? "Invalid input" }, 400);
+  }
+
+  try {
+    const settings = await updateTeamDiscordSettings(
+      db,
+      teamId,
+      result.auth.userId,
+      body.data,
+    );
+    return c.json({ settings });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "Failed to update Discord settings";
+    const status =
+      message === "Admin access required" || message === "Team access denied" ? 403 : 400;
+    return c.json({ error: message }, status);
+  }
+});
+
+app.get("/discord/guilds/:guildId/config", async (c) => {
+  const result = await requireAuth(c);
+  if ("error" in result) return result.error;
+
+  const guildId = c.req.param("guildId");
+  try {
+    const config = await getDiscordGuildConfig(db, guildId, result.auth.userId);
+    if (!config) return c.json({ error: "Discord server not linked to a team" }, 404);
+    return c.json({ config });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "Failed to load Discord config";
+    const status = message === "Team access denied" ? 403 : 400;
+    return c.json({ error: message }, status);
+  }
 });
 
 app.get("/invites/:token", async (c) => {

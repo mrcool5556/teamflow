@@ -2,13 +2,21 @@ import { z } from "zod";
 
 const KEY_CHARS = "abcdefghijklmnopqrstuvwxyz0123456789";
 
-export const ISSUE_REF_PATTERN = /^([A-Za-z][A-Za-z0-9]*)-(\d+)$/;
+/** Matches team keys from createTeamSchema (2–8 uppercase letters/digits). */
+export const TEAM_KEY_IN_REF = "[A-Z0-9]{2,8}";
+
+export const ISSUE_REF_PATTERN = new RegExp(
+  `^(${TEAM_KEY_IN_REF})-(\\d+)$`,
+  "i",
+);
 export const ROW_REF_PATTERN = /^row_[a-z0-9]{8}$/;
 export const COLUMN_REF_PATTERN = /^col_[a-z0-9]{8}$/;
 
 /** Matches issue, row, and column refs embedded in plain text. */
-export const REF_TOKEN_PATTERN =
-  /([A-Za-z][A-Za-z0-9]*-\d+|row_[a-z0-9]{8}|col_[a-z0-9]{8})/g;
+export const REF_TOKEN_PATTERN = new RegExp(
+  `(${TEAM_KEY_IN_REF}-\\d+|row_[a-z0-9]{8}|col_[a-z0-9]{8})`,
+  "gi",
+);
 
 export function isTeamflowRef(value: string) {
   const ref = value.trim();
@@ -42,8 +50,10 @@ export function splitRefText(text: string): RefTextSegment[] {
   if (!text) return [];
 
   const segments: RefTextSegment[] = [];
-  const pattern =
-    /https?:\/\/\S*?[?&]ref=([A-Za-z][A-Za-z0-9]*-\d+|row_[a-z0-9]{8}|col_[a-z0-9]{8})\S*|([A-Za-z][A-Za-z0-9]*-\d+|row_[a-z0-9]{8}|col_[a-z0-9]{8})/gi;
+  const pattern = new RegExp(
+    `https?:\\/\\/\\S*?[?&]ref=(${TEAM_KEY_IN_REF}-\\d+|row_[a-z0-9]{8}|col_[a-z0-9]{8})\\S*|(${TEAM_KEY_IN_REF}-\\d+|row_[a-z0-9]{8}|col_[a-z0-9]{8})`,
+    "gi",
+  );
 
   let lastIndex = 0;
   for (const match of text.matchAll(pattern)) {

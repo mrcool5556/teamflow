@@ -17,6 +17,9 @@ import type {
   ResolvedRef,
   TeamInvitePreview,
   TeamInvitePublic,
+  TeamDiscordSettingsPublic,
+  UpdateTeamDiscordSettingsInput,
+  DiscordGuildConfigPublic,
   TeamPublic,
   TeamMemberPublic,
   UpdateIssueInput,
@@ -266,6 +269,28 @@ export class TeamflowClient {
     return this.request<void>(`/teams/${teamId}/invites/${inviteId}`, {
       method: "DELETE",
     });
+  }
+
+  getTeamDiscordSettings(teamId: string) {
+    return this.request<{ settings: TeamDiscordSettingsPublic }>(
+      `/teams/${teamId}/discord-settings`,
+    );
+  }
+
+  updateTeamDiscordSettings(teamId: string, input: UpdateTeamDiscordSettingsInput) {
+    return this.request<{ settings: TeamDiscordSettingsPublic }>(
+      `/teams/${teamId}/discord-settings`,
+      {
+        method: "PATCH",
+        body: JSON.stringify(input),
+      },
+    );
+  }
+
+  getDiscordGuildConfig(guildId: string) {
+    return this.request<{ config: DiscordGuildConfigPublic }>(
+      `/discord/guilds/${guildId}/config`,
+    );
   }
 
   previewInvite(token: string) {

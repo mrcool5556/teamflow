@@ -99,6 +99,19 @@ export const teamInvites = sqliteTable(
   (table) => [uniqueIndex("team_invites_token_unique").on(table.token)],
 );
 
+export const teamDiscordSettings = sqliteTable("team_discord_settings", {
+  teamId: text("team_id")
+    .primaryKey()
+    .references(() => teams.id, { onDelete: "cascade" }),
+  guildId: text("guild_id"),
+  allowedRoleIds: text("allowed_role_ids").notNull().default("[]"),
+  ticketChannelIds: text("ticket_channel_ids").notNull().default("[]"),
+  allowDiscordAdministrators: integer("allow_discord_administrators").notNull().default(0),
+  updatedAt: text("updated_at")
+    .notNull()
+    .default(sql`(datetime('now'))`),
+});
+
 export const projects = sqliteTable("projects", {
   id: text("id")
     .primaryKey()

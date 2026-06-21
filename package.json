@@ -5,6 +5,7 @@
   "description": "Self-hosted team issue tracker with MCP and CLI for AI assistants",
   "scripts": {
     "dev": "pnpm --parallel -r --filter @teamflow/server --filter @teamflow/web dev",
+    "dev:discord": "pnpm --filter @teamflow/discord-bot dev",
     "build": "pnpm -r build",
     "db:generate": "pnpm --filter @teamflow/db generate",
     "db:migrate": "pnpm --filter @teamflow/db migrate",

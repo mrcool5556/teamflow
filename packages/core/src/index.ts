@@ -53,6 +53,35 @@ export const createTeamInviteSchema = z.object({
   maxUses: z.union([z.literal(1), z.null()]).optional().default(1),
 });
 
+const discordSnowflakeSchema = z.string().regex(/^\d{17,20}$/, "Invalid Discord ID");
+
+export const updateTeamDiscordSettingsSchema = z.object({
+  guildId: discordSnowflakeSchema.nullable().optional(),
+  allowedRoleIds: z.array(discordSnowflakeSchema).optional(),
+  ticketChannelIds: z.array(discordSnowflakeSchema).optional(),
+  allowDiscordAdministrators: z.boolean().optional(),
+});
+
+export type UpdateTeamDiscordSettingsInput = z.infer<
+  typeof updateTeamDiscordSettingsSchema
+>;
+
+export type TeamDiscordSettingsPublic = {
+  teamId: string;
+  guildId: string | null;
+  allowedRoleIds: string[];
+  ticketChannelIds: string[];
+  allowDiscordAdministrators: boolean;
+  updatedAt: string;
+};
+
+export type DiscordGuildConfigPublic = {
+  teamId: string;
+  allowedRoleIds: string[];
+  ticketChannelIds: string[];
+  allowDiscordAdministrators: boolean;
+};
+
 export const createProjectSchema = z.object({
   teamId: z.string().uuid(),
   name: z.string().min(1).max(120),
