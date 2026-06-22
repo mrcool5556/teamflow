@@ -427,7 +427,110 @@ select {
 }
 
 .quick-add-modal h2 {
+  margin: 0;
   font-size: 1.15rem;
+}
+
+.about-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 320;
+  background: rgba(0, 0, 0, 0.7);
+  display: grid;
+  place-items: center;
+  padding: 1rem;
+}
+
+.about-dialog {
+  width: min(440px, 100%);
+  background: var(--surface);
+  border: 3px solid var(--border-strong);
+  box-shadow: 8px 8px 0 #000;
+  padding: 1.25rem;
+  display: grid;
+  gap: 1rem;
+}
+
+.about-dialog-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 1rem;
+}
+
+.about-dialog-header h2 {
+  margin: 0.15rem 0 0;
+}
+
+.about-tagline {
+  margin: 0;
+  line-height: 1.45;
+}
+
+.about-meta {
+  margin: 0;
+  display: grid;
+  gap: 0.65rem;
+}
+
+.about-meta div {
+  display: grid;
+  grid-template-columns: 5.5rem 1fr;
+  gap: 0.75rem;
+  align-items: baseline;
+}
+
+.about-meta dt {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.8rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.about-meta dd {
+  margin: 0;
+}
+
+.about-license-note {
+  margin: 0;
+  font-size: 0.85rem;
+  line-height: 1.45;
+}
+
+.about-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.65rem;
+}
+
+.about-link-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.55rem 0.9rem;
+  border: 2px solid var(--border-strong);
+  background: var(--surface-2);
+  color: inherit;
+  text-decoration: none;
+  font: inherit;
+  font-weight: 600;
+  box-shadow: 3px 3px 0 #000;
+}
+
+.about-link-btn:hover {
+  transform: translate(1px, 1px);
+  box-shadow: 2px 2px 0 #000;
+}
+
+.about-link-btn--accent {
+  background: var(--accent);
+  color: var(--accent-contrast, #000);
+}
+
+.about-login-link {
+  margin-top: 0.5rem;
+  width: 100%;
 }
 
 .quick-add-modal label {

@@ -60,7 +60,11 @@ systemctl daemon-reload
 systemctl enable teamflow
 systemctl restart teamflow
 
+install -m 755 deploy/proxmox-lxc/update.sh /usr/local/bin/teamflow-update
+ln -sf teamflow-update /usr/local/bin/update
+
 echo ""
 echo "Install complete."
 echo "  systemctl status teamflow"
 echo "  curl http://localhost:3000/health"
+echo "  update                 # pull, build, migrate, restart (after git clone)"

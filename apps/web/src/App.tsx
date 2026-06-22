@@ -42,6 +42,7 @@ import { RolesSettingsSection } from "./components/RolesSettingsSection";
 import { SettingsNav, type SettingsPanel } from "./components/SettingsNav";
 import { TeamSettingsSection } from "./components/TeamSettingsSection";
 import { UndoToast } from "./components/UndoToast";
+import { AboutDialog } from "./components/AboutDialog";
 import { useChangeHistory } from "./hooks/useChangeHistory";
 import { useTeamPermissions } from "./hooks/useTeamPermissions";
 import { hasTeamPermission } from "./lib/teamPermissions";
@@ -64,6 +65,8 @@ import {
 } from "./lib/inviteLinks";
 
 type View = "login" | "board" | "settings" | "roadmap";
+
+const APP_VERSION = __TEAMFLOW_VERSION__;
 
 type QuickAddTarget =
   | { kind: "row" }
@@ -91,6 +94,7 @@ export function App() {
   const [profileMessage, setProfileMessage] = useState<string | null>(null);
   const profileSaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [historyOpen, setHistoryOpen] = useState(false);
+  const [aboutOpen, setAboutOpen] = useState(false);
   const [highlightedIssueId, setHighlightedIssueId] = useState<string | null>(null);
   const [highlightedColumnKey, setHighlightedColumnKey] = useState<string | null>(null);
   const [refNotice, setRefNotice] = useState<string | null>(null);
@@ -1215,12 +1219,20 @@ export function App() {
 
   if (view === "login") {
     return (
-      <LoginScreen
-        error={error}
-        loading={loading}
-        onLogin={handleLogin}
-        onRegister={handleRegister}
-      />
+      <>
+        <LoginScreen
+          error={error}
+          loading={loading}
+          onLogin={handleLogin}
+          onRegister={handleRegister}
+          onOpenAbout={() => setAboutOpen(true)}
+        />
+        <AboutDialog
+          open={aboutOpen}
+          version={APP_VERSION}
+          onClose={() => setAboutOpen(false)}
+        />
+      </>
     );
   }
 
@@ -1275,6 +1287,9 @@ export function App() {
             onClick={() => setView(settingsOpen ? "board" : "settings")}
           >
             {settingsOpen ? "Close settings" : "Settings"}
+          </button>
+          <button type="button" className="ghost" onClick={() => setAboutOpen(true)}>
+            About
           </button>
           <button type="button" className="ghost" onClick={logout}>
             Log out ({user?.name})
@@ -1478,6 +1493,11 @@ export function App() {
         onUndo={undoEntry}
         onRestore={restoreEntry}
       />
+      <AboutDialog
+        open={aboutOpen}
+        version={APP_VERSION}
+        onClose={() => setAboutOpen(false)}
+      />
     </div>
   );
 }
@@ -1487,11 +1507,13 @@ function LoginScreen({
   loading,
   onLogin,
   onRegister,
+  onOpenAbout,
 }: {
   error: string | null;
   loading: boolean;
   onLogin: (email: string, password: string) => void;
   onRegister: (name: string, email: string, password: string) => void;
+  onOpenAbout: () => void;
 }) {
   const [mode, setMode] = useState<"login" | "register">("login");
   const [name, setName] = useState("Demo User");
@@ -1578,6 +1600,10 @@ function LoginScreen({
         </button>
 
         <p className="hint">Demo: demo@teamflow.local / changeme123 (after seed)</p>
+
+        <button type="button" className="ghost about-login-link" onClick={onOpenAbout}>
+          About Teamflow
+        </button>
       </div>
     </div>
   );
