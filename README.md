@@ -82,6 +82,8 @@ Setup: [docs/discord-bot.md](docs/discord-bot.md)
 Teamflow is free to use under [AGPL-3.0](LICENSE). Optional donations help fund development:
 
 - [GitHub Sponsors](https://github.com/sponsors/mrcool5556)
+- [Ko-fi](https://ko-fi.com/YOUR_KOFI_USERNAME) — replace `YOUR_KOFI_USERNAME` in `.github/FUNDING.yml` and `packages/core/src/about.ts`
+- [PayPal](https://paypal.me/YOUR_PAYPAL_USERNAME) — replace `YOUR_PAYPAL_USERNAME` in the same files
 
 ## License
 

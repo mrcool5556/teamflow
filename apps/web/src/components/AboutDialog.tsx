@@ -1,5 +1,5 @@
 import { useEffect } from "react";
-import { TEAMFLOW_ABOUT } from "@teamflow/core";
+import { TEAMFLOW_ABOUT, TEAMFLOW_SUPPORT_LINKS } from "@teamflow/core";
 
 type AboutDialogProps = {
   open: boolean;
@@ -72,14 +72,21 @@ export function AboutDialog({ open, version, onClose }: AboutDialogProps) {
           >
             View on GitHub
           </a>
-          <a
-            className="about-link-btn about-link-btn--accent"
-            href={TEAMFLOW_ABOUT.donateUrl}
-            target="_blank"
-            rel="noreferrer"
-          >
-            Support development
-          </a>
+          {TEAMFLOW_SUPPORT_LINKS.map((link) => (
+            <a
+              key={link.label}
+              className={
+                "accent" in link && link.accent
+                  ? "about-link-btn about-link-btn--accent"
+                  : "about-link-btn"
+              }
+              href={link.url}
+              target="_blank"
+              rel="noreferrer"
+            >
+              {link.label}
+            </a>
+          ))}
         </div>
       </section>
     </div>
