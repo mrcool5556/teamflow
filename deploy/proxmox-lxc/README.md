@@ -57,3 +57,5 @@ sudo ln -sf teamflow-update /usr/local/bin/update
 | `.env.example` | Production env |
 
 Relay / remote access: [../relay/README.md](../relay/README.md)
+
+Full guide: [docs/SELF-HOSTING.md](../../docs/SELF-HOSTING.md#proxmox-lxc)

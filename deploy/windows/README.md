@@ -71,4 +71,4 @@ Default install keeps files in the repo. For a dedicated path:
 
 After seed: `demo@teamflow.local` / `changeme123`
 
-See [docs/steps/07-windows-deploy.md](../../docs/steps/07-windows-deploy.md)
+See [docs/SELF-HOSTING.md](../../docs/SELF-HOSTING.md#windows)

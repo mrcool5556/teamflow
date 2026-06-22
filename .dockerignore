@@ -1,0 +1,13 @@
+node_modules
+**/dist
+data
+.env
+.env.local
+*.db
+*.db-*
+.git
+.turbo
+coverage
+**/*.log
+docs/CONNECTIONS.md
+scripts/linear-export.json
