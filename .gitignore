@@ -12,3 +12,16 @@ coverage/
 
 # Machine-specific (IPs, SSH keys, passwords)
 docs/CONNECTIONS.md
+
+# Personal / one-off imports — do not publish
+scripts/linear-export.json
+scripts/import-from-linear.mjs
+
+# Internal dev notes (keep locally; not needed for users)
+docs/IDEAS.md
+docs/STATUS.md
+docs/AI_CONTEXT.md
+docs/AI-DOC-WORKFLOW.md
+docs/SETUP-FIRST-3.md
+docs/steps/
+AGENTS.md

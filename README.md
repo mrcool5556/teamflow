@@ -1,50 +1,51 @@
 # Teamflow
 
-Self-hosted issue tracker for teams — Linear-style task delegation with first-class **AI integration** via MCP and CLI. No LLM API keys required to manage tasks; your AI chat tool connects directly to Teamflow.
+Self-hosted issue tracker for teams — kanban boards, roles, Discord integration, and first-class **AI tooling** via MCP and CLI.
 
-## Features (planned)
+## Features
 
-- Teams, projects, issues, statuses, assignees, labels, comments
-- Web UI: list view, kanban board, issue detail
+- Teams, projects, issues, statuses, assignees, comments
+- Web UI: kanban board, issue drawer, roles & permissions
 - **MCP server** for Cursor / Codex (create, update, complete issues from chat)
 - **CLI** (`teamflow`) for scripts and terminal workflows
-- Personal access tokens (PATs) for AI and automation — not OpenAI/Anthropic keys
+- **Discord bot** — slash commands, ticket threads, share links
+- Personal access tokens (PATs) for AI and automation
 
-## Deployment paths
+## Deployment
 
-Pick one setup. **Docker is not required.**
+Docker is not required.
 
 | Setup | Doc | Best for |
 |-------|-----|----------|
-| **A — Windows self-host** | [deploy/windows/README.md](deploy/windows/README.md) | Solo/small team, same PC as Cursor |
-| **B — Proxmox LXC** | [deploy/proxmox-lxc/README.md](deploy/proxmox-lxc/README.md) | Always-on team server (native install, no Docker) |
-
-Remote access to Setup B: [deploy/relay/README.md](deploy/relay/README.md)
+| **Windows** | [deploy/windows/README.md](deploy/windows/README.md) | Dev machine or small team on one PC |
+| **Proxmox LXC** | [deploy/proxmox-lxc/README.md](deploy/proxmox-lxc/README.md) | Always-on Linux server (`sudo update` on the container) |
+| **Remote access** | [deploy/relay/README.md](deploy/relay/README.md) | nginx / Cloudflare in front of LXC |
 
 ## Quick start (development)
 
-> Application code is not scaffolded yet. See [docs/STATUS.md](docs/STATUS.md) for build progress.
-
-When the monorepo exists:
-
 ```powershell
-cd D:\projects\teamflow
+git clone https://github.com/mrcool5556/teamflow.git
+cd teamflow
 pnpm install
+cp .env.example .env
+pnpm db:setup
 pnpm dev
 ```
 
-Open `http://localhost:3000`
+Open `http://localhost:5173` (API on `http://localhost:3000`).
+
+Production single-port: set `SERVE_WEB=true`, run `pnpm build`, then start the server.
 
 ## AI integration (Cursor)
 
-MCP runs **locally** on your machine. It calls the Teamflow HTTP API (localhost or your server URL).
+MCP runs on your machine and calls the Teamflow HTTP API.
 
 ```json
 {
   "mcpServers": {
     "teamflow": {
       "command": "node",
-      "args": ["D:/projects/teamflow/apps/mcp/dist/index.js"],
+      "args": ["path/to/teamflow/apps/mcp/dist/index.js"],
       "env": {
         "TEAMFLOW_URL": "http://localhost:3000",
         "TEAMFLOW_TOKEN": "pat_your_token_here"
@@ -54,11 +55,9 @@ MCP runs **locally** on your machine. It calls the Teamflow HTTP API (localhost 
 }
 ```
 
-Create a PAT in the web UI under **Settings → API tokens**. Full details: [docs/MCP.md](docs/MCP.md)
+Create a PAT in **Settings → API tokens**. Details: [docs/MCP.md](docs/MCP.md)
 
 ## Discord bot
-
-Slash commands (`/issue`, `/create`, `/link`), ticket threads → issues, and `?ref=` share links.
 
 ```powershell
 pnpm --filter @teamflow/discord-bot dev
@@ -70,22 +69,18 @@ Setup: [docs/discord-bot.md](docs/discord-bot.md)
 
 | Doc | Purpose |
 |-----|---------|
-| [docs/STATUS.md](docs/STATUS.md) | **Start here** — what is done vs pending |
-| [docs/AI_CONTEXT.md](docs/AI_CONTEXT.md) | Architecture and conventions for AI assistants |
-| [docs/steps/00-overview.md](docs/steps/00-overview.md) | Build phases and step order |
-| [docs/discord-bot.md](docs/discord-bot.md) | Discord bot setup and slash commands |
-| [AGENTS.md](AGENTS.md) | Rules for AI agents working on this repo |
+| [docs/API.md](docs/API.md) | HTTP API reference |
+| [docs/CLI.md](docs/CLI.md) | CLI commands |
+| [docs/MCP.md](docs/MCP.md) | MCP tools for AI assistants |
+| [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md) | Deployment overview |
+| [docs/discord-bot.md](docs/discord-bot.md) | Discord bot setup |
 
-## Project layout (target)
+## Support
 
-```
-teamflow/
-  apps/          server, web, mcp, cli, discord-bot
-  packages/      core, db, api-client
-  deploy/        windows, proxmox-lxc, relay
-  docs/          living documentation
-```
+Teamflow is free to use under [AGPL-3.0](LICENSE). Optional donations help fund development:
+
+- [GitHub Sponsors](https://github.com/sponsors/mrcool5556)
 
 ## License
 
-TBD
+[GNU Affero General Public License v3.0](LICENSE) — free to use and modify. If you run a modified version for others over a network, you must share the source under the same license. This discourages proprietary forks while keeping the project open for everyone.

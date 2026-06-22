@@ -1,7 +1,6 @@
 {
   "name": "teamflow",
   "version": "0.1.0",
-  "private": true,
   "description": "Self-hosted team issue tracker with MCP and CLI for AI assistants",
   "scripts": {
     "dev": "pnpm --parallel -r --filter @teamflow/server --filter @teamflow/web dev",
