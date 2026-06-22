@@ -13,13 +13,14 @@ Self-hosted issue tracker for teams — kanban boards, roles, Discord integratio
 
 ## Deployment
 
-Docker is not required.
+**[Self-hosting guide](docs/SELF-HOSTING.md)** — install and update for Windows, Proxmox LXC, and Docker.
 
 | Setup | Doc | Best for |
 |-------|-----|----------|
 | **Windows** | [deploy/windows/README.md](deploy/windows/README.md) | Dev machine or small team on one PC |
-| **Proxmox LXC** | [deploy/proxmox-lxc/README.md](deploy/proxmox-lxc/README.md) | Always-on Linux server (`sudo update` on the container) |
-| **Remote access** | [deploy/relay/README.md](deploy/relay/README.md) | nginx / Cloudflare in front of LXC |
+| **Proxmox LXC** | [deploy/proxmox-lxc/README.md](deploy/proxmox-lxc/README.md) | Always-on Linux server (`sudo update`) |
+| **Docker** | [deploy/docker/README.md](deploy/docker/README.md) | VPS or any Docker host |
+| **Remote access** | [deploy/relay/README.md](deploy/relay/README.md) | nginx / Cloudflare in front of the server |
 
 ## Quick start (development)
 
@@ -69,6 +70,7 @@ Setup: [docs/discord-bot.md](docs/discord-bot.md)
 
 | Doc | Purpose |
 |-----|---------|
+| [docs/SELF-HOSTING.md](docs/SELF-HOSTING.md) | **Install & update** — Windows, LXC, Docker |
 | [docs/API.md](docs/API.md) | HTTP API reference |
 | [docs/CLI.md](docs/CLI.md) | CLI commands |
 | [docs/MCP.md](docs/MCP.md) | MCP tools for AI assistants |
