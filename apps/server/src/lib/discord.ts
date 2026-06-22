@@ -3,7 +3,7 @@ import type { TeamDiscordSettingsPublic, UpdateTeamDiscordSettingsInput } from "
 import type { Db } from "@teamflow/db";
 import { schema } from "@teamflow/db";
 import { userHasTeamAccess } from "./issues.js";
-import { userIsTeamAdmin } from "./invites.js";
+import { userHasTeamPermission } from "./permissions.js";
 
 function parseIdJson(raw: string) {
   try {
@@ -23,13 +23,20 @@ function sanitizeAllowedRoleIds(guildId: string | null, roleIds: string[]) {
 function mapSettings(
   row: typeof schema.teamDiscordSettings.$inferSelect,
 ): TeamDiscordSettingsPublic {
+  const guildId = row.guildId ?? null;
+  const allowedRoleIds = parseIdJson(row.allowedRoleIds);
+  const effectiveRoles = guildId
+    ? allowedRoleIds.filter((id) => id !== guildId)
+    : allowedRoleIds;
+
   return {
     teamId: row.teamId,
-    guildId: row.guildId ?? null,
-    allowedRoleIds: parseIdJson(row.allowedRoleIds),
+    guildId,
+    allowedRoleIds,
     ticketChannelIds: parseIdJson(row.ticketChannelIds),
     allowDiscordAdministrators: row.allowDiscordAdministrators === 1,
     updatedAt: row.updatedAt,
+    commandsReady: Boolean(guildId && effectiveRoles.length > 0),
   };
 }
 
@@ -40,6 +47,7 @@ const defaultSettings = (teamId: string): TeamDiscordSettingsPublic => ({
   ticketChannelIds: [],
   allowDiscordAdministrators: false,
   updatedAt: new Date().toISOString(),
+  commandsReady: false,
 });
 
 export async function getTeamDiscordSettings(db: Db, teamId: string) {
@@ -58,8 +66,8 @@ export async function updateTeamDiscordSettings(
   actorUserId: string,
   input: UpdateTeamDiscordSettingsInput,
 ) {
-  if (!(await userIsTeamAdmin(db, actorUserId, teamId))) {
-    throw new Error("Admin access required");
+  if (!(await userHasTeamPermission(db, actorUserId, teamId, "integrations.discord.manage"))) {
+    throw new Error("Permission denied");
   }
 
   const current = await getTeamDiscordSettings(db, teamId);

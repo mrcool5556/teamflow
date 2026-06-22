@@ -221,9 +221,15 @@ export const ROADMAP_IDEAS: RoadmapIdeaGroup[] = [
       { id: "d-postback", title: "Post ?ref= links on create/update", status: "done" },
       {
         id: "d-auth",
-        title: "Bot token and PAT per guild to team mapping",
-        status: "partial",
-        notes: "Settings UI for guild link, allowed roles, ticket channels; env for bot token + PAT.",
+        title: "Per-team guild link, roles, and tickets in Settings",
+        status: "done",
+        notes: "One bot + .env token/PAT; each team links its own Discord server.",
+      },
+      {
+        id: "d-secrets",
+        title: "Bot credentials in Settings (encrypted)",
+        status: "done",
+        notes: "TEAMFLOW_BOT_CONFIG_KEY + Settings → Bot credentials; .env fallback remains.",
       },
     ],
   },
@@ -331,7 +337,7 @@ export const ROADMAP_SHIPPED: ShippedItem[] = [
   { date: "2026-06", title: "Column drag-reorder" },
   { date: "2026-06", title: "Delete: immediate API soft-delete plus undo restore" },
   { date: "2026-06", title: "Linear import script" },
-  { date: "2026-06", title: "Discord bot v1 (slash commands, tickets, share links)" },
+  { date: "2026-06", title: "Discord bot v1 — slash commands, Settings UI, role gating, thread /create" },
 ];
 
 export const ROADMAP_DEPLOY_STEPS: DeployStep[] = [

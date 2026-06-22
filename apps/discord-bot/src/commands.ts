@@ -29,7 +29,10 @@ export const slashCommands = [
     .setName("create")
     .setDescription("Create a Teamflow issue")
     .addStringOption((option) =>
-      option.setName("title").setDescription("Issue title").setRequired(true),
+      option
+        .setName("title")
+        .setDescription("Issue title (defaults to thread name when run in a thread)")
+        .setRequired(false),
     )
     .addStringOption((option) =>
       option
@@ -123,7 +126,18 @@ export async function handleSlashCommand(
     }
 
     if (interaction.commandName === "create") {
-      const title = interaction.options.getString("title", true).trim();
+      let title = interaction.options.getString("title")?.trim() ?? "";
+      if (!title && interaction.channel?.isThread()) {
+        title = interaction.channel.name.trim();
+      }
+      if (!title) {
+        await respond(
+          interaction,
+          "Provide a `title`, or run `/create` inside a thread to use the thread name.",
+          true,
+        );
+        return;
+      }
       const userDescription =
         interaction.options.getString("description")?.trim() || undefined;
       const threadContext = await buildThreadContext(interaction);

@@ -13,6 +13,8 @@ import type {
 import {
   createDefaultUserProfile,
   mergeUserProfile,
+  permissionsForSystemSlug,
+  type SystemRoleSlug,
 } from "@teamflow/core";
 import {
   clearSession,
@@ -35,10 +37,14 @@ import { RoadmapPanel } from "./components/RoadmapPanel";
 import { CreateTeamSection } from "./components/CreateTeamSection";
 import { AdvancedProfileSettingsSection } from "./components/AdvancedProfileSettingsSection";
 import { AppearanceSettingsSection } from "./components/AppearanceSettingsSection";
-import { DiscordBotSettingsSection } from "./components/DiscordBotSettingsSection";
+import { IntegrationsSettingsSection } from "./components/IntegrationsSettingsSection";
+import { RolesSettingsSection } from "./components/RolesSettingsSection";
+import { SettingsNav, type SettingsPanel } from "./components/SettingsNav";
 import { TeamSettingsSection } from "./components/TeamSettingsSection";
 import { UndoToast } from "./components/UndoToast";
 import { useChangeHistory } from "./hooks/useChangeHistory";
+import { useTeamPermissions } from "./hooks/useTeamPermissions";
+import { hasTeamPermission } from "./lib/teamPermissions";
 import {
   normalizeRefInput,
   readRefFromLocation,
@@ -102,6 +108,36 @@ export function App() {
   } = useChangeHistory();
   const [quickAdd, setQuickAdd] = useState<QuickAddTarget | null>(null);
   const [quickAddValue, setQuickAddValue] = useState("");
+  const [settingsPanel, setSettingsPanel] = useState<SettingsPanel>("general");
+  const { permissions: teamPermissions, reload: reloadTeamPermissions } =
+    useTeamPermissions(teamId);
+  const currentMember = members.find((member) => member.userId === user?.id);
+  const effectiveTeamPermissions =
+    teamPermissions ??
+    (currentMember &&
+    ["admin", "member", "viewer"].includes(currentMember.roleSlug)
+      ? {
+          roleId: currentMember.roleId,
+          roleName: currentMember.roleName,
+          roleSlug: currentMember.roleSlug,
+          permissions: permissionsForSystemSlug(currentMember.roleSlug as SystemRoleSlug),
+        }
+      : null);
+  const showRoles = hasTeamPermission(effectiveTeamPermissions, "team.roles.view");
+  const canManageRoles = hasTeamPermission(effectiveTeamPermissions, "team.roles.manage");
+  const showIntegrations = hasTeamPermission(
+    effectiveTeamPermissions,
+    "integrations.discord.view",
+  );
+  const canManageDiscord = hasTeamPermission(
+    effectiveTeamPermissions,
+    "integrations.discord.manage",
+  );
+  const canManageDiscordSecrets = hasTeamPermission(
+    effectiveTeamPermissions,
+    "integrations.discord.secrets",
+  );
+  const currentTeam = teams.find((team) => team.id === teamId) ?? null;
 
   const persistProfile = useCallback(async (next: UserProfile) => {
     try {
@@ -1062,6 +1098,18 @@ export function App() {
     setView("login");
   }
 
+  useEffect(() => {
+    if (settingsPanel === "team" && !teamId) {
+      setSettingsPanel("general");
+    }
+    if (settingsPanel === "roles" && !showRoles) {
+      setSettingsPanel("general");
+    }
+    if (settingsPanel === "integrations" && !showIntegrations) {
+      setSettingsPanel("general");
+    }
+  }, [settingsPanel, showIntegrations, showRoles, teamId]);
+
   const settingsOpen = view === "settings";
   const roadmapOpen = view === "roadmap";
   const overlayOpen = settingsOpen || roadmapOpen;
@@ -1242,71 +1290,123 @@ export function App() {
         <div className="app-workspace app-workspace--settings">
           <aside className="settings-sidebar panel settings">
             <h2>Settings</h2>
-            <p className="settings-copy settings-lead">
-              Appearance is above. Expand Advanced for board layout and profile backup.
-            </p>
-
-          <AppearanceSettingsSection profile={profile} onProfileChange={updateProfile} />
-
-          <AdvancedProfileSettingsSection
-            profile={profile}
-            onProfileChange={updateProfile}
-            profileImportText={profileImportText}
-            onProfileImportTextChange={setProfileImportText}
-            profileMessage={profileMessage}
-            onExportProfile={exportProfileFile}
-            onImportProfile={importProfileFile}
-          />
-
-          <CreateTeamSection
-            onMessage={setProfileMessage}
-            onTeamCreated={(newTeamId, switchToNew) =>
-              void handleTeamCreated(newTeamId, switchToNew)
-            }
-          />
-
-          {teamId ? (
-            <DiscordBotSettingsSection
-              teamId={teamId}
-              isAdmin={
-                members.find((member) => member.userId === user?.id)?.role === "admin"
-              }
-              onMessage={setProfileMessage}
-            />
-          ) : null}
-
-          {teamId ? (
-            <TeamSettingsSection
-              teamId={teamId}
-              teamName={teams.find((team) => team.id === teamId)?.name ?? "Team"}
-              teamKey={teams.find((team) => team.id === teamId)?.key ?? "TEAM"}
-              members={members}
-              currentUserId={user?.id ?? null}
-              onMembersChange={setMembers}
-              onMessage={setProfileMessage}
-              onTeamJoined={(joinedTeamId) => void refreshTeamsAndSwitch(joinedTeamId)}
-              onTeamLeft={(leftTeamId) => void handleTeamLeft(leftTeamId)}
-              onTeamDeleted={(deletedTeamId) => void handleTeamDeleted(deletedTeamId)}
-            />
-          ) : null}
-
-          <section className="settings-section">
-            <h3>Personal access tokens</h3>
-            <p className="settings-copy">
-              Use a PAT for MCP and CLI. It is shown once when created.
-            </p>
-            <div className="row">
-              <input
-                value={patName}
-                onChange={(e) => setPatName(e.target.value)}
-                placeholder="Token name"
+            <div className="settings-shell">
+              <SettingsNav
+                panel={settingsPanel}
+                onPanelChange={setSettingsPanel}
+                showTeam={Boolean(teamId)}
+                showRoles={showRoles}
+                showIntegrations={showIntegrations}
               />
-              <button type="button" onClick={() => void createPat()}>
-                Create token
-              </button>
+              <div className="settings-main">
+                {settingsPanel === "general" ? (
+                  <div className="settings-panel">
+                    <header className="settings-panel-header">
+                      <h2>General</h2>
+                      <p className="settings-copy settings-lead">
+                        Theme, board layout, profile backup, and creating new teams.
+                      </p>
+                    </header>
+
+                    <AppearanceSettingsSection
+                      profile={profile}
+                      onProfileChange={updateProfile}
+                    />
+
+                    <AdvancedProfileSettingsSection
+                      profile={profile}
+                      onProfileChange={updateProfile}
+                      profileImportText={profileImportText}
+                      onProfileImportTextChange={setProfileImportText}
+                      profileMessage={profileMessage}
+                      onExportProfile={exportProfileFile}
+                      onImportProfile={importProfileFile}
+                    />
+
+                    <CreateTeamSection
+                      onMessage={setProfileMessage}
+                      onTeamCreated={(newTeamId, switchToNew) =>
+                        void handleTeamCreated(newTeamId, switchToNew)
+                      }
+                    />
+                  </div>
+                ) : null}
+
+                {settingsPanel === "team" && teamId && currentTeam ? (
+                  <div className="settings-panel">
+                    <header className="settings-panel-header">
+                      <h2>Team</h2>
+                      <p className="settings-copy settings-lead">
+                        Members, invites, and team lifecycle for{" "}
+                        <strong>{currentTeam.name}</strong>.
+                      </p>
+                    </header>
+
+                    <TeamSettingsSection
+                      teamId={teamId}
+                      teamName={currentTeam.name}
+                      teamKey={currentTeam.key}
+                      members={members}
+                      currentUserId={user?.id ?? null}
+                      permissions={effectiveTeamPermissions}
+                      onMembersChange={setMembers}
+                      onMessage={setProfileMessage}
+                      onTeamJoined={(joinedTeamId) => void refreshTeamsAndSwitch(joinedTeamId)}
+                      onTeamLeft={(leftTeamId) => void handleTeamLeft(leftTeamId)}
+                      onTeamDeleted={(deletedTeamId) => void handleTeamDeleted(deletedTeamId)}
+                    />
+                  </div>
+                ) : null}
+
+                {settingsPanel === "roles" && teamId && currentTeam && showRoles ? (
+                  <RolesSettingsSection
+                    teamId={teamId}
+                    canManage={canManageRoles}
+                    onMessage={setProfileMessage}
+                    onRolesChange={() => void reloadTeamPermissions()}
+                  />
+                ) : null}
+
+                {settingsPanel === "integrations" && teamId && currentTeam && showIntegrations ? (
+                  <IntegrationsSettingsSection
+                    teamId={teamId}
+                    teamKey={currentTeam.key}
+                    canManageDiscord={canManageDiscord}
+                    canManageSecrets={canManageDiscordSecrets}
+                    onMessage={setProfileMessage}
+                  />
+                ) : null}
+
+                {settingsPanel === "tokens" ? (
+                  <div className="settings-panel">
+                    <header className="settings-panel-header">
+                      <h2>API tokens</h2>
+                      <p className="settings-copy settings-lead">
+                        Personal access tokens for MCP, CLI, and the Discord bot.
+                      </p>
+                    </header>
+
+                    <section className="settings-section">
+                      <h3>Personal access tokens</h3>
+                      <p className="settings-copy">
+                        Use a PAT for MCP and CLI. It is shown once when created.
+                      </p>
+                      <div className="row">
+                        <input
+                          value={patName}
+                          onChange={(e) => setPatName(e.target.value)}
+                          placeholder="Token name"
+                        />
+                        <button type="button" onClick={() => void createPat()}>
+                          Create token
+                        </button>
+                      </div>
+                      {createdPat ? <pre className="token-box">{createdPat}</pre> : null}
+                    </section>
+                  </div>
+                ) : null}
+              </div>
             </div>
-            {createdPat && <pre className="token-box">{createdPat}</pre>}
-          </section>
           </aside>
           {boardPanel}
         </div>

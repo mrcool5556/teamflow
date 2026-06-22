@@ -1,7 +1,9 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import type { TeamInvitePublic, TeamMemberPublic } from "@teamflow/core";
+import type { TeamInvitePublic, TeamMemberPublic, TeamPermissionsPublic, TeamRolePublic } from "@teamflow/core";
 import { client } from "../api";
+import { useTeamRoles } from "../hooks/useTeamRoles";
 import { buildInviteShareUrl, extractInviteToken } from "../lib/inviteLinks";
+import { hasTeamPermission } from "../lib/teamPermissions";
 
 type TeamSettingsSectionProps = {
   teamId: string;
@@ -9,6 +11,7 @@ type TeamSettingsSectionProps = {
   teamKey: string;
   members: TeamMemberPublic[];
   currentUserId: string | null;
+  permissions: TeamPermissionsPublic | null;
   onMembersChange: (members: TeamMemberPublic[]) => void;
   onMessage: (message: string | null) => void;
   onTeamJoined?: (teamId: string) => void;
@@ -22,6 +25,7 @@ export function TeamSettingsSection({
   teamKey,
   members,
   currentUserId,
+  permissions,
   onMembersChange,
   onMessage,
   onTeamJoined,
@@ -39,13 +43,24 @@ export function TeamSettingsSection({
   const [leavingTeam, setLeavingTeam] = useState(false);
   const [deletingTeam, setDeletingTeam] = useState(false);
   const [copiedKey, setCopiedKey] = useState<string | null>(null);
+  const [updatingMemberRoleId, setUpdatingMemberRoleId] = useState<string | null>(null);
+  const [inviteRoleId, setInviteRoleId] = useState("");
   const copyTimeoutRef = useRef<number | null>(null);
 
-  const currentMember = members.find((member) => member.userId === currentUserId);
-  const isAdmin = currentMember?.role === "admin";
+  const canManageMembers = hasTeamPermission(permissions, "team.members.manage");
+  const canManageInvites = hasTeamPermission(permissions, "team.invites.manage");
+  const canDeleteTeam = hasTeamPermission(permissions, "team.delete");
+  const { roles } = useTeamRoles(canManageMembers || canManageInvites ? teamId : null);
+
+  useEffect(() => {
+    if (!inviteRoleId && roles.length > 0) {
+      const memberRole = roles.find((role) => role.slug === "member") ?? roles[0];
+      if (memberRole) setInviteRoleId(memberRole.id);
+    }
+  }, [inviteRoleId, roles]);
 
   const loadInvites = useCallback(async () => {
-    if (!isAdmin) {
+    if (!canManageInvites) {
       setInvites([]);
       return;
     }
@@ -58,7 +73,7 @@ export function TeamSettingsSection({
     } finally {
       setInvitesLoading(false);
     }
-  }, [isAdmin, onMessage, teamId]);
+  }, [canManageInvites, onMessage, teamId]);
 
   useEffect(() => {
     void loadInvites();
@@ -69,7 +84,7 @@ export function TeamSettingsSection({
     onMessage(null);
     try {
       const { invite } = await client.createTeamInvite(teamId, {
-        role: "member",
+        roleId: inviteRoleId || undefined,
         maxUses: multiUseInvite ? null : 1,
       });
       const url = buildInviteShareUrl(invite.token);
@@ -109,6 +124,22 @@ export function TeamSettingsSection({
       await loadInvites();
     } catch (err) {
       onMessage(err instanceof Error ? err.message : "Failed to revoke invite");
+    }
+  }
+
+  async function changeMemberRole(member: TeamMemberPublic, roleId: string) {
+    if (roleId === member.roleId) return;
+    setUpdatingMemberRoleId(member.id);
+    onMessage(null);
+    try {
+      await client.updateTeamMemberRole(teamId, member.id, roleId);
+      const { members: refreshed } = await client.listTeamMembers(teamId);
+      onMembersChange(refreshed);
+      onMessage(`Updated role for ${member.name}.`);
+    } catch (err) {
+      onMessage(err instanceof Error ? err.message : "Failed to update member role");
+    } finally {
+      setUpdatingMemberRoleId(null);
     }
   }
 
@@ -210,6 +241,34 @@ export function TeamSettingsSection({
 
   return (
     <>
+      {permissions ? (
+        <section className="settings-section team-access-summary">
+          <h3>Your access</h3>
+          <p className="settings-copy">
+            Your role is <strong>{permissions.roleName}</strong>. Edit roles under Settings →
+            Roles, then assign them to members below.
+          </p>
+          <ul className="team-access-list">
+            {permissions.permissions.includes("team.members.manage") ? (
+              <li>Manage members and assign roles</li>
+            ) : null}
+            {permissions.permissions.includes("team.invites.manage") ? (
+              <li>Create and revoke invite links</li>
+            ) : null}
+            {permissions.permissions.includes("team.roles.manage") ? (
+              <li>Create and edit roles & permissions</li>
+            ) : null}
+            {permissions.permissions.includes("integrations.discord.manage") ? (
+              <li>Manage Discord integration settings</li>
+            ) : null}
+            {permissions.permissions.length === 1 &&
+            permissions.permissions[0] === "team.members.view" ? (
+              <li>View team members only</li>
+            ) : null}
+          </ul>
+        </section>
+      ) : null}
+
       <section className="settings-section">
         <h3>Team members</h3>
         <p className="settings-copy">
@@ -223,8 +282,23 @@ export function TeamSettingsSection({
                 <span className="muted team-member-email">{member.email}</span>
               </div>
               <div className="team-member-meta">
-                <span className="team-member-role">{member.role}</span>
-                {isAdmin && member.userId !== currentUserId ? (
+                {canManageMembers ? (
+                  <select
+                    className="team-member-role-select"
+                    value={member.roleId}
+                    disabled={updatingMemberRoleId === member.id}
+                    onChange={(e) => void changeMemberRole(member, e.target.value)}
+                  >
+                    {roles.map((role: TeamRolePublic) => (
+                      <option key={role.id} value={role.id}>
+                        {role.name}
+                      </option>
+                    ))}
+                  </select>
+                ) : (
+                  <span className="team-member-role">{member.roleName}</span>
+                )}
+                {canManageMembers && member.userId !== currentUserId ? (
                   <button
                     type="button"
                     className="ghost danger"
@@ -250,7 +324,7 @@ export function TeamSettingsSection({
         </div>
       </section>
 
-      {isAdmin ? (
+      {canManageInvites ? (
         <section className="settings-section">
           <h3>Invite link</h3>
           <p className="settings-copy">
@@ -264,6 +338,20 @@ export function TeamSettingsSection({
               onChange={(e) => setMultiUseInvite(e.target.checked)}
             />
             Allow multiple people to use the same link
+          </label>
+          <label>
+            Role for new members
+            <select
+              value={inviteRoleId}
+              onChange={(e) => setInviteRoleId(e.target.value)}
+              disabled={roles.length === 0}
+            >
+              {roles.map((role) => (
+                <option key={role.id} value={role.id}>
+                  {role.name}
+                </option>
+              ))}
+            </select>
           </label>
           <div className="row settings-actions">
             <button type="button" disabled={creatingInvite} onClick={() => void createInviteLink()}>
@@ -290,8 +378,8 @@ export function TeamSettingsSection({
                   <div>
                     <code>{invite.token.slice(0, 10)}…</code>
                     <span className="muted">
-                      {invite.maxUses === 1 ? "single-use" : "multi-use"} · expires{" "}
-                      {new Date(invite.expiresAt).toLocaleDateString()}
+                      {invite.roleName} · {invite.maxUses === 1 ? "single-use" : "multi-use"} ·
+                      expires {new Date(invite.expiresAt).toLocaleDateString()}
                     </span>
                   </div>
                   <div className="row settings-actions">
@@ -319,7 +407,7 @@ export function TeamSettingsSection({
         </section>
       ) : null}
 
-      {isAdmin ? (
+      {canDeleteTeam ? (
         <section className="settings-section settings-danger-zone">
           <h3>Delete team</h3>
           <p className="settings-copy">

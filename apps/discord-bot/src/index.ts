@@ -14,15 +14,45 @@ import {
   Routes,
 } from "discord.js";
 import { handleSlashCommand, slashCommands } from "./commands.js";
-import { loadConfig } from "./config.js";
+import { loadConfig, type BotConfig } from "./config.js";
 import { registerTicketHandlers } from "./tickets.js";
 import { createTeamflowClient } from "./teamflow.js";
 
-async function registerSlashCommands(config: ReturnType<typeof loadConfig>) {
-  const rest = new REST({ version: "10" }).setToken(config.discordToken);
+async function resolveRegisterGuildIds(
+  config: BotConfig,
+  teamflow: ReturnType<typeof createTeamflowClient>,
+) {
+  const guildIds = new Set(config.registerGuildIds);
 
-  if (config.registerGuildIds.length > 0) {
-    for (const guildId of config.registerGuildIds) {
+  try {
+    const { teams } = await teamflow.listTeams();
+    for (const team of teams) {
+      try {
+        const { settings } = await teamflow.getTeamDiscordSettings(team.id);
+        if (settings.guildId) guildIds.add(settings.guildId);
+      } catch {
+        // skip teams the PAT cannot read
+      }
+    }
+  } catch (err) {
+    console.warn(
+      "[teamflow-discord] Could not load guild IDs from Teamflow settings:",
+      err instanceof Error ? err.message : err,
+    );
+  }
+
+  return [...guildIds];
+}
+
+async function registerSlashCommands(
+  config: BotConfig,
+  teamflow: ReturnType<typeof createTeamflowClient>,
+) {
+  const rest = new REST({ version: "10" }).setToken(config.discordToken);
+  const guildIds = await resolveRegisterGuildIds(config, teamflow);
+
+  if (guildIds.length > 0) {
+    for (const guildId of guildIds) {
       await rest.put(Routes.applicationGuildCommands(config.discordClientId, guildId), {
         body: slashCommands,
       });
@@ -38,8 +68,12 @@ async function registerSlashCommands(config: ReturnType<typeof loadConfig>) {
 }
 
 async function main() {
-  const config = loadConfig();
+  const config = await loadConfig();
   const teamflow = createTeamflowClient(config);
+
+  console.log(
+    `[teamflow-discord] Config source: ${config.configSource === "settings" ? "Teamflow Settings" : ".env file"}`,
+  );
 
   const { user } = await teamflow.me();
   console.log(`[teamflow-discord] Teamflow PAT user: ${user.name} (${user.email})`);
@@ -66,7 +100,7 @@ async function main() {
       );
     }
     try {
-      await registerSlashCommands(config);
+      await registerSlashCommands(config, teamflow);
     } catch (err) {
       console.error("[teamflow-discord] Failed to register slash commands:", err);
     }

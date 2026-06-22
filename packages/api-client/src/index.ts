@@ -20,6 +20,13 @@ import type {
   TeamDiscordSettingsPublic,
   UpdateTeamDiscordSettingsInput,
   DiscordGuildConfigPublic,
+  DiscordBotSecretsPublic,
+  UpdateDiscordBotSecretsInput,
+  TeamPermissionsPublic,
+  TeamRolePublic,
+  CreateTeamInviteInput,
+  CreateTeamRoleInput,
+  UpdateTeamRoleInput,
   TeamPublic,
   TeamMemberPublic,
   UpdateIssueInput,
@@ -251,14 +258,7 @@ export class TeamflowClient {
     );
   }
 
-  createTeamInvite(
-    teamId: string,
-    input: {
-      role?: "admin" | "member" | "viewer";
-      expiresInDays?: number;
-      maxUses?: 1 | null;
-    } = {},
-  ) {
+  createTeamInvite(teamId: string, input: Partial<CreateTeamInviteInput> = {}) {
     return this.request<{ invite: TeamInvitePublic }>(`/teams/${teamId}/invites`, {
       method: "POST",
       body: JSON.stringify(input),
@@ -271,6 +271,43 @@ export class TeamflowClient {
     });
   }
 
+  getTeamPermissions(teamId: string) {
+    return this.request<{ permissions: TeamPermissionsPublic }>(
+      `/teams/${teamId}/permissions/me`,
+    );
+  }
+
+  listTeamRoles(teamId: string) {
+    return this.request<{ roles: TeamRolePublic[] }>(`/teams/${teamId}/roles`);
+  }
+
+  createTeamRole(teamId: string, input: CreateTeamRoleInput) {
+    return this.request<{ role: TeamRolePublic }>(`/teams/${teamId}/roles`, {
+      method: "POST",
+      body: JSON.stringify(input),
+    });
+  }
+
+  updateTeamRole(teamId: string, roleId: string, input: UpdateTeamRoleInput) {
+    return this.request<{ role: TeamRolePublic }>(`/teams/${teamId}/roles/${roleId}`, {
+      method: "PATCH",
+      body: JSON.stringify(input),
+    });
+  }
+
+  deleteTeamRole(teamId: string, roleId: string) {
+    return this.request<void>(`/teams/${teamId}/roles/${roleId}`, {
+      method: "DELETE",
+    });
+  }
+
+  updateTeamMemberRole(teamId: string, memberId: string, roleId: string) {
+    return this.request<{ role: TeamRolePublic }>(`/teams/${teamId}/members/${memberId}`, {
+      method: "PATCH",
+      body: JSON.stringify({ roleId }),
+    });
+  }
+
   getTeamDiscordSettings(teamId: string) {
     return this.request<{ settings: TeamDiscordSettingsPublic }>(
       `/teams/${teamId}/discord-settings`,
@@ -280,6 +317,22 @@ export class TeamflowClient {
   updateTeamDiscordSettings(teamId: string, input: UpdateTeamDiscordSettingsInput) {
     return this.request<{ settings: TeamDiscordSettingsPublic }>(
       `/teams/${teamId}/discord-settings`,
+      {
+        method: "PATCH",
+        body: JSON.stringify(input),
+      },
+    );
+  }
+
+  getDiscordBotSecrets(teamId: string) {
+    return this.request<{ secrets: DiscordBotSecretsPublic }>(
+      `/teams/${teamId}/integrations/discord/secrets`,
+    );
+  }
+
+  updateDiscordBotSecrets(teamId: string, input: UpdateDiscordBotSecretsInput) {
+    return this.request<{ secrets: DiscordBotSecretsPublic }>(
+      `/teams/${teamId}/integrations/discord/secrets`,
       {
         method: "PATCH",
         body: JSON.stringify(input),

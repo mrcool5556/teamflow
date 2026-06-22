@@ -1,3 +1,5 @@
+import type { DiscordBotRuntimeConfig } from "@teamflow/core";
+
 export type BotConfig = {
   discordToken: string;
   discordClientId: string;
@@ -13,6 +15,7 @@ export type BotConfig = {
   /** Env fallback when guild is not linked in Teamflow settings UI. */
   allowedRoleIds: string[];
   allowDiscordAdministrators: boolean;
+  configSource: "settings" | "env";
 };
 
 function parseJsonRecord(raw: string | undefined): Record<string, string> {
@@ -46,14 +49,63 @@ function parseIdList(raw: string | undefined) {
   );
 }
 
-export function loadConfig(): BotConfig {
+function loadEnvOptionalFields(
+  teamflowUrl: string,
+  publicUrl: string,
+  requireTeamMapping = true,
+) {
+  const defaultTeamId = process.env.TEAMFLOW_TEAM_ID?.trim() || null;
+  const guildTeams = parseJsonRecord(process.env.DISCORD_GUILD_TEAMS);
+
+  if (requireTeamMapping && !defaultTeamId && Object.keys(guildTeams).length === 0) {
+    throw new Error(
+      "Set TEAMFLOW_TEAM_ID or DISCORD_GUILD_TEAMS so the bot knows which board to use",
+    );
+  }
+
+  return {
+    teamflowUrl,
+    publicUrl,
+    defaultTeamId,
+    guildTeams,
+    ticketChannelIds: parseIdList(process.env.DISCORD_TICKET_CHANNEL_IDS),
+    registerGuildIds: [...parseIdList(process.env.DISCORD_REGISTER_GUILD_IDS)],
+    messageContentIntent:
+      process.env.DISCORD_MESSAGE_CONTENT_INTENT === "true",
+    allowedRoleIds: [...parseIdList(process.env.DISCORD_ALLOWED_ROLE_IDS)],
+    allowDiscordAdministrators: process.env.DISCORD_ALLOW_ADMINISTRATORS === "true",
+  };
+}
+
+function buildConfigFromRemote(
+  remote: DiscordBotRuntimeConfig,
+  optional: ReturnType<typeof loadEnvOptionalFields>,
+): BotConfig {
+  return {
+    discordToken: remote.botToken,
+    discordClientId: remote.clientId,
+    teamflowUrl: remote.teamflowUrl,
+    teamflowToken: remote.pat,
+    publicUrl: remote.publicUrl,
+    defaultTeamId: optional.defaultTeamId,
+    guildTeams: optional.guildTeams,
+    ticketChannelIds: optional.ticketChannelIds,
+    registerGuildIds: optional.registerGuildIds,
+    messageContentIntent: remote.messageContentIntent,
+    allowedRoleIds: optional.allowedRoleIds,
+    allowDiscordAdministrators: optional.allowDiscordAdministrators,
+    configSource: "settings",
+  };
+}
+
+function loadConfigFromEnv(): BotConfig {
   const discordToken = process.env.DISCORD_BOT_TOKEN?.trim();
   const discordClientId = process.env.DISCORD_CLIENT_ID?.trim();
   const teamflowToken = process.env.TEAMFLOW_TOKEN?.trim();
 
   if (!discordToken) {
     throw new Error(
-      "DISCORD_BOT_TOKEN is required — copy apps/discord-bot/.env.example to .env and fill in values",
+      "DISCORD_BOT_TOKEN is required — save secrets in Teamflow Settings or copy apps/discord-bot/.env.example to .env",
     );
   }
   if (!discordClientId) {
@@ -63,34 +115,64 @@ export function loadConfig(): BotConfig {
     throw new Error("TEAMFLOW_TOKEN is required (create a PAT in Teamflow Settings)");
   }
 
-  const defaultTeamId = process.env.TEAMFLOW_TEAM_ID?.trim() || null;
-  const guildTeams = parseJsonRecord(process.env.DISCORD_GUILD_TEAMS);
-
-  if (!defaultTeamId && Object.keys(guildTeams).length === 0) {
-    throw new Error(
-      "Set TEAMFLOW_TEAM_ID or DISCORD_GUILD_TEAMS so the bot knows which board to use",
-    );
-  }
+  const teamflowUrl = (process.env.TEAMFLOW_URL ?? "http://localhost:3000").replace(/\/$/, "");
+  const publicUrl = (process.env.TEAMFLOW_PUBLIC_URL ?? "http://localhost:5173").replace(
+    /\/$/,
+    "",
+  );
+  const optional = loadEnvOptionalFields(teamflowUrl, publicUrl);
 
   return {
     discordToken,
     discordClientId,
-    teamflowUrl: (process.env.TEAMFLOW_URL ?? "http://localhost:3000").replace(/\/$/, ""),
     teamflowToken,
-    publicUrl: (process.env.TEAMFLOW_PUBLIC_URL ?? "http://localhost:5173").replace(
-      /\/$/,
-      "",
-    ),
-    defaultTeamId,
-    guildTeams,
-    ticketChannelIds: parseIdList(process.env.DISCORD_TICKET_CHANNEL_IDS),
-    registerGuildIds: parseIdList(process.env.DISCORD_REGISTER_GUILD_IDS)
-      ? [...parseIdList(process.env.DISCORD_REGISTER_GUILD_IDS)]
-      : [],
-    messageContentIntent: process.env.DISCORD_MESSAGE_CONTENT_INTENT === "true",
-    allowedRoleIds: [...parseIdList(process.env.DISCORD_ALLOWED_ROLE_IDS)],
-    allowDiscordAdministrators: process.env.DISCORD_ALLOW_ADMINISTRATORS === "true",
+    ...optional,
+    configSource: "env",
   };
+}
+
+async function loadConfigFromSettings(teamflowUrl: string, configKey: string) {
+  const response = await fetch(`${teamflowUrl}/integrations/discord/bot-config`, {
+    headers: { "X-Teamflow-Bot-Key": configKey },
+  });
+
+  if (response.status === 503) {
+    throw new Error(
+      "Server has no TEAMFLOW_BOT_CONFIG_KEY — set the same random key in Teamflow .env and apps/discord-bot/.env",
+    );
+  }
+  if (response.status === 404) {
+    throw new Error(
+      "Discord bot secrets are not saved in Settings → Integrations yet",
+    );
+  }
+  if (!response.ok) {
+    const payload = (await response.json().catch(() => ({}))) as { error?: string };
+    throw new Error(payload.error ?? `bot-config request failed (${response.status})`);
+  }
+
+  const { config } = (await response.json()) as { config: DiscordBotRuntimeConfig };
+  const optional = loadEnvOptionalFields(config.teamflowUrl, config.publicUrl, false);
+  return buildConfigFromRemote(config, optional);
+}
+
+export async function loadConfig(): Promise<BotConfig> {
+  const teamflowUrl = (process.env.TEAMFLOW_URL ?? "http://localhost:3000").replace(/\/$/, "");
+  const configKey = process.env.TEAMFLOW_BOT_CONFIG_KEY?.trim();
+
+  if (configKey) {
+    try {
+      return await loadConfigFromSettings(teamflowUrl, configKey);
+    } catch (err) {
+      console.warn(
+        "[teamflow-discord] Could not load secrets from Teamflow Settings:",
+        err instanceof Error ? err.message : err,
+      );
+      console.warn("[teamflow-discord] Falling back to apps/discord-bot/.env");
+    }
+  }
+
+  return loadConfigFromEnv();
 }
 
 export function resolveTeamId(config: BotConfig, guildId: string | null) {
@@ -101,6 +183,6 @@ export function resolveTeamId(config: BotConfig, guildId: string | null) {
     return config.defaultTeamId;
   }
   throw new Error(
-    "No Teamflow team configured for this Discord server. Set DISCORD_GUILD_TEAMS or TEAMFLOW_TEAM_ID.",
+    "No Teamflow team configured for this Discord server. Link the guild in Settings → Integrations or set TEAMFLOW_TEAM_ID.",
   );
 }
