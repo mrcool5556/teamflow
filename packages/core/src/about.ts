@@ -7,19 +7,41 @@ export const TEAMFLOW_ABOUT = {
   tagline: "Self-hosted team issue tracker with MCP and CLI for AI assistants.",
 } as const;
 
-/** Replace YOUR_* placeholders with your real usernames before going public. */
-export const TEAMFLOW_SUPPORT_LINKS = [
-  {
-    label: "GitHub Sponsors",
-    url: "https://github.com/sponsors/mrcool5556",
-    accent: true,
-  },
-  {
-    label: "Ko-fi",
-    url: "https://ko-fi.com/YOUR_KOFI_USERNAME",
-  },
-  {
+export type SupportLinkConfig = {
+  label: string;
+  url: string;
+  /** Flip to true after setting a real URL (no YOUR_* placeholders). */
+  enabled: boolean;
+  accent?: boolean;
+  /** Optional donate QR (e.g. PayPal). Put image in apps/web/public/support/ */
+  qrImageUrl?: string | null;
+};
+
+/**
+ * Donation links — hidden until enabled and configured.
+ *
+ * PayPal: set url, enabled: true, optional qrImageUrl: "/support/paypal-qr.png"
+ * Ko-fi: set url, enabled: true
+ */
+export const TEAMFLOW_SUPPORT = {
+  paypal: {
     label: "PayPal",
     url: "https://paypal.me/YOUR_PAYPAL_USERNAME",
+    enabled: false,
+    accent: true,
+    qrImageUrl: null,
   },
-] as const;
+  kofi: {
+    label: "Ko-fi",
+    url: "https://ko-fi.com/YOUR_KOFI_USERNAME",
+    enabled: false,
+  },
+} satisfies Record<string, SupportLinkConfig>;
+
+function isSupportLinkVisible(link: SupportLinkConfig) {
+  return link.enabled && !link.url.includes("YOUR_");
+}
+
+export function getVisibleSupportLinks(): SupportLinkConfig[] {
+  return Object.values(TEAMFLOW_SUPPORT).filter(isSupportLinkVisible);
+}

@@ -528,6 +528,30 @@ select {
   color: var(--accent-contrast, #000);
 }
 
+.about-qr {
+  display: grid;
+  justify-items: center;
+  gap: 0.5rem;
+  padding-top: 0.25rem;
+  border-top: 1px dashed var(--border);
+}
+
+.about-qr-label {
+  margin: 0;
+  font-size: 0.78rem;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.about-qr img {
+  width: min(180px, 100%);
+  height: auto;
+  border: 2px solid var(--border-strong);
+  background: #fff;
+  padding: 0.35rem;
+}
+
 .about-login-link {
   margin-top: 0.5rem;
   width: 100%;

@@ -1,5 +1,5 @@
 import { useEffect } from "react";
-import { TEAMFLOW_ABOUT, TEAMFLOW_SUPPORT_LINKS } from "@teamflow/core";
+import { TEAMFLOW_ABOUT, getVisibleSupportLinks } from "@teamflow/core";
 
 type AboutDialogProps = {
   open: boolean;
@@ -8,6 +8,8 @@ type AboutDialogProps = {
 };
 
 export function AboutDialog({ open, version, onClose }: AboutDialogProps) {
+  const supportLinks = getVisibleSupportLinks();
+
   useEffect(() => {
     if (!open) return;
 
@@ -72,13 +74,11 @@ export function AboutDialog({ open, version, onClose }: AboutDialogProps) {
           >
             View on GitHub
           </a>
-          {TEAMFLOW_SUPPORT_LINKS.map((link) => (
+          {supportLinks.map((link) => (
             <a
               key={link.label}
               className={
-                "accent" in link && link.accent
-                  ? "about-link-btn about-link-btn--accent"
-                  : "about-link-btn"
+                link.accent ? "about-link-btn about-link-btn--accent" : "about-link-btn"
               }
               href={link.url}
               target="_blank"
@@ -88,6 +88,15 @@ export function AboutDialog({ open, version, onClose }: AboutDialogProps) {
             </a>
           ))}
         </div>
+
+        {supportLinks.map((link) =>
+          link.qrImageUrl ? (
+            <div key={`${link.label}-qr`} className="about-qr">
+              <p className="about-qr-label">{link.label}</p>
+              <img src={link.qrImageUrl} alt={`${link.label} QR code`} />
+            </div>
+          ) : null,
+        )}
       </section>
     </div>
   );
