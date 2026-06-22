@@ -54,6 +54,30 @@ export const teams = sqliteTable("teams", {
     .default(sql`(datetime('now'))`),
 });
 
+export const teamRoles = sqliteTable(
+  "team_roles",
+  {
+    id: text("id")
+      .primaryKey()
+      .$defaultFn(() => crypto.randomUUID()),
+    teamId: text("team_id")
+      .notNull()
+      .references(() => teams.id, { onDelete: "cascade" }),
+    name: text("name").notNull(),
+    slug: text("slug").notNull(),
+    permissions: text("permissions").notNull().default("[]"),
+    isSystem: integer("is_system").notNull().default(0),
+    position: integer("position").notNull().default(0),
+    createdAt: text("created_at")
+      .notNull()
+      .default(sql`(datetime('now'))`),
+    updatedAt: text("updated_at")
+      .notNull()
+      .default(sql`(datetime('now'))`),
+  },
+  (table) => [uniqueIndex("team_roles_team_slug_unique").on(table.teamId, table.slug)],
+);
+
 export const teamMembers = sqliteTable(
   "team_members",
   {
@@ -66,6 +90,7 @@ export const teamMembers = sqliteTable(
     userId: text("user_id")
       .notNull()
       .references(() => users.id, { onDelete: "cascade" }),
+    roleId: text("role_id").references(() => teamRoles.id, { onDelete: "restrict" }),
     role: text("role").notNull().default("member"),
     createdAt: text("created_at")
       .notNull()
@@ -84,6 +109,7 @@ export const teamInvites = sqliteTable(
       .notNull()
       .references(() => teams.id, { onDelete: "cascade" }),
     token: text("token").notNull().unique(),
+    roleId: text("role_id").references(() => teamRoles.id, { onDelete: "restrict" }),
     role: text("role").notNull().default("member"),
     createdByUserId: text("created_by_user_id")
       .notNull()
@@ -110,6 +136,20 @@ export const teamDiscordSettings = sqliteTable("team_discord_settings", {
   updatedAt: text("updated_at")
     .notNull()
     .default(sql`(datetime('now'))`),
+});
+
+export const discordBotSecrets = sqliteTable("discord_bot_secrets", {
+  id: text("id").primaryKey().default("default"),
+  botTokenEnc: text("bot_token_enc"),
+  clientId: text("client_id"),
+  patEnc: text("pat_enc"),
+  teamflowUrl: text("teamflow_url").notNull().default("http://localhost:3000"),
+  publicUrl: text("public_url").notNull().default("http://localhost:5173"),
+  messageContentIntent: integer("message_content_intent").notNull().default(0),
+  updatedAt: text("updated_at"),
+  updatedByUserId: text("updated_by_user_id").references(() => users.id, {
+    onDelete: "set null",
+  }),
 });
 
 export const projects = sqliteTable("projects", {

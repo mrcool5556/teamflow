@@ -174,7 +174,7 @@ select {
 
 .app-workspace--settings {
   display: grid;
-  grid-template-columns: minmax(300px, 380px) minmax(0, 1fr);
+  grid-template-columns: minmax(420px, 560px) minmax(0, 1fr);
   align-items: stretch;
   flex: 1;
   min-height: 0;
@@ -192,6 +192,139 @@ select {
   padding: 1rem 1.25rem 2rem;
   overflow-y: auto;
   max-height: calc(100vh - 4.5rem);
+}
+
+.settings-shell {
+  display: flex;
+  gap: 0;
+  margin-top: 1rem;
+  min-height: 0;
+}
+
+.settings-nav {
+  flex: 0 0 9.5rem;
+  border-right: 2px solid var(--border);
+  padding-right: 0.75rem;
+}
+
+.settings-nav-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.settings-nav-btn {
+  width: 100%;
+  text-align: left;
+  padding: 0.45rem 0.6rem;
+  border: 2px solid transparent;
+  background: transparent;
+  font: inherit;
+  cursor: pointer;
+  color: var(--muted);
+}
+
+.settings-nav-btn:hover {
+  color: var(--text);
+  border-color: var(--border);
+}
+
+.settings-nav-btn.active {
+  color: var(--text);
+  border-color: var(--accent);
+  font-weight: 600;
+}
+
+.settings-main {
+  flex: 1;
+  min-width: 0;
+  padding-left: 1rem;
+}
+
+.settings-panel-header {
+  margin-bottom: 1rem;
+}
+
+.settings-panel-header h2 {
+  font-size: 1.15rem;
+  margin-bottom: 0.35rem;
+}
+
+.settings-main .settings-panel .settings-section:first-of-type {
+  margin-top: 0;
+  padding-top: 0;
+  border-top: none;
+}
+
+.roles-layout {
+  display: grid;
+  grid-template-columns: minmax(9rem, 11rem) minmax(0, 1fr);
+  gap: 1rem;
+}
+
+.roles-list {
+  list-style: none;
+  padding: 0;
+  margin: 0.75rem 0 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.roles-list-btn {
+  width: 100%;
+  text-align: left;
+  padding: 0.55rem 0.65rem;
+  border: 2px solid var(--border);
+  background: var(--bg-soft);
+  color: var(--text);
+  font: inherit;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+}
+
+.roles-list-btn.active,
+.roles-list-btn:hover {
+  border-color: var(--accent);
+}
+
+.roles-create-row {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  margin-top: 1rem;
+}
+
+.roles-permission-group {
+  margin-top: 1rem;
+}
+
+.roles-permission-group h4 {
+  margin: 0 0 0.35rem;
+  font-size: 0.92rem;
+}
+
+.roles-permission-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.team-member-role-select {
+  min-width: 7.5rem;
+  font: inherit;
+  padding: 0.25rem 0.35rem;
+  border: 2px solid var(--border);
+  background: var(--bg);
+  color: var(--text);
 }
 
 .board-wrap--preview {
@@ -1950,6 +2083,17 @@ select {
   max-width: none;
 }
 
+.team-access-list {
+  margin: 0.5rem 0 0;
+  padding-left: 1.25rem;
+  color: var(--muted);
+  font-size: 0.92rem;
+}
+
+.team-access-list li + li {
+  margin-top: 0.25rem;
+}
+
 .settings-section {
   margin-top: 1.5rem;
   padding-top: 1.25rem;
@@ -2058,6 +2202,19 @@ select {
 
 .settings-hint--warn {
   color: var(--danger, #e5534b);
+}
+
+.discord-setup-guide {
+  margin-top: 0.75rem;
+}
+
+.discord-setup-steps {
+  margin: 0.75rem 0 0;
+  padding-left: 1.25rem;
+}
+
+.discord-setup-steps li {
+  margin-bottom: 0.5rem;
 }
 
 .settings-actions {

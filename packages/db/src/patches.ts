@@ -86,6 +86,8 @@ export function applySchemaPatches(sqlite: Database.Database) {
   ensureColorColumns(sqlite);
   ensureTeamInvitesTable(sqlite);
   ensureTeamDiscordSettingsTable(sqlite);
+  ensureTeamRolesTable(sqlite);
+  ensureDiscordBotSecretsTable(sqlite);
   purgeExpiredDeletedIssues(sqlite);
 }
 
@@ -119,6 +121,166 @@ function ensureTeamInvitesTable(sqlite: Database.Database) {
     );
     console.log("Added team_invites.use_count column");
   }
+}
+
+function ensureTeamRolesTable(sqlite: Database.Database) {
+  sqlite.exec(`
+    CREATE TABLE IF NOT EXISTS team_roles (
+      id TEXT PRIMARY KEY,
+      team_id TEXT NOT NULL REFERENCES teams(id) ON DELETE CASCADE,
+      name TEXT NOT NULL,
+      slug TEXT NOT NULL,
+      permissions TEXT NOT NULL DEFAULT '[]',
+      is_system INTEGER NOT NULL DEFAULT 0,
+      position INTEGER NOT NULL DEFAULT 0,
+      created_at TEXT NOT NULL DEFAULT (datetime('now')),
+      updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+  `);
+  sqlite.exec(`
+    CREATE UNIQUE INDEX IF NOT EXISTS team_roles_team_slug_unique
+    ON team_roles(team_id, slug)
+  `);
+
+  const memberCols = sqlite
+    .prepare("PRAGMA table_info(team_members)")
+    .all() as { name: string }[];
+  if (!memberCols.some((col) => col.name === "role_id")) {
+    sqlite.exec(
+      `ALTER TABLE team_members ADD COLUMN role_id TEXT REFERENCES team_roles(id) ON DELETE RESTRICT`,
+    );
+    console.log("Added team_members.role_id column");
+  }
+
+  const inviteCols = sqlite
+    .prepare("PRAGMA table_info(team_invites)")
+    .all() as { name: string }[];
+  if (!inviteCols.some((col) => col.name === "role_id")) {
+    sqlite.exec(
+      `ALTER TABLE team_invites ADD COLUMN role_id TEXT REFERENCES team_roles(id) ON DELETE RESTRICT`,
+    );
+    console.log("Added team_invites.role_id column");
+  }
+
+  const defaultRoles = [
+    {
+      slug: "admin",
+      name: "Admin",
+      permissions: JSON.stringify([
+        "team.members.view",
+        "team.members.manage",
+        "team.invites.manage",
+        "team.roles.view",
+        "team.roles.manage",
+        "team.delete",
+        "integrations.discord.view",
+        "integrations.discord.manage",
+        "integrations.discord.secrets",
+      ]),
+      position: 0,
+    },
+    {
+      slug: "member",
+      name: "Member",
+      permissions: JSON.stringify(["team.members.view"]),
+      position: 1,
+    },
+    {
+      slug: "viewer",
+      name: "Viewer",
+      permissions: JSON.stringify(["team.members.view"]),
+      position: 2,
+    },
+  ] as const;
+
+  const teams = sqlite.prepare("SELECT id FROM teams").all() as { id: string }[];
+  const insertRole = sqlite.prepare(`
+    INSERT INTO team_roles (id, team_id, name, slug, permissions, is_system, position, updated_at)
+    VALUES (?, ?, ?, ?, ?, 1, ?, datetime('now'))
+  `);
+  const findRole = sqlite.prepare(
+    "SELECT id FROM team_roles WHERE team_id = ? AND slug = ? LIMIT 1",
+  );
+
+  for (const team of teams) {
+    const roleIds = new Map<string, string>();
+    for (const template of defaultRoles) {
+      const existing = findRole.get(team.id, template.slug) as { id: string } | undefined;
+      if (existing) {
+        roleIds.set(template.slug, existing.id);
+        continue;
+      }
+      const id = randomUUID();
+      insertRole.run(
+        id,
+        team.id,
+        template.name,
+        template.slug,
+        template.permissions,
+        template.position,
+      );
+      roleIds.set(template.slug, id);
+      console.log(`Seeded ${template.slug} role for team ${team.id}`);
+    }
+
+    sqlite
+      .prepare(
+        `UPDATE team_members
+         SET role_id = (
+           SELECT id FROM team_roles
+           WHERE team_roles.team_id = team_members.team_id
+             AND team_roles.slug = team_members.role
+           LIMIT 1
+         )
+         WHERE team_id = ? AND role_id IS NULL`,
+      )
+      .run(team.id);
+
+    sqlite
+      .prepare(
+        `UPDATE team_invites
+         SET role_id = (
+           SELECT id FROM team_roles
+           WHERE team_roles.team_id = team_invites.team_id
+             AND team_roles.slug = team_invites.role
+           LIMIT 1
+         )
+         WHERE team_id = ? AND role_id IS NULL`,
+      )
+      .run(team.id);
+
+    const memberRoleId = roleIds.get("member");
+    if (memberRoleId) {
+      sqlite
+        .prepare(
+          `UPDATE team_members SET role_id = ?, role = 'member'
+           WHERE team_id = ? AND role_id IS NULL`,
+        )
+        .run(memberRoleId, team.id);
+      sqlite
+        .prepare(
+          `UPDATE team_invites SET role_id = ?, role = 'member'
+           WHERE team_id = ? AND role_id IS NULL`,
+        )
+        .run(memberRoleId, team.id);
+    }
+  }
+}
+
+function ensureDiscordBotSecretsTable(sqlite: Database.Database) {
+  sqlite.exec(`
+    CREATE TABLE IF NOT EXISTS discord_bot_secrets (
+      id TEXT PRIMARY KEY DEFAULT 'default',
+      bot_token_enc TEXT,
+      client_id TEXT,
+      pat_enc TEXT,
+      teamflow_url TEXT NOT NULL DEFAULT 'http://localhost:3000',
+      public_url TEXT NOT NULL DEFAULT 'http://localhost:5173',
+      message_content_intent INTEGER NOT NULL DEFAULT 0,
+      updated_at TEXT,
+      updated_by_user_id TEXT REFERENCES users(id) ON DELETE SET NULL
+    );
+  `);
 }
 
 function ensureTeamDiscordSettingsTable(sqlite: Database.Database) {

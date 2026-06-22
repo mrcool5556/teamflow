@@ -1,7 +1,9 @@
 import { z } from "zod";
+import { TEAM_PERMISSIONS } from "./permissions.js";
 
 export * from "./profile.js";
 export * from "./refs.js";
+export * from "./permissions.js";
 
 export const PRIORITIES = ["none", "low", "medium", "high", "urgent"] as const;
 export type Priority = (typeof PRIORITIES)[number];
@@ -48,9 +50,24 @@ export const createTeamSchema = z.object({
 });
 
 export const createTeamInviteSchema = z.object({
-  role: z.enum(TEAM_ROLES).default("member"),
+  roleId: z.string().uuid().optional(),
+  role: z.enum(TEAM_ROLES).optional(),
   expiresInDays: z.number().int().min(1).max(365).optional(),
   maxUses: z.union([z.literal(1), z.null()]).optional().default(1),
+});
+
+export const createTeamRoleSchema = z.object({
+  name: z.string().min(1).max(60),
+  permissions: z.array(z.enum(TEAM_PERMISSIONS)).min(1),
+});
+
+export const updateTeamRoleSchema = z.object({
+  name: z.string().min(1).max(60).optional(),
+  permissions: z.array(z.enum(TEAM_PERMISSIONS)).min(1).optional(),
+});
+
+export const updateTeamMemberRoleSchema = z.object({
+  roleId: z.string().uuid(),
 });
 
 const discordSnowflakeSchema = z.string().regex(/^\d{17,20}$/, "Invalid Discord ID");
@@ -73,6 +90,8 @@ export type TeamDiscordSettingsPublic = {
   ticketChannelIds: string[];
   allowDiscordAdministrators: boolean;
   updatedAt: string;
+  /** True when guild is linked and at least one allowed role is configured. */
+  commandsReady: boolean;
 };
 
 export type DiscordGuildConfigPublic = {
@@ -80,6 +99,38 @@ export type DiscordGuildConfigPublic = {
   allowedRoleIds: string[];
   ticketChannelIds: string[];
   allowDiscordAdministrators: boolean;
+};
+
+export const updateDiscordBotSecretsSchema = z.object({
+  botToken: z.string().min(1).optional(),
+  clientId: z.string().min(1).optional(),
+  pat: z.string().min(1).optional(),
+  teamflowUrl: z.string().url().optional(),
+  publicUrl: z.string().url().optional(),
+  messageContentIntent: z.boolean().optional(),
+});
+
+export type UpdateDiscordBotSecretsInput = z.infer<typeof updateDiscordBotSecretsSchema>;
+
+export type DiscordBotSecretsPublic = {
+  configured: boolean;
+  clientId: string | null;
+  hasBotToken: boolean;
+  hasPat: boolean;
+  teamflowUrl: string;
+  publicUrl: string;
+  messageContentIntent: boolean;
+  botConfigKeyConfigured: boolean;
+  updatedAt: string | null;
+};
+
+export type DiscordBotRuntimeConfig = {
+  botToken: string;
+  clientId: string;
+  pat: string;
+  teamflowUrl: string;
+  publicUrl: string;
+  messageContentIntent: boolean;
 };
 
 export const createProjectSchema = z.object({
@@ -195,6 +246,9 @@ export type UpdateBoardRowInput = z.infer<typeof updateBoardRowSchema>;
 export type ListIssuesInput = z.infer<typeof listIssuesSchema>;
 export type CreateTeamInput = z.infer<typeof createTeamSchema>;
 export type CreateTeamInviteInput = z.infer<typeof createTeamInviteSchema>;
+export type CreateTeamRoleInput = z.infer<typeof createTeamRoleSchema>;
+export type UpdateTeamRoleInput = z.infer<typeof updateTeamRoleSchema>;
+export type UpdateTeamMemberRoleInput = z.infer<typeof updateTeamMemberRoleSchema>;
 export type CreateProjectInput = z.infer<typeof createProjectSchema>;
 export type CreateCommentInput = z.infer<typeof createCommentSchema>;
 export type CreateTokenInput = z.infer<typeof createTokenSchema>;
@@ -260,13 +314,21 @@ export type TeamMemberPublic = {
   userId: string;
   name: string;
   email: string;
-  role: TeamRole;
+  roleId: string;
+  roleName: string;
+  roleSlug: string;
+  /** Legacy alias for roleSlug */
+  role: string;
 };
 
 export type TeamInvitePublic = {
   id: string;
   teamId: string;
   token: string;
+  roleId: string;
+  roleName: string;
+  roleSlug: string;
+  /** @deprecated Use roleSlug */
   role: TeamRole;
   expiresAt: string;
   createdAt: string;
@@ -280,6 +342,10 @@ export type TeamInvitePublic = {
 
 export type TeamInvitePreview = {
   team: Pick<TeamPublic, "id" | "name" | "key">;
+  roleId: string;
+  roleName: string;
+  roleSlug: string;
+  /** @deprecated Use roleSlug */
   role: TeamRole;
   expired: boolean;
   revoked: boolean;

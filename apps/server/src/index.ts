@@ -10,6 +10,7 @@ import {
   createProjectSchema,
   createStatusSchema,
   createTeamInviteSchema,
+  createTeamRoleSchema,
   createTeamSchema,
   createTokenSchema,
   loginSchema,
@@ -18,6 +19,9 @@ import {
   updateIssueSchema,
   updateStatusSchema,
   updateTeamDiscordSettingsSchema,
+  updateDiscordBotSecretsSchema,
+  updateTeamMemberRoleSchema,
+  updateTeamRoleSchema,
   userProfilePatchSchema,
   userProfileSchema,
   parseUserProfileImport,
@@ -68,9 +72,17 @@ import {
   isInviteOnlyRegistration,
   listTeamInvites,
   revokeTeamInvite,
-  userIsTeamAdmin,
 } from "./lib/invites.js";
 import { leaveTeam, removeTeamMember } from "./lib/members.js";
+import {
+  createTeamRole,
+  deleteTeamRole,
+  getTeamRoleBySlug,
+  listTeamRoles,
+  seedDefaultTeamRoles,
+  updateTeamMemberRole,
+  updateTeamRole,
+} from "./lib/roles.js";
 import { deleteTeam, createTeamForUser, getOrCreatePersonalWorkspace } from "./lib/teams.js";
 import {
   buildProfileExport,
@@ -84,6 +96,16 @@ import {
   getTeamDiscordSettings,
   updateTeamDiscordSettings,
 } from "./lib/discord.js";
+import {
+  getDiscordBotRuntimeConfig,
+  getDiscordBotSecretsPublic,
+  updateDiscordBotSecrets,
+} from "./lib/discordSecrets.js";
+import { assertBotConfigKey } from "./lib/secretsCrypto.js";
+import {
+  getTeamPermissionsForUser,
+  userHasTeamPermission,
+} from "./lib/permissions.js";
 
 const db = createDb();
 const app = new Hono();
@@ -171,10 +193,17 @@ app.post("/auth/register", async (c) => {
     key: "GEN",
   });
 
+  await seedDefaultTeamRoles(db, teamId);
+  const adminRole = await getTeamRoleBySlug(db, teamId, "admin");
+  if (!adminRole) {
+    return c.json({ error: "Failed to initialize team roles" }, 500);
+  }
+
   await db.insert(schema.teamMembers).values({
     teamId,
     userId,
-    role: "admin",
+    roleId: adminRole.id,
+    role: adminRole.slug,
   });
 
   await createDefaultBoardRow(db, teamId);
@@ -414,7 +443,7 @@ app.delete("/teams/:teamId", async (c) => {
   } catch (err) {
     const message = err instanceof Error ? err.message : "Failed to delete team";
     const status =
-      message === "Admin access required"
+      message === "Permission denied" || message === "Admin access required"
         ? 403
         : message === "Team not found"
           ? 404
@@ -663,13 +692,52 @@ app.get("/teams/:teamId/members", async (c) => {
       userId: schema.users.id,
       name: schema.users.name,
       email: schema.users.email,
-      role: schema.teamMembers.role,
+      roleId: schema.teamRoles.id,
+      roleName: schema.teamRoles.name,
+      roleSlug: schema.teamRoles.slug,
+      role: schema.teamRoles.slug,
     })
     .from(schema.teamMembers)
     .innerJoin(schema.users, eq(schema.teamMembers.userId, schema.users.id))
+    .innerJoin(schema.teamRoles, eq(schema.teamMembers.roleId, schema.teamRoles.id))
     .where(eq(schema.teamMembers.teamId, teamId));
 
   return c.json({ members });
+});
+
+app.patch("/teams/:teamId/members/:memberId", async (c) => {
+  const result = await requireAuth(c);
+  if ("error" in result) return result.error;
+  requireWrite(result.auth);
+
+  const teamId = c.req.param("teamId");
+  const memberId = c.req.param("memberId");
+  const body = updateTeamMemberRoleSchema.safeParse(await c.req.json().catch(() => ({})));
+  if (!body.success) {
+    return c.json({ error: body.error.issues[0]?.message ?? "Invalid input" }, 400);
+  }
+
+  try {
+    const role = await updateTeamMemberRole(
+      db,
+      teamId,
+      memberId,
+      body.data.roleId,
+      result.auth.userId,
+    );
+    return c.json({ role });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "Failed to update member role";
+    const status =
+      message === "Permission denied" ||
+      message === "Team access denied" ||
+      message === "Member not found" ||
+      message === "Role not found" ||
+      message === "Cannot remove the last admin"
+        ? 403
+        : 400;
+    return c.json({ error: message }, status);
+  }
 });
 
 app.delete("/teams/:teamId/members/:memberId", async (c) => {
@@ -690,7 +758,11 @@ app.delete("/teams/:teamId/members/:memberId", async (c) => {
   } catch (err) {
     const message = err instanceof Error ? err.message : "Failed to remove member";
     const status =
-      message === "Team access denied" || message === "Admin access required" ? 403 : 400;
+      message === "Team access denied" ||
+      message === "Admin access required" ||
+      message === "Permission denied"
+        ? 403
+        : 400;
     return c.json({ error: message }, status);
   }
 });
@@ -703,8 +775,8 @@ app.get("/teams/:teamId/invites", async (c) => {
   if (!(await userHasTeamAccess(db, result.auth.userId, teamId))) {
     return c.json({ error: "Team access denied" }, 403);
   }
-  if (!(await userIsTeamAdmin(db, result.auth.userId, teamId))) {
-    return c.json({ error: "Admin access required" }, 403);
+  if (!(await userHasTeamPermission(db, result.auth.userId, teamId, "team.invites.manage"))) {
+    return c.json({ error: "Permission denied" }, 403);
   }
 
   const invites = await listTeamInvites(db, teamId);
@@ -720,8 +792,8 @@ app.post("/teams/:teamId/invites", async (c) => {
   if (!(await userHasTeamAccess(db, result.auth.userId, teamId))) {
     return c.json({ error: "Team access denied" }, 403);
   }
-  if (!(await userIsTeamAdmin(db, result.auth.userId, teamId))) {
-    return c.json({ error: "Admin access required" }, 403);
+  if (!(await userHasTeamPermission(db, result.auth.userId, teamId, "team.invites.manage"))) {
+    return c.json({ error: "Permission denied" }, 403);
   }
 
   const body = createTeamInviteSchema.safeParse(await c.req.json().catch(() => ({})));
@@ -732,6 +804,7 @@ app.post("/teams/:teamId/invites", async (c) => {
   const invite = await createTeamInvite(db, {
     teamId,
     createdByUserId: result.auth.userId,
+    roleId: body.data.roleId,
     role: body.data.role,
     expiresInDays: body.data.expiresInDays,
     maxUses: body.data.maxUses,
@@ -750,14 +823,156 @@ app.delete("/teams/:teamId/invites/:inviteId", async (c) => {
   if (!(await userHasTeamAccess(db, result.auth.userId, teamId))) {
     return c.json({ error: "Team access denied" }, 403);
   }
-  if (!(await userIsTeamAdmin(db, result.auth.userId, teamId))) {
-    return c.json({ error: "Admin access required" }, 403);
+  if (!(await userHasTeamPermission(db, result.auth.userId, teamId, "team.invites.manage"))) {
+    return c.json({ error: "Permission denied" }, 403);
   }
 
   const invite = await revokeTeamInvite(db, teamId, inviteId);
   if (!invite) return c.json({ error: "Invite not found" }, 404);
 
   return c.body(null, 204);
+});
+
+app.get("/teams/:teamId/permissions/me", async (c) => {
+  const result = await requireAuth(c);
+  if ("error" in result) return result.error;
+
+  const teamId = c.req.param("teamId");
+  if (!(await userHasTeamAccess(db, result.auth.userId, teamId))) {
+    return c.json({ error: "Team access denied" }, 403);
+  }
+
+  const permissions = await getTeamPermissionsForUser(db, result.auth.userId, teamId);
+  if (!permissions) {
+    return c.json({ error: "Team access denied" }, 403);
+  }
+
+  return c.json({ permissions });
+});
+
+app.get("/teams/:teamId/roles", async (c) => {
+  const result = await requireAuth(c);
+  if ("error" in result) return result.error;
+
+  const teamId = c.req.param("teamId");
+  if (!(await userHasTeamAccess(db, result.auth.userId, teamId))) {
+    return c.json({ error: "Team access denied" }, 403);
+  }
+  if (!(await userHasTeamPermission(db, result.auth.userId, teamId, "team.roles.view"))) {
+    const canAssignRoles = await userHasTeamPermission(
+      db,
+      result.auth.userId,
+      teamId,
+      "team.members.manage",
+    );
+    const canInvite = await userHasTeamPermission(
+      db,
+      result.auth.userId,
+      teamId,
+      "team.invites.manage",
+    );
+    if (!canAssignRoles && !canInvite) {
+      return c.json({ error: "Permission denied" }, 403);
+    }
+  }
+
+  const roles = await listTeamRoles(db, teamId);
+  return c.json({ roles });
+});
+
+app.post("/teams/:teamId/roles", async (c) => {
+  const result = await requireAuth(c);
+  if ("error" in result) return result.error;
+  requireWrite(result.auth);
+
+  const teamId = c.req.param("teamId");
+  if (!(await userHasTeamAccess(db, result.auth.userId, teamId))) {
+    return c.json({ error: "Team access denied" }, 403);
+  }
+
+  const body = createTeamRoleSchema.safeParse(await c.req.json().catch(() => ({})));
+  if (!body.success) {
+    return c.json({ error: body.error.issues[0]?.message ?? "Invalid input" }, 400);
+  }
+
+  try {
+    const role = await createTeamRole(db, teamId, result.auth.userId, body.data);
+    return c.json({ role }, 201);
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "Failed to create role";
+    const status = message === "Permission denied" ? 403 : 400;
+    return c.json({ error: message }, status);
+  }
+});
+
+app.patch("/teams/:teamId/roles/:roleId", async (c) => {
+  const result = await requireAuth(c);
+  if ("error" in result) return result.error;
+  requireWrite(result.auth);
+
+  const teamId = c.req.param("teamId");
+  const roleId = c.req.param("roleId");
+  if (!(await userHasTeamAccess(db, result.auth.userId, teamId))) {
+    return c.json({ error: "Team access denied" }, 403);
+  }
+
+  const body = updateTeamRoleSchema.safeParse(await c.req.json().catch(() => ({})));
+  if (!body.success) {
+    return c.json({ error: body.error.issues[0]?.message ?? "Invalid input" }, 400);
+  }
+
+  try {
+    const role = await updateTeamRole(db, teamId, roleId, result.auth.userId, body.data);
+    return c.json({ role });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "Failed to update role";
+    const status =
+      message === "Permission denied" || message === "Role not found" ? 403 : 400;
+    return c.json({ error: message }, status);
+  }
+});
+
+app.delete("/teams/:teamId/roles/:roleId", async (c) => {
+  const result = await requireAuth(c);
+  if ("error" in result) return result.error;
+  requireWrite(result.auth);
+
+  const teamId = c.req.param("teamId");
+  const roleId = c.req.param("roleId");
+  if (!(await userHasTeamAccess(db, result.auth.userId, teamId))) {
+    return c.json({ error: "Team access denied" }, 403);
+  }
+
+  try {
+    await deleteTeamRole(db, teamId, roleId, result.auth.userId);
+    return c.body(null, 204);
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "Failed to delete role";
+    const status =
+      message === "Permission denied" ||
+      message === "Role not found" ||
+      message === "System roles cannot be deleted"
+        ? 403
+        : 400;
+    return c.json({ error: message }, status);
+  }
+});
+
+app.get("/integrations/discord/bot-config", async (c) => {
+  try {
+    assertBotConfigKey(c.req.header("X-Teamflow-Bot-Key"));
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "Unauthorized";
+    const status = message === "Bot config endpoint is disabled" ? 503 : 401;
+    return c.json({ error: message }, status);
+  }
+
+  const config = await getDiscordBotRuntimeConfig(db);
+  if (!config) {
+    return c.json({ error: "Discord bot secrets are not configured in Settings" }, 404);
+  }
+
+  return c.json({ config });
 });
 
 app.get("/teams/:teamId/discord-settings", async (c) => {
@@ -767,6 +982,9 @@ app.get("/teams/:teamId/discord-settings", async (c) => {
   const teamId = c.req.param("teamId");
   if (!(await userHasTeamAccess(db, result.auth.userId, teamId))) {
     return c.json({ error: "Team access denied" }, 403);
+  }
+  if (!(await userHasTeamPermission(db, result.auth.userId, teamId, "integrations.discord.view"))) {
+    return c.json({ error: "Permission denied" }, 403);
   }
 
   const settings = await getTeamDiscordSettings(db, teamId);
@@ -799,7 +1017,57 @@ app.patch("/teams/:teamId/discord-settings", async (c) => {
   } catch (err) {
     const message = err instanceof Error ? err.message : "Failed to update Discord settings";
     const status =
-      message === "Admin access required" || message === "Team access denied" ? 403 : 400;
+      message === "Permission denied" ||
+      message === "Admin access required" ||
+      message === "Team access denied"
+        ? 403
+        : 400;
+    return c.json({ error: message }, status);
+  }
+});
+
+app.get("/teams/:teamId/integrations/discord/secrets", async (c) => {
+  const result = await requireAuth(c);
+  if ("error" in result) return result.error;
+
+  const teamId = c.req.param("teamId");
+  if (!(await userHasTeamAccess(db, result.auth.userId, teamId))) {
+    return c.json({ error: "Team access denied" }, 403);
+  }
+  if (!(await userHasTeamPermission(db, result.auth.userId, teamId, "integrations.discord.secrets"))) {
+    return c.json({ error: "Permission denied" }, 403);
+  }
+
+  const secrets = await getDiscordBotSecretsPublic(db);
+  return c.json({ secrets });
+});
+
+app.patch("/teams/:teamId/integrations/discord/secrets", async (c) => {
+  const result = await requireAuth(c);
+  if ("error" in result) return result.error;
+  requireWrite(result.auth);
+
+  const teamId = c.req.param("teamId");
+  if (!(await userHasTeamAccess(db, result.auth.userId, teamId))) {
+    return c.json({ error: "Team access denied" }, 403);
+  }
+
+  const body = updateDiscordBotSecretsSchema.safeParse(await c.req.json().catch(() => ({})));
+  if (!body.success) {
+    return c.json({ error: body.error.issues[0]?.message ?? "Invalid input" }, 400);
+  }
+
+  try {
+    const secrets = await updateDiscordBotSecrets(
+      db,
+      teamId,
+      result.auth.userId,
+      body.data,
+    );
+    return c.json({ secrets });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "Failed to update Discord secrets";
+    const status = message === "Permission denied" ? 403 : 400;
     return c.json({ error: message }, status);
   }
 });

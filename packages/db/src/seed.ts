@@ -35,9 +35,56 @@ async function seed() {
     issueCounter: 3,
   });
 
+  const adminPermissions = JSON.stringify([
+    "team.members.view",
+    "team.members.manage",
+    "team.invites.manage",
+    "team.roles.view",
+    "team.roles.manage",
+    "team.delete",
+    "integrations.discord.view",
+    "integrations.discord.manage",
+    "integrations.discord.secrets",
+  ]);
+  const memberPermissions = JSON.stringify(["team.members.view"]);
+  const adminRoleId = crypto.randomUUID();
+  const memberRoleId = crypto.randomUUID();
+  const viewerRoleId = crypto.randomUUID();
+
+  await db.insert(schema.teamRoles).values([
+    {
+      id: adminRoleId,
+      teamId,
+      name: "Admin",
+      slug: "admin",
+      permissions: adminPermissions,
+      isSystem: 1,
+      position: 0,
+    },
+    {
+      id: memberRoleId,
+      teamId,
+      name: "Member",
+      slug: "member",
+      permissions: memberPermissions,
+      isSystem: 1,
+      position: 1,
+    },
+    {
+      id: viewerRoleId,
+      teamId,
+      name: "Viewer",
+      slug: "viewer",
+      permissions: memberPermissions,
+      isSystem: 1,
+      position: 2,
+    },
+  ]);
+
   await db.insert(schema.teamMembers).values({
     teamId,
     userId,
+    roleId: adminRoleId,
     role: "admin",
   });
 

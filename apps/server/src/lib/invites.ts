@@ -4,6 +4,7 @@ import type { TeamInvitePublic, TeamInvitePreview, TeamPublic, TeamRole } from "
 import type { Db } from "@teamflow/db";
 import { schema } from "@teamflow/db";
 import { userHasTeamAccess } from "./issues.js";
+import { resolveInviteRoleId } from "./roles.js";
 
 const DEFAULT_INVITE_DAYS = 30;
 
@@ -28,30 +29,20 @@ export function isInviteActive(invite: typeof schema.teamInvites.$inferSelect) {
   return new Date(invite.expiresAt).getTime() > Date.now();
 }
 
-export async function userIsTeamAdmin(db: Db, userId: string, teamId: string) {
-  const [member] = await db
-    .select({ role: schema.teamMembers.role })
-    .from(schema.teamMembers)
-    .where(
-      and(
-        eq(schema.teamMembers.userId, userId),
-        eq(schema.teamMembers.teamId, teamId),
-      ),
-    )
-    .limit(1);
-  return member?.role === "admin";
-}
-
 function mapInvitePublic(
   invite: typeof schema.teamInvites.$inferSelect,
   createdByName: string,
+  role: { id: string; name: string; slug: string },
 ): TeamInvitePublic {
   const exhausted = isInviteExhausted(invite);
   return {
     id: invite.id,
     teamId: invite.teamId,
     token: invite.token,
-    role: invite.role as TeamRole,
+    roleId: role.id,
+    roleName: role.name,
+    roleSlug: role.slug,
+    role: role.slug as TeamRole,
     expiresAt: invite.expiresAt,
     createdAt: invite.createdAt,
     createdByName,
@@ -68,13 +59,23 @@ export async function listTeamInvites(db: Db, teamId: string) {
     .select({
       invite: schema.teamInvites,
       createdByName: schema.users.name,
+      roleId: schema.teamRoles.id,
+      roleName: schema.teamRoles.name,
+      roleSlug: schema.teamRoles.slug,
     })
     .from(schema.teamInvites)
     .innerJoin(schema.users, eq(schema.teamInvites.createdByUserId, schema.users.id))
+    .innerJoin(schema.teamRoles, eq(schema.teamInvites.roleId, schema.teamRoles.id))
     .where(and(eq(schema.teamInvites.teamId, teamId), isNull(schema.teamInvites.revokedAt)));
 
   return rows
-    .map((row) => mapInvitePublic(row.invite, row.createdByName))
+    .map((row) =>
+      mapInvitePublic(row.invite, row.createdByName, {
+        id: row.roleId,
+        name: row.roleName,
+        slug: row.roleSlug,
+      }),
+    )
     .filter((invite) => !invite.expired && !invite.exhausted)
     .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
 }
@@ -84,7 +85,8 @@ export async function createTeamInvite(
   input: {
     teamId: string;
     createdByUserId: string;
-    role: TeamRole;
+    roleId?: string;
+    role?: TeamRole;
     expiresInDays?: number;
     maxUses?: number | null;
   },
@@ -92,11 +94,16 @@ export async function createTeamInvite(
   const token = generateInviteToken();
   const expiresAt = defaultInviteExpiry(input.expiresInDays);
   const maxUses = input.maxUses === undefined ? 1 : input.maxUses;
+  const role = await resolveInviteRoleId(db, input.teamId, {
+    roleId: input.roleId,
+    role: input.role,
+  });
 
   await db.insert(schema.teamInvites).values({
     teamId: input.teamId,
     token,
-    role: input.role,
+    roleId: role.id,
+    role: role.slug,
     createdByUserId: input.createdByUserId,
     expiresAt,
     maxUses,
@@ -114,7 +121,11 @@ export async function createTeamInvite(
     .where(eq(schema.users.id, input.createdByUserId))
     .limit(1);
 
-  return mapInvitePublic(invite!, creator?.name ?? "Unknown");
+  return mapInvitePublic(
+    invite!,
+    creator?.name ?? "Unknown",
+    { id: role.id, name: role.name, slug: role.slug },
+  );
 }
 
 export async function revokeTeamInvite(db: Db, teamId: string, inviteId: string) {
@@ -139,9 +150,13 @@ async function loadInviteRow(db: Db, token: string) {
     .select({
       invite: schema.teamInvites,
       team: schema.teams,
+      roleId: schema.teamRoles.id,
+      roleName: schema.teamRoles.name,
+      roleSlug: schema.teamRoles.slug,
     })
     .from(schema.teamInvites)
     .innerJoin(schema.teams, eq(schema.teamInvites.teamId, schema.teams.id))
+    .innerJoin(schema.teamRoles, eq(schema.teamInvites.roleId, schema.teamRoles.id))
     .where(eq(schema.teamInvites.token, token))
     .limit(1);
 
@@ -180,7 +195,10 @@ export async function getInvitePreview(
       name: row.team.name,
       key: row.team.key,
     },
-    role: row.invite.role as TeamRole,
+    roleId: row.roleId,
+    roleName: row.roleName,
+    roleSlug: row.roleSlug,
+    role: row.roleSlug as TeamRole,
     expired: new Date(row.invite.expiresAt).getTime() <= Date.now(),
     revoked: Boolean(row.invite.revokedAt),
     exhausted: isInviteExhausted(row.invite),
@@ -219,7 +237,8 @@ export async function acceptTeamInvite(
     await db.insert(schema.teamMembers).values({
       teamId: row.team.id,
       userId,
-      role: row.invite.role,
+      roleId: row.roleId,
+      role: row.roleSlug,
     });
     await recordInviteUse(db, row.invite.id, row.invite.useCount);
   }
@@ -239,3 +258,5 @@ export async function acceptTeamInvite(
 export function isInviteOnlyRegistration() {
   return process.env.TEAMFLOW_INVITE_ONLY === "true";
 }
+
+export { userIsTeamAdmin } from "./permissions.js";

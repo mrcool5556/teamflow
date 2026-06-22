@@ -1,7 +1,8 @@
 import { eq, sql } from "drizzle-orm";
 import type { Db } from "@teamflow/db";
 import { schema } from "@teamflow/db";
-import { userIsTeamAdmin } from "./invites.js";
+import { userHasTeamPermission } from "./permissions.js";
+import { getTeamRoleBySlug, seedDefaultTeamRoles } from "./roles.js";
 
 export function personalWorkspaceSlug(userId: string) {
   return `ws-${userId.slice(0, 8)}`;
@@ -42,8 +43,8 @@ export async function countUserTeams(db: Db, userId: string) {
 }
 
 export async function deleteTeam(db: Db, teamId: string, actorUserId: string) {
-  if (!(await userIsTeamAdmin(db, actorUserId, teamId))) {
-    throw new Error("Admin access required");
+  if (!(await userHasTeamPermission(db, actorUserId, teamId, "team.delete"))) {
+    throw new Error("Permission denied");
   }
 
   const [team] = await db
@@ -80,10 +81,17 @@ export async function createTeamForUser(
     key: input.key,
   });
 
+  await seedDefaultTeamRoles(db, teamId);
+  const adminRole = await getTeamRoleBySlug(db, teamId, "admin");
+  if (!adminRole) {
+    throw new Error("Failed to seed team roles");
+  }
+
   await db.insert(schema.teamMembers).values({
     teamId,
     userId: input.userId,
-    role: "admin",
+    roleId: adminRole.id,
+    role: adminRole.slug,
   });
 
   const [team] = await db
