@@ -14,6 +14,9 @@ import type {
   LoginInput,
   ProjectPublic,
   RegisterInput,
+  ResetPasswordInput,
+  ForgotPasswordInput,
+  AuthConfigPublic,
   ResolvedRef,
   TeamInvitePreview,
   TeamInvitePublic,
@@ -124,7 +127,21 @@ export class TeamflowClient {
   }
 
   getAuthConfig() {
-    return this.request<{ inviteOnly: boolean }>("/auth/config");
+    return this.request<AuthConfigPublic>("/auth/config");
+  }
+
+  requestPasswordReset(input: ForgotPasswordInput) {
+    return this.request<{ message: string }>("/auth/forgot-password", {
+      method: "POST",
+      body: JSON.stringify(input),
+    });
+  }
+
+  resetPassword(input: ResetPasswordInput) {
+    return this.request<{ ok: true }>("/auth/reset-password", {
+      method: "POST",
+      body: JSON.stringify(input),
+    });
   }
 
   me() {

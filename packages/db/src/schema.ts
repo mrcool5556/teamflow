@@ -29,6 +29,21 @@ export const users = sqliteTable("users", {
     .default(sql`(datetime('now'))`),
 });
 
+export const passwordResetTokens = sqliteTable("password_reset_tokens", {
+  id: text("id")
+    .primaryKey()
+    .$defaultFn(() => crypto.randomUUID()),
+  userId: text("user_id")
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
+  tokenHash: text("token_hash").notNull().unique(),
+  expiresAt: text("expires_at").notNull(),
+  usedAt: text("used_at"),
+  createdAt: text("created_at")
+    .notNull()
+    .default(sql`(datetime('now'))`),
+});
+
 export const userProfiles = sqliteTable("user_profiles", {
   userId: text("user_id")
     .primaryKey()

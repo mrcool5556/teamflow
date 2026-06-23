@@ -1114,6 +1114,15 @@ select {
   font-size: 0.85rem;
 }
 
+.login-forgot-link {
+  display: block;
+  margin: -0.35rem 0 0.85rem;
+  padding: 0;
+  text-align: right;
+  font-size: 0.82rem;
+  text-decoration: underline;
+}
+
 .drawer-backdrop {
   position: fixed;
   inset: 0;

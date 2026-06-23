@@ -40,8 +40,11 @@ sudo -u postgres psql -tc "SELECT 1 FROM pg_database WHERE datname='teamflow'" |
 
 if [[ ! -f .env ]]; then
   cp deploy/proxmox-lxc/.env.example .env
-  sed -i "s/teamflow:teamflow@/teamflow:${APP_USER}@/" .env || true
-  echo "Edit $APP_DIR/.env and set JWT_SECRET before production use."
+  echo "Edit $APP_DIR/.env — set JWT_SECRET and PUBLIC_URL before production use."
+fi
+
+if ! grep -q '^SERVE_WEB=' .env 2>/dev/null; then
+  echo "SERVE_WEB=true" >> .env
 fi
 
 sudo -u "$APP_USER" pnpm install

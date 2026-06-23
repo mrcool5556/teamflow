@@ -13,8 +13,10 @@ import {
   createTeamRoleSchema,
   createTeamSchema,
   createTokenSchema,
+  forgotPasswordSchema,
   loginSchema,
   registerSchema,
+  resetPasswordSchema,
   updateBoardRowSchema,
   updateIssueSchema,
   updateStatusSchema,
@@ -57,6 +59,11 @@ import {
   verifyPassword,
   signSessionToken,
 } from "./lib/auth.js";
+import {
+  getPasswordResetAuthConfig,
+  requestPasswordReset,
+  resetPasswordWithToken,
+} from "./lib/passwordReset.js";
 import {
   getDoneStatusId,
   getTeamKey,
@@ -138,7 +145,10 @@ async function requireAuth(c: Context) {
 }
 
 app.get("/auth/config", (c) => {
-  return c.json({ inviteOnly: isInviteOnlyRegistration() });
+  return c.json({
+    inviteOnly: isInviteOnlyRegistration(),
+    ...getPasswordResetAuthConfig(),
+  });
 });
 
 app.post("/auth/register", async (c) => {
@@ -247,6 +257,33 @@ app.post("/auth/login", async (c) => {
 
   const token = await signSessionToken(user.id);
   return c.json({ user: toUserPublic(user), token });
+});
+
+app.post("/auth/forgot-password", async (c) => {
+  const body = forgotPasswordSchema.safeParse(await c.req.json());
+  if (!body.success) {
+    return c.json({ error: body.error.issues[0]?.message ?? "Invalid email" }, 400);
+  }
+
+  const result = await requestPasswordReset(db, body.data.email);
+  return c.json(result);
+});
+
+app.post("/auth/reset-password", async (c) => {
+  const body = resetPasswordSchema.safeParse(await c.req.json());
+  if (!body.success) {
+    return c.json({ error: body.error.issues[0]?.message ?? "Invalid input" }, 400);
+  }
+
+  try {
+    await resetPasswordWithToken(db, body.data.token, body.data.password);
+    return c.json({ ok: true });
+  } catch (err) {
+    return c.json(
+      { error: err instanceof Error ? err.message : "Reset failed" },
+      400,
+    );
+  }
 });
 
 app.get("/auth/me", async (c) => {
