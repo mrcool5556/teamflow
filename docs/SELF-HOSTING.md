@@ -132,7 +132,33 @@ systemctl restart teamflow
 curl http://localhost:3000/health
 ```
 
-`install.sh` installs Node 20, pnpm, builds the app, sets up systemd, and registers the **`update`** command.
+`install.sh` installs Node 20, pnpm, builds the app, sets up systemd, registers **`update`**, and offers optional **SMTP** setup for password reset emails.
+
+### SMTP (password reset emails)
+
+`install.sh` prompts to configure SMTP at the end. On an existing server:
+
+```bash
+sudo teamflow-smtp
+```
+
+Or:
+
+```bash
+sudo bash /opt/teamflow/deploy/proxmox-lxc/configure-smtp.sh
+```
+
+You need SMTP settings from your email provider (not a mail server installed on the LXC). Examples:
+
+| Provider | SMTP host | Port |
+|----------|-----------|------|
+| Gmail (app password) | `smtp.gmail.com` | 587 |
+| Outlook / Microsoft 365 | `smtp.office365.com` | 587 |
+| SendGrid | `smtp.sendgrid.net` | 587 |
+
+Values are saved to `/opt/teamflow/.env` and the service restarts automatically.
+
+Without SMTP, **Forgot password** still works — reset links are written to `journalctl -u teamflow`.
 
 ### Update
 
@@ -237,6 +263,11 @@ No install on their side.
 | `DATABASE_URL` | Yes | `file:./data/teamflow.db` for SQLite (default) |
 | `SERVE_WEB` | Auto on LXC/Docker | Serves built web UI from the API port |
 | `TEAMFLOW_INVITE_ONLY` | No | `true` = registration only via invite |
+| `SMTP_HOST` | For email reset | e.g. `smtp.gmail.com` |
+| `SMTP_PORT` | No | Default `587` |
+| `SMTP_SECURE` | No | `true` for port 465 |
+| `SMTP_USER` / `SMTP_PASS` | With SMTP | Provider credentials |
+| `SMTP_FROM` | With SMTP | From address on reset emails |
 | `PORT` / `HOST` | No | Default `3000` / `0.0.0.0` |
 
 Discord bot and MCP use separate docs: [discord-bot.md](discord-bot.md), [MCP.md](MCP.md).

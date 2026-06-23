@@ -47,6 +47,31 @@ if ! grep -q '^SERVE_WEB=' .env 2>/dev/null; then
   echo "SERVE_WEB=true" >> .env
 fi
 
+ensure_env_defaults() {
+  if ! grep -q '^DATABASE_URL=file:' .env 2>/dev/null; then
+    if grep -q '^DATABASE_URL=' .env 2>/dev/null; then
+      sed -i 's|^DATABASE_URL=.*|DATABASE_URL=file:./data/teamflow.db|' .env
+    else
+      echo "DATABASE_URL=file:./data/teamflow.db" >> .env
+    fi
+  fi
+
+  if ! grep -q '^SMTP_HOST=' .env 2>/dev/null && ! grep -q '^# SMTP (' .env 2>/dev/null; then
+    cat >> .env <<'EOF'
+
+# SMTP (password reset emails) — run: sudo bash deploy/proxmox-lxc/configure-smtp.sh
+# SMTP_HOST=smtp.example.com
+# SMTP_PORT=587
+# SMTP_SECURE=false
+# SMTP_USER=
+# SMTP_PASS=
+# SMTP_FROM=teamflow@example.com
+EOF
+  fi
+}
+
+ensure_env_defaults
+
 sudo -u "$APP_USER" pnpm install
 sudo -u "$APP_USER" pnpm build
 
@@ -65,9 +90,23 @@ systemctl restart teamflow
 
 install -m 755 deploy/proxmox-lxc/update.sh /usr/local/bin/teamflow-update
 ln -sf teamflow-update /usr/local/bin/update
+install -m 755 deploy/proxmox-lxc/configure-smtp.sh /usr/local/bin/teamflow-smtp
 
 echo ""
 echo "Install complete."
 echo "  systemctl status teamflow"
 echo "  curl http://localhost:3000/health"
-echo "  update                 # pull, build, migrate, restart (after git clone)"
+echo "  update                 # pull, build, migrate, restart"
+echo "  teamflow-smtp          # configure SMTP for password reset emails"
+echo ""
+
+if [[ -t 0 ]]; then
+  read -rp "Configure SMTP for password reset emails now? [y/N] " setup_smtp || setup_smtp=""
+  if [[ "$setup_smtp" =~ ^[Yy]$ ]]; then
+    bash deploy/proxmox-lxc/configure-smtp.sh
+  else
+    echo "Skipped SMTP setup. Run later: sudo teamflow-smtp"
+  fi
+else
+  echo "Optional: sudo teamflow-smtp  # enable password reset emails"
+fi
