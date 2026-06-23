@@ -45,12 +45,23 @@ sudo ln -sf teamflow-update /usr/local/bin/update
 
 **Requires a git clone** at `/opt/teamflow` (not a snapshot copy without `.git`).
 
+## SMTP (password reset)
+
+After install, run:
+
+```bash
+sudo teamflow-smtp
+```
+
+Interactive prompts save SMTP settings to `.env` and restart Teamflow. No local mail server is installed — use your provider's SMTP (Gmail app password, SendGrid, etc.).
+
 ## Files
 
 | File | Purpose |
 |------|---------|
 | `create-lxc.md` | Proxmox UI checklist |
-| `install.sh` | apt packages, build, systemd, `update` command |
+| `install.sh` | apt packages, build, systemd, `update` + SMTP prompt |
+| `configure-smtp.sh` | SMTP wizard (`teamflow-smtp` on PATH) |
 | `update.sh` | pull → build → migrate → restart |
 | `teamflow.service` | systemd unit |
 | `backup.sh` | SQLite / Postgres backups |
