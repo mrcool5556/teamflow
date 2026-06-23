@@ -35,6 +35,15 @@ export const loginSchema = z.object({
   password: z.string().min(1),
 });
 
+export const forgotPasswordSchema = z.object({
+  email: z.string().email(),
+});
+
+export const resetPasswordSchema = z.object({
+  token: z.string().min(20).max(256),
+  password: z.string().min(8).max(128),
+});
+
 export const createTokenSchema = z.object({
   name: z.string().min(1).max(120),
   scopes: z.array(z.enum(TOKEN_SCOPES)).min(1).default(["read", "write"]),
@@ -241,6 +250,8 @@ export const createLabelSchema = z.object({
 
 export type RegisterInput = z.infer<typeof registerSchema>;
 export type LoginInput = z.infer<typeof loginSchema>;
+export type ForgotPasswordInput = z.infer<typeof forgotPasswordSchema>;
+export type ResetPasswordInput = z.infer<typeof resetPasswordSchema>;
 export type CreateIssueInput = z.infer<typeof createIssueSchema>;
 export type UpdateIssueInput = z.infer<typeof updateIssueSchema>;
 export type UpdateBoardRowInput = z.infer<typeof updateBoardRowSchema>;
@@ -356,6 +367,7 @@ export type TeamInvitePreview = {
 
 export type AuthConfigPublic = {
   inviteOnly: boolean;
+  passwordResetEmail: boolean;
 };
 
 export type AssigneePublic = {
