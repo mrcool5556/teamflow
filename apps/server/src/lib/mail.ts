@@ -13,14 +13,17 @@ function createTransport() {
   const port = Number(process.env.SMTP_PORT ?? 587);
   const secure = process.env.SMTP_SECURE === "true" || port === 465;
   const user = process.env.SMTP_USER?.trim();
+  const pass = process.env.SMTP_PASS ?? "";
+
+  if (!user || !pass) {
+    throw new Error("SMTP_USER and SMTP_PASS are required when SMTP_HOST is set");
+  }
 
   return nodemailer.createTransport({
     host,
     port,
     secure,
-    auth: user
-      ? { user, pass: process.env.SMTP_PASS ?? "" }
-      : undefined,
+    auth: { user, pass },
   });
 }
 

@@ -50,8 +50,14 @@ prompt_secret() {
   local label=$1
   local value
   read -rsp "$label: " value
-  echo ""
-  echo "$value"
+  printf '\n' >&2
+  printf '%s' "$value"
+}
+
+write_smtp_env() {
+  local key=$1
+  local value=$2
+  printf '%s=%s\n' "$key" "$value" >> "$ENV_FILE"
 }
 
 echo "==> Teamflow SMTP configuration"
@@ -90,13 +96,13 @@ strip_smtp_from_env
 cat >> "$ENV_FILE" <<EOF
 
 # SMTP (password reset emails)
-SMTP_HOST=$SMTP_HOST
-SMTP_PORT=$SMTP_PORT
-SMTP_SECURE=$SMTP_SECURE
-SMTP_USER=$SMTP_USER
-SMTP_PASS=$SMTP_PASS
-SMTP_FROM=$SMTP_FROM
 EOF
+write_smtp_env SMTP_HOST "$SMTP_HOST"
+write_smtp_env SMTP_PORT "$SMTP_PORT"
+write_smtp_env SMTP_SECURE "$SMTP_SECURE"
+write_smtp_env SMTP_USER "$SMTP_USER"
+write_smtp_env SMTP_PASS "$SMTP_PASS"
+write_smtp_env SMTP_FROM "$SMTP_FROM"
 
 chmod 600 "$ENV_FILE"
 chown teamflow:teamflow "$ENV_FILE" 2>/dev/null || true
