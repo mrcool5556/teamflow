@@ -1,4 +1,5 @@
 import { z } from "zod";
+import type { AttachmentKind } from "./attachments.js";
 import { TEAM_PERMISSIONS } from "./permissions.js";
 
 export * from "./about.js";
@@ -428,13 +429,16 @@ export type CommentPublic = {
 export type IssueAttachmentPublic = {
   id: string;
   issueId: string;
+  fileId: string;
   filename: string;
   mimeType: string;
   sizeBytes: number;
+  kind: AttachmentKind;
   uploaderId: string;
   uploaderName: string;
   createdAt: string;
   downloadUrl: string;
+  canStream: boolean;
 };
 
 export type ApiTokenCreated = {

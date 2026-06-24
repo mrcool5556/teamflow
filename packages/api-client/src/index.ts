@@ -6,6 +6,8 @@ import type {
   CreateCommentInput,
   IssueAttachmentPublic,
   AttachmentLimitsPublic,
+  StreamTokenPublic,
+  UploadSessionPublic,
   CreateIssueInput,
   CreateProjectInput,
   CreateTeamInput,
@@ -527,6 +529,156 @@ export class TeamflowClient {
 
       xhr.send(form);
     });
+  }
+
+  createUploadSession(
+    issueId: string,
+    input: { filename: string; mimeType: string; totalBytes: number },
+  ) {
+    return this.request<{ session: UploadSessionPublic }>(
+      `/issues/${issueId}/uploads`,
+      {
+        method: "POST",
+        body: JSON.stringify(input),
+      },
+    );
+  }
+
+  getUploadSession(sessionId: string) {
+    return this.request<{ session: UploadSessionPublic }>(`/uploads/${sessionId}`);
+  }
+
+  uploadChunk(
+    sessionId: string,
+    chunkIndex: number,
+    chunk: Blob,
+    options?: { onProgress?: (percent: number) => void },
+  ) {
+    return new Promise<{ session: UploadSessionPublic }>((resolve, reject) => {
+      const xhr = new XMLHttpRequest();
+      xhr.open("PUT", `${this.baseUrl}/uploads/${sessionId}/chunks/${chunkIndex}`);
+
+      if (this.token) {
+        xhr.setRequestHeader("Authorization", `Bearer ${this.token}`);
+      }
+      xhr.setRequestHeader("Content-Type", "application/octet-stream");
+
+      xhr.upload.addEventListener("progress", (event) => {
+        if (!options?.onProgress || !event.lengthComputable || event.total <= 0) return;
+        options.onProgress(Math.min(100, Math.round((event.loaded / event.total) * 100)));
+      });
+
+      xhr.addEventListener("load", () => {
+        let payload: ApiError = { error: xhr.statusText };
+        if (xhr.responseText) {
+          try {
+            payload = JSON.parse(xhr.responseText) as ApiError;
+          } catch {
+            // ignore
+          }
+        }
+
+        if (xhr.status >= 200 && xhr.status < 300) {
+          resolve(JSON.parse(xhr.responseText) as { session: UploadSessionPublic });
+          return;
+        }
+
+        reject(
+          new TeamflowApiError(
+            payload.error ?? xhr.statusText,
+            xhr.status,
+            payload.code,
+          ),
+        );
+      });
+
+      xhr.addEventListener("error", () => reject(new TeamflowApiError("Upload failed", 0)));
+      xhr.send(chunk);
+    });
+  }
+
+  completeUpload(sessionId: string) {
+    return this.request<{ attachment: IssueAttachmentPublic }>(
+      `/uploads/${sessionId}/complete`,
+      { method: "POST" },
+    );
+  }
+
+  abortUpload(sessionId: string) {
+    return this.request<void>(`/uploads/${sessionId}`, { method: "DELETE" });
+  }
+
+  async uploadFile(
+    issueId: string,
+    file: File,
+    options?: {
+      limits?: AttachmentLimitsPublic;
+      onProgress?: (percent: number) => void;
+      resumeSessionId?: string;
+    },
+  ) {
+    const limits =
+      options?.limits ?? (await this.listAttachments(issueId)).limits;
+
+    if (file.size <= limits.chunkThresholdBytes) {
+      return this.uploadAttachment(issueId, file, {
+        onProgress: options?.onProgress,
+      });
+    }
+
+    let session: UploadSessionPublic;
+    if (options?.resumeSessionId) {
+      session = (await this.getUploadSession(options.resumeSessionId)).session;
+    } else {
+      session = (
+        await this.createUploadSession(issueId, {
+          filename: file.name,
+          mimeType: file.type || "application/octet-stream",
+          totalBytes: file.size,
+        })
+      ).session;
+    }
+
+    const received = new Set(session.receivedChunks);
+    for (let index = 0; index < session.totalChunks; index += 1) {
+      if (received.has(index)) continue;
+
+      const start = index * session.chunkSize;
+      const end = Math.min(start + session.chunkSize, file.size);
+      const chunk = file.slice(start, end);
+
+      const result = await this.uploadChunk(session.sessionId, index, chunk, {
+        onProgress: (chunkPercent) => {
+          if (!options?.onProgress) return;
+          const uploadedBefore = index * session.chunkSize;
+          const current = (chunk.size * chunkPercent) / 100;
+          const total = Math.max(file.size, 1);
+          options.onProgress(
+            Math.min(100, Math.round(((uploadedBefore + current) / total) * 100)),
+          );
+        },
+      });
+      session = result.session;
+      received.add(index);
+      if (options?.onProgress) {
+        const uploaded = Math.min(file.size, (index + 1) * session.chunkSize);
+        options.onProgress(Math.min(100, Math.round((uploaded / file.size) * 100)));
+      }
+    }
+
+    return this.completeUpload(session.sessionId);
+  }
+
+  createStreamToken(linkId: string) {
+    return this.request<StreamTokenPublic>(`/attachments/${linkId}/stream-token`, {
+      method: "POST",
+    });
+  }
+
+  async resolveStreamUrl(linkId: string) {
+    const { streamUrl } = await this.createStreamToken(linkId);
+    if (streamUrl.startsWith("http")) return streamUrl;
+    return `${this.baseUrl}${streamUrl}`;
   }
 
   async downloadAttachment(attachmentId: string) {

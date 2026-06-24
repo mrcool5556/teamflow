@@ -72,6 +72,7 @@ Setup: [docs/discord-bot.md](docs/discord-bot.md)
 |-----|---------|
 | [docs/SELF-HOSTING.md](docs/SELF-HOSTING.md) | **Install & update** — Windows, LXC, Docker |
 | [docs/AUTH.md](docs/AUTH.md) | Login, invites, forgot password, SMTP |
+| [docs/LARGE-FILES.md](docs/LARGE-FILES.md) | Chunked upload, 4 GB video/ZIP, streaming |
 | [docs/ATTACHMENTS.md](docs/ATTACHMENTS.md) | Issue file uploads |
 | [docs/API.md](docs/API.md) | HTTP API reference |
 | [docs/CLI.md](docs/CLI.md) | CLI commands |

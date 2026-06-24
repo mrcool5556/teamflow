@@ -42,12 +42,12 @@ export const ROADMAP_META = {
 
 export const ROADMAP_FOCUS: RoadmapItem[] = [
   {
-    id: "attachments",
-    title: "File attachments on issues",
-    notes: "Upload, list, download, delete on issue drawer. See docs/ATTACHMENTS.md.",
-    status: "done",
+    id: "large-files",
+    title: "Large files — chunked upload & seekable video",
+    notes: "4 GB video/ZIP, resumable chunks, HTTP Range streaming. See docs/LARGE-FILES.md.",
+    status: "focus",
     priority: 1,
-    tags: ["files", "issues"],
+    tags: ["files", "video"],
   },
   {
     id: "deploy",
@@ -348,7 +348,7 @@ export const ROADMAP_SHIPPED: ShippedItem[] = [
   { date: "2026-06", title: "Discord bot v1 — slash commands, Settings UI, role gating, thread /create" },
   { date: "2026-06", title: "Public release prep — AGPL, self-hosting docs, LXC update + SMTP" },
   { date: "2026-06", title: "Forgot password + optional SMTP email reset" },
-  { date: "2026-06", title: "Issue file attachments — upload, download, delete on issue drawer" },
+  { date: "2026-06", title: "Large files v1 — chunked upload, range streaming, move/link, video player" },
 ];
 
 export const ROADMAP_DEPLOY_STEPS: DeployStep[] = [
