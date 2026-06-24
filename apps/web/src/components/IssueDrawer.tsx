@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState, type ChangeEvent, type DragEvent } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type ChangeEvent, type DragEvent } from "react";
 import type {
   BoardRowPublic,
   CommentPublic,
@@ -20,6 +20,14 @@ import { RichText } from "./RichText";
 import { LinkPasteOffer } from "./LinkPasteOffer";
 import { initials } from "../lib/timer";
 import { useLinkPasteOffer } from "../hooks/useLinkPasteOffer";
+import {
+  AttachmentImageThumbnail,
+  AttachmentLightbox,
+  createAttachmentBlobCache,
+  isImageAttachment,
+} from "./AttachmentImagePreview";
+
+const DEFAULT_MAX_ATTACHMENT_BYTES = 10 * 1024 * 1024;
 
 const PRIORITY_LABELS: Record<Priority, string> = {
   none: "No priority",
@@ -101,6 +109,12 @@ export function IssueDrawer({
   const [uploadingAttachment, setUploadingAttachment] = useState(false);
   const [deletingAttachmentId, setDeletingAttachmentId] = useState<string | null>(null);
   const [attachmentDragOver, setAttachmentDragOver] = useState(false);
+  const [maxAttachmentBytes, setMaxAttachmentBytes] = useState(DEFAULT_MAX_ATTACHMENT_BYTES);
+  const [attachmentLightbox, setAttachmentLightbox] = useState<{
+    attachment: IssueAttachmentPublic;
+    imageUrl: string;
+  } | null>(null);
+  const attachmentBlobCache = useMemo(() => createAttachmentBlobCache(), []);
   const attachmentInputRef = useRef<HTMLInputElement>(null);
   const commentTextareaRef = useRef<HTMLTextAreaElement>(null);
   const {
@@ -148,8 +162,11 @@ export function IssueDrawer({
 
     void client
       .listAttachments(issue.id)
-      .then(({ attachments: loaded }) => {
-        if (!cancelled) setAttachments(loaded);
+      .then(({ attachments: loaded, maxBytes }) => {
+        if (!cancelled) {
+          setAttachments(loaded);
+          if (maxBytes > 0) setMaxAttachmentBytes(maxBytes);
+        }
       })
       .catch(() => {
         if (!cancelled) setAttachments([]);
@@ -162,6 +179,12 @@ export function IssueDrawer({
       cancelled = true;
     };
   }, [issue.id]);
+
+  useEffect(() => {
+    attachmentBlobCache.revokeAll();
+    setAttachmentLightbox(null);
+    return () => attachmentBlobCache.revokeAll();
+  }, [issue.id, attachmentBlobCache]);
 
   useEffect(() => {
     let cancelled = false;
@@ -222,6 +245,12 @@ export function IssueDrawer({
 
   async function uploadAttachmentFile(file: File) {
     if (uploadingAttachment) return;
+    if (file.size > maxAttachmentBytes) {
+      window.alert(
+        `File is too large (${formatFileSize(file.size)}). Max is ${formatFileSize(maxAttachmentBytes)}.`,
+      );
+      return;
+    }
     setUploadingAttachment(true);
     try {
       const { attachment } = await client.uploadAttachment(issue.id, file);
@@ -504,11 +533,31 @@ export function IssueDrawer({
             <ul className="issue-attachment-list">
               {attachments.map((attachment) => (
                 <li key={attachment.id} className="issue-attachment">
+                  {isImageAttachment(attachment) ? (
+                    <AttachmentImageThumbnail
+                      attachment={attachment}
+                      blobCache={attachmentBlobCache}
+                      onOpen={(imageUrl) =>
+                        setAttachmentLightbox({ attachment, imageUrl })
+                      }
+                    />
+                  ) : null}
                   <div className="issue-attachment-main">
                     <button
                       type="button"
                       className="ghost issue-attachment-name"
-                      onClick={() => void downloadAttachment(attachment)}
+                      onClick={() => {
+                        if (isImageAttachment(attachment)) {
+                          void attachmentBlobCache
+                            .get(attachment.id)
+                            .then((imageUrl) =>
+                              setAttachmentLightbox({ attachment, imageUrl }),
+                            )
+                            .catch(() => void downloadAttachment(attachment));
+                          return;
+                        }
+                        void downloadAttachment(attachment);
+                      }}
                     >
                       {attachment.filename}
                     </button>
@@ -550,7 +599,7 @@ export function IssueDrawer({
             <p>
               {uploadingAttachment
                 ? "Uploading…"
-                : "Drop a file here or choose one to upload (max 10 MB)."}
+                : `Drop a file here or choose one to upload (max ${formatFileSize(maxAttachmentBytes)}).`}
             </p>
             <button
               type="button"
@@ -661,6 +710,14 @@ export function IssueDrawer({
         </div>
         </div>
       </aside>
+      {attachmentLightbox ? (
+        <AttachmentLightbox
+          attachment={attachmentLightbox.attachment}
+          imageUrl={attachmentLightbox.imageUrl}
+          onClose={() => setAttachmentLightbox(null)}
+          onDownload={() => void downloadAttachment(attachmentLightbox.attachment)}
+        />
+      ) : null}
     </div>
   );
 }

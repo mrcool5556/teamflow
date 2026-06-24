@@ -4,9 +4,16 @@ Issue-level file uploads (v1). Files are stored on the server filesystem under `
 
 ## Limits
 
+Set on the server in `.env`, then restart Teamflow:
+
+```bash
+# 50 MB example
+ATTACHMENT_MAX_BYTES=52428800
+```
+
 | Setting | Default | Env |
 |---------|---------|-----|
-| Max file size | 10 MB | `ATTACHMENT_MAX_BYTES` |
+| Max file size | 10 MB (configurable) | `ATTACHMENT_MAX_BYTES` |
 | Storage directory | `data/uploads/` | `UPLOAD_DIR` (optional absolute path) |
 
 ## API
@@ -49,6 +56,8 @@ curl -X POST "https://teamflow.example.com/issues/ISSUE_UUID/attachments" \
 ## UI
 
 Open an issue → **Attachments** section → choose file or drag onto the drop zone.
+
+Image attachments show a thumbnail. Click the thumbnail or filename to open a full-size preview (Escape or **Close** to dismiss).
 
 ## Backups
 

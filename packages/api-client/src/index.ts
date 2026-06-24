@@ -459,7 +459,7 @@ export class TeamflowClient {
   }
 
   listAttachments(issueId: string) {
-    return this.request<{ attachments: IssueAttachmentPublic[] }>(
+    return this.request<{ attachments: IssueAttachmentPublic[]; maxBytes: number }>(
       `/issues/${issueId}/attachments`,
     );
   }
