@@ -1,11 +1,15 @@
 import { randomUUID } from "node:crypto";
 import fs from "node:fs/promises";
 import path from "node:path";
-import type { IssueAttachmentPublic } from "@teamflow/core";
+import {
+  attachmentFileKind,
+  DEFAULT_ATTACHMENT_LIMITS,
+  maxBytesForAttachmentFile,
+  type AttachmentLimitsPublic,
+  type IssueAttachmentPublic,
+} from "@teamflow/core";
 import { findRepoRoot, schema, type Db } from "@teamflow/db";
 import { eq } from "drizzle-orm";
-
-const DEFAULT_MAX_BYTES = 10 * 1024 * 1024;
 
 export class AttachmentError extends Error {
   status: number;
@@ -15,6 +19,30 @@ export class AttachmentError extends Error {
     this.name = "AttachmentError";
     this.status = status;
   }
+}
+
+function parseEnvBytes(key: string, fallback: number) {
+  const raw = process.env[key];
+  if (!raw) return fallback;
+  const parsed = Number(raw);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
+}
+
+export function getAttachmentLimits(): AttachmentLimitsPublic {
+  return {
+    imageBytes: parseEnvBytes(
+      "ATTACHMENT_MAX_IMAGE_BYTES",
+      DEFAULT_ATTACHMENT_LIMITS.imageBytes,
+    ),
+    zipBytes: parseEnvBytes(
+      "ATTACHMENT_MAX_ZIP_BYTES",
+      DEFAULT_ATTACHMENT_LIMITS.zipBytes,
+    ),
+    defaultBytes: parseEnvBytes(
+      "ATTACHMENT_MAX_BYTES",
+      DEFAULT_ATTACHMENT_LIMITS.defaultBytes,
+    ),
+  };
 }
 
 export function getUploadDir() {
@@ -27,16 +55,17 @@ export function getUploadDir() {
   return path.join(findRepoRoot(), "data", "uploads");
 }
 
-export function getMaxAttachmentBytes() {
-  const raw = process.env.ATTACHMENT_MAX_BYTES;
-  if (!raw) return DEFAULT_MAX_BYTES;
-  const parsed = Number(raw);
-  return Number.isFinite(parsed) && parsed > 0 ? parsed : DEFAULT_MAX_BYTES;
-}
-
 function sanitizeFilename(name: string) {
   const base = path.basename(name).replace(/[^\w.\- ()[\]]+/g, "_");
   return base.slice(0, 200) || "file";
+}
+
+function limitErrorMessage(filename: string, mimeType: string, maxBytes: number) {
+  const kind = attachmentFileKind(filename, mimeType);
+  const label =
+    kind === "zip" ? "ZIP files" : kind === "image" ? "images" : "this file type";
+  const mb = Math.round(maxBytes / (1024 * 1024));
+  return `${label} are limited to ${mb} MB (got ${filename})`;
 }
 
 export function mapAttachmentPublic(row: {
@@ -97,17 +126,19 @@ export async function saveIssueAttachment(
   uploaderId: string,
   file: UploadFile,
 ) {
-  const maxBytes = getMaxAttachmentBytes();
+  const limits = getAttachmentLimits();
+  const mimeType = file.type || "application/octet-stream";
+  const maxBytes = maxBytesForAttachmentFile(file.name, mimeType, limits);
+
   if (file.size <= 0) {
     throw new AttachmentError("Empty file", 400);
   }
   if (file.size > maxBytes) {
-    throw new AttachmentError(`File exceeds ${maxBytes} byte limit`, 413);
+    throw new AttachmentError(limitErrorMessage(file.name, mimeType, maxBytes), 413);
   }
 
   const id = randomUUID();
   const filename = sanitizeFilename(file.name);
-  const mimeType = file.type || "application/octet-stream";
   const issueDir = path.join(getUploadDir(), issueId);
   await fs.mkdir(issueDir, { recursive: true });
 
@@ -116,7 +147,7 @@ export async function saveIssueAttachment(
   const buffer = Buffer.from(await file.arrayBuffer());
 
   if (buffer.length > maxBytes) {
-    throw new AttachmentError(`File exceeds ${maxBytes} byte limit`, 413);
+    throw new AttachmentError(limitErrorMessage(filename, mimeType, maxBytes), 413);
   }
 
   await fs.writeFile(storagePath, buffer);
