@@ -9,7 +9,7 @@ import type {
   TeamMemberPublic,
   UpdateIssueInput,
 } from "@teamflow/core";
-import { PRIORITIES, DEFAULT_ATTACHMENT_LIMITS, maxBytesForAttachmentFile } from "@teamflow/core";
+import { PRIORITIES, DEFAULT_ATTACHMENT_LIMITS, maxBytesForAttachmentFile, isImageAttachmentFile } from "@teamflow/core";
 import type { AttachmentLimitsPublic } from "@teamflow/core";
 import { client } from "../api";
 import { IssueTimer } from "./IssueTimer";
@@ -22,7 +22,7 @@ import { LinkPasteOffer } from "./LinkPasteOffer";
 import { initials } from "../lib/timer";
 import { useLinkPasteOffer } from "../hooks/useLinkPasteOffer";
 import {
-  AttachmentImagePreviewButton,
+  AttachmentImageThumbnail,
   AttachmentLightbox,
   createAttachmentBlobCache,
   isImageAttachment,
@@ -110,6 +110,10 @@ export function IssueDrawer({
   const [attachments, setAttachments] = useState<IssueAttachmentPublic[]>([]);
   const [attachmentsLoading, setAttachmentsLoading] = useState(true);
   const [uploadingAttachment, setUploadingAttachment] = useState(false);
+  const [attachmentUploadProgress, setAttachmentUploadProgress] = useState<number | null>(
+    null,
+  );
+  const [attachmentUploadName, setAttachmentUploadName] = useState<string | null>(null);
   const [deletingAttachmentId, setDeletingAttachmentId] = useState<string | null>(null);
   const [attachmentDragOver, setAttachmentDragOver] = useState(false);
   const [attachmentLimits, setAttachmentLimits] = useState<AttachmentLimitsPublic>(
@@ -271,15 +275,24 @@ export function IssueDrawer({
       return;
     }
     setUploadingAttachment(true);
+    setAttachmentUploadProgress(0);
+    setAttachmentUploadName(file.name);
     try {
-      const { attachment } = await client.uploadAttachment(issue.id, file);
+      const { attachment } = await client.uploadAttachment(issue.id, file, {
+        onProgress: (percent) => setAttachmentUploadProgress(percent),
+      });
       setAttachments((prev) => [...prev, attachment]);
+      if (isImageAttachmentFile(file.name, file.type || "")) {
+        attachmentBlobCache.set(attachment.id, URL.createObjectURL(file));
+      }
     } catch (error) {
       const message =
         error instanceof Error ? error.message : "Upload failed";
       window.alert(message);
     } finally {
       setUploadingAttachment(false);
+      setAttachmentUploadProgress(null);
+      setAttachmentUploadName(null);
     }
   }
 
@@ -553,7 +566,7 @@ export function IssueDrawer({
               {attachments.map((attachment) => (
                 <li key={attachment.id} className="issue-attachment">
                   {isImageAttachment(attachment) ? (
-                    <AttachmentImagePreviewButton
+                    <AttachmentImageThumbnail
                       attachment={attachment}
                       blobCache={attachmentBlobCache}
                       onOpen={(imageUrl) =>
@@ -612,9 +625,32 @@ export function IssueDrawer({
             />
             <p>
               {uploadingAttachment
-                ? "Uploading…"
+                ? `Uploading ${attachmentUploadName ?? "file"}…`
                 : `Drop a file here or choose one (${describeAttachmentLimits(attachmentLimits)}).`}
             </p>
+            {uploadingAttachment ? (
+              <div
+                className="issue-attachment-progress"
+                role="progressbar"
+                aria-valuemin={0}
+                aria-valuemax={100}
+                aria-valuenow={attachmentUploadProgress ?? 0}
+                aria-label="Upload progress"
+              >
+                <div
+                  className={`issue-attachment-progress-bar${
+                    attachmentUploadProgress == null
+                      ? " issue-attachment-progress-bar--indeterminate"
+                      : ""
+                  }`}
+                  style={
+                    attachmentUploadProgress != null
+                      ? { width: `${attachmentUploadProgress}%` }
+                      : undefined
+                  }
+                />
+              </div>
+            ) : null}
             <button
               type="button"
               className="ghost"

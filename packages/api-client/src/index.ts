@@ -466,16 +466,67 @@ export class TeamflowClient {
     }>(`/issues/${issueId}/attachments`);
   }
 
-  uploadAttachment(issueId: string, file: File) {
+  uploadAttachment(
+    issueId: string,
+    file: File,
+    options?: { onProgress?: (percent: number) => void },
+  ) {
     const form = new FormData();
     form.append("file", file);
-    return this.request<{ attachment: IssueAttachmentPublic }>(
-      `/issues/${issueId}/attachments`,
-      {
-        method: "POST",
-        body: form,
-      },
-    );
+
+    return new Promise<{ attachment: IssueAttachmentPublic }>((resolve, reject) => {
+      const xhr = new XMLHttpRequest();
+      xhr.open("POST", `${this.baseUrl}/issues/${issueId}/attachments`);
+
+      if (this.token) {
+        xhr.setRequestHeader("Authorization", `Bearer ${this.token}`);
+      }
+
+      xhr.upload.addEventListener("progress", (event) => {
+        if (!options?.onProgress || !event.lengthComputable || event.total <= 0) return;
+        options.onProgress(Math.min(100, Math.round((event.loaded / event.total) * 100)));
+      });
+
+      xhr.addEventListener("load", () => {
+        const contentType = xhr.getResponseHeader("content-type") ?? "";
+        let payload: ApiError = { error: xhr.statusText };
+
+        if (contentType.includes("application/json") && xhr.responseText) {
+          try {
+            payload = JSON.parse(xhr.responseText) as ApiError;
+          } catch {
+            // ignore
+          }
+        }
+
+        if (xhr.status >= 200 && xhr.status < 300) {
+          try {
+            resolve(JSON.parse(xhr.responseText) as { attachment: IssueAttachmentPublic });
+          } catch {
+            reject(new TeamflowApiError("Invalid upload response", xhr.status));
+          }
+          return;
+        }
+
+        reject(
+          new TeamflowApiError(
+            payload.error ?? xhr.statusText,
+            xhr.status,
+            payload.code,
+          ),
+        );
+      });
+
+      xhr.addEventListener("error", () => {
+        reject(new TeamflowApiError("Upload failed", 0));
+      });
+
+      xhr.addEventListener("abort", () => {
+        reject(new TeamflowApiError("Upload cancelled", 0));
+      });
+
+      xhr.send(form);
+    });
   }
 
   async downloadAttachment(attachmentId: string) {
