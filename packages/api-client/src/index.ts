@@ -719,6 +719,153 @@ export class TeamflowClient {
     );
   }
 
+  listRowAttachments(rowId: string) {
+    return this.request<{
+      attachments: IssueAttachmentPublic[];
+      limits: AttachmentLimitsPublic;
+    }>(`/rows/${rowId}/attachments`);
+  }
+
+  uploadRowAttachment(
+    rowId: string,
+    file: File,
+    options?: { onProgress?: (percent: number) => void },
+  ) {
+    const form = new FormData();
+    form.append("file", file);
+
+    return new Promise<{ attachment: IssueAttachmentPublic }>((resolve, reject) => {
+      const xhr = new XMLHttpRequest();
+      xhr.open("POST", `${this.baseUrl}/rows/${rowId}/attachments`);
+
+      if (this.token) {
+        xhr.setRequestHeader("Authorization", `Bearer ${this.token}`);
+      }
+
+      xhr.upload.addEventListener("progress", (event) => {
+        if (!options?.onProgress || !event.lengthComputable || event.total <= 0) return;
+        options.onProgress(Math.min(100, Math.round((event.loaded / event.total) * 100)));
+      });
+
+      xhr.addEventListener("load", () => {
+        const contentType = xhr.getResponseHeader("content-type") ?? "";
+        let payload: ApiError = { error: xhr.statusText };
+
+        if (contentType.includes("application/json") && xhr.responseText) {
+          try {
+            payload = JSON.parse(xhr.responseText) as ApiError;
+          } catch {
+            // ignore
+          }
+        }
+
+        if (xhr.status >= 200 && xhr.status < 300) {
+          try {
+            resolve(JSON.parse(xhr.responseText) as { attachment: IssueAttachmentPublic });
+          } catch {
+            reject(new TeamflowApiError("Invalid upload response", xhr.status));
+          }
+          return;
+        }
+
+        reject(
+          new TeamflowApiError(
+            payload.error ?? xhr.statusText,
+            xhr.status,
+            payload.code,
+          ),
+        );
+      });
+
+      xhr.addEventListener("error", () => {
+        reject(new TeamflowApiError("Upload failed", 0));
+      });
+
+      xhr.addEventListener("abort", () => {
+        reject(new TeamflowApiError("Upload cancelled", 0));
+      });
+
+      xhr.send(form);
+    });
+  }
+
+  createRowUploadSession(
+    rowId: string,
+    input: { filename: string; mimeType: string; totalBytes: number },
+  ) {
+    return this.request<{ session: UploadSessionPublic }>(`/rows/${rowId}/uploads`, {
+      method: "POST",
+      body: JSON.stringify(input),
+    });
+  }
+
+  async uploadRowFile(
+    rowId: string,
+    file: File,
+    options?: {
+      limits?: AttachmentLimitsPublic;
+      onProgress?: (percent: number) => void;
+      resumeSessionId?: string;
+    },
+  ) {
+    const limits =
+      options?.limits ?? (await this.listRowAttachments(rowId)).limits;
+
+    if (file.size <= limits.chunkThresholdBytes) {
+      return this.uploadRowAttachment(rowId, file, {
+        onProgress: options?.onProgress,
+      });
+    }
+
+    let session: UploadSessionPublic;
+    if (options?.resumeSessionId) {
+      session = (await this.getUploadSession(options.resumeSessionId)).session;
+    } else {
+      session = (
+        await this.createRowUploadSession(rowId, {
+          filename: file.name,
+          mimeType: file.type || "application/octet-stream",
+          totalBytes: file.size,
+        })
+      ).session;
+    }
+
+    const received = new Set(session.receivedChunks);
+    for (let index = 0; index < session.totalChunks; index += 1) {
+      if (received.has(index)) continue;
+
+      const start = index * session.chunkSize;
+      const end = Math.min(start + session.chunkSize, file.size);
+      const chunk = file.slice(start, end);
+
+      const result = await this.uploadChunk(session.sessionId, index, chunk, {
+        onProgress: (chunkPercent) => {
+          if (!options?.onProgress) return;
+          const uploadedBefore = index * session.chunkSize;
+          const current = (chunk.size * chunkPercent) / 100;
+          const total = Math.max(file.size, 1);
+          options.onProgress(
+            Math.min(100, Math.round(((uploadedBefore + current) / total) * 100)),
+          );
+        },
+      });
+      session = result.session;
+      received.add(index);
+      if (options?.onProgress) {
+        const uploaded = Math.min(file.size, (index + 1) * session.chunkSize);
+        options.onProgress(Math.min(100, Math.round((uploaded / file.size) * 100)));
+      }
+    }
+
+    return this.completeUpload(session.sessionId);
+  }
+
+  deleteRowAttachment(rowId: string, attachmentId: string) {
+    return this.request<void>(`/rows/${rowId}/attachments/${attachmentId}`, {
+      method: "DELETE",
+    });
+  }
+
   resolveRef(teamId: string, ref: string) {
     const query = encodeURIComponent(ref);
     return this.request<{

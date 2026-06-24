@@ -14,18 +14,7 @@ import {
 
 const SESSION_TTL_MS = 48 * 60 * 60 * 1000;
 
-export type UploadSessionPublic = {
-  sessionId: string;
-  issueId: string;
-  filename: string;
-  mimeType: string;
-  totalBytes: number;
-  chunkSize: number;
-  totalChunks: number;
-  receivedChunks: number[];
-  status: string;
-  expiresAt: string;
-};
+type UploadTarget = { issueId: string } | { rowId: string };
 
 function sessionDir(sessionId: string) {
   return path.join(getUploadTempDir(), sessionId);
@@ -38,7 +27,7 @@ function computeTotalChunks(totalBytes: number, chunkSize: number) {
 export async function purgeExpiredUploadSessions(db: Db) {
   const now = new Date().toISOString();
   const expired = await db
-    .select({ id: schema.uploadSessions.id, tempDir: schema.uploadSessions.tempDir })
+    .select({ id: schema.uploadSessions.id })
     .from(schema.uploadSessions)
     .where(eq(schema.uploadSessions.status, "pending"));
 
@@ -55,7 +44,7 @@ export async function purgeExpiredUploadSessions(db: Db) {
 
 export async function createUploadSession(
   db: Db,
-  issueId: string,
+  target: UploadTarget,
   uploaderId: string,
   input: { filename: string; mimeType: string; totalBytes: number },
 ) {
@@ -67,10 +56,7 @@ export async function createUploadSession(
     throw new AttachmentError("Empty file", 400);
   }
   if (input.totalBytes > maxBytes) {
-    throw new AttachmentError(
-      `File exceeds limit for ${input.filename}`,
-      413,
-    );
+    throw new AttachmentError(`File exceeds limit for ${input.filename}`, 413);
   }
 
   const chunkSize = limits.chunkBytes;
@@ -82,7 +68,8 @@ export async function createUploadSession(
   const expiresAt = new Date(Date.now() + SESSION_TTL_MS).toISOString();
   await db.insert(schema.uploadSessions).values({
     id: sessionId,
-    issueId,
+    issueId: "issueId" in target ? target.issueId : null,
+    rowId: "rowId" in target ? target.rowId : null,
     uploaderId,
     filename: input.filename,
     mimeType,
@@ -94,44 +81,7 @@ export async function createUploadSession(
     expiresAt,
   });
 
-  return toSessionPublic({
-    id: sessionId,
-    issueId,
-    filename: input.filename,
-    mimeType,
-    totalBytes: input.totalBytes,
-    chunkSize,
-    totalChunks,
-    status: "pending",
-    expiresAt,
-    receivedChunks: [],
-  });
-}
-
-function toSessionPublic(row: {
-  id: string;
-  issueId: string;
-  filename: string;
-  mimeType: string;
-  totalBytes: number;
-  chunkSize: number;
-  totalChunks: number;
-  status: string;
-  expiresAt: string;
-  receivedChunks: number[];
-}): UploadSessionPublic {
-  return {
-    sessionId: row.id,
-    issueId: row.issueId,
-    filename: row.filename,
-    mimeType: row.mimeType,
-    totalBytes: row.totalBytes,
-    chunkSize: row.chunkSize,
-    totalChunks: row.totalChunks,
-    receivedChunks: row.receivedChunks,
-    status: row.status,
-    expiresAt: row.expiresAt,
-  };
+  return getUploadSession(db, sessionId);
 }
 
 async function listReceivedChunks(db: Db, sessionId: string) {
@@ -152,7 +102,19 @@ export async function getUploadSession(db: Db, sessionId: string) {
   if (!session) return null;
 
   const receivedChunks = await listReceivedChunks(db, sessionId);
-  return toSessionPublic({ ...session, id: session.id, receivedChunks });
+  return {
+    sessionId: session.id,
+    issueId: session.issueId,
+    rowId: session.rowId,
+    filename: session.filename,
+    mimeType: session.mimeType,
+    totalBytes: session.totalBytes,
+    chunkSize: session.chunkSize,
+    totalChunks: session.totalChunks,
+    receivedChunks,
+    status: session.status,
+    expiresAt: session.expiresAt,
+  };
 }
 
 export async function saveUploadChunk(
@@ -232,6 +194,15 @@ export async function completeUploadSession(
   const assembledPath = path.join(row.tempDir, "assembled");
   await assembleChunksToFile(row.tempDir, row.totalChunks, assembledPath);
 
+  const target =
+    row.issueId != null
+      ? { issueId: row.issueId }
+      : row.rowId != null
+        ? { rowId: row.rowId }
+        : null;
+
+  if (!target) throw new AttachmentError("Upload session has no target", 400);
+
   const attachment = await createStoredFileFromPath(
     db,
     uploaderId,
@@ -239,13 +210,8 @@ export async function completeUploadSession(
     row.mimeType,
     row.totalBytes,
     assembledPath,
-    row.issueId,
+    target,
   );
-
-  await db
-    .update(schema.uploadSessions)
-    .set({ status: "complete" })
-    .where(eq(schema.uploadSessions.id, sessionId));
 
   await fs.rm(row.tempDir, { recursive: true, force: true }).catch(() => {});
   await db.delete(schema.uploadChunks).where(eq(schema.uploadChunks.sessionId, sessionId));

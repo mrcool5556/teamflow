@@ -91,6 +91,7 @@ export function applySchemaPatches(sqlite: Database.Database) {
   ensurePasswordResetTokensTable(sqlite);
   ensureIssueAttachmentsTable(sqlite);
   ensureStoredFilesTables(sqlite);
+  ensureRowFileLinksTable(sqlite);
   purgeExpiredDeletedIssues(sqlite);
 }
 
@@ -211,6 +212,57 @@ function ensureStoredFilesTables(sqlite: Database.Database) {
   }
 
   console.log(`Migrated ${legacy.length} legacy attachment(s) to stored_files + issue_file_links`);
+}
+
+function ensureRowFileLinksTable(sqlite: Database.Database) {
+  sqlite.exec(`
+    CREATE TABLE IF NOT EXISTS row_file_links (
+      id TEXT PRIMARY KEY,
+      row_id TEXT NOT NULL REFERENCES board_rows(id) ON DELETE CASCADE,
+      file_id TEXT NOT NULL REFERENCES stored_files(id) ON DELETE CASCADE,
+      created_at TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+  `);
+  sqlite.exec(
+    `CREATE INDEX IF NOT EXISTS row_file_links_row_id_idx ON row_file_links(row_id)`,
+  );
+
+  const uploadCols = sqlite
+    .prepare("PRAGMA table_info(upload_sessions)")
+    .all() as { name: string }[];
+
+  if (uploadCols.length > 0 && !uploadCols.some((col) => col.name === "row_id")) {
+    sqlite.exec(`
+      CREATE TABLE upload_sessions_next (
+        id TEXT PRIMARY KEY,
+        issue_id TEXT REFERENCES issues(id) ON DELETE CASCADE,
+        row_id TEXT REFERENCES board_rows(id) ON DELETE CASCADE,
+        uploader_id TEXT NOT NULL REFERENCES users(id),
+        filename TEXT NOT NULL,
+        mime_type TEXT NOT NULL,
+        total_bytes INTEGER NOT NULL,
+        chunk_size INTEGER NOT NULL,
+        total_chunks INTEGER NOT NULL,
+        status TEXT NOT NULL DEFAULT 'pending',
+        temp_dir TEXT NOT NULL,
+        expires_at TEXT NOT NULL,
+        created_at TEXT NOT NULL DEFAULT (datetime('now'))
+      );
+    `);
+    sqlite.exec(`
+      INSERT INTO upload_sessions_next (
+        id, issue_id, uploader_id, filename, mime_type, total_bytes,
+        chunk_size, total_chunks, status, temp_dir, expires_at, created_at
+      )
+      SELECT
+        id, issue_id, uploader_id, filename, mime_type, total_bytes,
+        chunk_size, total_chunks, status, temp_dir, expires_at, created_at
+      FROM upload_sessions
+    `);
+    sqlite.exec(`DROP TABLE upload_sessions`);
+    sqlite.exec(`ALTER TABLE upload_sessions_next RENAME TO upload_sessions`);
+    console.log("Migrated upload_sessions for row uploads");
+  }
 }
 
 function ensurePasswordResetTokensTable(sqlite: Database.Database) {

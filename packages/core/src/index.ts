@@ -428,7 +428,8 @@ export type CommentPublic = {
 
 export type IssueAttachmentPublic = {
   id: string;
-  issueId: string;
+  issueId: string | null;
+  rowId?: string | null;
   fileId: string;
   filename: string;
   mimeType: string;

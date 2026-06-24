@@ -79,7 +79,8 @@ export const DEFAULT_ATTACHMENT_LIMITS: AttachmentLimitsPublic = {
 
 export type UploadSessionPublic = {
   sessionId: string;
-  issueId: string;
+  issueId: string | null;
+  rowId?: string | null;
   filename: string;
   mimeType: string;
   totalBytes: number;

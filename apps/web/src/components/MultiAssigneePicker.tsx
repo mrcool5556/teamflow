@@ -12,6 +12,7 @@ type MultiAssigneePickerProps = {
   compact?: boolean;
   panelPlacement?: "bottom" | "top" | "auto";
   floatingPanel?: boolean;
+  disabled?: boolean;
 };
 
 export function MultiAssigneePicker({
@@ -22,6 +23,7 @@ export function MultiAssigneePicker({
   compact = false,
   panelPlacement = "bottom",
   floatingPanel = false,
+  disabled = false,
 }: MultiAssigneePickerProps) {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
@@ -143,9 +145,11 @@ export function MultiAssigneePicker({
         ref={triggerRef}
         type="button"
         className={`assignee-picker-trigger ${compact ? "compact" : ""}`}
+        disabled={disabled}
         onPointerDown={(e) => e.stopPropagation()}
         onClick={(e) => {
           e.stopPropagation();
+          if (disabled) return;
           setOpen((value) => !value);
         }}
         title={
@@ -178,6 +182,39 @@ export function MultiAssigneePicker({
         : !floatingPanel
           ? panel
           : null}
+    </div>
+  );
+}
+
+type ToolbarUsersReadonlyProps = {
+  members: TeamMemberPublic[];
+  userIds: string[];
+  label?: string;
+  title?: string;
+};
+
+export function ToolbarUsersReadonly({
+  members,
+  userIds,
+  label = "Users",
+  title,
+}: ToolbarUsersReadonlyProps) {
+  const selected = members.filter((member) => userIds.includes(member.userId));
+
+  return (
+    <div className="toolbar-users toolbar-users--readonly" title={title}>
+      <span className="toolbar-users-label">{label}</span>
+      <span className="assignee-avatar-stack" aria-hidden>
+        {selected.length === 0 ? (
+          <span className="assignee-avatar">—</span>
+        ) : (
+          selected.slice(0, 3).map((member) => (
+            <span key={member.userId} className="assignee-avatar filled stacked">
+              {initials(member.name)}
+            </span>
+          ))
+        )}
+      </span>
     </div>
   );
 }

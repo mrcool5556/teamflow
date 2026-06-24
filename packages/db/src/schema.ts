@@ -390,13 +390,27 @@ export const issueFileLinks = sqliteTable("issue_file_links", {
     .default(sql`(datetime('now'))`),
 });
 
+export const rowFileLinks = sqliteTable("row_file_links", {
+  id: text("id")
+    .primaryKey()
+    .$defaultFn(() => crypto.randomUUID()),
+  rowId: text("row_id")
+    .notNull()
+    .references(() => boardRows.id, { onDelete: "cascade" }),
+  fileId: text("file_id")
+    .notNull()
+    .references(() => storedFiles.id, { onDelete: "cascade" }),
+  createdAt: text("created_at")
+    .notNull()
+    .default(sql`(datetime('now'))`),
+});
+
 export const uploadSessions = sqliteTable("upload_sessions", {
   id: text("id")
     .primaryKey()
     .$defaultFn(() => crypto.randomUUID()),
-  issueId: text("issue_id")
-    .notNull()
-    .references(() => issues.id, { onDelete: "cascade" }),
+  issueId: text("issue_id").references(() => issues.id, { onDelete: "cascade" }),
+  rowId: text("row_id").references(() => boardRows.id, { onDelete: "cascade" }),
   uploaderId: text("uploader_id")
     .notNull()
     .references(() => users.id),

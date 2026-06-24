@@ -30,7 +30,7 @@ import type {
 } from "@teamflow/core";
 import { mapStatusToRow } from "@teamflow/core";
 import { BoardSearchInput } from "./components/BoardSearchInput";
-import { MultiAssigneePicker } from "./components/MultiAssigneePicker";
+import { MultiAssigneePicker, ToolbarUsersReadonly } from "./components/MultiAssigneePicker";
 import { RefCopyButton } from "./components/RefCopyButton";
 import { RowEditMenu, RowEditMenuItem, RowEditMenuSection } from "./components/RowEditMenu";
 import { IssueTimer } from "./components/IssueTimer";
@@ -209,6 +209,7 @@ type KanbanBoardProps = {
   onBulkPriority?: (issueIds: string[], priority: Priority) => void;
   onBulkTimer?: (issueIds: string[], action: "pause" | "reset") => void;
   onBulkDelete?: (issues: IssuePublic[]) => void;
+  onOpenRowFiles?: (row: BoardRowPublic) => void;
 };
 
 export function KanbanBoard({
@@ -246,6 +247,7 @@ export function KanbanBoard({
   onBulkPriority,
   onBulkTimer,
   onBulkDelete,
+  onOpenRowFiles,
 }: KanbanBoardProps) {
   const [activeId, setActiveId] = useState<string | null>(null);
   const [issueInsertHint, setIssueInsertHint] = useState<IssueInsertHint | null>(
@@ -571,6 +573,7 @@ export function KanbanBoard({
               onIssueCardClick={handleIssueCardClick}
               previewMode={previewMode}
               issueInsertHint={issueInsertHint}
+              onOpenRowFiles={onOpenRowFiles}
             />
             );
           })}
@@ -642,6 +645,20 @@ function assigneeIdsFromEntity(entity: {
   return entity.assigneeId ? [entity.assigneeId] : [];
 }
 
+function uniqueAssigneeIdsFromIssues(issues: IssuePublic[]) {
+  const seen = new Set<string>();
+  const ids: string[] = [];
+  for (const issue of issues) {
+    const issueIds = assigneeIdsFromEntity(issue);
+    for (const userId of issueIds) {
+      if (seen.has(userId)) continue;
+      seen.add(userId);
+      ids.push(userId);
+    }
+  }
+  return ids;
+}
+
 function assigneeNamesLabel(entity: {
   assignees?: { name: string }[];
   assigneeName: string | null;
@@ -668,6 +685,8 @@ function RowSeparatorBar({
   onAddColumn,
   canRemoveRow,
   onRemoveRow,
+  onOpenRowFiles,
+  previewMode = false,
 }: {
   row: BoardRowPublic;
   rowSearch: string;
@@ -684,20 +703,23 @@ function RowSeparatorBar({
   onAddColumn: (rowId: string) => void;
   canRemoveRow: boolean;
   onRemoveRow: (row: BoardRowPublic) => void;
+  onOpenRowFiles?: (row: BoardRowPublic) => void;
+  previewMode?: boolean;
 }) {
   return (
     <div className="row-separator-bar">
-      <button
-        type="button"
-        ref={setActivatorNodeRef}
-        className="row-drag-handle"
-        aria-label={`Drag row ${row.name}`}
-        title="Hold to drag row"
-        {...listeners}
-      >
-        ⋮⋮
-      </button>
-      <div className="row-separator-primary">
+      <div className="row-separator-leading">
+        <button
+          type="button"
+          ref={setActivatorNodeRef}
+          className="row-drag-handle"
+          aria-label={`Drag row ${row.name}`}
+          title="Hold to drag row"
+          disabled={previewMode}
+          {...listeners}
+        >
+          ⋮⋮
+        </button>
         <EditableLabel
           label={row.name}
           className="row-separator-name"
@@ -712,28 +734,50 @@ function RowSeparatorBar({
           onGo={onGoToRef ? () => onGoToRef(row.key) : undefined}
         />
         <BoardSearchInput
-          className="row-search"
+          className="row-search row-toolbar-search"
           value={rowSearch}
           onChange={(value) => onRowSearchChange?.(value)}
-          placeholder="Search row…"
-          aria-label={`Search issues in row ${row.name}`}
+          placeholder="Filter row…"
+          aria-label={`Filter issues in row ${row.name}`}
         />
+      </div>
+      <div className="row-separator-tools">
+        <div className="toolbar-users">
+          <span className="toolbar-users-label">Users</span>
+          <MultiAssigneePicker
+            members={members}
+            assigneeIds={assigneeIdsFromEntity(row)}
+            label="Row owners"
+            compact
+            floatingPanel
+            disabled={previewMode}
+            onChange={(assigneeIds) => onAssignRow(row, assigneeIds)}
+          />
+        </div>
+        {onOpenRowFiles ? (
+          <button
+            type="button"
+            className="row-bar-action"
+            onClick={() => onOpenRowFiles(row)}
+          >
+            Files
+          </button>
+        ) : null}
+        <button
+          type="button"
+          className="row-bar-action"
+          disabled={previewMode}
+          onClick={() => onAddColumn(row.id)}
+        >
+          + Column
+        </button>
         <RowEditMenu>
-          <RowEditMenuSection title="Row owners">
-            <MultiAssigneePicker
-              members={members}
-              assigneeIds={assigneeIdsFromEntity(row)}
-              label="Row owners"
-              onChange={(assigneeIds) => onAssignRow(row, assigneeIds)}
-            />
-          </RowEditMenuSection>
           <RowEditMenuSection title="Row color">
             <RowColorPicker color={row.color} onSelect={(color) => onUpdateRowColor(row, color)} />
           </RowEditMenuSection>
           <RowEditMenuItem onClick={onToggleHeaders}>
             {headersVisible ? "Hide column headers" : "Show column headers"}
           </RowEditMenuItem>
-          <RowEditMenuItem onClick={() => onAddColumn(row.id)}>Add column</RowEditMenuItem>
           {canRemoveRow ? (
             <RowEditMenuItem danger onClick={() => onRemoveRow(row)}>
               Remove row
@@ -779,6 +823,7 @@ function SortableBoardRow({
   onIssueCardClick,
   previewMode = false,
   issueInsertHint = null,
+  onOpenRowFiles,
 }: {
   row: BoardRowPublic;
   statuses: IssueStatusPublic[];
@@ -825,6 +870,7 @@ function SortableBoardRow({
   ) => void;
   previewMode?: boolean;
   issueInsertHint?: IssueInsertHint | null;
+  onOpenRowFiles?: (row: BoardRowPublic) => void;
 }) {
   const {
     attributes,
@@ -890,6 +936,8 @@ function SortableBoardRow({
             onAddColumn={onAddColumn}
             canRemoveRow={canRemoveRow}
             onRemoveRow={onRemoveRow}
+            onOpenRowFiles={onOpenRowFiles}
+            previewMode={previewMode}
           />
         </div>
         <p className="board-row-empty-search muted">No matching issues in this row.</p>
@@ -922,6 +970,8 @@ function SortableBoardRow({
           onAddColumn={onAddColumn}
           canRemoveRow={canRemoveRow}
           onRemoveRow={onRemoveRow}
+          onOpenRowFiles={onOpenRowFiles}
+          previewMode={previewMode}
         />
       </div>
 
@@ -960,6 +1010,8 @@ function SortableBoardRow({
                         onColumnSearchChange={(value) =>
                           onColumnSearchChange?.(status.id, value)
                         }
+                        members={members}
+                        columnUserIds={uniqueAssigneeIdsFromIssues(cellIssues)}
                         className={`column-label column-label-row${isDragging ? " column-label--dragging" : ""}`}
                         onSave={(name) => onRenameStatus(status, name)}
                         onRemove={
@@ -1296,6 +1348,8 @@ function EditableLabel({
   onGoToRef,
   dragHandleRef,
   dragHandleListeners,
+  members,
+  columnUserIds = [],
 }: {
   label: string;
   count?: number;
@@ -1313,6 +1367,8 @@ function EditableLabel({
   onGoToRef?: (ref: string) => void;
   dragHandleRef?: (element: HTMLButtonElement | null) => void;
   dragHandleListeners?: ReturnType<typeof useSortable>["listeners"];
+  members?: TeamMemberPublic[];
+  columnUserIds?: string[];
 }) {
   const [editing, setEditing] = useState(false);
   const [value, setValue] = useState(label);
@@ -1361,7 +1417,7 @@ function EditableLabel({
       data-column-key={refKey}
       data-status-id={statusId}
     >
-      <div className="column-label-head">
+      <div className="column-label-toolbar">
         {dragHandleRef && dragHandleListeners ? (
           <button
             type="button"
@@ -1376,13 +1432,56 @@ function EditableLabel({
         ) : null}
         <button
           type="button"
-          className="label-btn"
+          className="label-btn column-label-name"
           onClick={() => setEditing(true)}
           title="Click to rename"
         >
           <span>{label}</span>
           {count !== undefined && <span className="count">{count}</span>}
         </button>
+        {refKey ? (
+          <RefCopyButton
+            value={refKey}
+            display="icon"
+            share
+            compact
+            title={`Column ${label}`}
+            onGo={onGoToRef ? () => onGoToRef(refKey) : undefined}
+          />
+        ) : null}
+        {onColumnSearchChange ? (
+          <BoardSearchInput
+            className="column-search column-toolbar-search"
+            value={columnSearch}
+            onChange={onColumnSearchChange}
+            placeholder="Filter column…"
+            aria-label={`Filter issues in column ${label}`}
+          />
+        ) : null}
+        {members ? (
+          <ToolbarUsersReadonly
+            members={members}
+            userIds={columnUserIds}
+            label="Users"
+            title={
+              columnUserIds.length > 0
+                ? `Assignees in this column: ${members
+                    .filter((member) => columnUserIds.includes(member.userId))
+                    .map((member) => member.name)
+                    .join(", ")}`
+                : "No assignees in this column yet"
+            }
+          />
+        ) : null}
+        {onColorChange ? (
+          <BoardColorPicker
+            color={color}
+            onSelect={onColorChange}
+            compact
+            title={`Column color: ${label}`}
+            className="color-picker--column"
+          />
+        ) : null}
         <button
           type="button"
           className={`ghost label-remove-btn${onRemove ? "" : " label-remove-btn--reserved"}`}
@@ -1395,35 +1494,7 @@ function EditableLabel({
         >
           ×
         </button>
-        {refKey ? (
-          <RefCopyButton
-            value={refKey}
-            display="icon"
-            share
-            compact
-            title={`Column ${label}`}
-            onGo={onGoToRef ? () => onGoToRef(refKey) : undefined}
-          />
-        ) : null}
-        {onColorChange ? (
-          <BoardColorPicker
-            color={color}
-            onSelect={onColorChange}
-            compact
-            title={`Column color: ${label}`}
-            className="color-picker--column"
-          />
-        ) : null}
       </div>
-      {onColumnSearchChange ? (
-        <BoardSearchInput
-          className="column-search"
-          value={columnSearch}
-          onChange={onColumnSearchChange}
-          placeholder="Search column…"
-          aria-label={`Search issues in column ${label}`}
-        />
-      ) : null}
     </div>
   );
 }
