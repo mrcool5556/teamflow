@@ -40,8 +40,11 @@ If you installed before `update` existed, install the command once:
 
 ```bash
 sudo install -m 755 /opt/teamflow/deploy/proxmox-lxc/update.sh /usr/local/bin/teamflow-update
+sudo install -m 755 /opt/teamflow/deploy/proxmox-lxc/backup.sh /usr/local/bin/teamflow-backup
 sudo ln -sf teamflow-update /usr/local/bin/update
 ```
+
+Manual backup anytime: `sudo teamflow-backup`
 
 **Requires a git clone** at `/opt/teamflow` (not a snapshot copy without `.git`).
 
