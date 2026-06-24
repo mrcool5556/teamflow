@@ -9,6 +9,7 @@ export function isImageAttachment(attachment: IssueAttachmentPublic) {
 
 export type AttachmentBlobCache = {
   get: (attachmentId: string) => Promise<string>;
+  set: (attachmentId: string, url: string) => void;
   revokeAll: () => void;
 };
 
@@ -24,6 +25,13 @@ export function createAttachmentBlobCache(): AttachmentBlobCache {
       map.set(attachmentId, url);
       return url;
     },
+    set(attachmentId: string, url: string) {
+      const existing = map.get(attachmentId);
+      if (existing && existing !== url) {
+        URL.revokeObjectURL(existing);
+      }
+      map.set(attachmentId, url);
+    },
     revokeAll() {
       for (const url of map.values()) {
         URL.revokeObjectURL(url);
@@ -33,44 +41,57 @@ export function createAttachmentBlobCache(): AttachmentBlobCache {
   };
 }
 
-type AttachmentImagePreviewButtonProps = {
+type AttachmentImageThumbnailProps = {
   attachment: IssueAttachmentPublic;
   blobCache: AttachmentBlobCache;
   onOpen: (url: string) => void;
 };
 
-export function AttachmentImagePreviewButton({
+export function AttachmentImageThumbnail({
   attachment,
   blobCache,
   onOpen,
-}: AttachmentImagePreviewButtonProps) {
-  const [loading, setLoading] = useState(false);
+}: AttachmentImageThumbnailProps) {
+  const [url, setUrl] = useState<string | null>(null);
+  const [failed, setFailed] = useState(false);
 
-  async function openPreview() {
-    if (loading) return;
-    setLoading(true);
-    try {
-      const url = await blobCache.get(attachment.id);
-      onOpen(url);
-    } catch {
-      window.alert("Could not load image preview.");
-    } finally {
-      setLoading(false);
-    }
-  }
+  useEffect(() => {
+    let cancelled = false;
+    setUrl(null);
+    setFailed(false);
+
+    void blobCache
+      .get(attachment.id)
+      .then((objectUrl) => {
+        if (!cancelled) setUrl(objectUrl);
+      })
+      .catch(() => {
+        if (!cancelled) setFailed(true);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [attachment.id, blobCache]);
+
+  if (failed) return null;
 
   return (
     <button
       type="button"
-      className="issue-attachment-thumb issue-attachment-thumb--idle"
-      onClick={() => void openPreview()}
-      disabled={loading}
+      className="issue-attachment-thumb"
+      onClick={() => {
+        if (url) onOpen(url);
+      }}
+      disabled={!url}
       aria-label={`Preview ${attachment.filename}`}
-      title="Click to load preview"
+      title="Click to enlarge"
     >
-      <span className="issue-attachment-thumb-label">
-        {loading ? "…" : "Preview"}
-      </span>
+      {url ? (
+        <img src={url} alt="" loading="lazy" />
+      ) : (
+        <span className="issue-attachment-thumb-placeholder muted">…</span>
+      )}
     </button>
   );
 }

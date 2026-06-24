@@ -2209,21 +2209,6 @@ select {
   place-items: center;
 }
 
-.issue-attachment-thumb--idle {
-  cursor: pointer;
-  font-size: 0.7rem;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-  color: var(--muted);
-}
-
-.issue-attachment-thumb-label {
-  padding: 0.25rem;
-  text-align: center;
-  line-height: 1.2;
-}
-
 .issue-attachment-thumb img {
   width: 100%;
   height: 100%;
@@ -2271,6 +2256,35 @@ select {
 .issue-attachment-drop--active {
   border-color: var(--accent);
   background: color-mix(in srgb, var(--accent) 8%, transparent);
+}
+
+.issue-attachment-progress {
+  width: 100%;
+  max-width: 18rem;
+  height: 0.55rem;
+  border: 2px solid var(--border);
+  background: var(--surface);
+  overflow: hidden;
+}
+
+.issue-attachment-progress-bar {
+  height: 100%;
+  background: var(--accent);
+  transition: width 120ms linear;
+}
+
+.issue-attachment-progress-bar--indeterminate {
+  width: 35% !important;
+  animation: issue-attachment-progress-indeterminate 1.1s ease-in-out infinite;
+}
+
+@keyframes issue-attachment-progress-indeterminate {
+  0% {
+    transform: translateX(-120%);
+  }
+  100% {
+    transform: translateX(320%);
+  }
 }
 
 .issue-attachment-input {

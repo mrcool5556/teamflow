@@ -68,7 +68,7 @@ curl -X POST "https://teamflow.example.com/issues/ISSUE_UUID/attachments" \
 
 Open an issue → **Attachments** section → choose file or drag onto the drop zone.
 
-Attachment metadata loads when you open the issue. **Image previews are not downloaded until you click Preview** (or the filename) — then the full image opens in a lightbox.
+Attachment metadata loads when you open the issue. Image thumbnails load then too; click a thumbnail or filename to open the full-size lightbox.
 
 ## Backups
 
