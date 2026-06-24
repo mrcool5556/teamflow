@@ -90,6 +90,7 @@ export function applySchemaPatches(sqlite: Database.Database) {
   ensureDiscordBotSecretsTable(sqlite);
   ensurePasswordResetTokensTable(sqlite);
   ensureIssueAttachmentsTable(sqlite);
+  ensureStoredFilesTables(sqlite);
   purgeExpiredDeletedIssues(sqlite);
 }
 
@@ -109,6 +110,107 @@ function ensureIssueAttachmentsTable(sqlite: Database.Database) {
   sqlite.exec(
     `CREATE INDEX IF NOT EXISTS issue_attachments_issue_id_idx ON issue_attachments(issue_id)`,
   );
+}
+
+function ensureStoredFilesTables(sqlite: Database.Database) {
+  sqlite.exec(`
+    CREATE TABLE IF NOT EXISTS stored_files (
+      id TEXT PRIMARY KEY,
+      uploader_id TEXT NOT NULL REFERENCES users(id),
+      filename TEXT NOT NULL,
+      mime_type TEXT NOT NULL,
+      size_bytes INTEGER NOT NULL,
+      storage_path TEXT NOT NULL,
+      created_at TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+  `);
+
+  sqlite.exec(`
+    CREATE TABLE IF NOT EXISTS issue_file_links (
+      id TEXT PRIMARY KEY,
+      issue_id TEXT NOT NULL REFERENCES issues(id) ON DELETE CASCADE,
+      file_id TEXT NOT NULL REFERENCES stored_files(id) ON DELETE CASCADE,
+      created_at TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+  `);
+  sqlite.exec(
+    `CREATE INDEX IF NOT EXISTS issue_file_links_issue_id_idx ON issue_file_links(issue_id)`,
+  );
+  sqlite.exec(
+    `CREATE INDEX IF NOT EXISTS issue_file_links_file_id_idx ON issue_file_links(file_id)`,
+  );
+
+  sqlite.exec(`
+    CREATE TABLE IF NOT EXISTS upload_sessions (
+      id TEXT PRIMARY KEY,
+      issue_id TEXT NOT NULL REFERENCES issues(id) ON DELETE CASCADE,
+      uploader_id TEXT NOT NULL REFERENCES users(id),
+      filename TEXT NOT NULL,
+      mime_type TEXT NOT NULL,
+      total_bytes INTEGER NOT NULL,
+      chunk_size INTEGER NOT NULL,
+      total_chunks INTEGER NOT NULL,
+      status TEXT NOT NULL DEFAULT 'pending',
+      temp_dir TEXT NOT NULL,
+      expires_at TEXT NOT NULL,
+      created_at TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+  `);
+
+  sqlite.exec(`
+    CREATE TABLE IF NOT EXISTS upload_chunks (
+      session_id TEXT NOT NULL REFERENCES upload_sessions(id) ON DELETE CASCADE,
+      chunk_index INTEGER NOT NULL,
+      size_bytes INTEGER NOT NULL,
+      created_at TEXT NOT NULL DEFAULT (datetime('now')),
+      UNIQUE(session_id, chunk_index)
+    );
+  `);
+
+  const linkCount = sqlite
+    .prepare("SELECT COUNT(*) as count FROM issue_file_links")
+    .get() as { count: number };
+  if (linkCount.count > 0) return;
+
+  const legacy = sqlite
+    .prepare("SELECT * FROM issue_attachments")
+    .all() as {
+    id: string;
+    issue_id: string;
+    uploader_id: string;
+    filename: string;
+    mime_type: string;
+    size_bytes: number;
+    storage_path: string;
+    created_at: string;
+  }[];
+
+  if (legacy.length === 0) return;
+
+  const insertFile = sqlite.prepare(`
+    INSERT INTO stored_files (id, uploader_id, filename, mime_type, size_bytes, storage_path, created_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?)
+  `);
+  const insertLink = sqlite.prepare(`
+    INSERT INTO issue_file_links (id, issue_id, file_id, created_at)
+    VALUES (?, ?, ?, ?)
+  `);
+
+  for (const row of legacy) {
+    const fileId = randomUUID();
+    insertFile.run(
+      fileId,
+      row.uploader_id,
+      row.filename,
+      row.mime_type,
+      row.size_bytes,
+      row.storage_path,
+      row.created_at,
+    );
+    insertLink.run(row.id, row.issue_id, fileId, row.created_at);
+  }
+
+  console.log(`Migrated ${legacy.length} legacy attachment(s) to stored_files + issue_file_links`);
 }
 
 function ensurePasswordResetTokensTable(sqlite: Database.Database) {

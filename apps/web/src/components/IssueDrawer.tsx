@@ -27,9 +27,14 @@ import {
   createAttachmentBlobCache,
   isImageAttachment,
 } from "./AttachmentImagePreview";
+import {
+  AttachmentVideoLightbox,
+  AttachmentVideoThumbnail,
+  isVideoAttachment,
+} from "./AttachmentVideoPlayer";
 
 function describeAttachmentLimits(limits: AttachmentLimitsPublic) {
-  return `Images up to ${formatFileSize(limits.imageBytes)}, ZIPs up to ${formatFileSize(limits.zipBytes)}`;
+  return `Images ${formatFileSize(limits.imageBytes)}, videos ${formatFileSize(limits.videoBytes)}, ZIPs ${formatFileSize(limits.zipBytes)}`;
 }
 
 const PRIORITY_LABELS: Record<Priority, string> = {
@@ -43,7 +48,8 @@ const PRIORITY_LABELS: Record<Priority, string> = {
 function formatFileSize(bytes: number) {
   if (bytes < 1024) return `${bytes} B`;
   if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
-  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+  if (bytes < 1024 * 1024 * 1024) return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+  return `${(bytes / (1024 * 1024 * 1024)).toFixed(1)} GB`;
 }
 
 function formatTimestamp(value: string) {
@@ -123,6 +129,7 @@ export function IssueDrawer({
     attachment: IssueAttachmentPublic;
     imageUrl: string;
   } | null>(null);
+  const [attachmentVideo, setAttachmentVideo] = useState<IssueAttachmentPublic | null>(null);
   const attachmentBlobCache = useMemo(() => createAttachmentBlobCache(), []);
   const attachmentInputRef = useRef<HTMLInputElement>(null);
   const commentTextareaRef = useRef<HTMLTextAreaElement>(null);
@@ -192,6 +199,7 @@ export function IssueDrawer({
   useEffect(() => {
     attachmentBlobCache.revokeAll();
     setAttachmentLightbox(null);
+    setAttachmentVideo(null);
     return () => attachmentBlobCache.revokeAll();
   }, [issue.id, attachmentBlobCache]);
 
@@ -278,7 +286,8 @@ export function IssueDrawer({
     setAttachmentUploadProgress(0);
     setAttachmentUploadName(file.name);
     try {
-      const { attachment } = await client.uploadAttachment(issue.id, file, {
+      const { attachment } = await client.uploadFile(issue.id, file, {
+        limits: attachmentLimits,
         onProgress: (percent) => setAttachmentUploadProgress(percent),
       });
       setAttachments((prev) => [...prev, attachment]);
@@ -565,7 +574,12 @@ export function IssueDrawer({
             <ul className="issue-attachment-list">
               {attachments.map((attachment) => (
                 <li key={attachment.id} className="issue-attachment">
-                  {isImageAttachment(attachment) ? (
+                  {isVideoAttachment(attachment) ? (
+                    <AttachmentVideoThumbnail
+                      attachment={attachment}
+                      onOpen={() => setAttachmentVideo(attachment)}
+                    />
+                  ) : isImageAttachment(attachment) ? (
                     <AttachmentImageThumbnail
                       attachment={attachment}
                       blobCache={attachmentBlobCache}
@@ -579,6 +593,10 @@ export function IssueDrawer({
                       type="button"
                       className="ghost issue-attachment-name"
                       onClick={() => {
+                        if (isVideoAttachment(attachment)) {
+                          setAttachmentVideo(attachment);
+                          return;
+                        }
                         if (isImageAttachment(attachment)) {
                           void openImagePreview(attachment);
                           return;
@@ -766,6 +784,13 @@ export function IssueDrawer({
           imageUrl={attachmentLightbox.imageUrl}
           onClose={() => setAttachmentLightbox(null)}
           onDownload={() => void downloadAttachment(attachmentLightbox.attachment)}
+        />
+      ) : null}
+      {attachmentVideo ? (
+        <AttachmentVideoLightbox
+          attachment={attachmentVideo}
+          onClose={() => setAttachmentVideo(null)}
+          onDownload={() => void downloadAttachment(attachmentVideo)}
         />
       ) : null}
     </div>

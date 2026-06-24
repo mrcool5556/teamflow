@@ -359,6 +359,77 @@ export const issueAttachments = sqliteTable("issue_attachments", {
     .default(sql`(datetime('now'))`),
 });
 
+export const storedFiles = sqliteTable("stored_files", {
+  id: text("id")
+    .primaryKey()
+    .$defaultFn(() => crypto.randomUUID()),
+  uploaderId: text("uploader_id")
+    .notNull()
+    .references(() => users.id),
+  filename: text("filename").notNull(),
+  mimeType: text("mime_type").notNull(),
+  sizeBytes: integer("size_bytes").notNull(),
+  storagePath: text("storage_path").notNull(),
+  createdAt: text("created_at")
+    .notNull()
+    .default(sql`(datetime('now'))`),
+});
+
+export const issueFileLinks = sqliteTable("issue_file_links", {
+  id: text("id")
+    .primaryKey()
+    .$defaultFn(() => crypto.randomUUID()),
+  issueId: text("issue_id")
+    .notNull()
+    .references(() => issues.id, { onDelete: "cascade" }),
+  fileId: text("file_id")
+    .notNull()
+    .references(() => storedFiles.id, { onDelete: "cascade" }),
+  createdAt: text("created_at")
+    .notNull()
+    .default(sql`(datetime('now'))`),
+});
+
+export const uploadSessions = sqliteTable("upload_sessions", {
+  id: text("id")
+    .primaryKey()
+    .$defaultFn(() => crypto.randomUUID()),
+  issueId: text("issue_id")
+    .notNull()
+    .references(() => issues.id, { onDelete: "cascade" }),
+  uploaderId: text("uploader_id")
+    .notNull()
+    .references(() => users.id),
+  filename: text("filename").notNull(),
+  mimeType: text("mime_type").notNull(),
+  totalBytes: integer("total_bytes").notNull(),
+  chunkSize: integer("chunk_size").notNull(),
+  totalChunks: integer("total_chunks").notNull(),
+  status: text("status").notNull().default("pending"),
+  tempDir: text("temp_dir").notNull(),
+  expiresAt: text("expires_at").notNull(),
+  createdAt: text("created_at")
+    .notNull()
+    .default(sql`(datetime('now'))`),
+});
+
+export const uploadChunks = sqliteTable(
+  "upload_chunks",
+  {
+    sessionId: text("session_id")
+      .notNull()
+      .references(() => uploadSessions.id, { onDelete: "cascade" }),
+    chunkIndex: integer("chunk_index").notNull(),
+    sizeBytes: integer("size_bytes").notNull(),
+    createdAt: text("created_at")
+      .notNull()
+      .default(sql`(datetime('now'))`),
+  },
+  (table) => [
+    uniqueIndex("upload_chunks_session_index").on(table.sessionId, table.chunkIndex),
+  ],
+);
+
 export const apiTokens = sqliteTable("api_tokens", {
   id: text("id")
     .primaryKey()
