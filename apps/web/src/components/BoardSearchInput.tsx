@@ -29,6 +29,7 @@ export function BoardSearchInput({
           type="button"
           className="ghost board-search-clear"
           aria-label="Clear search"
+          title="Clear search"
           onPointerDown={(e) => e.stopPropagation()}
           onClick={(e) => {
             e.stopPropagation();

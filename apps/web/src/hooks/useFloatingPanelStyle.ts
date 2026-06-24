@@ -6,6 +6,8 @@ export function useFloatingPanelStyle(
   open: boolean,
   anchorRef: RefObject<HTMLElement | null>,
   placement: "auto" | "top" | "bottom" = "auto",
+  align: "left" | "right" = "left",
+  panelWidth = 280,
 ) {
   const [style, setStyle] = useState<CSSProperties>({});
 
@@ -17,18 +19,24 @@ export function useFloatingPanelStyle(
       if (!anchor) return;
 
       const rect = anchor.getBoundingClientRect();
+      const width = Math.max(rect.width, panelWidth);
       const preferTop =
         placement === "top" ||
         (placement === "auto" &&
           rect.bottom + PANEL_ESTIMATE_HEIGHT > window.innerHeight - 12);
 
+      const left =
+        align === "right"
+          ? Math.max(12, rect.right - width)
+          : Math.max(12, Math.min(rect.left, window.innerWidth - width - 12));
+
       setStyle({
         position: "fixed",
-        left: Math.max(12, Math.min(rect.left, window.innerWidth - 332)),
+        left,
         top: preferTop ? rect.top - 8 : rect.bottom + 6,
         transform: preferTop ? "translateY(-100%)" : undefined,
         zIndex: 500,
-        minWidth: Math.max(rect.width, 280),
+        minWidth: width,
       });
     }
 
@@ -40,7 +48,7 @@ export function useFloatingPanelStyle(
       window.removeEventListener("resize", updatePosition);
       window.removeEventListener("scroll", updatePosition, true);
     };
-  }, [open, anchorRef, placement]);
+  }, [open, anchorRef, placement, align, panelWidth]);
 
   return style;
 }

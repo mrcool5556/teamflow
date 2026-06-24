@@ -30,7 +30,7 @@ import type {
 } from "@teamflow/core";
 import { mapStatusToRow } from "@teamflow/core";
 import { BoardSearchInput } from "./components/BoardSearchInput";
-import { MultiAssigneePicker, ToolbarUsersReadonly } from "./components/MultiAssigneePicker";
+import { MultiAssigneePicker } from "./components/MultiAssigneePicker";
 import { RefCopyButton } from "./components/RefCopyButton";
 import { RowEditMenu, RowEditMenuItem, RowEditMenuSection } from "./components/RowEditMenu";
 import { IssueTimer } from "./components/IssueTimer";
@@ -708,82 +708,88 @@ function RowSeparatorBar({
 }) {
   return (
     <div className="row-separator-bar">
-      <div className="row-separator-leading">
-        <button
-          type="button"
-          ref={setActivatorNodeRef}
-          className="row-drag-handle"
-          aria-label={`Drag row ${row.name}`}
-          title="Hold to drag row"
-          disabled={previewMode}
-          {...listeners}
-        >
-          ⋮⋮
-        </button>
-        <EditableLabel
-          label={row.name}
-          className="row-separator-name"
-          onSave={(name) => onRenameRow(row, name)}
-        />
-        <RefCopyButton
-          value={row.key}
-          display="icon"
-          share
-          compact
-          title={`Row ${row.name}`}
-          onGo={onGoToRef ? () => onGoToRef(row.key) : undefined}
-        />
+      <div className="row-separator-main">
+        <div className="row-separator-title">
+          <button
+            type="button"
+            ref={setActivatorNodeRef}
+            className="row-drag-handle"
+            aria-label={`Drag row ${row.name}`}
+            title="Hold to drag row"
+            disabled={previewMode}
+            {...listeners}
+          >
+            ⋮⋮
+          </button>
+          <span className="row-separator-name-wrap">
+            <EditableLabel
+              label={row.name}
+              className="row-separator-name"
+              onSave={(name) => onRenameRow(row, name)}
+            />
+          </span>
+          <RefCopyButton
+            value={row.key}
+            display="icon"
+            share
+            compact
+            title={`Row ${row.name}`}
+            onGo={onGoToRef ? () => onGoToRef(row.key) : undefined}
+          />
+        </div>
+        <div className="row-separator-main-spacer" aria-hidden="true" />
+        <div className="row-separator-tools">
+          <div className="toolbar-users">
+            <span className="toolbar-users-label">Users</span>
+            <MultiAssigneePicker
+              members={members}
+              assigneeIds={assigneeIdsFromEntity(row)}
+              label="Row owners"
+              compact
+              floatingPanel
+              disabled={previewMode}
+              onChange={(assigneeIds) => onAssignRow(row, assigneeIds)}
+            />
+          </div>
+          {onOpenRowFiles ? (
+            <button
+              type="button"
+              className="row-bar-action"
+              onClick={() => onOpenRowFiles(row)}
+            >
+              Files
+            </button>
+          ) : null}
+          <button
+            type="button"
+            className="row-bar-action"
+            disabled={previewMode}
+            onClick={() => onAddColumn(row.id)}
+          >
+            + Column
+          </button>
+          <RowEditMenu>
+            <RowEditMenuSection title="Row color">
+              <RowColorPicker color={row.color} onSelect={(color) => onUpdateRowColor(row, color)} />
+            </RowEditMenuSection>
+            <RowEditMenuItem onClick={onToggleHeaders}>
+              {headersVisible ? "Hide column headers" : "Show column headers"}
+            </RowEditMenuItem>
+            {canRemoveRow ? (
+              <RowEditMenuItem danger onClick={() => onRemoveRow(row)}>
+                Remove row
+              </RowEditMenuItem>
+            ) : null}
+          </RowEditMenu>
+        </div>
+      </div>
+      <div className="row-separator-search-span">
         <BoardSearchInput
-          className="row-search row-toolbar-search"
           value={rowSearch}
           onChange={(value) => onRowSearchChange?.(value)}
           placeholder="Filter row…"
           aria-label={`Filter issues in row ${row.name}`}
         />
-      </div>
-      <div className="row-separator-tools">
-        <div className="toolbar-users">
-          <span className="toolbar-users-label">Users</span>
-          <MultiAssigneePicker
-            members={members}
-            assigneeIds={assigneeIdsFromEntity(row)}
-            label="Row owners"
-            compact
-            floatingPanel
-            disabled={previewMode}
-            onChange={(assigneeIds) => onAssignRow(row, assigneeIds)}
-          />
-        </div>
-        {onOpenRowFiles ? (
-          <button
-            type="button"
-            className="row-bar-action"
-            onClick={() => onOpenRowFiles(row)}
-          >
-            Files
-          </button>
-        ) : null}
-        <button
-          type="button"
-          className="row-bar-action"
-          disabled={previewMode}
-          onClick={() => onAddColumn(row.id)}
-        >
-          + Column
-        </button>
-        <RowEditMenu>
-          <RowEditMenuSection title="Row color">
-            <RowColorPicker color={row.color} onSelect={(color) => onUpdateRowColor(row, color)} />
-          </RowEditMenuSection>
-          <RowEditMenuItem onClick={onToggleHeaders}>
-            {headersVisible ? "Hide column headers" : "Show column headers"}
-          </RowEditMenuItem>
-          {canRemoveRow ? (
-            <RowEditMenuItem danger onClick={() => onRemoveRow(row)}>
-              Remove row
-            </RowEditMenuItem>
-          ) : null}
-        </RowEditMenu>
       </div>
     </div>
   );
@@ -999,7 +1005,7 @@ function SortableBoardRow({
                 {({ setActivatorNodeRef, listeners, isDragging }) => (
                   <>
                     {headersVisible ? (
-                      <EditableLabel
+                      <ColumnHeader
                         label={status.name}
                         count={cellIssues.length}
                         statusType={status.type}
@@ -1011,7 +1017,13 @@ function SortableBoardRow({
                           onColumnSearchChange?.(status.id, value)
                         }
                         members={members}
-                        columnUserIds={uniqueAssigneeIdsFromIssues(cellIssues)}
+                        columnAssigneeIds={uniqueAssigneeIdsFromIssues(cellIssues)}
+                        onAssignColumn={(assigneeIds) => {
+                          for (const issue of cellIssues) {
+                            onAssignIssue(issue, assigneeIds);
+                          }
+                        }}
+                        previewMode={previewMode}
                         className={`column-label column-label-row${isDragging ? " column-label--dragging" : ""}`}
                         onSave={(name) => onRenameStatus(status, name)}
                         onRemove={
@@ -1331,7 +1343,7 @@ function SortableIssueCard({
   );
 }
 
-function EditableLabel({
+function ColumnHeader({
   label,
   count,
   statusType,
@@ -1349,7 +1361,9 @@ function EditableLabel({
   dragHandleRef,
   dragHandleListeners,
   members,
-  columnUserIds = [],
+  columnAssigneeIds = [],
+  onAssignColumn,
+  previewMode = false,
 }: {
   label: string;
   count?: number;
@@ -1368,7 +1382,9 @@ function EditableLabel({
   dragHandleRef?: (element: HTMLButtonElement | null) => void;
   dragHandleListeners?: ReturnType<typeof useSortable>["listeners"];
   members?: TeamMemberPublic[];
-  columnUserIds?: string[];
+  columnAssigneeIds?: string[];
+  onAssignColumn?: (assigneeIds: string[]) => void;
+  previewMode?: boolean;
 }) {
   const [editing, setEditing] = useState(false);
   const [value, setValue] = useState(label);
@@ -1388,6 +1404,7 @@ function EditableLabel({
         style={columnStyle}
       >
         <input
+          className="column-label-rename-input"
           autoFocus
           value={value}
           onChange={(e) => setValue(e.target.value)}
@@ -1416,85 +1433,147 @@ function EditableLabel({
       style={columnStyle}
       data-column-key={refKey}
       data-status-id={statusId}
+      onPointerDown={(event) => event.stopPropagation()}
+      onClick={(event) => event.stopPropagation()}
     >
-      <div className="column-label-toolbar">
-        {dragHandleRef && dragHandleListeners ? (
-          <button
-            type="button"
-            ref={dragHandleRef}
-            className="column-drag-handle"
-            aria-label={`Drag column ${label}`}
-            title="Hold to drag column"
-            {...dragHandleListeners}
-          >
-            ⋮⋮
-          </button>
-        ) : null}
-        <button
-          type="button"
-          className="label-btn column-label-name"
-          onClick={() => setEditing(true)}
-          title="Click to rename"
-        >
-          <span>{label}</span>
-          {count !== undefined && <span className="count">{count}</span>}
-        </button>
-        {refKey ? (
-          <RefCopyButton
-            value={refKey}
-            display="icon"
-            share
-            compact
-            title={`Column ${label}`}
-            onGo={onGoToRef ? () => onGoToRef(refKey) : undefined}
-          />
-        ) : null}
-        {onColumnSearchChange ? (
+      <div className="column-label-main">
+        <div className="column-label-title">
+          {dragHandleRef && dragHandleListeners ? (
+            <button
+              type="button"
+              ref={dragHandleRef}
+              className="column-drag-handle"
+              aria-label={`Drag column ${label}`}
+              title="Hold to drag column"
+              disabled={previewMode}
+              {...dragHandleListeners}
+            >
+              ⋮⋮
+            </button>
+          ) : null}
+          {count !== undefined ? (
+            <span className="column-issue-count" aria-label={`${count} issues`}>
+              {count}
+            </span>
+          ) : null}
+          <span className="column-label-name-wrap">
+            <button
+              type="button"
+              className="column-label-name"
+              onClick={() => setEditing(true)}
+              title="Click to rename"
+            >
+              {label}
+            </button>
+          </span>
+          {members && onAssignColumn ? (
+            <MultiAssigneePicker
+              members={members}
+              assigneeIds={columnAssigneeIds}
+              compact
+              panelPlacement="top"
+              floatingPanel
+              disabled={previewMode}
+              onChange={onAssignColumn}
+            />
+          ) : null}
+        </div>
+        <div className="column-label-actions">
+          {refKey ? (
+            <RefCopyButton
+              value={refKey}
+              display="label"
+              buttonLabel="Copy"
+              compact
+              share
+              title={`Column ${label}`}
+              onGo={onGoToRef ? () => onGoToRef(refKey) : undefined}
+            />
+          ) : null}
+          {(onColorChange || onRemove) ? (
+            <RowEditMenu>
+              {onColorChange ? (
+                <RowEditMenuSection title="Column color">
+                  <BoardColorPicker
+                    color={color}
+                    onSelect={onColorChange}
+                    title={`Column color: ${label}`}
+                  />
+                </RowEditMenuSection>
+              ) : null}
+              {onRemove ? (
+                <RowEditMenuItem danger onClick={onRemove}>
+                  Remove column
+                </RowEditMenuItem>
+              ) : null}
+            </RowEditMenu>
+          ) : null}
+        </div>
+      </div>
+      {onColumnSearchChange ? (
+        <div className="column-label-search-span">
           <BoardSearchInput
-            className="column-search column-toolbar-search"
+            className="column-label-search"
             value={columnSearch}
             onChange={onColumnSearchChange}
-            placeholder="Filter column…"
-            aria-label={`Filter issues in column ${label}`}
+            placeholder="Search column…"
+            aria-label={`Search issues in column ${label}`}
           />
-        ) : null}
-        {members ? (
-          <ToolbarUsersReadonly
-            members={members}
-            userIds={columnUserIds}
-            label="Users"
-            title={
-              columnUserIds.length > 0
-                ? `Assignees in this column: ${members
-                    .filter((member) => columnUserIds.includes(member.userId))
-                    .map((member) => member.name)
-                    .join(", ")}`
-                : "No assignees in this column yet"
-            }
-          />
-        ) : null}
-        {onColorChange ? (
-          <BoardColorPicker
-            color={color}
-            onSelect={onColorChange}
-            compact
-            title={`Column color: ${label}`}
-            className="color-picker--column"
-          />
-        ) : null}
-        <button
-          type="button"
-          className={`ghost label-remove-btn${onRemove ? "" : " label-remove-btn--reserved"}`}
-          onClick={onRemove}
-          disabled={!onRemove}
-          tabIndex={onRemove ? 0 : -1}
-          aria-hidden={!onRemove}
-          title={onRemove ? `Remove empty column "${label}"` : undefined}
-          aria-label={onRemove ? `Remove column ${label}` : undefined}
-        >
-          ×
-        </button>
-      </div>
+        </div>
+      ) : null}
     </div>
+  );
+}
+
+function EditableLabel({
+  label,
+  className = "column-label",
+  onSave,
+}: {
+  label: string;
+  className?: string;
+  onSave: (name: string) => void;
+}) {
+  const [editing, setEditing] = useState(false);
+  const [value, setValue] = useState(label);
+
+  useEffect(() => {
+    setValue(label);
+  }, [label]);
+
+  if (editing) {
+    return (
+      <input
+        className="row-separator-rename-input"
+        autoFocus
+        value={value}
+        onChange={(e) => setValue(e.target.value)}
+        onBlur={() => {
+          setEditing(false);
+          onSave(value);
+        }}
+        onKeyDown={(e) => {
+          if (e.key === "Enter") {
+            setEditing(false);
+            onSave(value);
+          }
+          if (e.key === "Escape") {
+            setValue(label);
+            setEditing(false);
+          }
+        }}
+      />
+    );
+  }
+
+  return (
+    <button
+      type="button"
+      className={className}
+      onClick={() => setEditing(true)}
+      title="Click to rename"
+    >
+      {label}
+    </button>
   );
 }
