@@ -90,6 +90,7 @@ systemctl restart teamflow
 
 install -m 755 deploy/proxmox-lxc/update.sh /usr/local/bin/teamflow-update
 ln -sf teamflow-update /usr/local/bin/update
+install -m 755 deploy/proxmox-lxc/backup.sh /usr/local/bin/teamflow-backup
 install -m 755 deploy/proxmox-lxc/configure-smtp.sh /usr/local/bin/teamflow-smtp
 
 echo ""

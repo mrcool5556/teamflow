@@ -3,7 +3,7 @@ set -euo pipefail
 
 APP_DIR="${APP_DIR:-/opt/teamflow}"
 APP_USER="${APP_USER:-teamflow}"
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+BACKUP_SCRIPT="$APP_DIR/deploy/proxmox-lxc/backup.sh"
 SKIP_BACKUP=false
 BRANCH=""
 
@@ -63,7 +63,12 @@ echo "    App dir: $APP_DIR"
 systemctl stop teamflow
 
 if [[ "$SKIP_BACKUP" != true ]]; then
-  bash "$SCRIPT_DIR/backup.sh"
+  if [[ ! -f "$BACKUP_SCRIPT" ]]; then
+    echo "Backup script not found: $BACKUP_SCRIPT"
+    echo "Use --skip-backup or run: sudo bash $APP_DIR/deploy/proxmox-lxc/update.sh"
+    exit 1
+  fi
+  bash "$BACKUP_SCRIPT"
 fi
 
 cd "$APP_DIR"
