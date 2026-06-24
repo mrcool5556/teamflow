@@ -424,6 +424,18 @@ export type CommentPublic = {
   createdAt: string;
 };
 
+export type IssueAttachmentPublic = {
+  id: string;
+  issueId: string;
+  filename: string;
+  mimeType: string;
+  sizeBytes: number;
+  uploaderId: string;
+  uploaderName: string;
+  createdAt: string;
+  downloadUrl: string;
+};
+
 export type ApiTokenCreated = {
   id: string;
   name: string;

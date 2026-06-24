@@ -2177,6 +2177,67 @@ select {
   font-size: 0.75rem;
 }
 
+.issue-attachment-list {
+  list-style: none;
+  margin: 0 0 0.75rem;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.issue-attachment {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.5rem 0.65rem;
+  border: 2px solid var(--border);
+  background: var(--surface-2);
+}
+
+.issue-attachment-main {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  min-width: 0;
+}
+
+.issue-attachment-name {
+  text-align: left;
+  font-weight: 600;
+  word-break: break-word;
+}
+
+.issue-attachment-meta {
+  font-size: 0.75rem;
+}
+
+.issue-attachment-delete {
+  flex-shrink: 0;
+  font-size: 0.75rem;
+}
+
+.issue-attachment-drop {
+  margin-top: 0.5rem;
+  padding: 1rem;
+  border: 2px dashed var(--border);
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.issue-attachment-drop--active {
+  border-color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 8%, transparent);
+}
+
+.issue-attachment-input {
+  display: none;
+}
+
 .issue-drawer-actions {
   margin-top: auto;
   padding-top: 0.5rem;

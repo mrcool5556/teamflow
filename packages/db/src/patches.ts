@@ -89,7 +89,26 @@ export function applySchemaPatches(sqlite: Database.Database) {
   ensureTeamRolesTable(sqlite);
   ensureDiscordBotSecretsTable(sqlite);
   ensurePasswordResetTokensTable(sqlite);
+  ensureIssueAttachmentsTable(sqlite);
   purgeExpiredDeletedIssues(sqlite);
+}
+
+function ensureIssueAttachmentsTable(sqlite: Database.Database) {
+  sqlite.exec(`
+    CREATE TABLE IF NOT EXISTS issue_attachments (
+      id TEXT PRIMARY KEY,
+      issue_id TEXT NOT NULL REFERENCES issues(id) ON DELETE CASCADE,
+      uploader_id TEXT NOT NULL REFERENCES users(id),
+      filename TEXT NOT NULL,
+      mime_type TEXT NOT NULL,
+      size_bytes INTEGER NOT NULL,
+      storage_path TEXT NOT NULL,
+      created_at TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+  `);
+  sqlite.exec(
+    `CREATE INDEX IF NOT EXISTS issue_attachments_issue_id_idx ON issue_attachments(issue_id)`,
+  );
 }
 
 function ensurePasswordResetTokensTable(sqlite: Database.Database) {

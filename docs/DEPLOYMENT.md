@@ -9,6 +9,11 @@
 | **Docker** | [deploy/docker/](../deploy/docker/) | [Self-hosting → Docker](SELF-HOSTING.md#docker) |
 | **Relay** (remote HTTPS) | [deploy/relay/](../deploy/relay/) | [Self-hosting → Remote access](SELF-HOSTING.md#remote-access) |
 
+| Doc | Purpose |
+|-----|---------|
+| [AUTH.md](AUTH.md) | Password reset, SMTP, invites, PATs |
+| [ATTACHMENTS.md](ATTACHMENTS.md) | Issue file uploads |
+
 ## Local development
 
 ```powershell

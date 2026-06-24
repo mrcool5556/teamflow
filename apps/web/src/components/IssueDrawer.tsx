@@ -1,6 +1,8 @@
-import { useCallback, useEffect, useRef, useState } from "react";import type {
+import { useCallback, useEffect, useRef, useState, type ChangeEvent, type DragEvent } from "react";
+import type {
   BoardRowPublic,
   CommentPublic,
+  IssueAttachmentPublic,
   IssuePublic,
   IssueStatusPublic,
   Priority,
@@ -26,6 +28,12 @@ const PRIORITY_LABELS: Record<Priority, string> = {
   high: "High",
   urgent: "Urgent",
 };
+
+function formatFileSize(bytes: number) {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
 
 function formatTimestamp(value: string) {
   const trimmed = value.trim();
@@ -88,6 +96,12 @@ export function IssueDrawer({
   const [commentDraft, setCommentDraft] = useState("");
   const [commentSubmitting, setCommentSubmitting] = useState(false);
   const [deletingCommentId, setDeletingCommentId] = useState<string | null>(null);
+  const [attachments, setAttachments] = useState<IssueAttachmentPublic[]>([]);
+  const [attachmentsLoading, setAttachmentsLoading] = useState(true);
+  const [uploadingAttachment, setUploadingAttachment] = useState(false);
+  const [deletingAttachmentId, setDeletingAttachmentId] = useState<string | null>(null);
+  const [attachmentDragOver, setAttachmentDragOver] = useState(false);
+  const attachmentInputRef = useRef<HTMLInputElement>(null);
   const commentTextareaRef = useRef<HTMLTextAreaElement>(null);
   const {
     linkOffer: commentLinkOffer,
@@ -127,6 +141,27 @@ export function IssueDrawer({
     setTitle(issue.title);
     setDescription(issue.description ?? "");
   }, [issue.id, issue.title, issue.description]);
+
+  useEffect(() => {
+    let cancelled = false;
+    setAttachmentsLoading(true);
+
+    void client
+      .listAttachments(issue.id)
+      .then(({ attachments: loaded }) => {
+        if (!cancelled) setAttachments(loaded);
+      })
+      .catch(() => {
+        if (!cancelled) setAttachments([]);
+      })
+      .finally(() => {
+        if (!cancelled) setAttachmentsLoading(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [issue.id]);
 
   useEffect(() => {
     let cancelled = false;
@@ -183,6 +218,61 @@ export function IssueDrawer({
       if (normalized === current) return;
       void patchIssue({ description: normalized || "" });
     }, 500);
+  }
+
+  async function uploadAttachmentFile(file: File) {
+    if (uploadingAttachment) return;
+    setUploadingAttachment(true);
+    try {
+      const { attachment } = await client.uploadAttachment(issue.id, file);
+      setAttachments((prev) => [...prev, attachment]);
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : "Upload failed";
+      window.alert(message);
+    } finally {
+      setUploadingAttachment(false);
+    }
+  }
+
+  function handleAttachmentInputChange(event: ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0];
+    event.target.value = "";
+    if (file) void uploadAttachmentFile(file);
+  }
+
+  function handleAttachmentDrop(event: DragEvent) {
+    event.preventDefault();
+    setAttachmentDragOver(false);
+    const file = event.dataTransfer.files[0];
+    if (file) void uploadAttachmentFile(file);
+  }
+
+  async function downloadAttachment(attachment: IssueAttachmentPublic) {
+    try {
+      const blob = await client.downloadAttachment(attachment.id);
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = attachment.filename;
+      link.click();
+      URL.revokeObjectURL(url);
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : "Download failed";
+      window.alert(message);
+    }
+  }
+
+  async function deleteAttachment(attachment: IssueAttachmentPublic) {
+    if (!window.confirm(`Remove ${attachment.filename}?`)) return;
+    setDeletingAttachmentId(attachment.id);
+    try {
+      await client.deleteAttachment(issue.id, attachment.id);
+      setAttachments((prev) => prev.filter((item) => item.id !== attachment.id));
+    } finally {
+      setDeletingAttachmentId(null);
+    }
   }
 
   async function submitComment() {
@@ -402,6 +492,75 @@ export function IssueDrawer({
             }}
             onNavigateRef={onNavigateRef}
           />
+        </section>
+
+        <section className="issue-drawer-section">
+          <h3>Attachments</h3>
+          {attachmentsLoading ? (
+            <p className="muted">Loading attachments…</p>
+          ) : attachments.length === 0 ? (
+            <p className="muted">No files attached yet.</p>
+          ) : (
+            <ul className="issue-attachment-list">
+              {attachments.map((attachment) => (
+                <li key={attachment.id} className="issue-attachment">
+                  <div className="issue-attachment-main">
+                    <button
+                      type="button"
+                      className="ghost issue-attachment-name"
+                      onClick={() => void downloadAttachment(attachment)}
+                    >
+                      {attachment.filename}
+                    </button>
+                    <span className="issue-attachment-meta muted">
+                      {formatFileSize(attachment.sizeBytes)} · {attachment.uploaderName} ·{" "}
+                      {formatTimestamp(attachment.createdAt)}
+                    </span>
+                  </div>
+                  <button
+                    type="button"
+                    className="ghost issue-attachment-delete"
+                    disabled={deletingAttachmentId === attachment.id}
+                    onClick={() => void deleteAttachment(attachment)}
+                    aria-label={`Remove ${attachment.filename}`}
+                    title="Remove attachment"
+                  >
+                    {deletingAttachmentId === attachment.id ? "…" : "Remove"}
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
+
+          <div
+            className={`issue-attachment-drop${attachmentDragOver ? " issue-attachment-drop--active" : ""}`}
+            onDragOver={(event) => {
+              event.preventDefault();
+              setAttachmentDragOver(true);
+            }}
+            onDragLeave={() => setAttachmentDragOver(false)}
+            onDrop={handleAttachmentDrop}
+          >
+            <input
+              ref={attachmentInputRef}
+              type="file"
+              className="issue-attachment-input"
+              onChange={handleAttachmentInputChange}
+            />
+            <p>
+              {uploadingAttachment
+                ? "Uploading…"
+                : "Drop a file here or choose one to upload (max 10 MB)."}
+            </p>
+            <button
+              type="button"
+              className="ghost"
+              disabled={uploadingAttachment}
+              onClick={() => attachmentInputRef.current?.click()}
+            >
+              Choose file
+            </button>
+          </div>
         </section>
 
         <section className="issue-drawer-section">

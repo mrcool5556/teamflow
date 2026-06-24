@@ -42,11 +42,19 @@ export const ROADMAP_META = {
 
 export const ROADMAP_FOCUS: RoadmapItem[] = [
   {
-    id: "deploy",
-    title: "Windows deploy validation",
-    notes: "Smoke-test install.ps1 and single-port production on a real machine.",
+    id: "attachments",
+    title: "File attachments on issues",
+    notes: "Upload, list, download, delete on issue drawer. See docs/ATTACHMENTS.md.",
     status: "done",
     priority: 1,
+    tags: ["files", "issues"],
+  },
+  {
+    id: "deploy",
+    title: "Self-hosted deploy (Windows / LXC / Docker)",
+    notes: "SELF-HOSTING.md, update command, SMTP wizard. Production at teamflow.toasterland.org.",
+    status: "done",
+    priority: 2,
     tags: ["deploy", "ops"],
   },
   {
@@ -251,7 +259,7 @@ export const ROADMAP_IDEAS: RoadmapIdeaGroup[] = [
     id: "attachments",
     title: "File attachments",
     items: [
-      { id: "a-issue", title: "Upload on issue (v1)", status: "planned" },
+      { id: "a-issue", title: "Upload on issue (v1)", status: "done" },
       { id: "a-comment-img", title: "Attach / paste images in comments", status: "planned" },
       { id: "a-desc-img", title: "Attach / paste images in description", status: "planned" },
       { id: "a-row", title: "Upload on row (v2)", status: "planned" },
@@ -320,7 +328,7 @@ export const ROADMAP_IDEAS: RoadmapIdeaGroup[] = [
     title: "Operations",
     summary: "Keep single-machine hosting simple before adding heavier deployment targets.",
     items: [
-      { id: "health-check", title: "Add a documented health check endpoint", status: "planned" },
+      { id: "health-check", title: "Health check endpoint GET /health", status: "done" },
       { id: "scheduled-backup", title: "Scheduled database backups", status: "planned" },
     ],
   },
@@ -338,13 +346,15 @@ export const ROADMAP_SHIPPED: ShippedItem[] = [
   { date: "2026-06", title: "Delete: immediate API soft-delete plus undo restore" },
   { date: "2026-06", title: "Linear import script" },
   { date: "2026-06", title: "Discord bot v1 — slash commands, Settings UI, role gating, thread /create" },
+  { date: "2026-06", title: "Public release prep — AGPL, self-hosting docs, LXC update + SMTP" },
+  { date: "2026-06", title: "Forgot password + optional SMTP email reset" },
+  { date: "2026-06", title: "Issue file attachments — upload, download, delete on issue drawer" },
 ];
 
 export const ROADMAP_DEPLOY_STEPS: DeployStep[] = [
-  { step: "Now", label: "Local dev", detail: "pnpm dev; data stays on this machine." },
-  { step: "Next", label: "Windows install.ps1 or Proxmox LXC", detail: "One URL for the team." },
-  { step: "Then", label: "Relay (optional)", detail: "Remote access to your server." },
-  { step: "Always", label: "Backup teamflow.db", detail: "That file is your project." },
+  { step: "Done", label: "Proxmox LXC + Cloudflare", detail: "git clone, install.sh, sudo update, teamflow-smtp." },
+  { step: "Done", label: "File attachments", detail: "Upload files on issues; backup data/uploads/ with the DB." },
+  { step: "Always", label: "Backup teamflow.db + data/uploads/", detail: "That is your project data." },
 ];
 
 export function countByStatus(
