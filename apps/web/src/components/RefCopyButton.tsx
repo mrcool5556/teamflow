@@ -7,6 +7,7 @@ type RefCopyButtonProps = {
   compact?: boolean;
   variant?: "default" | "issue";
   display?: "label" | "icon";
+  buttonLabel?: string;
   share?: boolean;
   onGo?: () => void;
 };
@@ -17,6 +18,7 @@ export function RefCopyButton({
   compact = false,
   variant = "default",
   display = "label",
+  buttonLabel,
   share = false,
   onGo,
 }: RefCopyButtonProps) {
@@ -85,7 +87,7 @@ export function RefCopyButton({
       onPointerDown={(event) => event.stopPropagation()}
       onClick={copyRef}
     >
-      <span className="ref-copy-label">{copied ? "Copied" : value}</span>
+      <span className="ref-copy-label">{copied ? "Copied" : buttonLabel ?? value}</span>
     </button>
   );
 }

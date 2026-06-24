@@ -1,4 +1,6 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
+import { createPortal } from "react-dom";
+import { useFloatingPanelStyle } from "../hooks/useFloatingPanelStyle";
 
 type RowEditMenuProps = {
   children: ReactNode;
@@ -7,19 +9,36 @@ type RowEditMenuProps = {
 export function RowEditMenu({ children }: RowEditMenuProps) {
   const [open, setOpen] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
+  const triggerRef = useRef<HTMLButtonElement>(null);
+  const panelRef = useRef<HTMLDivElement>(null);
+  const panelStyle = useFloatingPanelStyle(open, triggerRef, "bottom", "right", 224);
+  const panelPositioned = Boolean(panelStyle.position);
 
   useEffect(() => {
     if (!open) return;
 
     function handlePointerDown(event: MouseEvent) {
-      if (!rootRef.current?.contains(event.target as Node)) {
-        setOpen(false);
-      }
+      const target = event.target as Node;
+      if (rootRef.current?.contains(target)) return;
+      if (panelRef.current?.contains(target)) return;
+      setOpen(false);
     }
 
-    window.addEventListener("mousedown", handlePointerDown);
-    return () => window.removeEventListener("mousedown", handlePointerDown);
+    window.addEventListener("mousedown", handlePointerDown, true);
+    return () => window.removeEventListener("mousedown", handlePointerDown, true);
   }, [open]);
+
+  const panel = open ? (
+    <div
+      ref={panelRef}
+      className={`row-edit-menu-panel row-edit-menu-panel--floating ${panelPositioned ? "row-edit-menu-panel--positioned" : ""}`}
+      style={panelStyle}
+      onPointerDown={(event) => event.stopPropagation()}
+      onClick={(event) => event.stopPropagation()}
+    >
+      {children}
+    </div>
+  ) : null;
 
   return (
     <div
@@ -29,6 +48,7 @@ export function RowEditMenu({ children }: RowEditMenuProps) {
       onClick={(e) => e.stopPropagation()}
     >
       <button
+        ref={triggerRef}
         type="button"
         className="row-edit-menu-trigger"
         aria-expanded={open}
@@ -37,9 +57,7 @@ export function RowEditMenu({ children }: RowEditMenuProps) {
         Edit
         <span className="assignee-picker-caret">{open ? "▴" : "▾"}</span>
       </button>
-      {open ? (
-        <div className="row-edit-menu-panel">{children}</div>
-      ) : null}
+      {panelPositioned && panel ? createPortal(panel, document.body) : null}
     </div>
   );
 }
