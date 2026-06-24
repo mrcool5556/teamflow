@@ -99,6 +99,14 @@ import {
 } from "./lib/profile.js";
 import { resolveTeamRefDetailed } from "./lib/refs.js";
 import {
+  AttachmentError,
+  deleteIssueAttachment,
+  getAttachmentForDownload,
+  listIssueAttachments,
+  saveIssueAttachment,
+} from "./lib/attachments.js";
+import { readFile } from "node:fs/promises";
+import {
   getDiscordGuildConfig,
   getTeamDiscordSettings,
   updateTeamDiscordSettings,
@@ -1934,6 +1942,118 @@ app.delete("/issues/:issueId/comments/:commentId", async (c) => {
   return c.body(null, 204);
 });
 
+app.get("/issues/:issueId/attachments", async (c) => {
+  const result = await requireAuth(c);
+  if ("error" in result) return result.error;
+
+  const issueId = c.req.param("issueId");
+  const [issue] = await db
+    .select()
+    .from(schema.issues)
+    .where(eq(schema.issues.id, issueId))
+    .limit(1);
+
+  if (!issue) return c.json({ error: "Issue not found" }, 404);
+  if (!(await userHasTeamAccess(db, result.auth.userId, issue.teamId))) {
+    return c.json({ error: "Team access denied" }, 403);
+  }
+
+  const attachments = await listIssueAttachments(db, issueId);
+  return c.json({ attachments });
+});
+
+app.post("/issues/:issueId/attachments", async (c) => {
+  const result = await requireAuth(c);
+  if ("error" in result) return result.error;
+  requireWrite(result.auth);
+
+  const issueId = c.req.param("issueId");
+  const [issue] = await db
+    .select()
+    .from(schema.issues)
+    .where(eq(schema.issues.id, issueId))
+    .limit(1);
+
+  if (!issue) return c.json({ error: "Issue not found" }, 404);
+  if (!(await userHasTeamAccess(db, result.auth.userId, issue.teamId))) {
+    return c.json({ error: "Team access denied" }, 403);
+  }
+
+  const body = await c.req.parseBody();
+  const raw = body.file;
+  const file = Array.isArray(raw) ? raw[0] : raw;
+  if (!(file instanceof File)) {
+    return c.json({ error: "Missing file field" }, 400);
+  }
+
+  try {
+    const attachment = await saveIssueAttachment(
+      db,
+      issueId,
+      result.auth.userId,
+      file,
+    );
+    return c.json({ attachment }, 201);
+  } catch (error) {
+    if (error instanceof AttachmentError) {
+      return c.json({ error: error.message }, error.status as 400 | 413);
+    }
+    throw error;
+  }
+});
+
+app.get("/attachments/:id/download", async (c) => {
+  const result = await requireAuth(c);
+  if ("error" in result) return result.error;
+
+  const attachmentId = c.req.param("id");
+  const row = await getAttachmentForDownload(db, attachmentId);
+  if (!row) return c.json({ error: "Attachment not found" }, 404);
+
+  if (!(await userHasTeamAccess(db, result.auth.userId, row.teamId))) {
+    return c.json({ error: "Team access denied" }, 403);
+  }
+
+  let data: Buffer;
+  try {
+    data = await readFile(row.fullPath);
+  } catch {
+    return c.json({ error: "File missing on server" }, 404);
+  }
+
+  const encodedName = encodeURIComponent(row.attachment.filename);
+  return c.body(new Uint8Array(data), 200, {
+    "Content-Type": row.attachment.mimeType,
+    "Content-Disposition": `attachment; filename="${encodedName}"; filename*=UTF-8''${encodedName}`,
+    "Content-Length": String(data.length),
+  });
+});
+
+app.delete("/issues/:issueId/attachments/:id", async (c) => {
+  const result = await requireAuth(c);
+  if ("error" in result) return result.error;
+  requireWrite(result.auth);
+
+  const issueId = c.req.param("issueId");
+  const attachmentId = c.req.param("id");
+
+  const [issue] = await db
+    .select()
+    .from(schema.issues)
+    .where(eq(schema.issues.id, issueId))
+    .limit(1);
+
+  if (!issue) return c.json({ error: "Issue not found" }, 404);
+  if (!(await userHasTeamAccess(db, result.auth.userId, issue.teamId))) {
+    return c.json({ error: "Team access denied" }, 403);
+  }
+
+  const deleted = await deleteIssueAttachment(db, issueId, attachmentId);
+  if (!deleted) return c.json({ error: "Attachment not found" }, 404);
+
+  return c.body(null, 204);
+});
+
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const webDist =
   process.env.WEB_DIST ??
@@ -1949,6 +2069,7 @@ const apiPathPrefixes = [
   "/invites",
   "/projects",
   "/issues",
+  "/attachments",
   "/statuses",
   "/rows",
 ];

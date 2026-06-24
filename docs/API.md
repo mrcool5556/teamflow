@@ -14,10 +14,15 @@ Auth: `Authorization: Bearer <session_jwt | pat_...>`
 
 | Method | Path | Body |
 |--------|------|------|
-| POST | `/auth/register` | `{ email, name, password }` |
+| GET | `/auth/config` | — → `{ inviteOnly, passwordResetEmail }` |
+| POST | `/auth/register` | `{ email, name, password, inviteToken? }` |
 | POST | `/auth/login` | `{ email, password }` |
+| POST | `/auth/forgot-password` | `{ email }` |
+| POST | `/auth/reset-password` | `{ token, password }` |
 | GET | `/auth/me` | — |
 | POST | `/auth/tokens` | `{ name, scopes?, teamId? }` → returns `token` once |
+
+Details: [AUTH.md](AUTH.md)
 
 ## Teams
 
@@ -45,6 +50,12 @@ Auth: `Authorization: Bearer <session_jwt | pat_...>`
 | POST | `/issues/:id/complete` |
 | DELETE | `/issues/:id` |
 | POST | `/issues/:id/comments` | `{ body }` |
+| GET | `/issues/:issueId/attachments` | List file attachments |
+| POST | `/issues/:issueId/attachments` | `multipart/form-data` field `file` |
+| GET | `/attachments/:id/download` | Download attachment |
+| DELETE | `/issues/:issueId/attachments/:id` | Remove attachment |
+
+Attachments: [ATTACHMENTS.md](ATTACHMENTS.md)
 
 ## Issue response shape
 

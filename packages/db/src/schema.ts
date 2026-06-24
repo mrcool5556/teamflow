@@ -340,6 +340,25 @@ export const comments = sqliteTable("comments", {
     .default(sql`(datetime('now'))`),
 });
 
+export const issueAttachments = sqliteTable("issue_attachments", {
+  id: text("id")
+    .primaryKey()
+    .$defaultFn(() => crypto.randomUUID()),
+  issueId: text("issue_id")
+    .notNull()
+    .references(() => issues.id, { onDelete: "cascade" }),
+  uploaderId: text("uploader_id")
+    .notNull()
+    .references(() => users.id),
+  filename: text("filename").notNull(),
+  mimeType: text("mime_type").notNull(),
+  sizeBytes: integer("size_bytes").notNull(),
+  storagePath: text("storage_path").notNull(),
+  createdAt: text("created_at")
+    .notNull()
+    .default(sql`(datetime('now'))`),
+});
+
 export const apiTokens = sqliteTable("api_tokens", {
   id: text("id")
     .primaryKey()
@@ -401,4 +420,5 @@ export const issuesRelations = relations(issues, ({ one, many }) => ({
     references: [users.id],
   }),
   comments: many(comments),
+  attachments: many(issueAttachments),
 }));

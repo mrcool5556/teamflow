@@ -71,6 +71,8 @@ Setup: [docs/discord-bot.md](docs/discord-bot.md)
 | Doc | Purpose |
 |-----|---------|
 | [docs/SELF-HOSTING.md](docs/SELF-HOSTING.md) | **Install & update** — Windows, LXC, Docker |
+| [docs/AUTH.md](docs/AUTH.md) | Login, invites, forgot password, SMTP |
+| [docs/ATTACHMENTS.md](docs/ATTACHMENTS.md) | Issue file uploads |
 | [docs/API.md](docs/API.md) | HTTP API reference |
 | [docs/CLI.md](docs/CLI.md) | CLI commands |
 | [docs/MCP.md](docs/MCP.md) | MCP tools for AI assistants |

@@ -4,6 +4,7 @@ import type {
   BoardRowPublic,
   CommentPublic,
   CreateCommentInput,
+  IssueAttachmentPublic,
   CreateIssueInput,
   CreateProjectInput,
   CreateTeamInput,
@@ -78,7 +79,9 @@ export class TeamflowClient {
     init: RequestInit = {},
   ): Promise<T> {
     const headers = new Headers(init.headers);
-    headers.set("Content-Type", "application/json");
+    if (!(init.body instanceof FormData)) {
+      headers.set("Content-Type", "application/json");
+    }
     if (this.token) {
       headers.set("Authorization", `Bearer ${this.token}`);
     }
@@ -453,6 +456,62 @@ export class TeamflowClient {
     return this.request<void>(`/issues/${issueId}/comments/${commentId}`, {
       method: "DELETE",
     });
+  }
+
+  listAttachments(issueId: string) {
+    return this.request<{ attachments: IssueAttachmentPublic[] }>(
+      `/issues/${issueId}/attachments`,
+    );
+  }
+
+  uploadAttachment(issueId: string, file: File) {
+    const form = new FormData();
+    form.append("file", file);
+    return this.request<{ attachment: IssueAttachmentPublic }>(
+      `/issues/${issueId}/attachments`,
+      {
+        method: "POST",
+        body: form,
+      },
+    );
+  }
+
+  async downloadAttachment(attachmentId: string) {
+    const headers = new Headers();
+    if (this.token) {
+      headers.set("Authorization", `Bearer ${this.token}`);
+    }
+
+    const response = await this.fetchImpl(
+      `${this.baseUrl}/attachments/${attachmentId}/download`,
+      { headers },
+    );
+
+    if (!response.ok) {
+      let payload: ApiError = { error: response.statusText };
+      const contentType = response.headers.get("content-type") ?? "";
+      if (contentType.includes("application/json")) {
+        try {
+          payload = (await response.json()) as ApiError;
+        } catch {
+          // ignore
+        }
+      }
+      throw new TeamflowApiError(
+        payload.error ?? response.statusText,
+        response.status,
+        payload.code,
+      );
+    }
+
+    return response.blob();
+  }
+
+  deleteAttachment(issueId: string, attachmentId: string) {
+    return this.request<void>(
+      `/issues/${issueId}/attachments/${attachmentId}`,
+      { method: "DELETE" },
+    );
   }
 
   resolveRef(teamId: string, ref: string) {

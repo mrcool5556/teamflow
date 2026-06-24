@@ -254,6 +254,19 @@ No install on their side.
 
 ---
 
+## Password reset
+
+Users can click **Forgot password?** on the login screen.
+
+- **With SMTP** in `.env` → reset link emailed automatically  
+- **Without SMTP** → link logged on the server (`journalctl -u teamflow`)
+
+Configure SMTP on LXC: `sudo teamflow-smtp`
+
+Full details: [AUTH.md](AUTH.md)
+
+---
+
 ## Environment variables (production)
 
 | Variable | Required | Purpose |
@@ -276,9 +289,10 @@ Discord bot and MCP use separate docs: [discord-bot.md](discord-bot.md), [MCP.md
 
 ## Moving your board to another machine
 
-Copy these two things:
+Copy these:
 
 - `data/teamflow.db` (and `-wal` / `-shm` if present — stop the server first)
+- `data/uploads/` (issue file attachments)
 - `.env` (secrets and `PUBLIC_URL`)
 
 Then install on the new machine and replace `data/` + `.env` before starting.
