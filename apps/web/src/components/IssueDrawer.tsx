@@ -9,7 +9,8 @@ import type {
   TeamMemberPublic,
   UpdateIssueInput,
 } from "@teamflow/core";
-import { PRIORITIES } from "@teamflow/core";
+import { PRIORITIES, DEFAULT_ATTACHMENT_LIMITS, maxBytesForAttachmentFile } from "@teamflow/core";
+import type { AttachmentLimitsPublic } from "@teamflow/core";
 import { client } from "../api";
 import { IssueTimer } from "./IssueTimer";
 import { DescriptionEditor } from "./DescriptionEditor";
@@ -21,13 +22,15 @@ import { LinkPasteOffer } from "./LinkPasteOffer";
 import { initials } from "../lib/timer";
 import { useLinkPasteOffer } from "../hooks/useLinkPasteOffer";
 import {
-  AttachmentImageThumbnail,
+  AttachmentImagePreviewButton,
   AttachmentLightbox,
   createAttachmentBlobCache,
   isImageAttachment,
 } from "./AttachmentImagePreview";
 
-const DEFAULT_MAX_ATTACHMENT_BYTES = 10 * 1024 * 1024;
+function describeAttachmentLimits(limits: AttachmentLimitsPublic) {
+  return `Images up to ${formatFileSize(limits.imageBytes)}, ZIPs up to ${formatFileSize(limits.zipBytes)}`;
+}
 
 const PRIORITY_LABELS: Record<Priority, string> = {
   none: "No priority",
@@ -109,7 +112,9 @@ export function IssueDrawer({
   const [uploadingAttachment, setUploadingAttachment] = useState(false);
   const [deletingAttachmentId, setDeletingAttachmentId] = useState<string | null>(null);
   const [attachmentDragOver, setAttachmentDragOver] = useState(false);
-  const [maxAttachmentBytes, setMaxAttachmentBytes] = useState(DEFAULT_MAX_ATTACHMENT_BYTES);
+  const [attachmentLimits, setAttachmentLimits] = useState<AttachmentLimitsPublic>(
+    DEFAULT_ATTACHMENT_LIMITS,
+  );
   const [attachmentLightbox, setAttachmentLightbox] = useState<{
     attachment: IssueAttachmentPublic;
     imageUrl: string;
@@ -162,10 +167,10 @@ export function IssueDrawer({
 
     void client
       .listAttachments(issue.id)
-      .then(({ attachments: loaded, maxBytes }) => {
+      .then(({ attachments: loaded, limits }) => {
         if (!cancelled) {
           setAttachments(loaded);
-          if (maxBytes > 0) setMaxAttachmentBytes(maxBytes);
+          setAttachmentLimits(limits);
         }
       })
       .catch(() => {
@@ -243,11 +248,25 @@ export function IssueDrawer({
     }, 500);
   }
 
+  async function openImagePreview(attachment: IssueAttachmentPublic) {
+    try {
+      const imageUrl = await attachmentBlobCache.get(attachment.id);
+      setAttachmentLightbox({ attachment, imageUrl });
+    } catch {
+      window.alert("Could not load image preview.");
+    }
+  }
+
   async function uploadAttachmentFile(file: File) {
     if (uploadingAttachment) return;
-    if (file.size > maxAttachmentBytes) {
+    const maxBytes = maxBytesForAttachmentFile(
+      file.name,
+      file.type || "application/octet-stream",
+      attachmentLimits,
+    );
+    if (file.size > maxBytes) {
       window.alert(
-        `File is too large (${formatFileSize(file.size)}). Max is ${formatFileSize(maxAttachmentBytes)}.`,
+        `File is too large (${formatFileSize(file.size)}). Max for this type is ${formatFileSize(maxBytes)}.`,
       );
       return;
     }
@@ -534,7 +553,7 @@ export function IssueDrawer({
               {attachments.map((attachment) => (
                 <li key={attachment.id} className="issue-attachment">
                   {isImageAttachment(attachment) ? (
-                    <AttachmentImageThumbnail
+                    <AttachmentImagePreviewButton
                       attachment={attachment}
                       blobCache={attachmentBlobCache}
                       onOpen={(imageUrl) =>
@@ -548,12 +567,7 @@ export function IssueDrawer({
                       className="ghost issue-attachment-name"
                       onClick={() => {
                         if (isImageAttachment(attachment)) {
-                          void attachmentBlobCache
-                            .get(attachment.id)
-                            .then((imageUrl) =>
-                              setAttachmentLightbox({ attachment, imageUrl }),
-                            )
-                            .catch(() => void downloadAttachment(attachment));
+                          void openImagePreview(attachment);
                           return;
                         }
                         void downloadAttachment(attachment);
@@ -599,7 +613,7 @@ export function IssueDrawer({
             <p>
               {uploadingAttachment
                 ? "Uploading…"
-                : `Drop a file here or choose one to upload (max ${formatFileSize(maxAttachmentBytes)}).`}
+                : `Drop a file here or choose one (${describeAttachmentLimits(attachmentLimits)}).`}
             </p>
             <button
               type="button"

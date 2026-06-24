@@ -2,6 +2,7 @@ import { z } from "zod";
 import { TEAM_PERMISSIONS } from "./permissions.js";
 
 export * from "./about.js";
+export * from "./attachments.js";
 export * from "./profile.js";
 export * from "./refs.js";
 export * from "./permissions.js";

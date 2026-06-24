@@ -5,6 +5,7 @@ import type {
   CommentPublic,
   CreateCommentInput,
   IssueAttachmentPublic,
+  AttachmentLimitsPublic,
   CreateIssueInput,
   CreateProjectInput,
   CreateTeamInput,
@@ -459,9 +460,10 @@ export class TeamflowClient {
   }
 
   listAttachments(issueId: string) {
-    return this.request<{ attachments: IssueAttachmentPublic[]; maxBytes: number }>(
-      `/issues/${issueId}/attachments`,
-    );
+    return this.request<{
+      attachments: IssueAttachmentPublic[];
+      limits: AttachmentLimitsPublic;
+    }>(`/issues/${issueId}/attachments`);
   }
 
   uploadAttachment(issueId: string, file: File) {

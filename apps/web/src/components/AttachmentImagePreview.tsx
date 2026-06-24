@@ -1,10 +1,10 @@
 import { useEffect, useState } from "react";
 import type { IssueAttachmentPublic } from "@teamflow/core";
+import { isImageAttachmentFile } from "@teamflow/core";
 import { client } from "../api";
 
 export function isImageAttachment(attachment: IssueAttachmentPublic) {
-  if (attachment.mimeType.startsWith("image/")) return true;
-  return /\.(png|jpe?g|gif|webp|bmp|avif|svg)$/i.test(attachment.filename);
+  return isImageAttachmentFile(attachment.filename, attachment.mimeType);
 }
 
 export type AttachmentBlobCache = {
@@ -33,57 +33,44 @@ export function createAttachmentBlobCache(): AttachmentBlobCache {
   };
 }
 
-type AttachmentImageThumbnailProps = {
+type AttachmentImagePreviewButtonProps = {
   attachment: IssueAttachmentPublic;
   blobCache: AttachmentBlobCache;
   onOpen: (url: string) => void;
 };
 
-export function AttachmentImageThumbnail({
+export function AttachmentImagePreviewButton({
   attachment,
   blobCache,
   onOpen,
-}: AttachmentImageThumbnailProps) {
-  const [url, setUrl] = useState<string | null>(null);
-  const [failed, setFailed] = useState(false);
+}: AttachmentImagePreviewButtonProps) {
+  const [loading, setLoading] = useState(false);
 
-  useEffect(() => {
-    let cancelled = false;
-    setUrl(null);
-    setFailed(false);
-
-    void blobCache
-      .get(attachment.id)
-      .then((objectUrl) => {
-        if (!cancelled) setUrl(objectUrl);
-      })
-      .catch(() => {
-        if (!cancelled) setFailed(true);
-      });
-
-    return () => {
-      cancelled = true;
-    };
-  }, [attachment.id, blobCache]);
-
-  if (failed) return null;
+  async function openPreview() {
+    if (loading) return;
+    setLoading(true);
+    try {
+      const url = await blobCache.get(attachment.id);
+      onOpen(url);
+    } catch {
+      window.alert("Could not load image preview.");
+    } finally {
+      setLoading(false);
+    }
+  }
 
   return (
     <button
       type="button"
-      className="issue-attachment-thumb"
-      onClick={() => {
-        if (url) onOpen(url);
-      }}
-      disabled={!url}
+      className="issue-attachment-thumb issue-attachment-thumb--idle"
+      onClick={() => void openPreview()}
+      disabled={loading}
       aria-label={`Preview ${attachment.filename}`}
-      title="Click to enlarge"
+      title="Click to load preview"
     >
-      {url ? (
-        <img src={url} alt="" loading="lazy" />
-      ) : (
-        <span className="issue-attachment-thumb-placeholder muted">…</span>
-      )}
+      <span className="issue-attachment-thumb-label">
+        {loading ? "…" : "Preview"}
+      </span>
     </button>
   );
 }
