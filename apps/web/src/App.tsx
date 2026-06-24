@@ -33,6 +33,7 @@ import { BoardLayoutPreview } from "./components/BoardLayoutPreview";
 import { ChangeHistoryPanel } from "./components/ChangeHistoryPanel";
 import { GoToRefBar } from "./components/GoToRefBar";
 import { IssueDrawer } from "./components/IssueDrawer";
+import { RowFilesDrawer } from "./components/RowFilesDrawer";
 import { RoadmapPanel } from "./components/RoadmapPanel";
 import { CreateTeamSection } from "./components/CreateTeamSection";
 import { AdvancedProfileSettingsSection } from "./components/AdvancedProfileSettingsSection";
@@ -85,6 +86,7 @@ export function App() {
   const [members, setMembers] = useState<TeamMemberPublic[]>([]);
   const [teamId, setTeamId] = useState<string | null>(null);
   const [selectedIssue, setSelectedIssue] = useState<IssuePublic | null>(null);
+  const [rowFilesRow, setRowFilesRow] = useState<BoardRowPublic | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [patName, setPatName] = useState("Cursor MCP");
@@ -1210,6 +1212,7 @@ export function App() {
               onBulkPriority={settingsOpen ? undefined : bulkSetPriority}
               onBulkTimer={settingsOpen ? undefined : bulkTimerIssues}
               onBulkDelete={settingsOpen ? undefined : bulkDeleteIssues}
+              onOpenRowFiles={settingsOpen ? undefined : setRowFilesRow}
             />
           )}
         </div>
@@ -1458,6 +1461,13 @@ export function App() {
         onClose={closeQuickAdd}
       />
 
+      {rowFilesRow && !overlayOpen && (
+        <RowFilesDrawer
+          row={rowFilesRow}
+          onClose={() => setRowFilesRow(null)}
+          onNavigateRef={(ref) => void goToRef(ref)}
+        />
+      )}
       {selectedIssue && !overlayOpen && (
         <IssueDrawer
           issue={selectedIssue}

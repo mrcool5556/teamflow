@@ -106,8 +106,11 @@ import {
   getFileTeamId,
   linkFileToIssue,
   listIssueAttachments,
+  listRowAttachments,
   moveIssueAttachment,
   saveIssueAttachment,
+  saveRowAttachment,
+  deleteRowAttachment,
 } from "./lib/attachments.js";
 import {
   abortUploadSession,
@@ -1985,6 +1988,31 @@ function parseLinkAttachment(body: unknown) {
   return { fileId };
 }
 
+async function userCanAccessUploadSession(
+  userId: string,
+  session: { issueId: string | null; rowId: string | null },
+) {
+  if (session.issueId) {
+    const [issue] = await db
+      .select()
+      .from(schema.issues)
+      .where(eq(schema.issues.id, session.issueId))
+      .limit(1);
+    if (!issue) return false;
+    return userHasTeamAccess(db, userId, issue.teamId);
+  }
+  if (session.rowId) {
+    const [row] = await db
+      .select()
+      .from(schema.boardRows)
+      .where(eq(schema.boardRows.id, session.rowId))
+      .limit(1);
+    if (!row) return false;
+    return userHasTeamAccess(db, userId, row.teamId);
+  }
+  return false;
+}
+
 app.get("/issues/:issueId/attachments", async (c) => {
   const result = await requireAuth(c);
   if ("error" in result) return result.error;
@@ -2068,11 +2096,16 @@ app.post("/issues/:issueId/uploads", async (c) => {
   }
 
   try {
-    const session = await createUploadSession(db, issueId, result.auth.userId, {
-      filename: body.filename,
-      mimeType: body.mimeType,
-      totalBytes: body.totalBytes,
-    });
+    const session = await createUploadSession(
+      db,
+      { issueId },
+      result.auth.userId,
+      {
+        filename: body.filename,
+        mimeType: body.mimeType,
+        totalBytes: body.totalBytes,
+      },
+    );
     return c.json({ session }, 201);
   } catch (error) {
     if (error instanceof AttachmentError) {
@@ -2090,13 +2123,7 @@ app.get("/uploads/:sessionId", async (c) => {
   const session = await getUploadSession(db, sessionId);
   if (!session) return c.json({ error: "Upload session not found" }, 404);
 
-  const [issue] = await db
-    .select()
-    .from(schema.issues)
-    .where(eq(schema.issues.id, session.issueId))
-    .limit(1);
-
-  if (!issue || !(await userHasTeamAccess(db, result.auth.userId, issue.teamId))) {
+  if (!(await userCanAccessUploadSession(result.auth.userId, session))) {
     return c.json({ error: "Team access denied" }, 403);
   }
 
@@ -2117,13 +2144,7 @@ app.put("/uploads/:sessionId/chunks/:index", async (c) => {
   const existing = await getUploadSession(db, sessionId);
   if (!existing) return c.json({ error: "Upload session not found" }, 404);
 
-  const [issue] = await db
-    .select()
-    .from(schema.issues)
-    .where(eq(schema.issues.id, existing.issueId))
-    .limit(1);
-
-  if (!issue || !(await userHasTeamAccess(db, result.auth.userId, issue.teamId))) {
+  if (!(await userCanAccessUploadSession(result.auth.userId, existing))) {
     return c.json({ error: "Team access denied" }, 403);
   }
 
@@ -2148,13 +2169,7 @@ app.post("/uploads/:sessionId/complete", async (c) => {
   const existing = await getUploadSession(db, sessionId);
   if (!existing) return c.json({ error: "Upload session not found" }, 404);
 
-  const [issue] = await db
-    .select()
-    .from(schema.issues)
-    .where(eq(schema.issues.id, existing.issueId))
-    .limit(1);
-
-  if (!issue || !(await userHasTeamAccess(db, result.auth.userId, issue.teamId))) {
+  if (!(await userCanAccessUploadSession(result.auth.userId, existing))) {
     return c.json({ error: "Team access denied" }, 403);
   }
 
@@ -2182,17 +2197,138 @@ app.delete("/uploads/:sessionId", async (c) => {
   const existing = await getUploadSession(db, sessionId);
   if (!existing) return c.json({ error: "Upload session not found" }, 404);
 
-  const [issue] = await db
-    .select()
-    .from(schema.issues)
-    .where(eq(schema.issues.id, existing.issueId))
-    .limit(1);
-
-  if (!issue || !(await userHasTeamAccess(db, result.auth.userId, issue.teamId))) {
+  if (!(await userCanAccessUploadSession(result.auth.userId, existing))) {
     return c.json({ error: "Team access denied" }, 403);
   }
 
   await abortUploadSession(db, sessionId);
+  return c.body(null, 204);
+});
+
+app.get("/rows/:rowId/attachments", async (c) => {
+  const result = await requireAuth(c);
+  if ("error" in result) return result.error;
+
+  const rowId = c.req.param("rowId");
+  const [row] = await db
+    .select()
+    .from(schema.boardRows)
+    .where(eq(schema.boardRows.id, rowId))
+    .limit(1);
+
+  if (!row) return c.json({ error: "Row not found" }, 404);
+  if (!(await userHasTeamAccess(db, result.auth.userId, row.teamId))) {
+    return c.json({ error: "Team access denied" }, 403);
+  }
+
+  const attachments = await listRowAttachments(db, rowId);
+  return c.json({ attachments, limits: getAttachmentLimits() });
+});
+
+app.post("/rows/:rowId/attachments", async (c) => {
+  const result = await requireAuth(c);
+  if ("error" in result) return result.error;
+  requireWrite(result.auth);
+
+  const rowId = c.req.param("rowId");
+  const [row] = await db
+    .select()
+    .from(schema.boardRows)
+    .where(eq(schema.boardRows.id, rowId))
+    .limit(1);
+
+  if (!row) return c.json({ error: "Row not found" }, 404);
+  if (!(await userHasTeamAccess(db, result.auth.userId, row.teamId))) {
+    return c.json({ error: "Team access denied" }, 403);
+  }
+
+  const body = await c.req.parseBody();
+  const raw = body.file;
+  const file = Array.isArray(raw) ? raw[0] : raw;
+  if (!(file instanceof File)) {
+    return c.json({ error: "Missing file field" }, 400);
+  }
+
+  try {
+    const attachment = await saveRowAttachment(
+      db,
+      rowId,
+      result.auth.userId,
+      file,
+    );
+    return c.json({ attachment }, 201);
+  } catch (error) {
+    if (error instanceof AttachmentError) {
+      return c.json({ error: error.message }, error.status as 400 | 413);
+    }
+    throw error;
+  }
+});
+
+app.post("/rows/:rowId/uploads", async (c) => {
+  const result = await requireAuth(c);
+  if ("error" in result) return result.error;
+  requireWrite(result.auth);
+
+  const rowId = c.req.param("rowId");
+  const body = parseCreateUploadSession(await c.req.json());
+  if (!body) {
+    return c.json({ error: "Invalid input" }, 400);
+  }
+
+  const [row] = await db
+    .select()
+    .from(schema.boardRows)
+    .where(eq(schema.boardRows.id, rowId))
+    .limit(1);
+
+  if (!row) return c.json({ error: "Row not found" }, 404);
+  if (!(await userHasTeamAccess(db, result.auth.userId, row.teamId))) {
+    return c.json({ error: "Team access denied" }, 403);
+  }
+
+  try {
+    const session = await createUploadSession(
+      db,
+      { rowId },
+      result.auth.userId,
+      {
+        filename: body.filename,
+        mimeType: body.mimeType,
+        totalBytes: body.totalBytes,
+      },
+    );
+    return c.json({ session }, 201);
+  } catch (error) {
+    if (error instanceof AttachmentError) {
+      return c.json({ error: error.message }, error.status as 400 | 413);
+    }
+    throw error;
+  }
+});
+
+app.delete("/rows/:rowId/attachments/:id", async (c) => {
+  const result = await requireAuth(c);
+  if ("error" in result) return result.error;
+  requireWrite(result.auth);
+
+  const rowId = c.req.param("rowId");
+  const attachmentId = c.req.param("id");
+
+  const [row] = await db
+    .select()
+    .from(schema.boardRows)
+    .where(eq(schema.boardRows.id, rowId))
+    .limit(1);
+
+  if (!row) return c.json({ error: "Row not found" }, 404);
+  if (!(await userHasTeamAccess(db, result.auth.userId, row.teamId))) {
+    return c.json({ error: "Team access denied" }, 403);
+  }
+
+  const deleted = await deleteRowAttachment(db, rowId, attachmentId);
+  if (!deleted) return c.json({ error: "Attachment not found" }, 404);
+
   return c.body(null, 204);
 });
 

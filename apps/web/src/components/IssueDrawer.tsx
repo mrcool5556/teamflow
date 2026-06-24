@@ -378,8 +378,15 @@ export function IssueDrawer({
     onUpdate(updated);
   }
 
+  function handleDrawerClose() {
+    setAttachmentLightbox(null);
+    setAttachmentVideo(null);
+    attachmentBlobCache.revokeAll();
+    onClose();
+  }
+
   return (
-    <div className="drawer-backdrop" onClick={onClose}>
+    <div className="drawer-backdrop" onClick={handleDrawerClose}>
       <aside
         className={`drawer issue-drawer ${refNavActive ? "issue-drawer--ref-nav" : ""}`}
         onClick={(e) => e.stopPropagation()}
@@ -399,7 +406,7 @@ export function IssueDrawer({
             </div>
             {saving && <span className="issue-drawer-saving">Saving…</span>}
           </div>
-          <button type="button" className="ghost" onClick={onClose}>
+          <button type="button" className="ghost" onClick={handleDrawerClose}>
             Close
           </button>
         </header>

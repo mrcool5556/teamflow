@@ -1,6 +1,6 @@
 # File attachments
 
-Issue-level file uploads (v1). Files are stored on the server filesystem under `data/uploads/`.
+Issue and row file uploads. Files are stored on the server filesystem under `data/uploads/` (`issues/{issueId}/` or `rows/{rowId}/`).
 
 ## Limits
 
@@ -26,10 +26,13 @@ Auth required for all routes.
 
 | Method | Path | Description |
 |--------|------|-------------|
-| GET | `/issues/:issueId/attachments` | List attachments + `limits` object |
-| POST | `/issues/:issueId/attachments` | Upload (`multipart/form-data`, field `file`) |
+| GET | `/issues/:issueId/attachments` | List issue attachments + `limits` object |
+| POST | `/issues/:issueId/attachments` | Upload to issue (`multipart/form-data`, field `file`) |
+| GET | `/rows/:rowId/attachments` | List row shared files + `limits` |
+| POST | `/rows/:rowId/attachments` | Upload to row (`multipart/form-data`, field `file`) |
 | GET | `/attachments/:id/download` | Download file |
-| DELETE | `/issues/:issueId/attachments/:id` | Remove attachment |
+| DELETE | `/issues/:issueId/attachments/:id` | Remove issue attachment |
+| DELETE | `/rows/:rowId/attachments/:id` | Remove row file |
 
 ### Upload example
 

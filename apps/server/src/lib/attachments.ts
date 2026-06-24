@@ -98,7 +98,8 @@ function limitErrorMessage(filename: string, mimeType: string, maxBytes: number)
 
 export function mapAttachmentPublic(row: {
   linkId: string;
-  issueId: string;
+  issueId?: string | null;
+  rowId?: string | null;
   fileId: string;
   filename: string;
   mimeType: string;
@@ -110,7 +111,8 @@ export function mapAttachmentPublic(row: {
   const kind = attachmentFileKind(row.filename, row.mimeType);
   return {
     id: row.linkId,
-    issueId: row.issueId,
+    issueId: row.issueId ?? null,
+    rowId: row.rowId ?? null,
     fileId: row.fileId,
     filename: row.filename,
     mimeType: row.mimeType,
@@ -153,7 +155,7 @@ export async function listIssueAttachments(db: Db, issueId: string) {
 }
 
 export async function getAttachmentLinkContext(db: Db, linkId: string) {
-  const [row] = await db
+  const [issueRow] = await db
     .select({
       linkId: schema.issueFileLinks.id,
       issueId: schema.issueFileLinks.issueId,
@@ -177,11 +179,45 @@ export async function getAttachmentLinkContext(db: Db, linkId: string) {
     .where(eq(schema.issueFileLinks.id, linkId))
     .limit(1);
 
-  if (!row) return null;
+  if (issueRow) {
+    return {
+      ...issueRow,
+      fullPath: path.join(getUploadDir(), issueRow.storagePath),
+      public: mapAttachmentPublic({ ...issueRow, rowId: null }),
+    };
+  }
+
+  const [rowLink] = await db
+    .select({
+      linkId: schema.rowFileLinks.id,
+      rowId: schema.rowFileLinks.rowId,
+      fileId: schema.storedFiles.id,
+      filename: schema.storedFiles.filename,
+      mimeType: schema.storedFiles.mimeType,
+      sizeBytes: schema.storedFiles.sizeBytes,
+      uploaderId: schema.storedFiles.uploaderId,
+      createdAt: schema.rowFileLinks.createdAt,
+      uploaderName: schema.users.name,
+      storagePath: schema.storedFiles.storagePath,
+      teamId: schema.boardRows.teamId,
+    })
+    .from(schema.rowFileLinks)
+    .innerJoin(
+      schema.storedFiles,
+      eq(schema.storedFiles.id, schema.rowFileLinks.fileId),
+    )
+    .innerJoin(schema.users, eq(schema.users.id, schema.storedFiles.uploaderId))
+    .innerJoin(schema.boardRows, eq(schema.boardRows.id, schema.rowFileLinks.rowId))
+    .where(eq(schema.rowFileLinks.id, linkId))
+    .limit(1);
+
+  if (!rowLink) return null;
+
   return {
-    ...row,
-    fullPath: path.join(getUploadDir(), row.storagePath),
-    public: mapAttachmentPublic(row),
+    ...rowLink,
+    issueId: null,
+    fullPath: path.join(getUploadDir(), rowLink.storagePath),
+    public: mapAttachmentPublic({ ...rowLink, issueId: null }),
   };
 }
 
@@ -192,12 +228,17 @@ export async function getAttachmentForDownload(db: Db, linkId: string) {
 }
 
 async function deleteStoredFileIfOrphaned(db: Db, fileId: string) {
-  const [countRow] = await db
+  const [issueCountRow] = await db
     .select({ count: sql<number>`count(*)` })
     .from(schema.issueFileLinks)
     .where(eq(schema.issueFileLinks.fileId, fileId));
+  const [rowCountRow] = await db
+    .select({ count: sql<number>`count(*)` })
+    .from(schema.rowFileLinks)
+    .where(eq(schema.rowFileLinks.fileId, fileId));
 
-  const remaining = Number(countRow?.count ?? 0);
+  const remaining =
+    Number(issueCountRow?.count ?? 0) + Number(rowCountRow?.count ?? 0);
   if (remaining > 0) return;
 
   const [file] = await db
@@ -289,6 +330,7 @@ export async function linkFileToIssue(
   return mapAttachmentPublic({
     linkId,
     issueId,
+    rowId: null,
     fileId,
     filename: file.filename,
     mimeType: file.mimeType,
@@ -306,12 +348,13 @@ export async function createStoredFileFromPath(
   mimeType: string,
   sizeBytes: number,
   absolutePath: string,
-  issueId: string,
+  target: { issueId: string } | { rowId: string },
 ) {
   const fileId = randomUUID();
   const linkId = randomUUID();
   const safeName = sanitizeFilename(filename);
-  const relativeDir = issueId;
+  const relativeDir =
+    "issueId" in target ? target.issueId : path.join("rows", target.rowId);
   const storageName = `${fileId}_${safeName}`;
   const relativePath = path.join(relativeDir, storageName);
   const finalDir = path.join(getUploadDir(), relativeDir);
@@ -329,12 +372,22 @@ export async function createStoredFileFromPath(
     storagePath: relativePath,
     createdAt: now,
   });
-  await db.insert(schema.issueFileLinks).values({
-    id: linkId,
-    issueId,
-    fileId,
-    createdAt: now,
-  });
+
+  if ("issueId" in target) {
+    await db.insert(schema.issueFileLinks).values({
+      id: linkId,
+      issueId: target.issueId,
+      fileId,
+      createdAt: now,
+    });
+  } else {
+    await db.insert(schema.rowFileLinks).values({
+      id: linkId,
+      rowId: target.rowId,
+      fileId,
+      createdAt: now,
+    });
+  }
 
   const [uploader] = await db
     .select()
@@ -344,7 +397,8 @@ export async function createStoredFileFromPath(
 
   return mapAttachmentPublic({
     linkId,
-    issueId,
+    issueId: "issueId" in target ? target.issueId : null,
+    rowId: "rowId" in target ? target.rowId : null,
     fileId,
     filename: safeName,
     mimeType,
@@ -421,6 +475,7 @@ export async function saveIssueAttachment(
   return mapAttachmentPublic({
     linkId,
     issueId,
+    rowId: null,
     fileId,
     filename,
     mimeType,
@@ -429,6 +484,118 @@ export async function saveIssueAttachment(
     uploaderName: uploader!.name,
     createdAt: now,
   });
+}
+
+export async function listRowAttachments(db: Db, rowId: string) {
+  const rows = await db
+    .select({
+      linkId: schema.rowFileLinks.id,
+      rowId: schema.rowFileLinks.rowId,
+      fileId: schema.storedFiles.id,
+      filename: schema.storedFiles.filename,
+      mimeType: schema.storedFiles.mimeType,
+      sizeBytes: schema.storedFiles.sizeBytes,
+      uploaderId: schema.storedFiles.uploaderId,
+      createdAt: schema.rowFileLinks.createdAt,
+      uploaderName: schema.users.name,
+    })
+    .from(schema.rowFileLinks)
+    .innerJoin(
+      schema.storedFiles,
+      eq(schema.storedFiles.id, schema.rowFileLinks.fileId),
+    )
+    .innerJoin(schema.users, eq(schema.users.id, schema.storedFiles.uploaderId))
+    .where(eq(schema.rowFileLinks.rowId, rowId));
+
+  return rows.map((row) =>
+    mapAttachmentPublic({ ...row, issueId: null }),
+  );
+}
+
+export async function saveRowAttachment(
+  db: Db,
+  rowId: string,
+  uploaderId: string,
+  file: UploadFile,
+) {
+  const limits = getAttachmentLimits();
+  const mimeType = file.type || "application/octet-stream";
+  const maxBytes = maxBytesForAttachmentFile(file.name, mimeType, limits);
+
+  if (file.size <= 0) throw new AttachmentError("Empty file", 400);
+  if (file.size > maxBytes) {
+    throw new AttachmentError(limitErrorMessage(file.name, mimeType, maxBytes), 413);
+  }
+
+  const fileId = randomUUID();
+  const linkId = randomUUID();
+  const filename = sanitizeFilename(file.name);
+  const relativeDir = path.join("rows", rowId);
+  const rowDir = path.join(getUploadDir(), relativeDir);
+  await fs.mkdir(rowDir, { recursive: true });
+
+  const storageName = `${fileId}_${filename}`;
+  const storagePath = path.join(rowDir, storageName);
+  const buffer = Buffer.from(await file.arrayBuffer());
+
+  if (buffer.length > maxBytes) {
+    throw new AttachmentError(limitErrorMessage(filename, mimeType, maxBytes), 413);
+  }
+
+  await fs.writeFile(storagePath, buffer);
+
+  const now = new Date().toISOString();
+  const relativePath = path.join(relativeDir, storageName);
+
+  await db.insert(schema.storedFiles).values({
+    id: fileId,
+    uploaderId,
+    filename,
+    mimeType,
+    sizeBytes: buffer.length,
+    storagePath: relativePath,
+    createdAt: now,
+  });
+  await db.insert(schema.rowFileLinks).values({
+    id: linkId,
+    rowId,
+    fileId,
+    createdAt: now,
+  });
+
+  const [uploader] = await db
+    .select()
+    .from(schema.users)
+    .where(eq(schema.users.id, uploaderId))
+    .limit(1);
+
+  return mapAttachmentPublic({
+    linkId,
+    issueId: null,
+    rowId,
+    fileId,
+    filename,
+    mimeType,
+    sizeBytes: buffer.length,
+    uploaderId,
+    uploaderName: uploader!.name,
+    createdAt: now,
+  });
+}
+
+export async function deleteRowAttachment(db: Db, rowId: string, linkId: string) {
+  const [link] = await db
+    .select()
+    .from(schema.rowFileLinks)
+    .where(eq(schema.rowFileLinks.id, linkId))
+    .limit(1);
+
+  if (!link || link.rowId !== rowId) return null;
+
+  const fileId = link.fileId;
+  await db.delete(schema.rowFileLinks).where(eq(schema.rowFileLinks.id, linkId));
+  await deleteStoredFileIfOrphaned(db, fileId);
+  return link;
 }
 
 export async function assembleChunksToFile(
@@ -457,11 +624,19 @@ export async function countLinksForFile(db: Db, fileId: string) {
 }
 
 export async function getFileTeamId(db: Db, fileId: string) {
-  const [row] = await db
+  const [issueRow] = await db
     .select({ teamId: schema.issues.teamId })
     .from(schema.issueFileLinks)
     .innerJoin(schema.issues, eq(schema.issues.id, schema.issueFileLinks.issueId))
     .where(eq(schema.issueFileLinks.fileId, fileId))
     .limit(1);
-  return row?.teamId ?? null;
+  if (issueRow?.teamId) return issueRow.teamId;
+
+  const [rowLink] = await db
+    .select({ teamId: schema.boardRows.teamId })
+    .from(schema.rowFileLinks)
+    .innerJoin(schema.boardRows, eq(schema.boardRows.id, schema.rowFileLinks.rowId))
+    .where(eq(schema.rowFileLinks.fileId, fileId))
+    .limit(1);
+  return rowLink?.teamId ?? null;
 }
