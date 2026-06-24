@@ -102,6 +102,7 @@ import {
   AttachmentError,
   deleteIssueAttachment,
   getAttachmentForDownload,
+  getMaxAttachmentBytes,
   listIssueAttachments,
   saveIssueAttachment,
 } from "./lib/attachments.js";
@@ -1959,7 +1960,7 @@ app.get("/issues/:issueId/attachments", async (c) => {
   }
 
   const attachments = await listIssueAttachments(db, issueId);
-  return c.json({ attachments });
+  return c.json({ attachments, maxBytes: getMaxAttachmentBytes() });
 });
 
 app.post("/issues/:issueId/attachments", async (c) => {
