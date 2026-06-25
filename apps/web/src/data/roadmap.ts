@@ -104,9 +104,9 @@ export const ROADMAP_FILESYSTEM_ORDER: RoadmapItem[] = [
   {
     id: "fs-trash",
     title: "File soft-delete bin (7-day)",
-    status: "planned",
+    status: "partial",
     priority: 4,
-    notes: "Recover removed files; permanent delete after retention.",
+    notes: "Team Files trash tab; restore within 7 days; auto-purge on API startup.",
     tags: ["files"],
   },
   {
@@ -138,7 +138,7 @@ export const ROADMAP_FILESYSTEM_ORDER: RoadmapItem[] = [
     title: "Team-wide file area",
     status: "partial",
     priority: 8,
-    notes: "Files toolbar drawer lists all team uploads with search, size sort, and reference links.",
+    notes: "Files toolbar drawer: search, linked-on dropdown, trash tab, copy ref.",
     tags: ["files"],
   },
   {

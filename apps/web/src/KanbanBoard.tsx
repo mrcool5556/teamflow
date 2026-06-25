@@ -330,6 +330,7 @@ export function KanbanBoard({
   const [rowSearchQueries, setRowSearchQueries] = useState<Record<string, string>>({});
   const [columnSearchQueries, setColumnSearchQueries] = useState<Record<string, string>>({});
   const [selectedIssueIds, setSelectedIssueIds] = useState<Set<string>>(() => new Set());
+  const [columnDropTargetId, setColumnDropTargetId] = useState<string | null>(null);
   const lastSelectedIssueIdRef = useRef<string | null>(null);
   const suppressClickRef = useRef<string | null>(null);
 
@@ -464,6 +465,7 @@ export function KanbanBoard({
   function handleDragStart(event: DragStartEvent) {
     setActiveId(String(event.active.id));
     setIssueInsertHint(null);
+    setColumnDropTargetId(null);
     suppressClickRef.current = String(event.active.id);
   }
 
@@ -471,11 +473,24 @@ export function KanbanBoard({
     setIssueInsertHint(
       resolveIssueInsertHint(event.active, event.over, issues, defaultRowId),
     );
+
+    const activeParsed = parseDndId(String(event.active.id));
+    if (activeParsed.kind !== "column") {
+      setColumnDropTargetId(null);
+      return;
+    }
+
+    const overParsed = event.over ? parseDndId(String(event.over.id)) : { kind: "unknown" as const };
+    const target = resolveColumnDropTarget(overParsed, issues, defaultRowId);
+    setColumnDropTargetId(
+      target ? columnDndId(target.rowId, target.statusId) : null,
+    );
   }
 
   function handleDragCancel() {
     setActiveId(null);
     setIssueInsertHint(null);
+    setColumnDropTargetId(null);
     suppressClickRef.current = null;
   }
 
@@ -491,6 +506,7 @@ export function KanbanBoard({
     const { active, over } = event;
     setActiveId(null);
     setIssueInsertHint(null);
+    setColumnDropTargetId(null);
 
     window.setTimeout(() => {
       suppressClickRef.current = null;
@@ -677,6 +693,7 @@ export function KanbanBoard({
               onIssueCardClick={handleIssueCardClick}
               activeDragIssueIds={activeDragIssueIds}
               activeId={activeId}
+              columnDropTargetId={columnDropTargetId}
               previewMode={previewMode}
               issueInsertHint={issueInsertHint}
               onOpenRowFiles={onOpenRowFiles}
@@ -717,7 +734,7 @@ export function KanbanBoard({
         ) : null}
         {activeColumn ? (
           <div
-            className={`column-label column-label-row column-label--${activeColumn.status.type} column-label-overlay`}
+            className={`column-label column-label-row column-label--${activeColumn.status.type} column-label-overlay column-label-overlay--active`}
           >
             <span>{activeColumn.status.name}</span>
           </div>
@@ -940,6 +957,7 @@ function SortableBoardRow({
   onIssueCardClick,
   activeDragIssueIds = new Set(),
   activeId = null,
+  columnDropTargetId = null,
   previewMode = false,
   issueInsertHint = null,
   onOpenRowFiles,
@@ -990,6 +1008,7 @@ function SortableBoardRow({
   ) => void;
   activeDragIssueIds?: Set<string>;
   activeId?: string | null;
+  columnDropTargetId?: string | null;
   previewMode?: boolean;
   issueInsertHint?: IssueInsertHint | null;
   onOpenRowFiles?: (row: BoardRowPublic) => void;
@@ -1113,11 +1132,15 @@ function SortableBoardRow({
                 ? issueInsertHint
                 : null;
 
+            const columnId = columnDndId(row.id, status.id);
+            const isColumnDropTarget = columnDropTargetId === columnId;
+
             return (
               <SortableColumn
                 key={`${row.id}-${status.id}`}
-                id={columnDndId(row.id, status.id)}
+                id={columnId}
                 disabled={!columnSortable}
+                isDropTarget={isColumnDropTarget}
               >
                 {({ setActivatorNodeRef, listeners, isDragging }) => (
                   <>
@@ -1227,10 +1250,12 @@ function SortableBoardRow({
 function SortableColumn({
   id,
   disabled = false,
+  isDropTarget = false,
   children,
 }: {
   id: string;
   disabled?: boolean;
+  isDropTarget?: boolean;
   children: (props: {
     setActivatorNodeRef: (element: HTMLButtonElement | null) => void;
     listeners: ReturnType<typeof useSortable>["listeners"];
@@ -1257,7 +1282,7 @@ function SortableColumn({
     <div
       ref={setNodeRef}
       style={style}
-      className={`board-column-stack${isDragging ? " board-column-stack--dragging" : ""}`}
+      className={`board-column-stack${isDragging ? " board-column-stack--dragging" : ""}${isDropTarget && !isDragging ? " board-column-stack--drop-target" : ""}`}
       {...attributes}
     >
       {children({ setActivatorNodeRef, listeners, isDragging })}

@@ -1591,6 +1591,38 @@ body.board-pan-active {
   z-index: 2;
 }
 
+.board-column-stack--dragging .column-label {
+  border-color: var(--accent);
+  box-shadow:
+    0 0 0 2px color-mix(in srgb, var(--accent) 28%, transparent),
+    var(--chrome-drag-shadow);
+}
+
+.board-column-stack--dragging .column.cell {
+  opacity: 0.55;
+}
+
+.board-column-stack--drop-target .column-label {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 22%, transparent);
+}
+
+.board-column-stack--drop-target .column.cell {
+  outline: 2px dashed color-mix(in srgb, var(--accent) 45%, var(--border));
+  outline-offset: -2px;
+}
+
+.column-label--dragging {
+  color: var(--accent);
+}
+
+.column-label-overlay--active {
+  border-color: var(--accent);
+  box-shadow:
+    var(--chrome-drag-shadow),
+    0 0 0 3px color-mix(in srgb, var(--accent) 35%, transparent);
+}
+
 .column-drag-handle {
   flex-shrink: 0;
   background: transparent;
@@ -1701,6 +1733,47 @@ body.board-pan-active {
 .team-files-drawer-summary {
   margin: 0.2rem 0 0;
   font-size: 0.82rem;
+}
+
+.team-files-tabs {
+  display: flex;
+  gap: 0.45rem;
+  padding: 0 1rem 0.65rem;
+}
+
+.team-files-tabs button {
+  padding: 0.28rem 0.65rem;
+  font-size: 0.82rem;
+}
+
+.team-files-tabs button.active {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.team-files-ref-select select {
+  max-width: 11rem;
+  font-size: 0.78rem;
+}
+
+.team-files-delete-btn {
+  color: var(--danger);
+}
+
+.team-files-delete-btn:hover {
+  border-color: var(--danger);
+}
+
+.team-files-item-uploader {
+  font-size: 0.74rem;
+}
+
+.team-files-item-copy {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.12rem;
 }
 
 .team-files-drawer-toolbar {

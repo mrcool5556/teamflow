@@ -1,5 +1,5 @@
-import { useEffect, useMemo, useState } from "react";
-import type { TeamFilePublic } from "@teamflow/core";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { FILE_TRASH_RETENTION_DAYS, type TeamFilePublic } from "@teamflow/core";
 import { client } from "../api";
 import { FileRefCopyButton } from "./FileRefCopyButton";
 
@@ -10,6 +10,13 @@ function formatFileSize(bytes: number) {
   return `${(bytes / (1024 * 1024 * 1024)).toFixed(1)} GB`;
 }
 
+function formatPurgeDate(iso: string | null | undefined) {
+  if (!iso) return null;
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) return null;
+  return date.toLocaleDateString(undefined, { month: "short", day: "numeric" });
+}
+
 type TeamFilesDrawerProps = {
   teamId: string;
   open: boolean;
@@ -18,6 +25,7 @@ type TeamFilesDrawerProps = {
 };
 
 type SortMode = "size" | "name" | "refs";
+type FilesTab = "active" | "trash";
 
 export function TeamFilesDrawer({
   teamId,
@@ -25,43 +33,35 @@ export function TeamFilesDrawer({
   onClose,
   onNavigateRef,
 }: TeamFilesDrawerProps) {
+  const [tab, setTab] = useState<FilesTab>("active");
   const [files, setFiles] = useState<TeamFilePublic[]>([]);
   const [totalBytes, setTotalBytes] = useState(0);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [query, setQuery] = useState("");
   const [sort, setSort] = useState<SortMode>("size");
-  const [expandedFileId, setExpandedFileId] = useState<string | null>(null);
+  const [busyFileId, setBusyFileId] = useState<string | null>(null);
+
+  const loadFiles = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const result = await client.listTeamFiles(teamId, { trash: tab === "trash" });
+      setFiles(result.files);
+      setTotalBytes(result.totalBytes);
+    } catch (err) {
+      setFiles([]);
+      setTotalBytes(0);
+      setError(err instanceof Error ? err.message : "Could not load team files");
+    } finally {
+      setLoading(false);
+    }
+  }, [teamId, tab]);
 
   useEffect(() => {
     if (!open) return;
-
-    let cancelled = false;
-    setLoading(true);
-    setError(null);
-
-    void client
-      .listTeamFiles(teamId)
-      .then((result) => {
-        if (cancelled) return;
-        setFiles(result.files);
-        setTotalBytes(result.totalBytes);
-      })
-      .catch((err) => {
-        if (!cancelled) {
-          setFiles([]);
-          setTotalBytes(0);
-          setError(err instanceof Error ? err.message : "Could not load team files");
-        }
-      })
-      .finally(() => {
-        if (!cancelled) setLoading(false);
-      });
-
-    return () => {
-      cancelled = true;
-    };
-  }, [open, teamId]);
+    void loadFiles();
+  }, [open, loadFiles]);
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -95,8 +95,35 @@ export function TeamFilesDrawer({
 
   function handleClose() {
     setQuery("");
-    setExpandedFileId(null);
+    setTab("active");
     onClose();
+  }
+
+  async function softDelete(file: TeamFilePublic) {
+    if (!window.confirm(`Move ${file.filename} to trash for ${FILE_TRASH_RETENTION_DAYS} days?`)) {
+      return;
+    }
+    setBusyFileId(file.fileId);
+    try {
+      await client.softDeleteTeamFile(teamId, file.fileId);
+      await loadFiles();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not delete file");
+    } finally {
+      setBusyFileId(null);
+    }
+  }
+
+  async function restore(file: TeamFilePublic) {
+    setBusyFileId(file.fileId);
+    try {
+      await client.restoreTeamFile(teamId, file.fileId);
+      await loadFiles();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not restore file");
+    } finally {
+      setBusyFileId(null);
+    }
   }
 
   return (
@@ -108,12 +135,30 @@ export function TeamFilesDrawer({
             <h2>File directory</h2>
             <p className="muted team-files-drawer-summary">
               {files.length} file{files.length === 1 ? "" : "s"} · {formatFileSize(totalBytes)} total
+              {tab === "trash" ? ` · purged after ${FILE_TRASH_RETENTION_DAYS} days` : ""}
             </p>
           </div>
           <button type="button" className="ghost" onClick={handleClose}>
             Close
           </button>
         </header>
+
+        <div className="team-files-tabs">
+          <button
+            type="button"
+            className={tab === "active" ? "active" : undefined}
+            onClick={() => setTab("active")}
+          >
+            Active
+          </button>
+          <button
+            type="button"
+            className={tab === "trash" ? "active" : undefined}
+            onClick={() => setTab("trash")}
+          >
+            Trash
+          </button>
+        </div>
 
         <div className="team-files-drawer-toolbar">
           <input
@@ -139,70 +184,76 @@ export function TeamFilesDrawer({
           ) : error ? (
             <p className="issue-link-row-files-error">{error}</p>
           ) : filtered.length === 0 ? (
-            <p className="muted">{query ? "No files match your search." : "No files uploaded yet."}</p>
+            <p className="muted">
+              {query
+                ? "No files match your search."
+                : tab === "trash"
+                  ? "Trash is empty."
+                  : "No files uploaded yet."}
+            </p>
           ) : (
             <ul className="team-files-list">
-              {filtered.map((file) => {
-                const expanded = expandedFileId === file.fileId;
-                return (
-                  <li key={file.fileId} className="team-files-item">
-                    <div className="team-files-item-main">
-                      <button
-                        type="button"
-                        className="team-files-item-toggle"
-                        onClick={() =>
-                          setExpandedFileId((current) =>
-                            current === file.fileId ? null : file.fileId,
-                          )
-                        }
-                      >
-                        <span className="team-files-item-name">{file.filename}</span>
-                        <span className="team-files-item-meta muted">
-                          {file.fileRef} · {formatFileSize(file.sizeBytes)} · {file.linkCount} link
-                          {file.linkCount === 1 ? "" : "s"}
-                        </span>
-                      </button>
-                      <div className="team-files-item-actions">
-                        <FileRefCopyButton fileRef={file.fileRef} filename={file.filename} />
-                      </div>
+              {filtered.map((file) => (
+                <li key={file.fileId} className="team-files-item">
+                  <div className="team-files-item-main">
+                    <div className="team-files-item-copy">
+                      <span className="team-files-item-name">{file.filename}</span>
+                      <span className="team-files-item-meta muted">
+                        {file.fileRef} · {formatFileSize(file.sizeBytes)} · {file.linkCount} link
+                        {file.linkCount === 1 ? "" : "s"}
+                        {tab === "trash" && file.purgeAt
+                          ? ` · purges ${formatPurgeDate(file.purgeAt) ?? "soon"}`
+                          : ""}
+                      </span>
+                      <span className="muted team-files-item-uploader">by {file.uploaderName}</span>
                     </div>
-                    {expanded ? (
-                      <div className="team-files-item-refs">
-                        <p className="muted team-files-item-refs-label">
-                          Linked on · uploaded by {file.uploaderName}
-                        </p>
-                        <ul className="team-files-ref-list">
-                          {file.references.map((ref) => (
-                            <li key={`${ref.kind}-${ref.linkId}`}>
-                              {onNavigateRef ? (
-                                <button
-                                  type="button"
-                                  className="team-files-ref-link"
-                                  onClick={() => onNavigateRef(ref.ref)}
-                                >
-                                  <span className="team-files-ref-kind">
-                                    {ref.kind === "issue" ? "Issue" : "Row"}
-                                  </span>
-                                  <span className="team-files-ref-id">{ref.ref}</span>
-                                  <span className="muted team-files-ref-name">{ref.name}</span>
-                                </button>
-                              ) : (
-                                <span className="team-files-ref-static">
-                                  <span className="team-files-ref-kind">
-                                    {ref.kind === "issue" ? "Issue" : "Row"}
-                                  </span>
-                                  <span className="team-files-ref-id">{ref.ref}</span>
-                                  <span className="muted team-files-ref-name">{ref.name}</span>
-                                </span>
-                              )}
-                            </li>
-                          ))}
-                        </ul>
-                      </div>
-                    ) : null}
-                  </li>
-                );
-              })}
+
+                    <div className="team-files-item-actions">
+                      {file.references.length > 0 && onNavigateRef ? (
+                        <label className="team-files-ref-select">
+                          <span className="sr-only">Jump to linked location for {file.filename}</span>
+                          <select
+                            defaultValue=""
+                            onChange={(event) => {
+                              const ref = event.target.value;
+                              if (!ref) return;
+                              onNavigateRef(ref);
+                              event.target.value = "";
+                            }}
+                          >
+                            <option value="">Linked on…</option>
+                            {file.references.map((ref) => (
+                              <option key={`${ref.kind}-${ref.linkId}`} value={ref.ref}>
+                                {ref.kind === "issue" ? "Issue" : "Row"} {ref.ref} — {ref.name}
+                              </option>
+                            ))}
+                          </select>
+                        </label>
+                      ) : null}
+                      <FileRefCopyButton fileRef={file.fileRef} filename={file.filename} />
+                      {tab === "active" ? (
+                        <button
+                          type="button"
+                          className="ghost team-files-delete-btn"
+                          disabled={busyFileId === file.fileId}
+                          onClick={() => void softDelete(file)}
+                        >
+                          {busyFileId === file.fileId ? "…" : "Delete"}
+                        </button>
+                      ) : (
+                        <button
+                          type="button"
+                          className="secondary compact"
+                          disabled={busyFileId === file.fileId}
+                          onClick={() => void restore(file)}
+                        >
+                          {busyFileId === file.fileId ? "…" : "Restore"}
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                </li>
+              ))}
             </ul>
           )}
         </div>
