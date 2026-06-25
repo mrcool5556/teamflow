@@ -5,8 +5,66 @@ export const USER_PROFILE_VERSION = 1 as const;
 export const THEME_MODES = ["dark", "light"] as const;
 export type ThemeMode = (typeof THEME_MODES)[number];
 
-export const COLOR_PRESETS = ["default", "sunset", "ocean", "forest"] as const;
+export const COLOR_PRESETS = ["default", "sunset", "ocean", "forest", "custom"] as const;
 export type ColorPreset = (typeof COLOR_PRESETS)[number];
+
+export const SHAPE_PRESETS = ["sharp", "soft", "round", "octagon"] as const;
+export type ShapePreset = (typeof SHAPE_PRESETS)[number];
+
+export const CHROME_STYLES = [
+  "industrial",
+  "minimal",
+  "soft",
+  "classic",
+  "glass",
+  "terminal",
+  "paper",
+  "neon",
+] as const;
+export type ChromeStyle = (typeof CHROME_STYLES)[number];
+
+export const SEMANTIC_CONTRAST_MODES = ["adapt", "preserve"] as const;
+export type SemanticContrastMode = (typeof SEMANTIC_CONTRAST_MODES)[number];
+
+export const TEXT_CONTRAST_PRESETS = ["default", "high", "muted"] as const;
+export type TextContrastPreset = (typeof TEXT_CONTRAST_PRESETS)[number];
+
+export const DEFAULT_UI_PRIMARY = "#ff5500";
+export const DEFAULT_UI_ACCENT = "#00d8ff";
+
+export const UI_COLOR_PRESET_PALETTES = {
+  default: { primary: DEFAULT_UI_PRIMARY, accent: DEFAULT_UI_ACCENT },
+  sunset: { primary: "#ff6b35", accent: "#ffb347" },
+  ocean: { primary: "#2563eb", accent: "#06b6d4" },
+  forest: { primary: "#16a34a", accent: "#84cc16" },
+} as const satisfies Record<Exclude<ColorPreset, "custom">, { primary: string; accent: string }>;
+
+export function resolveUiColors(appearance: {
+  colorPreset: ColorPreset;
+  customColors: { primary?: string; accent?: string };
+}) {
+  if (appearance.colorPreset === "custom") {
+    return {
+      primary: appearance.customColors.primary ?? DEFAULT_UI_PRIMARY,
+      accent: appearance.customColors.accent ?? DEFAULT_UI_ACCENT,
+    };
+  }
+
+  return UI_COLOR_PRESET_PALETTES[appearance.colorPreset];
+}
+
+const hexColorSchema = z
+  .string()
+  .regex(/^#[0-9A-Fa-f]{6}$/, "Expected #RRGGBB hex color");
+
+export const userProfileCustomColorsSchema = z
+  .object({
+    primary: hexColorSchema.optional(),
+    accent: hexColorSchema.optional(),
+    text: hexColorSchema.optional(),
+    textSoft: hexColorSchema.optional(),
+  })
+  .default({});
 
 export const DEFAULT_BOARD_COLUMN_WIDTH = 420;
 export const MIN_BOARD_COLUMN_WIDTH = 240;
@@ -31,6 +89,11 @@ export const userProfileBoardSchema = z.object({
 export const userProfileAppearanceSchema = z.object({
   theme: z.enum(THEME_MODES).default("dark"),
   colorPreset: z.enum(COLOR_PRESETS).default("default"),
+  customColors: userProfileCustomColorsSchema.default({}),
+  shape: z.enum(SHAPE_PRESETS).default("soft"),
+  chromeStyle: z.enum(CHROME_STYLES).default("industrial"),
+  semanticContrast: z.enum(SEMANTIC_CONTRAST_MODES).default("adapt"),
+  textContrast: z.enum(TEXT_CONTRAST_PRESETS).default("default"),
 });
 
 export const userProfileUiSchema = z.object({
@@ -65,6 +128,7 @@ export const userProfileExportSchema = z.object({
 export type UserProfile = z.infer<typeof userProfileSchema>;
 export type UserProfilePatch = z.infer<typeof userProfilePatchSchema>;
 export type UserProfileExport = z.infer<typeof userProfileExportSchema>;
+export type UserProfileCustomColors = z.infer<typeof userProfileCustomColorsSchema>;
 
 export function clampBoardColumnWidth(value: number) {
   return Math.min(
@@ -86,6 +150,11 @@ export function createDefaultUserProfile(): UserProfile {
     appearance: {
       theme: "dark",
       colorPreset: "default",
+      customColors: {},
+      shape: "soft",
+      chromeStyle: "industrial",
+      semanticContrast: "adapt",
+      textContrast: "default",
     },
     board: {
       columnWidth: DEFAULT_BOARD_COLUMN_WIDTH,
@@ -105,6 +174,10 @@ export function mergeUserProfile(
     appearance: {
       ...current.appearance,
       ...patch.appearance,
+      customColors: {
+        ...current.appearance.customColors,
+        ...patch.appearance?.customColors,
+      },
     },
     board: {
       ...current.board,
@@ -129,10 +202,20 @@ export function parseUserProfile(input: unknown): UserProfile {
   if (!input || typeof input !== "object") return defaults;
 
   const raw = input as Record<string, unknown>;
-  const appearance =
+  const rawAppearance =
     typeof raw.appearance === "object" && raw.appearance
-      ? { ...defaults.appearance, ...(raw.appearance as object) }
-      : defaults.appearance;
+      ? (raw.appearance as Record<string, unknown>)
+      : {};
+  const appearance = {
+    ...defaults.appearance,
+    ...rawAppearance,
+    customColors: {
+      ...defaults.appearance.customColors,
+      ...(typeof rawAppearance.customColors === "object" && rawAppearance.customColors
+        ? rawAppearance.customColors
+        : {}),
+    },
+  };
   const board =
     typeof raw.board === "object" && raw.board
       ? {

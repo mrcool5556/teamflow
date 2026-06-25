@@ -6,16 +6,8 @@ import type {
   Priority,
   TeamMemberPublic,
 } from "@teamflow/core";
-import { PRIORITIES } from "@teamflow/core";
+import { PRIORITIES, PRIORITY_LABELS } from "@teamflow/core";
 import { MultiAssigneePicker } from "./MultiAssigneePicker";
-
-const PRIORITY_LABELS: Record<Priority, string> = {
-  none: "No priority",
-  low: "Low",
-  medium: "Medium",
-  high: "High",
-  urgent: "Urgent",
-};
 
 type TimerBulkAction = "pause" | "reset";
 

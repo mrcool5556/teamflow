@@ -95,6 +95,7 @@ export function App() {
   const [profileImportText, setProfileImportText] = useState("");
   const [profileMessage, setProfileMessage] = useState<string | null>(null);
   const profileSaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const profileRef = useRef<UserProfile>(createDefaultUserProfile());
   const [historyOpen, setHistoryOpen] = useState(false);
   const [aboutOpen, setAboutOpen] = useState(false);
   const [highlightedIssueId, setHighlightedIssueId] = useState<string | null>(null);
@@ -148,8 +149,15 @@ export function App() {
   const persistProfile = useCallback(async (next: UserProfile) => {
     try {
       const { profile: saved } = await client.saveProfile(next);
-      setProfile(saved);
-      applyUserProfile(saved);
+      const merged = mergeUserProfile(saved, {
+        appearance: next.appearance,
+        board: {
+          rowHeadersVisible: next.board.rowHeadersVisible,
+        },
+      });
+      profileRef.current = merged;
+      setProfile(merged);
+      applyUserProfile(merged);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to save profile");
     }
@@ -157,17 +165,22 @@ export function App() {
 
   const updateProfile = useCallback(
     (next: UserProfile) => {
+      profileRef.current = next;
       applyUserProfile(next);
       setProfile(next);
       if (profileSaveTimerRef.current) {
         clearTimeout(profileSaveTimerRef.current);
       }
       profileSaveTimerRef.current = setTimeout(() => {
-        void persistProfile(next);
+        void persistProfile(profileRef.current);
       }, 600);
     },
     [persistProfile],
   );
+
+  useEffect(() => {
+    profileRef.current = profile;
+  }, [profile]);
 
   const isRowHeadersVisible = useCallback(
     (rowId: string) => profile.board.rowHeadersVisible[rowId] !== false,
@@ -235,6 +248,7 @@ export function App() {
         const { profile: serverProfile } = await client.getProfile();
         const { profile: next, migrated } = mergeWithLegacyDefaults(serverProfile);
         profileState = next;
+        profileRef.current = next;
         applyUserProfile(next);
         setProfile(next);
         if (migrated) {
@@ -244,6 +258,7 @@ export function App() {
       } catch {
         const { profile: fallback } = mergeWithLegacyDefaults(createDefaultUserProfile());
         profileState = fallback;
+        profileRef.current = fallback;
         applyUserProfile(fallback);
         setProfile(fallback);
       }
@@ -285,6 +300,7 @@ export function App() {
       setTeamId(activeTeam);
       if (activeTeam && activeTeam !== savedTeamId) {
         const withTeam = mergeUserProfile(profileState, { ui: { lastTeamId: activeTeam } });
+        profileRef.current = withTeam;
         setProfile(withTeam);
         applyUserProfile(withTeam);
         void client.patchProfile({ ui: { lastTeamId: activeTeam } });
@@ -305,10 +321,12 @@ export function App() {
       if (!nextTeamId) return;
       setTeamId(nextTeamId);
       setSelectedIssue(null);
-      updateProfile(mergeUserProfile(profile, { ui: { lastTeamId: nextTeamId } }));
+      updateProfile(
+        mergeUserProfile(profileRef.current, { ui: { lastTeamId: nextTeamId } }),
+      );
       await loadBoard(nextTeamId);
     },
-    [loadBoard, profile, updateProfile],
+    [loadBoard, updateProfile],
   );
 
   async function refreshTeamsAndSwitch(teamIdToSelect: string) {
@@ -791,6 +809,19 @@ export function App() {
     }
   }
 
+  async function updateIssuePriority(issue: IssuePublic, priority: Priority) {
+    if (issue.priority === priority) return;
+    try {
+      const { issue: updated } = await client.updateIssue(issue.id, { priority });
+      setIssues((prev) => prev.map((item) => (item.id === updated.id ? updated : item)));
+      if (selectedIssue?.id === updated.id) {
+        setSelectedIssue(updated);
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to update priority");
+    }
+  }
+
   function updateIssueTimer(
     issue: IssuePublic,
     patch: {
@@ -1020,7 +1051,7 @@ export function App() {
           const headersWereHidden = !isRowHeadersVisible(result.row.id);
           if (headersWereHidden) {
             updateProfile(
-              mergeUserProfile(profile, {
+              mergeUserProfile(profileRef.current, {
                 board: {
                   rowHeadersVisible: {
                     [result.row.id]: true,
@@ -1203,6 +1234,9 @@ export function App() {
               onUpdateIssueColor={
                 settingsOpen ? () => {} : (issue, color) => void updateIssueColor(issue, color)
               }
+              onUpdateIssuePriority={
+                settingsOpen ? () => {} : (issue, priority) => void updateIssuePriority(issue, priority)
+              }
               onUpdateIssueTimer={settingsOpen ? () => {} : updateIssueTimer}
               highlightedIssueId={settingsOpen ? null : highlightedIssueId}
               highlightedColumnKey={settingsOpen ? null : highlightedColumnKey}
@@ -1322,14 +1356,9 @@ export function App() {
                     <header className="settings-panel-header">
                       <h2>General</h2>
                       <p className="settings-copy settings-lead">
-                        Theme, board layout, profile backup, and creating new teams.
+                        Board layout, profile backup, and creating new teams.
                       </p>
                     </header>
-
-                    <AppearanceSettingsSection
-                      profile={profile}
-                      onProfileChange={updateProfile}
-                    />
 
                     <AdvancedProfileSettingsSection
                       profile={profile}
@@ -1346,6 +1375,22 @@ export function App() {
                       onTeamCreated={(newTeamId, switchToNew) =>
                         void handleTeamCreated(newTeamId, switchToNew)
                       }
+                    />
+                  </div>
+                ) : null}
+
+                {settingsPanel === "appearance" ? (
+                  <div className="settings-panel">
+                    <header className="settings-panel-header">
+                      <h2>Appearance</h2>
+                      <p className="settings-copy settings-lead">
+                        Personalize how you feel your board should be.
+                      </p>
+                    </header>
+
+                    <AppearanceSettingsSection
+                      profile={profile}
+                      onProfileChange={updateProfile}
                     />
                   </div>
                 ) : null}

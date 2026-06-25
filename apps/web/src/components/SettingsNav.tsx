@@ -1,4 +1,10 @@
-export type SettingsPanel = "general" | "team" | "roles" | "integrations" | "tokens";
+export type SettingsPanel =
+  | "general"
+  | "appearance"
+  | "team"
+  | "roles"
+  | "integrations"
+  | "tokens";
 
 type SettingsNavProps = {
   panel: SettingsPanel;
@@ -16,6 +22,7 @@ const NAV_ITEMS: {
   integrations?: boolean;
 }[] = [
   { id: "general", label: "General" },
+  { id: "appearance", label: "Appearance" },
   { id: "team", label: "Team", teamOnly: true },
   { id: "roles", label: "Roles", teamOnly: true, roles: true },
   { id: "integrations", label: "Integrations", teamOnly: true, integrations: true },

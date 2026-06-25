@@ -9,7 +9,7 @@ import type {
   TeamMemberPublic,
   UpdateIssueInput,
 } from "@teamflow/core";
-import { PRIORITIES, DEFAULT_ATTACHMENT_LIMITS, maxBytesForAttachmentFile, isImageAttachmentFile } from "@teamflow/core";
+import { PRIORITIES, DEFAULT_ATTACHMENT_LIMITS, PRIORITY_LABELS, maxBytesForAttachmentFile, isImageAttachmentFile } from "@teamflow/core";
 import type { AttachmentLimitsPublic } from "@teamflow/core";
 import { client } from "../api";
 import { IssueTimer } from "./IssueTimer";
@@ -36,14 +36,6 @@ import {
 function describeAttachmentLimits(limits: AttachmentLimitsPublic) {
   return `Images ${formatFileSize(limits.imageBytes)}, videos ${formatFileSize(limits.videoBytes)}, ZIPs ${formatFileSize(limits.zipBytes)}`;
 }
-
-const PRIORITY_LABELS: Record<Priority, string> = {
-  none: "No priority",
-  low: "Low",
-  medium: "Medium",
-  high: "High",
-  urgent: "Urgent",
-};
 
 function formatFileSize(bytes: number) {
   if (bytes < 1024) return `${bytes} B`;

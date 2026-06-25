@@ -1,9 +1,9 @@
 import type { CSSProperties } from "react";
 
 const PREVIEW_COLUMNS = [
-  { name: "Backlog", type: "backlog", count: 1 },
-  { name: "In Progress", type: "in_progress", count: 2 },
-  { name: "Done", type: "done", count: 0 },
+  { name: "Backlog", type: "backlog", count: 1, color: null },
+  { name: "In Progress", type: "in_progress", count: 2, color: "#6366f1" },
+  { name: "Done", type: "done", count: 0, color: null },
 ] as const;
 
 const PREVIEW_CARDS = [
@@ -21,35 +21,47 @@ export function BoardLayoutPreview() {
       >
         <div className="row-separator-wrap">
           <div className="row-separator-bar">
-            <span className="row-drag-handle preview-muted">⋮⋮</span>
-            <span className="row-separator-name preview-label">Preview row</span>
-            <span className="preview-chip">Sample layout</span>
+            <div className="row-separator-main">
+              <div className="row-separator-title">
+                <span className="row-drag-handle preview-muted">⋮⋮</span>
+                <span className="row-separator-name-wrap">
+                  <span className="row-separator-name preview-label">Preview row</span>
+                </span>
+              </div>
+              <span className="preview-chip">Shell + team color</span>
+            </div>
+            <div className="row-separator-search-span">
+              <div className="board-search">
+                <input type="search" readOnly tabIndex={-1} placeholder="Filter row…" />
+              </div>
+            </div>
           </div>
         </div>
 
         <div className="board-row-scroll">
-          <div
-            className="board-row-grid"
-            style={{ "--column-count": PREVIEW_COLUMNS.length } as CSSProperties}
-          >
+          <div className="board-row-columns">
             {PREVIEW_COLUMNS.map((column) => (
-              <div
-                key={column.name}
-                className={`column-label column-label-row column-label--${column.type}`}
-              >
-                <button type="button" className="label-btn" tabIndex={-1}>
-                  <span>{column.name}</span>
-                  <span className="count">{column.count}</span>
-                </button>
-              </div>
-            ))}
-
-            {PREVIEW_COLUMNS.map((column) => {
-              const cards = PREVIEW_CARDS.filter((card) => card.status === column.type);
-              return (
-                <div key={`${column.name}-cell`} className="column cell board-preview-cell">
+              <div key={column.name} className="board-column-stack">
+                <div
+                  className={`column-label column-label-row column-label--${column.type}${column.color ? " has-column-color" : ""}`}
+                  style={
+                    column.color
+                      ? ({ "--column-accent": column.color } as CSSProperties)
+                      : undefined
+                  }
+                >
+                  <div className="column-label-main">
+                    <div className="column-label-title">
+                      <span className="column-issue-count">{column.count}</span>
+                      <span className="column-label-name-wrap">
+                        <span className="column-label-name">{column.name}</span>
+                      </span>
+                    </div>
+                  </div>
+                </div>
+                <div className="column cell board-preview-cell">
                   <div className="column-body">
-                    {cards.map((card) => (
+                    {PREVIEW_CARDS.filter((card) => card.status === column.type).map((card) => (
                       <article key={card.id} className="issue-card board-preview-card">
                         <div className="issue-card-header">
                           <span className="issue-id">{card.identifier}</span>
@@ -57,13 +69,13 @@ export function BoardLayoutPreview() {
                         <h3 className="issue-card-title">{card.title}</h3>
                       </article>
                     ))}
-                    {cards.length === 0 && (
+                    {PREVIEW_CARDS.every((card) => card.status !== column.type) ? (
                       <div className="board-preview-empty">Empty column</div>
-                    )}
+                    ) : null}
                   </div>
                 </div>
-              );
-            })}
+              </div>
+            ))}
           </div>
         </div>
       </div>
