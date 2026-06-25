@@ -79,6 +79,18 @@ Include `data/uploads/` when backing up your server — attachments are not stor
 
 ## Roadmap
 
-- Paste images in comments and descriptions
-- Row-level attachments
-- Soft-delete bin (7-day retention)
+See **Plan → Filesystem — suggested build order** in the app for the full ordered backlog. Summary:
+
+1. Link row file to issue (no re-upload) — **done**
+2. Move attachment between issues (UI for existing API)
+3. Paste images in comments
+4. File soft-delete bin (7-day retention)
+5. Resume / cancel chunked uploads in UI
+6. File count badge on row **Files** button
+7. Cross-link indicators (also on row X / issue Y)
+8. Team-wide file area
+9. Folders / directory tree
+
+Also planned: paste images in descriptions.
+
+**Done:** issue uploads, row shared files drawer, chunked upload + seekable video (server).

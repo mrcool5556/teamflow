@@ -13,7 +13,7 @@ import {
   type IssueAttachmentPublic,
 } from "@teamflow/core";
 import { findRepoRoot, schema, type Db } from "@teamflow/db";
-import { eq, sql } from "drizzle-orm";
+import { eq, sql, and } from "drizzle-orm";
 
 const MB = 1024 * 1024;
 
@@ -304,6 +304,36 @@ export async function linkFileToIssue(
   issueId: string,
   fileId: string,
 ) {
+  const [existing] = await db
+    .select({
+      linkId: schema.issueFileLinks.id,
+      issueId: schema.issueFileLinks.issueId,
+      fileId: schema.storedFiles.id,
+      filename: schema.storedFiles.filename,
+      mimeType: schema.storedFiles.mimeType,
+      sizeBytes: schema.storedFiles.sizeBytes,
+      uploaderId: schema.storedFiles.uploaderId,
+      createdAt: schema.issueFileLinks.createdAt,
+      uploaderName: schema.users.name,
+    })
+    .from(schema.issueFileLinks)
+    .innerJoin(
+      schema.storedFiles,
+      eq(schema.storedFiles.id, schema.issueFileLinks.fileId),
+    )
+    .innerJoin(schema.users, eq(schema.users.id, schema.storedFiles.uploaderId))
+    .where(
+      and(
+        eq(schema.issueFileLinks.issueId, issueId),
+        eq(schema.issueFileLinks.fileId, fileId),
+      ),
+    )
+    .limit(1);
+
+  if (existing) {
+    return mapAttachmentPublic({ ...existing, rowId: null });
+  }
+
   const [file] = await db
     .select()
     .from(schema.storedFiles)

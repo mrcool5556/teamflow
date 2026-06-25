@@ -719,6 +719,16 @@ export class TeamflowClient {
     );
   }
 
+  linkIssueAttachment(issueId: string, fileId: string) {
+    return this.request<{ attachment: IssueAttachmentPublic }>(
+      `/issues/${issueId}/attachments/link`,
+      {
+        method: "POST",
+        body: JSON.stringify({ fileId }),
+      },
+    );
+  }
+
   listRowAttachments(rowId: string) {
     return this.request<{
       attachments: IssueAttachmentPublic[];
