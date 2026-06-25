@@ -737,7 +737,6 @@ function RowSeparatorBar({
             onGo={onGoToRef ? () => onGoToRef(row.key) : undefined}
           />
         </div>
-        <div className="row-separator-main-spacer" aria-hidden="true" />
         <div className="row-separator-tools">
           <div className="toolbar-users">
             <span className="toolbar-users-label">Users</span>
@@ -985,7 +984,8 @@ function SortableBoardRow({
         items={visibleStatuses.map((status) => columnDndId(row.id, status.id))}
         strategy={horizontalListSortingStrategy}
       >
-        <div className="board-row-columns">
+        <div className="board-row-scroll">
+          <div className="board-row-columns">
           {visibleStatuses.map((status) => {
             const cellIssues = filterCellIssues(status.id);
             const issueIds = cellIssues.map((issue) => issueDndId(issue.id));
@@ -1094,6 +1094,7 @@ function SortableBoardRow({
               </SortableColumn>
             );
           })}
+          </div>
         </div>
       </SortableContext>
     </div>

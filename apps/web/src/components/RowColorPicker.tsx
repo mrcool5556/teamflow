@@ -12,7 +12,7 @@ export function RowColorPicker({ color, onSelect }: RowColorPickerProps) {
       onSelect={onSelect}
       title="Row color"
       label="Color"
-      hint="Applies to this row bar and column headers."
+      hint="Tints the row header bar, filter field, and column header tops in this row."
     />
   );
 }

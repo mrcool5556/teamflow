@@ -15,7 +15,10 @@ const PREVIEW_CARDS = [
 export function BoardLayoutPreview() {
   return (
     <div className="board-stack board-layout-preview">
-      <div className="board-row has-row-color">
+      <div
+        className="board-row has-row-color"
+        style={{ "--row-accent": "#2dd4bf" } as CSSProperties}
+      >
         <div className="row-separator-wrap">
           <div className="row-separator-bar">
             <span className="row-drag-handle preview-muted">⋮⋮</span>
@@ -24,42 +27,44 @@ export function BoardLayoutPreview() {
           </div>
         </div>
 
-        <div
-          className="board-row-grid"
-          style={{ "--column-count": PREVIEW_COLUMNS.length } as CSSProperties}
-        >
-          {PREVIEW_COLUMNS.map((column) => (
-            <div
-              key={column.name}
-              className={`column-label column-label-row column-label--${column.type}`}
-            >
-              <button type="button" className="label-btn" tabIndex={-1}>
-                <span>{column.name}</span>
-                <span className="count">{column.count}</span>
-              </button>
-            </div>
-          ))}
-
-          {PREVIEW_COLUMNS.map((column) => {
-            const cards = PREVIEW_CARDS.filter((card) => card.status === column.type);
-            return (
-              <div key={`${column.name}-cell`} className="column cell board-preview-cell">
-                <div className="column-body">
-                  {cards.map((card) => (
-                    <article key={card.id} className="issue-card board-preview-card">
-                      <div className="issue-card-header">
-                        <span className="issue-id">{card.identifier}</span>
-                      </div>
-                      <h3 className="issue-card-title">{card.title}</h3>
-                    </article>
-                  ))}
-                  {cards.length === 0 && (
-                    <div className="board-preview-empty">Empty column</div>
-                  )}
-                </div>
+        <div className="board-row-scroll">
+          <div
+            className="board-row-grid"
+            style={{ "--column-count": PREVIEW_COLUMNS.length } as CSSProperties}
+          >
+            {PREVIEW_COLUMNS.map((column) => (
+              <div
+                key={column.name}
+                className={`column-label column-label-row column-label--${column.type}`}
+              >
+                <button type="button" className="label-btn" tabIndex={-1}>
+                  <span>{column.name}</span>
+                  <span className="count">{column.count}</span>
+                </button>
               </div>
-            );
-          })}
+            ))}
+
+            {PREVIEW_COLUMNS.map((column) => {
+              const cards = PREVIEW_CARDS.filter((card) => card.status === column.type);
+              return (
+                <div key={`${column.name}-cell`} className="column cell board-preview-cell">
+                  <div className="column-body">
+                    {cards.map((card) => (
+                      <article key={card.id} className="issue-card board-preview-card">
+                        <div className="issue-card-header">
+                          <span className="issue-id">{card.identifier}</span>
+                        </div>
+                        <h3 className="issue-card-title">{card.title}</h3>
+                      </article>
+                    ))}
+                    {cards.length === 0 && (
+                      <div className="board-preview-empty">Empty column</div>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
         </div>
       </div>
     </div>

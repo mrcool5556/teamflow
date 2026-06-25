@@ -63,12 +63,13 @@ function scrollIntoBoardView(
   target: Element | null,
   options: ScrollIntoViewOptions & ScrollRefOptions = {},
 ) {
+  if (!target) return;
   const { delayMs = 0, ...scrollOptions } = options;
   const run = () => {
-    target?.scrollIntoView({
+    target.scrollIntoView({
       behavior: "smooth",
-      block: "center",
-      inline: "center",
+      block: "nearest",
+      inline: "nearest",
       ...scrollOptions,
     });
   };
@@ -79,7 +80,7 @@ function scrollIntoBoardView(
 export function scrollToIssueRef(issueId: string, delayMs = 50) {
   scrollIntoBoardView(
     document.querySelector(`[data-issue-id="${CSS.escape(issueId)}"]`),
-    { delayMs },
+    { delayMs, inline: "center" },
   );
 }
 
@@ -89,7 +90,7 @@ export function scrollToColumnRef(columnKey: string, delayMs = 80) {
     const target =
       document.querySelector(`section.column.cell[data-column-key="${escaped}"]`) ??
       document.querySelector(`[data-column-key="${escaped}"]`);
-    scrollIntoBoardView(target);
+    scrollIntoBoardView(target, { inline: "center" });
   };
   if (delayMs > 0) window.setTimeout(run, delayMs);
   else run();
@@ -97,7 +98,9 @@ export function scrollToColumnRef(columnKey: string, delayMs = 80) {
 
 export function scrollToRowRef(rowId: string, delayMs = 0) {
   scrollIntoBoardView(
-    document.querySelector(`[data-row-id="${CSS.escape(rowId)}"]`),
+    document.querySelector(
+      `[data-row-id="${CSS.escape(rowId)}"] .row-separator-wrap`,
+    ) ?? document.querySelector(`[data-row-id="${CSS.escape(rowId)}"]`),
     { delayMs },
   );
 }
