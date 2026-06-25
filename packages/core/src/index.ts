@@ -7,12 +7,13 @@ export * from "./attachments.js";
 export * from "./priorities.js";
 export * from "./profile.js";
 export * from "./refs.js";
+export * from "./maintenance.js";
 export * from "./permissions.js";
 
 export const PRIORITIES = ["none", "low", "medium", "high", "urgent"] as const;
 export type Priority = (typeof PRIORITIES)[number];
 
-export const TEAM_ROLES = ["admin", "member", "viewer"] as const;
+export const TEAM_ROLES = ["owner", "admin", "member", "viewer"] as const;
 export type TeamRole = (typeof TEAM_ROLES)[number];
 
 export const TOKEN_SCOPES = ["read", "write"] as const;

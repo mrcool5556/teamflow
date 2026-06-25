@@ -22,6 +22,8 @@ import {
   updateStatusSchema,
   updateTeamDiscordSettingsSchema,
   updateDiscordBotSecretsSchema,
+  runMaintenanceBackupSchema,
+  runMaintenanceUpdateSchema,
   updateTeamMemberRoleSchema,
   updateTeamRoleSchema,
   userProfilePatchSchema,
@@ -139,6 +141,12 @@ import {
 } from "./lib/discordSecrets.js";
 import { assertBotConfigKey } from "./lib/secretsCrypto.js";
 import {
+  getMaintenanceJob,
+  getMaintenanceStatus,
+  runMaintenanceBackup,
+  runMaintenanceUpdate,
+} from "./lib/maintenance.js";
+import {
   getTeamPermissionsForUser,
   userHasTeamPermission,
 } from "./lib/permissions.js";
@@ -235,16 +243,16 @@ app.post("/auth/register", async (c) => {
   });
 
   await seedDefaultTeamRoles(db, teamId);
-  const adminRole = await getTeamRoleBySlug(db, teamId, "admin");
-  if (!adminRole) {
+  const ownerRole = await getTeamRoleBySlug(db, teamId, "owner");
+  if (!ownerRole) {
     return c.json({ error: "Failed to initialize team roles" }, 500);
   }
 
   await db.insert(schema.teamMembers).values({
     teamId,
     userId,
-    roleId: adminRole.id,
-    role: adminRole.slug,
+    roleId: ownerRole.id,
+    role: ownerRole.slug,
   });
 
   await createDefaultBoardRow(db, teamId);
@@ -801,7 +809,8 @@ app.patch("/teams/:teamId/members/:memberId", async (c) => {
       message === "Team access denied" ||
       message === "Member not found" ||
       message === "Role not found" ||
-      message === "Cannot remove the last admin"
+      message === "Cannot remove the last admin" ||
+      message === "Cannot remove the last owner"
         ? 403
         : 400;
     return c.json({ error: message }, status);
@@ -1137,6 +1146,92 @@ app.patch("/teams/:teamId/integrations/discord/secrets", async (c) => {
     const message = err instanceof Error ? err.message : "Failed to update Discord secrets";
     const status = message === "Permission denied" ? 403 : 400;
     return c.json({ error: message }, status);
+  }
+});
+
+app.get("/teams/:teamId/server/maintenance", async (c) => {
+  const result = await requireAuth(c);
+  if ("error" in result) return result.error;
+
+  const teamId = c.req.param("teamId");
+  if (!(await userHasTeamAccess(db, result.auth.userId, teamId))) {
+    return c.json({ error: "Team access denied" }, 403);
+  }
+  if (!(await userHasTeamPermission(db, result.auth.userId, teamId, "server.maintenance.view"))) {
+    return c.json({ error: "Permission denied" }, 403);
+  }
+
+  const status = await getMaintenanceStatus();
+  return c.json({ status });
+});
+
+app.get("/teams/:teamId/server/maintenance/job", async (c) => {
+  const result = await requireAuth(c);
+  if ("error" in result) return result.error;
+
+  const teamId = c.req.param("teamId");
+  if (!(await userHasTeamAccess(db, result.auth.userId, teamId))) {
+    return c.json({ error: "Team access denied" }, 403);
+  }
+  if (!(await userHasTeamPermission(db, result.auth.userId, teamId, "server.maintenance.view"))) {
+    return c.json({ error: "Permission denied" }, 403);
+  }
+
+  const job = await getMaintenanceJob();
+  return c.json({ job });
+});
+
+app.post("/teams/:teamId/server/maintenance/backup", async (c) => {
+  const result = await requireAuth(c);
+  if ("error" in result) return result.error;
+  requireWrite(result.auth);
+
+  const teamId = c.req.param("teamId");
+  if (!(await userHasTeamAccess(db, result.auth.userId, teamId))) {
+    return c.json({ error: "Team access denied" }, 403);
+  }
+  if (!(await userHasTeamPermission(db, result.auth.userId, teamId, "server.maintenance.run"))) {
+    return c.json({ error: "Permission denied" }, 403);
+  }
+
+  const body = runMaintenanceBackupSchema.safeParse(await c.req.json().catch(() => ({})));
+  if (!body.success) {
+    return c.json({ error: body.error.issues[0]?.message ?? "Invalid input" }, 400);
+  }
+
+  try {
+    const job = await runMaintenanceBackup(body.data);
+    return c.json({ job }, 202);
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "Failed to start backup";
+    return c.json({ error: message }, 400);
+  }
+});
+
+app.post("/teams/:teamId/server/maintenance/update", async (c) => {
+  const result = await requireAuth(c);
+  if ("error" in result) return result.error;
+  requireWrite(result.auth);
+
+  const teamId = c.req.param("teamId");
+  if (!(await userHasTeamAccess(db, result.auth.userId, teamId))) {
+    return c.json({ error: "Team access denied" }, 403);
+  }
+  if (!(await userHasTeamPermission(db, result.auth.userId, teamId, "server.maintenance.run"))) {
+    return c.json({ error: "Permission denied" }, 403);
+  }
+
+  const body = runMaintenanceUpdateSchema.safeParse(await c.req.json().catch(() => ({})));
+  if (!body.success) {
+    return c.json({ error: body.error.issues[0]?.message ?? "Invalid input" }, 400);
+  }
+
+  try {
+    const job = await runMaintenanceUpdate(body.data);
+    return c.json({ job }, 202);
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "Failed to start update";
+    return c.json({ error: message }, 400);
   }
 });
 

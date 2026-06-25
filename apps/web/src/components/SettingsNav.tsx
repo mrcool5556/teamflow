@@ -4,6 +4,7 @@ export type SettingsPanel =
   | "team"
   | "roles"
   | "integrations"
+  | "updates"
   | "tokens";
 
 type SettingsNavProps = {
@@ -12,6 +13,7 @@ type SettingsNavProps = {
   showTeam: boolean;
   showRoles: boolean;
   showIntegrations: boolean;
+  showUpdates: boolean;
 };
 
 const NAV_ITEMS: {
@@ -20,12 +22,14 @@ const NAV_ITEMS: {
   teamOnly?: boolean;
   roles?: boolean;
   integrations?: boolean;
+  updates?: boolean;
 }[] = [
   { id: "general", label: "General" },
   { id: "appearance", label: "Appearance" },
   { id: "team", label: "Team", teamOnly: true },
   { id: "roles", label: "Roles", teamOnly: true, roles: true },
   { id: "integrations", label: "Integrations", teamOnly: true, integrations: true },
+  { id: "updates", label: "Updates", teamOnly: true, updates: true },
   { id: "tokens", label: "API tokens" },
 ];
 
@@ -35,11 +39,13 @@ export function SettingsNav({
   showTeam,
   showRoles,
   showIntegrations,
+  showUpdates,
 }: SettingsNavProps) {
   const items = NAV_ITEMS.filter((item) => {
     if (item.teamOnly && !showTeam) return false;
     if (item.roles && !showRoles) return false;
     if (item.integrations && !showIntegrations) return false;
+    if (item.updates && !showUpdates) return false;
     return true;
   });
 

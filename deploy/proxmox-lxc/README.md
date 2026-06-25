@@ -26,7 +26,9 @@ On a dedicated Teamflow LXC, after `install.sh` you can run:
 sudo update
 ```
 
-That stops the service, backs up the database, `git pull`s, builds, runs migrations, and restarts.
+That stops the service, backs up the **database** (not uploads — those stay on disk), `git pull`s, builds, runs migrations, and restarts.
+
+Uploads are unchanged during an update. For a full backup including files, run `sudo teamflow-backup` (or `sudo update --backup-full`).
 
 Same script is also available as `teamflow-update`:
 
@@ -34,6 +36,7 @@ Same script is also available as `teamflow-update`:
 sudo teamflow-update
 sudo teamflow-update --branch main
 sudo teamflow-update --skip-backup   # not recommended
+sudo teamflow-update --backup-full # include uploads (slow)
 ```
 
 If you installed before `update` existed, install the command once:
@@ -44,7 +47,16 @@ sudo install -m 755 /opt/teamflow/deploy/proxmox-lxc/backup.sh /usr/local/bin/te
 sudo ln -sf teamflow-update /usr/local/bin/update
 ```
 
-Manual backup anytime: `sudo teamflow-backup`
+Manual backup anytime: `sudo teamflow-backup` (DB + uploads) or `sudo teamflow-backup --db-only`
+
+**In-app updates (Settings → Updates):** enable `TEAMFLOW_MAINTENANCE_ENABLED=true` in `.env` and grant the **Owner** role. The API runs the same scripts via passwordless sudo:
+
+```bash
+cat >/etc/sudoers.d/teamflow-maintenance <<'EOF'
+teamflow ALL=(root) NOPASSWD: /opt/teamflow/deploy/proxmox-lxc/backup.sh, /opt/teamflow/deploy/proxmox-lxc/update.sh
+EOF
+chmod 440 /etc/sudoers.d/teamflow-maintenance
+```
 
 **Requires a git clone** at `/opt/teamflow` (not a snapshot copy without `.git`).
 

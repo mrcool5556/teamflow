@@ -3,7 +3,7 @@ import type { Db } from "@teamflow/db";
 import { schema } from "@teamflow/db";
 import { userHasTeamAccess } from "./issues.js";
 import { userHasTeamPermission } from "./permissions.js";
-import { countTeamAdmins } from "./roles.js";
+import { countTeamAdmins, countTeamOwners } from "./roles.js";
 
 async function getTeamMemberRowWithRole(db: Db, teamId: string, memberId: string) {
   const [member] = await db
@@ -50,6 +50,13 @@ async function assertCanRemoveMember(
     const adminCount = await countTeamAdmins(db, teamId);
     if (adminCount <= 1) {
       throw new Error("Cannot remove the last admin");
+    }
+  }
+
+  if (targetMember.roleSlug === "owner") {
+    const ownerCount = await countTeamOwners(db, teamId);
+    if (ownerCount <= 1) {
+      throw new Error("Cannot remove the last owner");
     }
   }
 }

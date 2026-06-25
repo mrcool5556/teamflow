@@ -35,6 +35,19 @@ async function seed() {
     issueCounter: 3,
   });
 
+  const ownerPermissions = JSON.stringify([
+    "team.members.view",
+    "team.members.manage",
+    "team.invites.manage",
+    "team.roles.view",
+    "team.roles.manage",
+    "team.delete",
+    "integrations.discord.view",
+    "integrations.discord.manage",
+    "integrations.discord.secrets",
+    "server.maintenance.view",
+    "server.maintenance.run",
+  ]);
   const adminPermissions = JSON.stringify([
     "team.members.view",
     "team.members.manage",
@@ -47,11 +60,21 @@ async function seed() {
     "integrations.discord.secrets",
   ]);
   const memberPermissions = JSON.stringify(["team.members.view"]);
+  const ownerRoleId = crypto.randomUUID();
   const adminRoleId = crypto.randomUUID();
   const memberRoleId = crypto.randomUUID();
   const viewerRoleId = crypto.randomUUID();
 
   await db.insert(schema.teamRoles).values([
+    {
+      id: ownerRoleId,
+      teamId,
+      name: "Owner",
+      slug: "owner",
+      permissions: ownerPermissions,
+      isSystem: 1,
+      position: 0,
+    },
     {
       id: adminRoleId,
       teamId,
@@ -59,7 +82,7 @@ async function seed() {
       slug: "admin",
       permissions: adminPermissions,
       isSystem: 1,
-      position: 0,
+      position: 1,
     },
     {
       id: memberRoleId,
@@ -68,7 +91,7 @@ async function seed() {
       slug: "member",
       permissions: memberPermissions,
       isSystem: 1,
-      position: 1,
+      position: 2,
     },
     {
       id: viewerRoleId,
@@ -77,15 +100,15 @@ async function seed() {
       slug: "viewer",
       permissions: memberPermissions,
       isSystem: 1,
-      position: 2,
+      position: 3,
     },
   ]);
 
   await db.insert(schema.teamMembers).values({
     teamId,
     userId,
-    roleId: adminRoleId,
-    role: "admin",
+    roleId: ownerRoleId,
+    role: "owner",
   });
 
   const rowId = crypto.randomUUID();

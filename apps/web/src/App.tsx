@@ -42,6 +42,7 @@ import { AdvancedProfileSettingsSection } from "./components/AdvancedProfileSett
 import { AppearanceSettingsSection } from "./components/AppearanceSettingsSection";
 import { IntegrationsSettingsSection } from "./components/IntegrationsSettingsSection";
 import { RolesSettingsSection } from "./components/RolesSettingsSection";
+import { ServerMaintenanceSettingsSection } from "./components/ServerMaintenanceSettingsSection";
 import { SettingsNav, type SettingsPanel } from "./components/SettingsNav";
 import { TeamSettingsSection } from "./components/TeamSettingsSection";
 import { UndoToast } from "./components/UndoToast";
@@ -133,7 +134,7 @@ export function App() {
   const effectiveTeamPermissions =
     teamPermissions ??
     (currentMember &&
-    ["admin", "member", "viewer"].includes(currentMember.roleSlug)
+    ["owner", "admin", "member", "viewer"].includes(currentMember.roleSlug)
       ? {
           roleId: currentMember.roleId,
           roleName: currentMember.roleName,
@@ -154,6 +155,14 @@ export function App() {
   const canManageDiscordSecrets = hasTeamPermission(
     effectiveTeamPermissions,
     "integrations.discord.secrets",
+  );
+  const showMaintenance = hasTeamPermission(
+    effectiveTeamPermissions,
+    "server.maintenance.view",
+  );
+  const canRunMaintenance = hasTeamPermission(
+    effectiveTeamPermissions,
+    "server.maintenance.run",
   );
   const currentTeam = teams.find((team) => team.id === teamId) ?? null;
 
@@ -1415,6 +1424,7 @@ export function App() {
                 showTeam={Boolean(teamId)}
                 showRoles={showRoles}
                 showIntegrations={showIntegrations}
+                showUpdates={showMaintenance}
               />
               <div className="settings-main">
                 {settingsPanel === "general" ? (
@@ -1502,6 +1512,14 @@ export function App() {
                     teamKey={currentTeam.key}
                     canManageDiscord={canManageDiscord}
                     canManageSecrets={canManageDiscordSecrets}
+                    onMessage={setProfileMessage}
+                  />
+                ) : null}
+
+                {settingsPanel === "updates" && teamId && currentTeam && showMaintenance ? (
+                  <ServerMaintenanceSettingsSection
+                    teamId={teamId}
+                    canRun={canRunMaintenance}
                     onMessage={setProfileMessage}
                   />
                 ) : null}
