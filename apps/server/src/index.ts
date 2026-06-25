@@ -108,6 +108,7 @@ import {
   linkFileToRow,
   listIssueAttachments,
   listRowAttachments,
+  listTeamFiles,
   moveIssueAttachment,
   saveIssueAttachment,
   saveRowAttachment,
@@ -1204,6 +1205,20 @@ app.get("/teams/:teamId/resolve", async (c) => {
   }
 
   return c.json(match);
+});
+
+app.get("/teams/:teamId/files", async (c) => {
+  const result = await requireAuth(c);
+  if ("error" in result) return result.error;
+
+  const teamId = c.req.param("teamId");
+  if (!(await userHasTeamAccess(db, result.auth.userId, teamId))) {
+    return c.json({ error: "Team access denied" }, 403);
+  }
+
+  const files = await listTeamFiles(db, teamId);
+  const totalBytes = files.reduce((sum, file) => sum + file.sizeBytes, 0);
+  return c.json({ files, totalBytes, fileCount: files.length });
 });
 
 app.post("/teams/:teamId/rows", async (c) => {

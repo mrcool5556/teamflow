@@ -24,6 +24,7 @@ import type {
   TeamInvitePreview,
   TeamInvitePublic,
   TeamDiscordSettingsPublic,
+  TeamFilePublic,
   UpdateTeamDiscordSettingsInput,
   DiscordGuildConfigPublic,
   DiscordBotSecretsPublic,
@@ -743,6 +744,14 @@ export class TeamflowClient {
       attachments: IssueAttachmentPublic[];
       limits: AttachmentLimitsPublic;
     }>(`/rows/${rowId}/attachments`);
+  }
+
+  listTeamFiles(teamId: string) {
+    return this.request<{
+      files: TeamFilePublic[];
+      totalBytes: number;
+      fileCount: number;
+    }>(`/teams/${teamId}/files`);
   }
 
   uploadRowAttachment(

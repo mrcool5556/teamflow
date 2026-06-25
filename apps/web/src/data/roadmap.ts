@@ -136,9 +136,9 @@ export const ROADMAP_FILESYSTEM_ORDER: RoadmapItem[] = [
   {
     id: "fs-team-area",
     title: "Team-wide file area",
-    status: "planned",
+    status: "partial",
     priority: 8,
-    notes: "Shared files at team scope, not only per issue or row.",
+    notes: "Files toolbar drawer lists all team uploads with search, size sort, and reference links.",
     tags: ["files"],
   },
   {

@@ -11,7 +11,9 @@ import {
   isStreamableAttachmentFile,
   maxBytesForAttachmentFile,
   type AttachmentLimitsPublic,
+  type FileLinkReferencePublic,
   type IssueAttachmentPublic,
+  type TeamFilePublic,
 } from "@teamflow/core";
 import { findRepoRoot, schema, type Db } from "@teamflow/db";
 import { eq, sql, and } from "drizzle-orm";
@@ -782,4 +784,128 @@ export async function getFileTeamId(db: Db, fileId: string) {
     .where(eq(schema.rowFileLinks.fileId, fileId))
     .limit(1);
   return rowLink?.teamId ?? null;
+}
+
+export async function listTeamFiles(db: Db, teamId: string): Promise<TeamFilePublic[]> {
+  const [team] = await db
+    .select({ key: schema.teams.key })
+    .from(schema.teams)
+    .where(eq(schema.teams.id, teamId))
+    .limit(1);
+
+  if (!team) return [];
+
+  const issueLinks = await db
+    .select({
+      fileId: schema.storedFiles.id,
+      fileRef: schema.storedFiles.key,
+      filename: schema.storedFiles.filename,
+      mimeType: schema.storedFiles.mimeType,
+      sizeBytes: schema.storedFiles.sizeBytes,
+      uploaderId: schema.storedFiles.uploaderId,
+      uploaderName: schema.users.name,
+      fileCreatedAt: schema.storedFiles.createdAt,
+      linkId: schema.issueFileLinks.id,
+      issueNumber: schema.issues.number,
+      issueTitle: schema.issues.title,
+    })
+    .from(schema.issueFileLinks)
+    .innerJoin(schema.issues, eq(schema.issues.id, schema.issueFileLinks.issueId))
+    .innerJoin(
+      schema.storedFiles,
+      eq(schema.storedFiles.id, schema.issueFileLinks.fileId),
+    )
+    .innerJoin(schema.users, eq(schema.users.id, schema.storedFiles.uploaderId))
+    .where(eq(schema.issues.teamId, teamId));
+
+  const rowLinks = await db
+    .select({
+      fileId: schema.storedFiles.id,
+      fileRef: schema.storedFiles.key,
+      filename: schema.storedFiles.filename,
+      mimeType: schema.storedFiles.mimeType,
+      sizeBytes: schema.storedFiles.sizeBytes,
+      uploaderId: schema.storedFiles.uploaderId,
+      uploaderName: schema.users.name,
+      fileCreatedAt: schema.storedFiles.createdAt,
+      linkId: schema.rowFileLinks.id,
+      rowKey: schema.boardRows.key,
+      rowName: schema.boardRows.name,
+    })
+    .from(schema.rowFileLinks)
+    .innerJoin(schema.boardRows, eq(schema.boardRows.id, schema.rowFileLinks.rowId))
+    .innerJoin(
+      schema.storedFiles,
+      eq(schema.storedFiles.id, schema.rowFileLinks.fileId),
+    )
+    .innerJoin(schema.users, eq(schema.users.id, schema.storedFiles.uploaderId))
+    .where(eq(schema.boardRows.teamId, teamId));
+
+  const byFile = new Map<
+    string,
+    {
+      file: Omit<TeamFilePublic, "references" | "linkCount">;
+      references: FileLinkReferencePublic[];
+    }
+  >();
+
+  for (const row of issueLinks) {
+    const ref = `${team.key}-${row.issueNumber}`;
+    const entry = byFile.get(row.fileId) ?? {
+      file: {
+        fileId: row.fileId,
+        fileRef: row.fileRef,
+        filename: row.filename,
+        mimeType: row.mimeType,
+        sizeBytes: row.sizeBytes,
+        kind: attachmentFileKind(row.filename, row.mimeType),
+        uploaderId: row.uploaderId,
+        uploaderName: row.uploaderName,
+        createdAt: row.fileCreatedAt,
+      },
+      references: [],
+    };
+    entry.references.push({
+      kind: "issue",
+      linkId: row.linkId,
+      ref,
+      name: row.issueTitle,
+    });
+    byFile.set(row.fileId, entry);
+  }
+
+  for (const row of rowLinks) {
+    const entry = byFile.get(row.fileId) ?? {
+      file: {
+        fileId: row.fileId,
+        fileRef: row.fileRef,
+        filename: row.filename,
+        mimeType: row.mimeType,
+        sizeBytes: row.sizeBytes,
+        kind: attachmentFileKind(row.filename, row.mimeType),
+        uploaderId: row.uploaderId,
+        uploaderName: row.uploaderName,
+        createdAt: row.fileCreatedAt,
+      },
+      references: [],
+    };
+    entry.references.push({
+      kind: "row",
+      linkId: row.linkId,
+      ref: row.rowKey,
+      name: row.rowName,
+    });
+    byFile.set(row.fileId, entry);
+  }
+
+  return [...byFile.values()]
+    .map(({ file, references }) => ({
+      ...file,
+      linkCount: references.length,
+      references: references.sort((a, b) => a.ref.localeCompare(b.ref)),
+    }))
+    .sort((a, b) => {
+      if (b.sizeBytes !== a.sizeBytes) return b.sizeBytes - a.sizeBytes;
+      return a.filename.localeCompare(b.filename);
+    });
 }
