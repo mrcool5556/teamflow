@@ -16,6 +16,7 @@ import { IssueTimer } from "./IssueTimer";
 import { DescriptionEditor } from "./DescriptionEditor";
 import { MultiAssigneePicker } from "./MultiAssigneePicker";
 import { BoardColorPicker } from "./BoardColorPicker";
+import { FileRefCopyButton } from "./FileRefCopyButton";
 import { RefCopyButton } from "./RefCopyButton";
 import { RichText } from "./RichText";
 import { LinkPasteOffer } from "./LinkPasteOffer";
@@ -617,11 +618,13 @@ export function IssueDrawer({
                       {attachment.filename}
                     </button>
                     <span className="issue-attachment-meta muted">
-                      {formatFileSize(attachment.sizeBytes)} · {attachment.uploaderName} ·{" "}
-                      {formatTimestamp(attachment.createdAt)}
+                      {attachment.fileRef} · {formatFileSize(attachment.sizeBytes)} ·{" "}
+                      {attachment.uploaderName} · {formatTimestamp(attachment.createdAt)}
                     </span>
                   </div>
-                  <button
+                  <div className="issue-attachment-actions">
+                    <FileRefCopyButton fileRef={attachment.fileRef} filename={attachment.filename} />
+                    <button
                     type="button"
                     className="ghost issue-attachment-delete"
                     disabled={deletingAttachmentId === attachment.id}
@@ -631,12 +634,14 @@ export function IssueDrawer({
                   >
                     {deletingAttachmentId === attachment.id ? "…" : "Remove"}
                   </button>
+                  </div>
                 </li>
               ))}
             </ul>
           )}
 
           <LinkRowFilePanel
+            teamId={issue.teamId}
             issueId={issue.id}
             row={issueRow}
             linkedFileIds={linkedFileIds}

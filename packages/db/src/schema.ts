@@ -370,6 +370,7 @@ export const storedFiles = sqliteTable("stored_files", {
   mimeType: text("mime_type").notNull(),
   sizeBytes: integer("size_bytes").notNull(),
   storagePath: text("storage_path").notNull(),
+  key: text("key").notNull().unique(),
   createdAt: text("created_at")
     .notNull()
     .default(sql`(datetime('now'))`),

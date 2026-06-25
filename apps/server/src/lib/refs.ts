@@ -1,6 +1,7 @@
 import { and, eq } from "drizzle-orm";
 import {
   COLUMN_REF_PATTERN,
+  FILE_REF_PATTERN,
   ROW_REF_PATTERN,
   parseIssueRef,
   type ResolvedRef,
@@ -9,6 +10,7 @@ import type { Db } from "@teamflow/db";
 import { schema } from "@teamflow/db";
 import { getTeamKey, mapIssue } from "./issues.js";
 import { mapBoardRow, mapIssueStatus } from "./board.js";
+import { getStoredFileByRef } from "./attachments.js";
 
 export async function resolveTeamRef(
   db: Db,
@@ -90,6 +92,19 @@ export async function resolveTeamRef(
     };
   }
 
+  if (FILE_REF_PATTERN.test(ref)) {
+    const file = await getStoredFileByRef(db, teamId, ref);
+    if (!file) return null;
+
+    return {
+      type: "file",
+      ref: file.key,
+      fileId: file.id,
+      fileRef: file.key,
+      filename: file.filename,
+    };
+  }
+
   return null;
 }
 
@@ -100,6 +115,21 @@ export async function resolveTeamRefDetailed(
 ) {
   const resolved = await resolveTeamRef(db, teamId, rawRef);
   if (!resolved) return null;
+
+  if (resolved.type === "file") {
+    const file = await getStoredFileByRef(db, teamId, resolved.fileRef);
+    if (!file) return null;
+    return {
+      resolved,
+      file: {
+        fileId: file.id,
+        fileRef: file.key,
+        filename: file.filename,
+        mimeType: file.mimeType,
+        sizeBytes: file.sizeBytes,
+      },
+    };
+  }
 
   if (resolved.type === "issue") {
     const [issue] = await db

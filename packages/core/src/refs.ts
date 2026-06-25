@@ -11,10 +11,11 @@ export const ISSUE_REF_PATTERN = new RegExp(
 );
 export const ROW_REF_PATTERN = /^row_[a-z0-9]{8}$/;
 export const COLUMN_REF_PATTERN = /^col_[a-z0-9]{8}$/;
+export const FILE_REF_PATTERN = /^file_[a-z0-9]{8}$/;
 
-/** Matches issue, row, and column refs embedded in plain text. */
+/** Matches issue, row, column, and file refs embedded in plain text. */
 export const REF_TOKEN_PATTERN = new RegExp(
-  `(${TEAM_KEY_IN_REF}-\\d+|row_[a-z0-9]{8}|col_[a-z0-9]{8})`,
+  `(${TEAM_KEY_IN_REF}-\\d+|row_[a-z0-9]{8}|col_[a-z0-9]{8}|file_[a-z0-9]{8})`,
   "gi",
 );
 
@@ -23,7 +24,8 @@ export function isTeamflowRef(value: string) {
   return (
     ISSUE_REF_PATTERN.test(ref) ||
     ROW_REF_PATTERN.test(ref) ||
-    COLUMN_REF_PATTERN.test(ref)
+    COLUMN_REF_PATTERN.test(ref) ||
+    FILE_REF_PATTERN.test(ref)
   );
 }
 
@@ -51,7 +53,7 @@ export function splitRefText(text: string): RefTextSegment[] {
 
   const segments: RefTextSegment[] = [];
   const pattern = new RegExp(
-    `https?:\\/\\/\\S*?[?&]ref=(${TEAM_KEY_IN_REF}-\\d+|row_[a-z0-9]{8}|col_[a-z0-9]{8})\\S*|(${TEAM_KEY_IN_REF}-\\d+|row_[a-z0-9]{8}|col_[a-z0-9]{8})`,
+    `https?:\\/\\/\\S*?[?&]ref=(${TEAM_KEY_IN_REF}-\\d+|row_[a-z0-9]{8}|col_[a-z0-9]{8}|file_[a-z0-9]{8})\\S*|(${TEAM_KEY_IN_REF}-\\d+|row_[a-z0-9]{8}|col_[a-z0-9]{8}|file_[a-z0-9]{8})`,
     "gi",
   );
 
@@ -73,7 +75,7 @@ export function splitRefText(text: string): RefTextSegment[] {
   return segments;
 }
 
-export function generateEntityKey(prefix: "row" | "col") {
+export function generateEntityKey(prefix: "row" | "col" | "file") {
   let suffix = "";
   for (let i = 0; i < 8; i++) {
     suffix += KEY_CHARS[Math.floor(Math.random() * KEY_CHARS.length)]!;
@@ -120,4 +122,16 @@ export type ResolvedColumnRef = {
   rowName: string;
 };
 
-export type ResolvedRef = ResolvedIssueRef | ResolvedRowRef | ResolvedColumnRef;
+export type ResolvedFileRef = {
+  type: "file";
+  ref: string;
+  fileId: string;
+  fileRef: string;
+  filename: string;
+};
+
+export type ResolvedRef =
+  | ResolvedIssueRef
+  | ResolvedRowRef
+  | ResolvedColumnRef
+  | ResolvedFileRef;

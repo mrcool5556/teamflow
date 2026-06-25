@@ -3497,14 +3497,16 @@ select {
   background: color-mix(in srgb, var(--cell) 70%, var(--panel));
 }
 
-.issue-link-row-files-head {
-  margin: 0 0 0.5rem;
-  font-size: 0.78rem;
-  color: var(--text-soft);
+.issue-link-row-files-toolbar {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  margin-bottom: 0.65rem;
 }
 
-.issue-link-row-files-head strong {
-  color: var(--text);
+.issue-link-row-files-hint {
+  margin: 0;
+  font-size: 0.74rem;
 }
 
 .issue-link-row-files-empty {
@@ -3512,49 +3514,179 @@ select {
   font-size: 0.78rem;
 }
 
-.issue-link-row-files-list {
+.issue-link-row-files-error {
+  margin: 0.45rem 0 0;
+  font-size: 0.74rem;
+  color: var(--danger);
+}
+
+.link-from-file-ref {
+  display: grid;
+  gap: 0.35rem;
+}
+
+.link-from-file-ref-label {
+  font-size: 0.72rem;
+  color: var(--text-soft);
+}
+
+.link-from-file-ref-row {
+  display: flex;
+  gap: 0.35rem;
+}
+
+.link-from-file-ref-row input {
+  flex: 1;
+  min-width: 0;
+  font-size: 0.78rem;
+  padding: 0.35rem 0.45rem;
+}
+
+.link-from-file-ref-error {
+  margin: 0;
+  font-size: 0.72rem;
+  color: var(--danger);
+}
+
+.shared-file-browser-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 380;
+  background: rgba(0, 0, 0, 0.55);
+  display: grid;
+  place-items: center;
+  padding: 1rem;
+}
+
+.shared-file-browser {
+  width: min(560px, 100%);
+  max-height: min(78vh, 720px);
+  display: flex;
+  flex-direction: column;
+  background: var(--panel);
+  border: var(--chrome-frame-border-width) solid var(--border-strong);
+  box-shadow: var(--chrome-modal-shadow);
+}
+
+.shared-file-browser-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 0.75rem;
+  padding: 0.85rem 1rem;
+  border-bottom: 1px solid var(--border);
+}
+
+.shared-file-browser-header h3 {
+  margin: 0;
+  font-size: 0.95rem;
+}
+
+.shared-file-browser-header p {
+  margin: 0.2rem 0 0;
+  font-size: 0.74rem;
+}
+
+.shared-file-browser-search {
+  padding: 0.65rem 1rem 0;
+}
+
+.shared-file-browser-search input {
+  width: 100%;
+  font-size: 0.82rem;
+}
+
+.shared-file-browser-body {
+  padding: 0.65rem 1rem 1rem;
+  overflow: auto;
+}
+
+.shared-file-browser-list {
   list-style: none;
   margin: 0;
   padding: 0;
   display: flex;
   flex-direction: column;
-  gap: 0.35rem;
+  gap: 0.4rem;
 }
 
-.issue-link-row-files-item {
+.shared-file-browser-item {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 0.5rem;
-  padding: 0.35rem 0.4rem;
+  padding: 0.45rem 0.5rem;
   border: 1px solid var(--border);
   border-radius: var(--radius-xs);
-  background: var(--panel);
+  background: var(--surface);
 }
 
-.issue-link-row-files-meta {
+.shared-file-browser-meta {
+  min-width: 0;
   display: flex;
   flex-direction: column;
   gap: 0.1rem;
-  min-width: 0;
 }
 
-.issue-link-row-files-name {
-  font-size: 0.78rem;
+.shared-file-browser-name {
+  font-size: 0.8rem;
   font-weight: 600;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.issue-link-row-files-meta .muted {
+.shared-file-browser-sub {
   font-size: 0.68rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
-.issue-link-row-files-error {
-  margin: 0.45rem 0 0;
-  font-size: 0.74rem;
-  color: var(--danger);
+.shared-file-browser-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+  flex-shrink: 0;
+}
+
+.file-ref-copy-btn {
+  font-size: 0.66rem;
+  padding: 0.15rem 0.35rem;
+  background: var(--bg);
+  color: var(--text-soft);
+  border: 1px solid var(--border);
+  box-shadow: none;
+}
+
+.file-ref-copy-btn.compact {
+  white-space: nowrap;
+}
+
+.file-ref-copy-btn:hover {
+  color: var(--text);
+  border-color: var(--accent);
+}
+
+.file-ref-copy-btn.copied {
+  color: var(--done);
+  border-color: var(--done);
+}
+
+.row-files-search {
+  margin-bottom: 0.65rem;
+}
+
+.row-files-search input {
+  width: 100%;
+  font-size: 0.8rem;
+}
+
+.issue-attachment-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  flex-shrink: 0;
 }
 
 button.secondary.compact {

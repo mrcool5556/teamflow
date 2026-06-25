@@ -432,6 +432,7 @@ export type IssueAttachmentPublic = {
   issueId: string | null;
   rowId?: string | null;
   fileId: string;
+  fileRef: string;
   filename: string;
   mimeType: string;
   sizeBytes: number;
