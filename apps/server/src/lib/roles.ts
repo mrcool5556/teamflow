@@ -201,6 +201,14 @@ function validateRolePermissions(role: typeof schema.teamRoles.$inferSelect, per
   if (role.slug === "admin" && !permissions.includes("team.roles.manage")) {
     throw new Error("The Admin role must keep team.roles.manage permission");
   }
+  if (role.slug === "owner") {
+    if (!permissions.includes("server.maintenance.view")) {
+      throw new Error("The Owner role must keep server.maintenance.view permission");
+    }
+    if (!permissions.includes("server.maintenance.run")) {
+      throw new Error("The Owner role must keep server.maintenance.run permission");
+    }
+  }
 }
 
 export async function updateTeamRole(
@@ -279,6 +287,15 @@ export async function countTeamAdmins(db: Db, teamId: string) {
   return Number(row?.count ?? 0);
 }
 
+export async function countTeamOwners(db: Db, teamId: string) {
+  const [row] = await db
+    .select({ count: sql<number>`count(*)` })
+    .from(schema.teamMembers)
+    .innerJoin(schema.teamRoles, eq(schema.teamMembers.roleId, schema.teamRoles.id))
+    .where(and(eq(schema.teamMembers.teamId, teamId), eq(schema.teamRoles.slug, "owner")));
+  return Number(row?.count ?? 0);
+}
+
 export async function updateTeamMemberRole(
   db: Db,
   teamId: string,
@@ -309,6 +326,13 @@ export async function updateTeamMemberRole(
     const adminCount = await countTeamAdmins(db, teamId);
     if (adminCount <= 1) {
       throw new Error("Cannot remove the last admin");
+    }
+  }
+
+  if (member.roleSlug === "owner" && nextRole.slug !== "owner") {
+    const ownerCount = await countTeamOwners(db, teamId);
+    if (ownerCount <= 1) {
+      throw new Error("Cannot remove the last owner");
     }
   }
 

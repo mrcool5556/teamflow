@@ -408,6 +408,24 @@ function ensureTeamRolesTable(sqlite: Database.Database) {
 
   const defaultRoles = [
     {
+      slug: "owner",
+      name: "Owner",
+      permissions: JSON.stringify([
+        "team.members.view",
+        "team.members.manage",
+        "team.invites.manage",
+        "team.roles.view",
+        "team.roles.manage",
+        "team.delete",
+        "integrations.discord.view",
+        "integrations.discord.manage",
+        "integrations.discord.secrets",
+        "server.maintenance.view",
+        "server.maintenance.run",
+      ]),
+      position: 0,
+    },
+    {
       slug: "admin",
       name: "Admin",
       permissions: JSON.stringify([
@@ -421,19 +439,19 @@ function ensureTeamRolesTable(sqlite: Database.Database) {
         "integrations.discord.manage",
         "integrations.discord.secrets",
       ]),
-      position: 0,
+      position: 1,
     },
     {
       slug: "member",
       name: "Member",
       permissions: JSON.stringify(["team.members.view"]),
-      position: 1,
+      position: 2,
     },
     {
       slug: "viewer",
       name: "Viewer",
       permissions: JSON.stringify(["team.members.view"]),
-      position: 2,
+      position: 3,
     },
   ] as const;
 
@@ -857,5 +875,54 @@ function migrateStatusesToRows(sqlite: Database.Database) {
         );
     }
     console.log(`Seeded default columns for row ${row.id}`);
+  }
+
+  const ownerPermissions = JSON.stringify([
+    "team.members.view",
+    "team.members.manage",
+    "team.invites.manage",
+    "team.roles.view",
+    "team.roles.manage",
+    "team.delete",
+    "integrations.discord.view",
+    "integrations.discord.manage",
+    "integrations.discord.secrets",
+    "server.maintenance.view",
+    "server.maintenance.run",
+  ]);
+
+  const ownerTeams = sqlite.prepare("SELECT id FROM teams").all() as { id: string }[];
+  const findRoleBySlug = sqlite.prepare(
+    "SELECT id FROM team_roles WHERE team_id = ? AND slug = ? LIMIT 1",
+  );
+  const insertOwnerRole = sqlite.prepare(`
+    INSERT INTO team_roles (id, team_id, name, slug, permissions, is_system, position, updated_at)
+    VALUES (?, ?, 'Owner', 'owner', ?, 1, 0, datetime('now'))
+  `);
+  const bumpRolePositions = sqlite.prepare(
+    "UPDATE team_roles SET position = position + 1 WHERE team_id = ?",
+  );
+  const promoteFirstAdmin = sqlite.prepare(`
+    UPDATE team_members
+    SET role_id = ?, role = 'owner'
+    WHERE id = (
+      SELECT tm.id
+      FROM team_members tm
+      INNER JOIN team_roles tr ON tr.id = tm.role_id
+      WHERE tm.team_id = ? AND tr.slug = 'admin'
+      ORDER BY tm.created_at ASC
+      LIMIT 1
+    )
+  `);
+
+  for (const team of ownerTeams) {
+    const existingOwner = findRoleBySlug.get(team.id, "owner") as { id: string } | undefined;
+    if (existingOwner) continue;
+
+    bumpRolePositions.run(team.id);
+    const ownerRoleId = randomUUID();
+    insertOwnerRole.run(ownerRoleId, team.id, ownerPermissions);
+    promoteFirstAdmin.run(ownerRoleId, team.id);
+    console.log(`Seeded owner role for team ${team.id}`);
   }
 }

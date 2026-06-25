@@ -1,0 +1,305 @@
+import { randomUUID } from "node:crypto";
+import { spawn } from "node:child_process";
+import { existsSync } from "node:fs";
+import fs from "node:fs/promises";
+import path from "node:path";
+import type {
+  MaintenanceBackupPublic,
+  MaintenanceJobPublic,
+  MaintenanceStatusPublic,
+  RunMaintenanceBackupInput,
+  RunMaintenanceUpdateInput,
+} from "@teamflow/core";
+import { findRepoRoot } from "@teamflow/db";
+
+const JOB_FILE = "maintenance-job.json";
+const LOG_FILE = "maintenance.log";
+const LOG_TAIL_BYTES = 12_000;
+
+function getAppDir() {
+  const configured = process.env.TEAMFLOW_APP_DIR?.trim();
+  if (configured) {
+    return path.isAbsolute(configured) ? configured : path.resolve(findRepoRoot(), configured);
+  }
+  return findRepoRoot();
+}
+
+function getDataDir() {
+  return path.join(getAppDir(), "data");
+}
+
+function isMaintenanceEnabled() {
+  return process.env.TEAMFLOW_MAINTENANCE_ENABLED === "true";
+}
+
+function getBackupDir() {
+  const configured = process.env.TEAMFLOW_BACKUP_DIR?.trim();
+  if (configured) {
+    return path.isAbsolute(configured) ? configured : path.resolve(getAppDir(), configured);
+  }
+  return "/var/backups/teamflow";
+}
+
+function getBackupScript() {
+  const configured = process.env.TEAMFLOW_BACKUP_SCRIPT?.trim();
+  if (configured) {
+    return path.isAbsolute(configured) ? configured : path.resolve(getAppDir(), configured);
+  }
+  return path.join(getAppDir(), "deploy", "proxmox-lxc", "backup.sh");
+}
+
+function getUpdateScript() {
+  const configured = process.env.TEAMFLOW_UPDATE_SCRIPT?.trim();
+  if (configured) {
+    return path.isAbsolute(configured) ? configured : path.resolve(getAppDir(), configured);
+  }
+  return path.join(getAppDir(), "deploy", "proxmox-lxc", "update.sh");
+}
+
+function useSudo() {
+  return process.env.TEAMFLOW_MAINTENANCE_SUDO !== "false";
+}
+
+function disabledReason(): string | null {
+  if (!isMaintenanceEnabled()) {
+    return "Server maintenance is disabled. Set TEAMFLOW_MAINTENANCE_ENABLED=true on the host.";
+  }
+  if (process.platform === "win32") {
+    return "In-app maintenance is only supported on Linux server installs.";
+  }
+  return null;
+}
+
+function backupKindFromName(name: string): MaintenanceBackupPublic["kind"] {
+  if (name.includes("uploads")) return "uploads";
+  return "database";
+}
+
+async function readLogTail(): Promise<string> {
+  const logPath = path.join(getDataDir(), LOG_FILE);
+  try {
+    const stat = await fs.stat(logPath);
+    const start = Math.max(0, stat.size - LOG_TAIL_BYTES);
+    const handle = await fs.open(logPath, "r");
+    try {
+      const buffer = Buffer.alloc(stat.size - start);
+      await handle.read(buffer, 0, buffer.length, start);
+      return buffer.toString("utf8");
+    } finally {
+      await handle.close();
+    }
+  } catch {
+    return "";
+  }
+}
+
+type StoredJob = Omit<MaintenanceJobPublic, "logTail">;
+
+async function readStoredJob(): Promise<StoredJob | null> {
+  const jobPath = path.join(getDataDir(), JOB_FILE);
+  try {
+    const raw = await fs.readFile(jobPath, "utf8");
+    const parsed = JSON.parse(raw) as StoredJob;
+    if (!parsed?.id || !parsed.type || !parsed.status) return null;
+    return parsed;
+  } catch {
+    return null;
+  }
+}
+
+async function writeStoredJob(job: StoredJob) {
+  const dataDir = getDataDir();
+  await fs.mkdir(dataDir, { recursive: true });
+  await fs.writeFile(path.join(dataDir, JOB_FILE), JSON.stringify(job, null, 2), "utf8");
+}
+
+async function mapJob(job: StoredJob | null): Promise<MaintenanceJobPublic | null> {
+  if (!job) return null;
+  return {
+    ...job,
+    logTail: await readLogTail(),
+  };
+}
+
+async function listBackups(): Promise<MaintenanceBackupPublic[]> {
+  const backupDir = getBackupDir();
+  let entries: string[];
+  try {
+    entries = await fs.readdir(backupDir);
+  } catch {
+    return [];
+  }
+
+  const backups: MaintenanceBackupPublic[] = [];
+  for (const name of entries) {
+    if (!/^teamflow_.+\.(db|sql|tar\.gz)$/.test(name)) continue;
+    const fullPath = path.join(backupDir, name);
+    try {
+      const stat = await fs.stat(fullPath);
+      if (!stat.isFile()) continue;
+      backups.push({
+        name,
+        kind: backupKindFromName(name),
+        sizeBytes: stat.size,
+        createdAt: stat.mtime.toISOString(),
+      });
+    } catch {
+      continue;
+    }
+  }
+
+  return backups.sort((a, b) => Date.parse(b.createdAt) - Date.parse(a.createdAt));
+}
+
+function buildSpawnArgs(script: string, args: string[]) {
+  if (useSudo() && process.platform !== "win32") {
+    return { command: "sudo", args: ["-n", "bash", script, ...args] };
+  }
+  return { command: "bash", args: [script, ...args] };
+}
+
+async function assertJobIdle() {
+  const current = await readStoredJob();
+  if (current?.status === "running") {
+    throw new Error("A maintenance job is already running. Wait for it to finish.");
+  }
+}
+
+async function startJob(
+  type: MaintenanceJobPublic["type"],
+  script: string,
+  args: string[],
+  options: MaintenanceJobPublic["options"],
+) {
+  await assertJobIdle();
+
+  const dataDir = getDataDir();
+  await fs.mkdir(dataDir, { recursive: true });
+  const logPath = path.join(dataDir, LOG_FILE);
+  await fs.writeFile(logPath, "", "utf8");
+
+  const job: StoredJob = {
+    id: randomUUID(),
+    type,
+    status: "running",
+    startedAt: new Date().toISOString(),
+    finishedAt: null,
+    options,
+  };
+  await writeStoredJob(job);
+
+  const { command, args: spawnArgs } = buildSpawnArgs(script, args);
+  const env = {
+    ...process.env,
+    APP_DIR: getAppDir(),
+    BACKUP_DIR: getBackupDir(),
+  };
+
+  const child = spawn(command, spawnArgs, {
+    env,
+    stdio: ["ignore", "pipe", "pipe"],
+    windowsHide: true,
+  });
+
+  const append = async (chunk: Buffer) => {
+    await fs.appendFile(logPath, chunk);
+  };
+
+  child.stdout?.on("data", (chunk: Buffer) => {
+    void append(chunk);
+  });
+  child.stderr?.on("data", (chunk: Buffer) => {
+    void append(chunk);
+  });
+
+  child.on("close", (code) => {
+    void (async () => {
+      const latest = await readStoredJob();
+      if (!latest || latest.id !== job.id) return;
+      await writeStoredJob({
+        ...latest,
+        status: code === 0 ? "success" : "failed",
+        finishedAt: new Date().toISOString(),
+      });
+    })();
+  });
+
+  child.on("error", (err) => {
+    void (async () => {
+      await fs.appendFile(logPath, `\n${err.message}\n`);
+      const latest = await readStoredJob();
+      if (!latest || latest.id !== job.id) return;
+      await writeStoredJob({
+        ...latest,
+        status: "failed",
+        finishedAt: new Date().toISOString(),
+      });
+    })();
+  });
+
+  return mapJob(job);
+}
+
+export async function getMaintenanceStatus(): Promise<MaintenanceStatusPublic> {
+  const reason = disabledReason();
+  const backupScript = getBackupScript();
+  const updateScript = getUpdateScript();
+  const enabled = reason === null;
+  const backups = enabled ? await listBackups() : [];
+  const job = await mapJob(await readStoredJob());
+
+  return {
+    enabled,
+    reason,
+    platform: process.platform,
+    backupScriptReady: existsSync(backupScript),
+    updateScriptReady: existsSync(updateScript),
+    backupDir: enabled ? getBackupDir() : null,
+    backups,
+    job,
+  };
+}
+
+export async function runMaintenanceBackup(input: RunMaintenanceBackupInput) {
+  const reason = disabledReason();
+  if (reason) throw new Error(reason);
+
+  const script = getBackupScript();
+  if (!existsSync(script)) {
+    throw new Error(`Backup script not found at ${script}`);
+  }
+
+  const args = input.full ? ["--full"] : ["--db-only"];
+  const job = await startJob("backup", script, args, { full: input.full });
+  if (!job) throw new Error("Failed to start backup job");
+  return job;
+}
+
+export async function runMaintenanceUpdate(input: RunMaintenanceUpdateInput) {
+  const reason = disabledReason();
+  if (reason) throw new Error(reason);
+
+  const script = getUpdateScript();
+  if (!existsSync(script)) {
+    throw new Error(`Update script not found at ${script}`);
+  }
+
+  const args: string[] = [];
+  if (input.skipBackup) args.push("--skip-backup");
+  if (input.backupFull) args.push("--backup-full");
+  if (input.branch) {
+    args.push("--branch", input.branch);
+  }
+
+  const job = await startJob("update", script, args, {
+    backupFull: input.backupFull,
+    skipBackup: input.skipBackup,
+    branch: input.branch,
+  });
+  if (!job) throw new Error("Failed to start update job");
+  return job;
+}
+
+export async function getMaintenanceJob() {
+  return mapJob(await readStoredJob());
+}

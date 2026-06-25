@@ -28,6 +28,10 @@ import type {
   UpdateTeamDiscordSettingsInput,
   DiscordGuildConfigPublic,
   DiscordBotSecretsPublic,
+  MaintenanceJobPublic,
+  MaintenanceStatusPublic,
+  RunMaintenanceBackupInput,
+  RunMaintenanceUpdateInput,
   UpdateDiscordBotSecretsInput,
   TeamPermissionsPublic,
   TeamRolePublic,
@@ -358,6 +362,38 @@ export class TeamflowClient {
       `/teams/${teamId}/integrations/discord/secrets`,
       {
         method: "PATCH",
+        body: JSON.stringify(input),
+      },
+    );
+  }
+
+  getServerMaintenanceStatus(teamId: string) {
+    return this.request<{ status: MaintenanceStatusPublic }>(
+      `/teams/${teamId}/server/maintenance`,
+    );
+  }
+
+  getServerMaintenanceJob(teamId: string) {
+    return this.request<{ job: MaintenanceJobPublic | null }>(
+      `/teams/${teamId}/server/maintenance/job`,
+    );
+  }
+
+  runServerMaintenanceBackup(teamId: string, input: RunMaintenanceBackupInput = {}) {
+    return this.request<{ job: MaintenanceJobPublic }>(
+      `/teams/${teamId}/server/maintenance/backup`,
+      {
+        method: "POST",
+        body: JSON.stringify(input),
+      },
+    );
+  }
+
+  runServerMaintenanceUpdate(teamId: string, input: RunMaintenanceUpdateInput = {}) {
+    return this.request<{ job: MaintenanceJobPublic }>(
+      `/teams/${teamId}/server/maintenance/update`,
+      {
+        method: "POST",
         body: JSON.stringify(input),
       },
     );

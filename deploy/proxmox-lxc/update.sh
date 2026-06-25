@@ -5,6 +5,7 @@ APP_DIR="${APP_DIR:-/opt/teamflow}"
 APP_USER="${APP_USER:-teamflow}"
 BACKUP_SCRIPT="$APP_DIR/deploy/proxmox-lxc/backup.sh"
 SKIP_BACKUP=false
+BACKUP_FULL=false
 BRANCH=""
 
 usage() {
@@ -12,10 +13,11 @@ usage() {
 Teamflow update — pull latest, build, migrate, restart.
 
 Usage:
-  sudo update [--skip-backup] [--branch <name>]
+  sudo update [--skip-backup] [--backup-full] [--branch <name>]
 
 Options:
   --skip-backup   Skip database backup (not recommended)
+  --backup-full   Also back up uploads before update (slow if you have large files)
   --branch NAME   Pull a specific branch instead of the current one
 EOF
 }
@@ -24,6 +26,10 @@ while [[ $# -gt 0 ]]; do
   case "$1" in
     --skip-backup)
       SKIP_BACKUP=true
+      shift
+      ;;
+    --backup-full)
+      BACKUP_FULL=true
       shift
       ;;
     --branch)
@@ -68,7 +74,11 @@ if [[ "$SKIP_BACKUP" != true ]]; then
     echo "Use --skip-backup or run: sudo bash $APP_DIR/deploy/proxmox-lxc/update.sh"
     exit 1
   fi
-  bash "$BACKUP_SCRIPT"
+  if [[ "$BACKUP_FULL" == true ]]; then
+    bash "$BACKUP_SCRIPT" --full
+  else
+    bash "$BACKUP_SCRIPT" --db-only
+  fi
 fi
 
 cd "$APP_DIR"

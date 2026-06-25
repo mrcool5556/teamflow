@@ -1,5 +1,5 @@
 /** Built-in role slugs seeded for every team. Custom roles use their own slug. */
-export type SystemRoleSlug = "admin" | "member" | "viewer";
+export type SystemRoleSlug = "owner" | "admin" | "member" | "viewer";
 
 /** Granular team permissions stored on each role. */
 export const TEAM_PERMISSIONS = [
@@ -13,6 +13,8 @@ export const TEAM_PERMISSIONS = [
   "integrations.discord.manage",
   /** Future: store bot token / PAT in Settings instead of .env */
   "integrations.discord.secrets",
+  "server.maintenance.view",
+  "server.maintenance.run",
 ] as const;
 
 export type TeamPermission = (typeof TEAM_PERMISSIONS)[number];
@@ -27,6 +29,8 @@ export const TEAM_PERMISSION_LABELS: Record<TeamPermission, string> = {
   "integrations.discord.view": "View Discord integration",
   "integrations.discord.manage": "Edit Discord integration",
   "integrations.discord.secrets": "Manage Discord bot secrets",
+  "server.maintenance.view": "View backups & update status",
+  "server.maintenance.run": "Run backups and install updates",
 };
 
 export const TEAM_PERMISSION_GROUPS: {
@@ -51,6 +55,10 @@ export const TEAM_PERMISSION_GROUPS: {
       "integrations.discord.manage",
       "integrations.discord.secrets",
     ],
+  },
+  {
+    label: "Server",
+    permissions: ["server.maintenance.view", "server.maintenance.run"],
   },
 ];
 
@@ -82,24 +90,34 @@ export const DEFAULT_SYSTEM_ROLE_TEMPLATES: {
   permissions: TeamPermission[];
 }[] = [
   {
-    slug: "admin",
-    name: "Admin",
+    slug: "owner",
+    name: "Owner",
     isSystem: true,
     position: 0,
     permissions: [...TEAM_PERMISSIONS],
   },
   {
+    slug: "admin",
+    name: "Admin",
+    isSystem: true,
+    position: 1,
+    permissions: TEAM_PERMISSIONS.filter(
+      (permission) =>
+        permission !== "server.maintenance.view" && permission !== "server.maintenance.run",
+    ),
+  },
+  {
     slug: "member",
     name: "Member",
     isSystem: true,
-    position: 1,
+    position: 2,
     permissions: ["team.members.view"],
   },
   {
     slug: "viewer",
     name: "Viewer",
     isSystem: true,
-    position: 2,
+    position: 3,
     permissions: ["team.members.view"],
   },
 ];
