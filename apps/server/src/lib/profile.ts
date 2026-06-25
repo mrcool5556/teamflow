@@ -1,6 +1,7 @@
 import { eq } from "drizzle-orm";
 import {
   createDefaultUserProfile,
+  mergeUserProfile,
   parseUserProfile,
   type UserProfile,
   type UserProfileExport,
@@ -59,18 +60,7 @@ export async function patchUserProfile(
   patch: UserProfilePatch,
 ): Promise<UserProfile> {
   const current = await getUserProfile(db, userId);
-  const next = userProfileSchema.parse({
-    version: USER_PROFILE_VERSION,
-    appearance: { ...current.appearance, ...patch.appearance },
-    board: {
-      ...current.board,
-      ...patch.board,
-      rowHeadersVisible: {
-        ...current.board.rowHeadersVisible,
-        ...patch.board?.rowHeadersVisible,
-      },
-    },
-  });
+  const next = mergeUserProfile(current, patch);
   return saveUserProfile(db, userId, next);
 }
 

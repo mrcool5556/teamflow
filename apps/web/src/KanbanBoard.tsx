@@ -37,6 +37,7 @@ import { IssueTimer } from "./components/IssueTimer";
 import { RowColorPicker } from "./components/RowColorPicker";
 import { BulkActionBar } from "./components/BulkActionBar";
 import { BoardColorPicker } from "./components/BoardColorPicker";
+import { PriorityPicker } from "./components/PriorityPicker";
 import { issueMatchesBoardSearch } from "./lib/refLinks";
 import type { Priority } from "@teamflow/core";
 
@@ -191,6 +192,7 @@ type KanbanBoardProps = {
   members: TeamMemberPublic[];
   onAssignIssue: (issue: IssuePublic, assigneeIds: string[]) => void;
   onUpdateIssueColor: (issue: IssuePublic, color: string | null) => void;
+  onUpdateIssuePriority: (issue: IssuePublic, priority: Priority) => void;
   onAssignRow: (row: BoardRowPublic, assigneeIds: string[]) => void;
   onUpdateRowColor: (row: BoardRowPublic, color: string | null) => void;
   onUpdateIssueTimer: (
@@ -236,6 +238,7 @@ export function KanbanBoard({
   members,
   onAssignIssue,
   onUpdateIssueColor,
+  onUpdateIssuePriority,
   onAssignRow,
   onUpdateRowColor,
   onUpdateIssueTimer,
@@ -557,6 +560,7 @@ export function KanbanBoard({
               onUpdateRowColor={onUpdateRowColor}
               onAssignIssue={onAssignIssue}
               onUpdateIssueColor={onUpdateIssueColor}
+              onUpdateIssuePriority={onUpdateIssuePriority}
               onUpdateIssueTimer={onUpdateIssueTimer}
               highlightedIssueId={highlightedIssueId}
               highlightedColumnKey={highlightedColumnKey}
@@ -816,6 +820,7 @@ function SortableBoardRow({
   onUpdateRowColor,
   onAssignIssue,
   onUpdateIssueColor,
+  onUpdateIssuePriority,
   onUpdateIssueTimer,
   highlightedIssueId = null,
   highlightedColumnKey = null,
@@ -852,6 +857,7 @@ function SortableBoardRow({
   onUpdateRowColor: (row: BoardRowPublic, color: string | null) => void;
   onAssignIssue: (issue: IssuePublic, assigneeIds: string[]) => void;
   onUpdateIssueColor: (issue: IssuePublic, color: string | null) => void;
+  onUpdateIssuePriority: (issue: IssuePublic, priority: Priority) => void;
   onUpdateIssueTimer: (
     issue: IssuePublic,
     patch: {
@@ -1078,6 +1084,7 @@ function SortableBoardRow({
                             onDelete={() => onDeleteIssue(issue)}
                             onAssignIssue={onAssignIssue}
                             onUpdateIssueColor={onUpdateIssueColor}
+                            onUpdateIssuePriority={onUpdateIssuePriority}
                             onUpdateIssueTimer={onUpdateIssueTimer}
                             onGoToRef={onGoToRef}
                           />
@@ -1212,6 +1219,7 @@ function SortableIssueCard({
   onDelete,
   onAssignIssue,
   onUpdateIssueColor,
+  onUpdateIssuePriority,
   onUpdateIssueTimer,
   onGoToRef,
 }: {
@@ -1225,6 +1233,7 @@ function SortableIssueCard({
   onDelete: () => void;
   onAssignIssue: (issue: IssuePublic, assigneeIds: string[]) => void;
   onUpdateIssueColor: (issue: IssuePublic, color: string | null) => void;
+  onUpdateIssuePriority: (issue: IssuePublic, priority: Priority) => void;
   onUpdateIssueTimer: (
     issue: IssuePublic,
     patch: {
@@ -1296,11 +1305,13 @@ function SortableIssueCard({
             title={`Card color: ${issue.identifier}`}
             className="color-picker--card"
           />
-          {issue.priority !== "none" && (
-            <span className={`priority-badge priority-${issue.priority}`}>
-              {issue.priority}
-            </span>
-          )}
+          <PriorityPicker
+            priority={issue.priority}
+            onSelect={(priority) => onUpdateIssuePriority(issue, priority)}
+            compact
+            floatingPanel
+            title={`Priority: ${issue.identifier}`}
+          />
           <button
             type="button"
             className="ghost issue-delete-btn"
