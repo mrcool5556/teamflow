@@ -14,11 +14,23 @@ import {
   type FileLinkReferencePublic,
   type IssueAttachmentPublic,
   type TeamFilePublic,
+  FILE_TRASH_RETENTION_DAYS,
 } from "@teamflow/core";
 import { findRepoRoot, schema, type Db } from "@teamflow/db";
-import { eq, sql, and } from "drizzle-orm";
+import { eq, sql, and, isNull, isNotNull, lte } from "drizzle-orm";
 
 const MB = 1024 * 1024;
+const FILE_TRASH_MS = FILE_TRASH_RETENTION_DAYS * 24 * 60 * 60 * 1000;
+
+function activeStoredFileFilter() {
+  return isNull(schema.storedFiles.deletedAt);
+}
+
+function purgeAtFromDeletedAt(deletedAt: string) {
+  const deletedMs = Date.parse(deletedAt);
+  if (!Number.isFinite(deletedMs)) return null;
+  return new Date(deletedMs + FILE_TRASH_MS).toISOString();
+}
 
 export class AttachmentError extends Error {
   status: number;
@@ -165,7 +177,7 @@ async function attachmentRowsForIssue(db: Db, issueId: string) {
       eq(schema.storedFiles.id, schema.issueFileLinks.fileId),
     )
     .innerJoin(schema.users, eq(schema.users.id, schema.storedFiles.uploaderId))
-    .where(eq(schema.issueFileLinks.issueId, issueId));
+    .where(and(eq(schema.issueFileLinks.issueId, issueId), activeStoredFileFilter()));
 }
 
 export async function listIssueAttachments(db: Db, issueId: string) {
@@ -196,7 +208,7 @@ export async function getAttachmentLinkContext(db: Db, linkId: string) {
     )
     .innerJoin(schema.users, eq(schema.users.id, schema.storedFiles.uploaderId))
     .innerJoin(schema.issues, eq(schema.issues.id, schema.issueFileLinks.issueId))
-    .where(eq(schema.issueFileLinks.id, linkId))
+    .where(and(eq(schema.issueFileLinks.id, linkId), activeStoredFileFilter()))
     .limit(1);
 
   if (issueRow) {
@@ -229,7 +241,7 @@ export async function getAttachmentLinkContext(db: Db, linkId: string) {
     )
     .innerJoin(schema.users, eq(schema.users.id, schema.storedFiles.uploaderId))
     .innerJoin(schema.boardRows, eq(schema.boardRows.id, schema.rowFileLinks.rowId))
-    .where(eq(schema.rowFileLinks.id, linkId))
+    .where(and(eq(schema.rowFileLinks.id, linkId), activeStoredFileFilter()))
     .limit(1);
 
   if (!rowLink) return null;
@@ -246,6 +258,20 @@ export async function getAttachmentForDownload(db: Db, linkId: string) {
   const row = await getAttachmentLinkContext(db, linkId);
   if (!row) return null;
   return row;
+}
+
+async function hardDeleteStoredFile(db: Db, fileId: string) {
+  const [file] = await db
+    .select()
+    .from(schema.storedFiles)
+    .where(eq(schema.storedFiles.id, fileId))
+    .limit(1);
+
+  if (!file) return;
+
+  await db.delete(schema.storedFiles).where(eq(schema.storedFiles.id, fileId));
+  const fullPath = path.join(getUploadDir(), file.storagePath);
+  await fs.unlink(fullPath).catch(() => {});
 }
 
 async function deleteStoredFileIfOrphaned(db: Db, fileId: string) {
@@ -270,9 +296,7 @@ async function deleteStoredFileIfOrphaned(db: Db, fileId: string) {
 
   if (!file) return;
 
-  await db.delete(schema.storedFiles).where(eq(schema.storedFiles.id, fileId));
-  const fullPath = path.join(getUploadDir(), file.storagePath);
-  await fs.unlink(fullPath).catch(() => {});
+  await hardDeleteStoredFile(db, fileId);
 }
 
 export async function deleteIssueAttachment(
@@ -465,7 +489,7 @@ export async function getStoredFileByRef(db: Db, teamId: string, ref: string) {
   const [file] = await db
     .select()
     .from(schema.storedFiles)
-    .where(eq(schema.storedFiles.key, ref))
+    .where(and(eq(schema.storedFiles.key, ref), activeStoredFileFilter()))
     .limit(1);
 
   if (!file) return null;
@@ -647,7 +671,7 @@ export async function listRowAttachments(db: Db, rowId: string) {
       eq(schema.storedFiles.id, schema.rowFileLinks.fileId),
     )
     .innerJoin(schema.users, eq(schema.users.id, schema.storedFiles.uploaderId))
-    .where(eq(schema.rowFileLinks.rowId, rowId));
+    .where(and(eq(schema.rowFileLinks.rowId, rowId), activeStoredFileFilter()));
 
   return rows.map((row) =>
     mapAttachmentPublic({ ...row, issueId: null }),
@@ -786,7 +810,16 @@ export async function getFileTeamId(db: Db, fileId: string) {
   return rowLink?.teamId ?? null;
 }
 
-export async function listTeamFiles(db: Db, teamId: string): Promise<TeamFilePublic[]> {
+export async function listTeamFiles(
+  db: Db,
+  teamId: string,
+  options?: { trash?: boolean },
+): Promise<TeamFilePublic[]> {
+  const trash = options?.trash ?? false;
+  const deletedFilter = trash
+    ? isNotNull(schema.storedFiles.deletedAt)
+    : isNull(schema.storedFiles.deletedAt);
+
   const [team] = await db
     .select({ key: schema.teams.key })
     .from(schema.teams)
@@ -805,6 +838,7 @@ export async function listTeamFiles(db: Db, teamId: string): Promise<TeamFilePub
       uploaderId: schema.storedFiles.uploaderId,
       uploaderName: schema.users.name,
       fileCreatedAt: schema.storedFiles.createdAt,
+      deletedAt: schema.storedFiles.deletedAt,
       linkId: schema.issueFileLinks.id,
       issueNumber: schema.issues.number,
       issueTitle: schema.issues.title,
@@ -816,7 +850,7 @@ export async function listTeamFiles(db: Db, teamId: string): Promise<TeamFilePub
       eq(schema.storedFiles.id, schema.issueFileLinks.fileId),
     )
     .innerJoin(schema.users, eq(schema.users.id, schema.storedFiles.uploaderId))
-    .where(eq(schema.issues.teamId, teamId));
+    .where(and(eq(schema.issues.teamId, teamId), deletedFilter));
 
   const rowLinks = await db
     .select({
@@ -828,6 +862,7 @@ export async function listTeamFiles(db: Db, teamId: string): Promise<TeamFilePub
       uploaderId: schema.storedFiles.uploaderId,
       uploaderName: schema.users.name,
       fileCreatedAt: schema.storedFiles.createdAt,
+      deletedAt: schema.storedFiles.deletedAt,
       linkId: schema.rowFileLinks.id,
       rowKey: schema.boardRows.key,
       rowName: schema.boardRows.name,
@@ -839,7 +874,7 @@ export async function listTeamFiles(db: Db, teamId: string): Promise<TeamFilePub
       eq(schema.storedFiles.id, schema.rowFileLinks.fileId),
     )
     .innerJoin(schema.users, eq(schema.users.id, schema.storedFiles.uploaderId))
-    .where(eq(schema.boardRows.teamId, teamId));
+    .where(and(eq(schema.boardRows.teamId, teamId), deletedFilter));
 
   const byFile = new Map<
     string,
@@ -862,6 +897,8 @@ export async function listTeamFiles(db: Db, teamId: string): Promise<TeamFilePub
         uploaderId: row.uploaderId,
         uploaderName: row.uploaderName,
         createdAt: row.fileCreatedAt,
+        deletedAt: row.deletedAt,
+        purgeAt: row.deletedAt ? purgeAtFromDeletedAt(row.deletedAt) : null,
       },
       references: [],
     };
@@ -886,6 +923,8 @@ export async function listTeamFiles(db: Db, teamId: string): Promise<TeamFilePub
         uploaderId: row.uploaderId,
         uploaderName: row.uploaderName,
         createdAt: row.fileCreatedAt,
+        deletedAt: row.deletedAt,
+        purgeAt: row.deletedAt ? purgeAtFromDeletedAt(row.deletedAt) : null,
       },
       references: [],
     };
@@ -905,7 +944,75 @@ export async function listTeamFiles(db: Db, teamId: string): Promise<TeamFilePub
       references: references.sort((a, b) => a.ref.localeCompare(b.ref)),
     }))
     .sort((a, b) => {
+      if (trash) {
+        const aDeleted = a.deletedAt ? Date.parse(a.deletedAt) : 0;
+        const bDeleted = b.deletedAt ? Date.parse(b.deletedAt) : 0;
+        if (bDeleted !== aDeleted) return bDeleted - aDeleted;
+      }
       if (b.sizeBytes !== a.sizeBytes) return b.sizeBytes - a.sizeBytes;
       return a.filename.localeCompare(b.filename);
     });
+}
+
+export async function softDeleteTeamFile(db: Db, teamId: string, fileId: string) {
+  const fileTeamId = await getFileTeamId(db, fileId);
+  if (!fileTeamId || fileTeamId !== teamId) {
+    throw new AttachmentError("File not found", 404);
+  }
+
+  const [file] = await db
+    .select()
+    .from(schema.storedFiles)
+    .where(eq(schema.storedFiles.id, fileId))
+    .limit(1);
+
+  if (!file) throw new AttachmentError("File not found", 404);
+  if (file.deletedAt) throw new AttachmentError("File already deleted", 400);
+
+  const now = new Date().toISOString();
+  await db
+    .update(schema.storedFiles)
+    .set({ deletedAt: now })
+    .where(eq(schema.storedFiles.id, fileId));
+
+  return { fileId, deletedAt: now, purgeAt: purgeAtFromDeletedAt(now) };
+}
+
+export async function restoreTeamFile(db: Db, teamId: string, fileId: string) {
+  const fileTeamId = await getFileTeamId(db, fileId);
+  if (!fileTeamId || fileTeamId !== teamId) {
+    throw new AttachmentError("File not found", 404);
+  }
+
+  const [file] = await db
+    .select()
+    .from(schema.storedFiles)
+    .where(eq(schema.storedFiles.id, fileId))
+    .limit(1);
+
+  if (!file) throw new AttachmentError("File not found", 404);
+  if (!file.deletedAt) throw new AttachmentError("File is not in trash", 400);
+
+  await db
+    .update(schema.storedFiles)
+    .set({ deletedAt: null })
+    .where(eq(schema.storedFiles.id, fileId));
+
+  return { fileId };
+}
+
+export async function purgeExpiredDeletedFiles(db: Db) {
+  const cutoff = new Date(Date.now() - FILE_TRASH_MS).toISOString();
+  const expired = await db
+    .select({ id: schema.storedFiles.id })
+    .from(schema.storedFiles)
+    .where(
+      and(isNotNull(schema.storedFiles.deletedAt), lte(schema.storedFiles.deletedAt, cutoff)),
+    );
+
+  for (const row of expired) {
+    await hardDeleteStoredFile(db, row.id);
+  }
+
+  return expired.length;
 }

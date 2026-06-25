@@ -92,6 +92,7 @@ export function applySchemaPatches(sqlite: Database.Database) {
   ensureIssueAttachmentsTable(sqlite);
   ensureStoredFilesTables(sqlite);
   ensureStoredFileRefKeys(sqlite);
+  ensureStoredFileDeletedAt(sqlite);
   ensureRowFileLinksTable(sqlite);
   purgeExpiredDeletedIssues(sqlite);
 }
@@ -152,6 +153,17 @@ function ensureStoredFileRefKeys(sqlite: Database.Database) {
 
   if (missing.length > 0) {
     console.log(`Backfilled stored_files.key for ${missing.length} file(s)`);
+  }
+}
+
+function ensureStoredFileDeletedAt(sqlite: Database.Database) {
+  const cols = sqlite
+    .prepare("PRAGMA table_info(stored_files)")
+    .all() as { name: string }[];
+
+  if (!cols.some((col) => col.name === "deleted_at")) {
+    sqlite.exec(`ALTER TABLE stored_files ADD COLUMN deleted_at TEXT`);
+    console.log("Added stored_files.deleted_at column");
   }
 }
 

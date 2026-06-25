@@ -461,9 +461,13 @@ export type TeamFilePublic = {
   uploaderId: string;
   uploaderName: string;
   createdAt: string;
+  deletedAt?: string | null;
+  purgeAt?: string | null;
   linkCount: number;
   references: FileLinkReferencePublic[];
 };
+
+export const FILE_TRASH_RETENTION_DAYS = 7;
 
 export type ApiTokenCreated = {
   id: string;

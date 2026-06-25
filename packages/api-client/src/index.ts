@@ -746,12 +746,27 @@ export class TeamflowClient {
     }>(`/rows/${rowId}/attachments`);
   }
 
-  listTeamFiles(teamId: string) {
+  listTeamFiles(teamId: string, options?: { trash?: boolean }) {
+    const query = options?.trash ? "?trash=1" : "";
     return this.request<{
       files: TeamFilePublic[];
       totalBytes: number;
       fileCount: number;
-    }>(`/teams/${teamId}/files`);
+      trash: boolean;
+    }>(`/teams/${teamId}/files${query}`);
+  }
+
+  softDeleteTeamFile(teamId: string, fileId: string) {
+    return this.request<{ fileId: string; deletedAt: string; purgeAt: string | null }>(
+      `/teams/${teamId}/files/${fileId}`,
+      { method: "DELETE" },
+    );
+  }
+
+  restoreTeamFile(teamId: string, fileId: string) {
+    return this.request<{ fileId: string }>(`/teams/${teamId}/files/${fileId}/restore`, {
+      method: "POST",
+    });
   }
 
   uploadRowAttachment(

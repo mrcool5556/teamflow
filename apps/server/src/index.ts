@@ -110,9 +110,12 @@ import {
   listRowAttachments,
   listTeamFiles,
   moveIssueAttachment,
+  purgeExpiredDeletedFiles,
+  restoreTeamFile,
   saveIssueAttachment,
   saveRowAttachment,
   deleteRowAttachment,
+  softDeleteTeamFile,
 } from "./lib/attachments.js";
 import {
   abortUploadSession,
@@ -142,6 +145,7 @@ import {
 
 const db = createDb();
 void purgeExpiredUploadSessions(db);
+void purgeExpiredDeletedFiles(db);
 const app = new Hono();
 
 app.onError((err, c) => {
@@ -1216,9 +1220,54 @@ app.get("/teams/:teamId/files", async (c) => {
     return c.json({ error: "Team access denied" }, 403);
   }
 
-  const files = await listTeamFiles(db, teamId);
+  const trash = c.req.query("trash") === "1";
+  const files = await listTeamFiles(db, teamId, { trash });
   const totalBytes = files.reduce((sum, file) => sum + file.sizeBytes, 0);
-  return c.json({ files, totalBytes, fileCount: files.length });
+  return c.json({ files, totalBytes, fileCount: files.length, trash });
+});
+
+app.delete("/teams/:teamId/files/:fileId", async (c) => {
+  const result = await requireAuth(c);
+  if ("error" in result) return result.error;
+  requireWrite(result.auth);
+
+  const teamId = c.req.param("teamId");
+  const fileId = c.req.param("fileId");
+  if (!(await userHasTeamAccess(db, result.auth.userId, teamId))) {
+    return c.json({ error: "Team access denied" }, 403);
+  }
+
+  try {
+    const deleted = await softDeleteTeamFile(db, teamId, fileId);
+    return c.json(deleted);
+  } catch (error) {
+    if (error instanceof AttachmentError) {
+      return c.json({ error: error.message }, error.status as 400 | 404);
+    }
+    throw error;
+  }
+});
+
+app.post("/teams/:teamId/files/:fileId/restore", async (c) => {
+  const result = await requireAuth(c);
+  if ("error" in result) return result.error;
+  requireWrite(result.auth);
+
+  const teamId = c.req.param("teamId");
+  const fileId = c.req.param("fileId");
+  if (!(await userHasTeamAccess(db, result.auth.userId, teamId))) {
+    return c.json({ error: "Team access denied" }, 403);
+  }
+
+  try {
+    const restored = await restoreTeamFile(db, teamId, fileId);
+    return c.json(restored);
+  } catch (error) {
+    if (error instanceof AttachmentError) {
+      return c.json({ error: error.message }, error.status as 400 | 404);
+    }
+    throw error;
+  }
 });
 
 app.post("/teams/:teamId/rows", async (c) => {
