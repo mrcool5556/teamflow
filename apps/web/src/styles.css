@@ -1179,7 +1179,19 @@ select {
   overflow-x: hidden;
   overflow-y: auto;
   padding-bottom: 0.75rem;
-  overscroll-behavior: contain;
+  overscroll-behavior-y: auto;
+}
+
+.board-scroll.is-pan-scrolling,
+.board-row-scroll.is-pan-scrolling,
+.column-body.is-pan-scrolling {
+  cursor: grabbing;
+  user-select: none;
+}
+
+body.board-pan-active {
+  cursor: grabbing;
+  user-select: none;
 }
 
 .board-stack {
@@ -1542,7 +1554,7 @@ select {
   min-width: 0;
   overflow-x: auto;
   overflow-y: visible;
-  overscroll-behavior-x: contain;
+  overscroll-behavior-x: auto;
   -webkit-overflow-scrolling: touch;
 }
 
@@ -1616,6 +1628,209 @@ select {
 .issue-card-overlay {
   box-shadow: var(--chrome-drag-shadow);
   cursor: grabbing;
+}
+
+.issue-card-overlay-stack {
+  position: relative;
+  width: var(--board-column-width);
+  max-width: min(var(--board-column-width), 92vw);
+}
+
+.issue-card-overlay-stack--multi .issue-card-overlay {
+  position: relative;
+  z-index: 3;
+  box-shadow:
+    var(--chrome-drag-shadow),
+    0 0 0 2px color-mix(in srgb, var(--accent) 35%, transparent);
+}
+
+.issue-card-stack-ghost {
+  position: absolute;
+  inset: 0;
+  border: var(--chrome-card-border-width) solid var(--border-strong);
+  background: var(--panel);
+  box-shadow: 4px 4px 0 #000;
+  pointer-events: none;
+}
+
+.issue-card-stack-ghost--near {
+  transform: translate(6px, 6px);
+  z-index: 1;
+  opacity: 0.72;
+}
+
+.issue-card-stack-ghost--far {
+  transform: translate(12px, 12px);
+  z-index: 0;
+  opacity: 0.45;
+}
+
+.issue-card-drag-count--large {
+  position: absolute;
+  top: -0.55rem;
+  right: -0.55rem;
+  z-index: 4;
+  min-width: 2rem;
+  height: 2rem;
+  margin: 0;
+  padding: 0 0.45rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1rem;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+  color: #111;
+  background: var(--accent);
+  border: 3px solid #111;
+  border-radius: var(--radius-xs);
+  box-shadow: 3px 3px 0 #000;
+}
+
+.ref-back-btn {
+  max-width: 8rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.team-files-drawer {
+  width: min(720px, 96vw);
+}
+
+.team-files-drawer-summary {
+  margin: 0.2rem 0 0;
+  font-size: 0.82rem;
+}
+
+.team-files-drawer-toolbar {
+  display: flex;
+  gap: 0.55rem;
+  padding: 0 1rem 0.75rem;
+  border-bottom: 1px solid var(--border);
+}
+
+.team-files-drawer-toolbar input[type="search"] {
+  flex: 1;
+  min-width: 0;
+}
+
+.team-files-sort select {
+  font-size: 0.82rem;
+}
+
+.team-files-drawer-body {
+  padding-top: 0.75rem;
+}
+
+.team-files-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+}
+
+.team-files-item {
+  border: var(--chrome-card-border-width) solid var(--border);
+  background: var(--surface);
+}
+
+.team-files-item-main {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5rem;
+  padding: 0.55rem 0.65rem;
+}
+
+.team-files-item-toggle {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.15rem;
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.team-files-item-name {
+  font-weight: 600;
+  word-break: break-word;
+}
+
+.team-files-item-meta {
+  font-size: 0.78rem;
+}
+
+.team-files-item-actions {
+  flex-shrink: 0;
+}
+
+.team-files-item-refs {
+  padding: 0 0.65rem 0.65rem;
+  border-top: 1px dashed var(--border);
+}
+
+.team-files-item-refs-label {
+  margin: 0.45rem 0 0.35rem;
+  font-size: 0.78rem;
+}
+
+.team-files-ref-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.team-files-ref-link,
+.team-files-ref-static {
+  display: grid;
+  grid-template-columns: auto auto 1fr;
+  gap: 0.45rem;
+  align-items: baseline;
+  width: 100%;
+}
+
+.team-files-ref-link {
+  padding: 0.35rem 0.45rem;
+  border: 1px solid var(--border);
+  background: var(--panel);
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.team-files-ref-link:hover {
+  border-color: var(--accent);
+}
+
+.team-files-ref-kind {
+  font-size: 0.68rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--muted);
+}
+
+.team-files-ref-id {
+  font-weight: 700;
+  letter-spacing: 0.04em;
+}
+
+.team-files-ref-name {
+  font-size: 0.82rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .row-separator-name {
@@ -1912,7 +2127,7 @@ select {
   min-height: 0;
   overflow-x: hidden;
   overflow-y: auto;
-  overscroll-behavior: contain;
+  overscroll-behavior-y: auto;
   scrollbar-gutter: stable;
 }
 
@@ -1948,7 +2163,7 @@ select {
   border: var(--chrome-card-border-width) solid var(--border);
   padding: 0.7rem 0.75rem;
   cursor: grab;
-  touch-action: none;
+  touch-action: pan-x pan-y;
   user-select: none;
   display: flex;
   flex-direction: column;
@@ -1970,6 +2185,25 @@ select {
   opacity: 0.45;
 }
 
+.issue-card-dragging-companion {
+  border-color: var(--accent);
+  opacity: 0.5;
+  filter: brightness(0.92);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--accent) 40%, transparent);
+}
+
+.issue-card-drag-count {
+  margin-left: auto;
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  padding: 0.12rem 0.4rem;
+  color: #111;
+  background: var(--accent);
+  border: 2px solid #111;
+  border-radius: var(--radius-xs);
+}
+
 .issue-card-header {
   display: flex;
   align-items: center;
@@ -1981,7 +2215,7 @@ select {
   display: flex;
   align-items: center;
   gap: 0.3rem;
-  flex: 1;
+  flex: 0 1 auto;
   min-width: 0;
   overflow: hidden;
 }
@@ -1991,6 +2225,7 @@ select {
   align-items: center;
   gap: 0.3rem;
   flex-shrink: 0;
+  margin-left: auto;
 }
 
 .issue-card-header-meta .assignee-picker,

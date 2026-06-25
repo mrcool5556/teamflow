@@ -4,6 +4,7 @@ import {
   PointerSensor,
   TouchSensor,
   closestCorners,
+  closestCenter,
   pointerWithin,
   useDroppable,
   useSensor,
@@ -134,20 +135,56 @@ function resolveIssueInsertHint(
   return null;
 }
 
-function reorderIssueIds(
+function reorderMultipleIssueIds(
   orderedIds: string[],
-  draggedId: string,
+  draggedIds: string[],
   overId: string | null,
   insertAfter: boolean,
 ): string[] {
-  const next = orderedIds.filter((id) => id !== draggedId);
-  if (!overId) return [...next, draggedId];
+  const dragSet = new Set(draggedIds);
+  const next = orderedIds.filter((id) => !dragSet.has(id));
+  const block = draggedIds;
+
+  if (!overId) return [...next, ...block];
 
   let insertIndex = next.indexOf(overId);
-  if (insertIndex < 0) return [...next, draggedId];
+  if (insertIndex < 0) return [...next, ...block];
   if (insertAfter) insertIndex += 1;
-  next.splice(insertIndex, 0, draggedId);
+  next.splice(insertIndex, 0, ...block);
   return next;
+}
+
+function sortIssueIdsByBoardOrder(
+  ids: string[],
+  issues: IssuePublic[],
+  defaultRowId: string | null,
+): string[] {
+  const byId = new Map(issues.map((issue) => [issue.id, issue]));
+  return [...ids].sort((a, b) => {
+    const issueA = byId.get(a);
+    const issueB = byId.get(b);
+    if (!issueA || !issueB) return 0;
+
+    const rowA = issueA.rowId ?? defaultRowId ?? "";
+    const rowB = issueB.rowId ?? defaultRowId ?? "";
+    if (rowA !== rowB) return rowA.localeCompare(rowB);
+    if (issueA.statusId !== issueB.statusId) {
+      return issueA.statusId.localeCompare(issueB.statusId);
+    }
+    return (issueA.boardSort ?? 0) - (issueB.boardSort ?? 0);
+  });
+}
+
+function draggingIssueIds(
+  activeIssueId: string,
+  selectedIssueIds: Set<string>,
+  issues: IssuePublic[],
+  defaultRowId: string | null,
+): string[] {
+  if (selectedIssueIds.has(activeIssueId) && selectedIssueIds.size > 1) {
+    return sortIssueIdsByBoardOrder(Array.from(selectedIssueIds), issues, defaultRowId);
+  }
+  return [activeIssueId];
 }
 
 const issueCollisionDetection: CollisionDetection = (args) => {
@@ -155,9 +192,43 @@ const issueCollisionDetection: CollisionDetection = (args) => {
   if (activeParsed.kind === "issue") {
     const pointerHits = pointerWithin(args);
     if (pointerHits.length > 0) return pointerHits;
+    return closestCorners(args);
+  }
+  if (activeParsed.kind === "column") {
+    const columnContainers = args.droppableContainers.filter((container) => {
+      const parsed = parseDndId(String(container.id));
+      return parsed.kind === "column";
+    });
+    if (columnContainers.length === 0) return [];
+
+    const columnArgs = { ...args, droppableContainers: columnContainers };
+    const pointerHits = pointerWithin(columnArgs);
+    if (pointerHits.length > 0) return pointerHits;
+    return closestCenter(columnArgs);
   }
   return closestCorners(args);
 };
+
+function resolveColumnDropTarget(
+  overParsed: ParsedDndId,
+  issues: IssuePublic[],
+  defaultRowId: string | null,
+): { rowId: string; statusId: string } | null {
+  if (overParsed.kind === "column") {
+    return { rowId: overParsed.rowId, statusId: overParsed.statusId };
+  }
+  if (overParsed.kind === "cell" || overParsed.kind === "cell-tail") {
+    return { rowId: overParsed.rowId, statusId: overParsed.statusId };
+  }
+  if (overParsed.kind === "issue") {
+    const overIssue = issues.find((item) => item.id === overParsed.issueId);
+    if (!overIssue) return null;
+    const rowId = overIssue.rowId ?? defaultRowId;
+    if (!rowId) return null;
+    return { rowId, statusId: overIssue.statusId };
+  }
+  return null;
+}
 
 type KanbanBoardProps = {
   previewMode?: boolean;
@@ -366,6 +437,15 @@ export function KanbanBoard({
     return issues.find((issue) => issue.id === issueId) ?? null;
   }, [activeId, issues]);
 
+  const activeDragIssueIds = useMemo(() => {
+    if (!activeIssue) return new Set<string>();
+    return new Set(
+      draggingIssueIds(activeIssue.id, selectedIssueIds, issues, defaultRowId),
+    );
+  }, [activeIssue, selectedIssueIds, issues, defaultRowId]);
+
+  const activeDragCount = activeDragIssueIds.size;
+
   const activeRow = useMemo(() => {
     if (!activeId?.startsWith("row:")) return null;
     const rowId = activeId.slice("row:".length);
@@ -428,15 +508,15 @@ export function KanbanBoard({
       return;
     }
 
-    if (activeParsed.kind === "column" && overParsed.kind === "column") {
-      if (
-        activeParsed.rowId === overParsed.rowId &&
-        activeParsed.statusId !== overParsed.statusId
-      ) {
+    if (activeParsed.kind === "column") {
+      const target = resolveColumnDropTarget(overParsed, issues, defaultRowId);
+      if (!target) return;
+      if (activeParsed.rowId !== target.rowId) return;
+      if (activeParsed.statusId !== target.statusId) {
         onReorderColumns(
           activeParsed.rowId,
           activeParsed.statusId,
-          overParsed.statusId,
+          target.statusId,
         );
       }
       return;
@@ -446,6 +526,13 @@ export function KanbanBoard({
 
     const issue = issues.find((item) => item.id === activeParsed.issueId);
     if (!issue) return;
+
+    const movingIds = draggingIssueIds(
+      issue.id,
+      selectedIssueIds,
+      issues,
+      defaultRowId,
+    );
 
     const dropTarget = resolveIssueInsertHint(active, over, issues, defaultRowId);
     if (!dropTarget) return;
@@ -465,18 +552,14 @@ export function KanbanBoard({
       targetStatusId = mappedStatusId;
     }
 
-    const sourceCell = issuesForCell(sourceRowId, sourceStatusId).map((item) => item.id);
-    const targetCell = issuesForCell(targetRowId, targetStatusId)
-      .filter((item) => item.id !== issue.id)
-      .map((item) => item.id);
-
     const sameCell =
       sourceRowId === targetRowId && sourceStatusId === targetStatusId;
 
     if (sameCell) {
-      const nextCell = reorderIssueIds(
+      const sourceCell = issuesForCell(sourceRowId, sourceStatusId).map((item) => item.id);
+      const nextCell = reorderMultipleIssueIds(
         sourceCell,
-        issue.id,
+        movingIds,
         overIssueId,
         insertAfter,
       );
@@ -485,9 +568,13 @@ export function KanbanBoard({
       return;
     }
 
-    const nextTargetCell = reorderIssueIds(
+    const targetCell = issuesForCell(targetRowId, targetStatusId)
+      .filter((item) => !movingIds.includes(item.id))
+      .map((item) => item.id);
+
+    const nextTargetCell = reorderMultipleIssueIds(
       targetCell,
-      issue.id,
+      movingIds,
       overIssueId,
       insertAfter,
     );
@@ -497,9 +584,22 @@ export function KanbanBoard({
       statusId: targetStatusId,
     });
 
-    if (sourceRowId !== targetRowId || sourceStatusId !== targetStatusId) {
-      const nextSourceCell = sourceCell.filter((id) => id !== issue.id);
-      onReorderIssuesInCell(sourceRowId, sourceStatusId, nextSourceCell);
+    const sourceCells = new Map<string, { rowId: string; statusId: string }>();
+    for (const id of movingIds) {
+      const movingIssue = issues.find((item) => item.id === id);
+      if (!movingIssue) continue;
+      const rowId = movingIssue.rowId ?? defaultRowId;
+      if (!rowId) continue;
+      const key = `${rowId}:${movingIssue.statusId}`;
+      sourceCells.set(key, { rowId, statusId: movingIssue.statusId });
+    }
+
+    for (const { rowId, statusId } of sourceCells.values()) {
+      if (rowId === targetRowId && statusId === targetStatusId) continue;
+      const nextSourceCell = issuesForCell(rowId, statusId)
+        .filter((item) => !movingIds.includes(item.id))
+        .map((item) => item.id);
+      onReorderIssuesInCell(rowId, statusId, nextSourceCell);
     }
   }
 
@@ -575,6 +675,8 @@ export function KanbanBoard({
               onGoToRef={onGoToRef}
               selectedIssueIds={selectedIssueIds}
               onIssueCardClick={handleIssueCardClick}
+              activeDragIssueIds={activeDragIssueIds}
+              activeId={activeId}
               previewMode={previewMode}
               issueInsertHint={issueInsertHint}
               onOpenRowFiles={onOpenRowFiles}
@@ -586,12 +688,27 @@ export function KanbanBoard({
 
       <DragOverlay dropAnimation={null}>
         {activeIssue ? (
-          <article className="issue-card issue-card-overlay">
-            <div className="issue-card-header">
-              <span className="issue-id">{activeIssue.identifier}</span>
-            </div>
-            <h3 className="issue-card-title">{activeIssue.title}</h3>
-          </article>
+          <div
+            className={`issue-card-overlay-stack${activeDragCount > 1 ? " issue-card-overlay-stack--multi" : ""}`}
+          >
+            {activeDragCount > 1 ? (
+              <>
+                <div className="issue-card-stack-ghost issue-card-stack-ghost--far" aria-hidden />
+                <div className="issue-card-stack-ghost issue-card-stack-ghost--near" aria-hidden />
+              </>
+            ) : null}
+            <article className="issue-card issue-card-overlay">
+              {activeDragCount > 1 ? (
+                <span className="issue-card-drag-count issue-card-drag-count--large" aria-hidden>
+                  {activeDragCount}
+                </span>
+              ) : null}
+              <div className="issue-card-header">
+                <span className="issue-id">{activeIssue.identifier}</span>
+              </div>
+              <h3 className="issue-card-title">{activeIssue.title}</h3>
+            </article>
+          </div>
         ) : null}
         {activeRow ? (
           <div className="row-separator-bar row-separator-overlay">
@@ -821,6 +938,8 @@ function SortableBoardRow({
   onGoToRef,
   selectedIssueIds = new Set(),
   onIssueCardClick,
+  activeDragIssueIds = new Set(),
+  activeId = null,
   previewMode = false,
   issueInsertHint = null,
   onOpenRowFiles,
@@ -869,6 +988,8 @@ function SortableBoardRow({
     event: React.MouseEvent,
     cellIssues: IssuePublic[],
   ) => void;
+  activeDragIssueIds?: Set<string>;
+  activeId?: string | null;
   previewMode?: boolean;
   issueInsertHint?: IssueInsertHint | null;
   onOpenRowFiles?: (row: BoardRowPublic) => void;
@@ -1065,6 +1186,11 @@ function SortableBoardRow({
                             issue={issue}
                             members={members}
                             selected={selectedIssueIds.has(issue.id)}
+                            draggingCompanion={
+                              activeDragIssueIds.has(issue.id) &&
+                              activeDragIssueIds.size > 1 &&
+                              activeId !== issueDndId(issue.id)
+                            }
                             highlighted={highlightedIssueId === issue.id}
                             suppressClickRef={suppressClickRef}
                             layoutAnimationDisabled={Boolean(issueInsertHint)}
@@ -1202,6 +1328,7 @@ function SortableIssueCard({
   issue,
   members,
   selected = false,
+  draggingCompanion = false,
   highlighted = false,
   suppressClickRef,
   layoutAnimationDisabled = false,
@@ -1216,6 +1343,7 @@ function SortableIssueCard({
   issue: IssuePublic;
   members: TeamMemberPublic[];
   selected?: boolean;
+  draggingCompanion?: boolean;
   highlighted?: boolean;
   suppressClickRef: React.MutableRefObject<string | null>;
   layoutAnimationDisabled?: boolean;
@@ -1251,7 +1379,8 @@ function SortableIssueCard({
   const style = {
     transform: CSS.Transform.toString(transform),
     transition,
-    opacity: isDragging ? 0.35 : 1,
+    opacity: isDragging ? 0.35 : draggingCompanion ? 0.5 : 1,
+    ...(draggingCompanion ? { filter: "brightness(0.92)" } : {}),
     ...(issue.color ? { "--card-accent": issue.color } : {}),
   } as CSSProperties;
 
@@ -1260,7 +1389,7 @@ function SortableIssueCard({
       ref={setNodeRef}
       style={style}
       data-issue-id={issue.id}
-      className={`issue-card ${issue.color ? "has-card-color" : ""} ${isDragging ? "issue-card-dragging" : ""} ${highlighted ? "issue-card--highlighted" : ""} ${selected ? "issue-card--selected" : ""}`}
+      className={`issue-card ${issue.color ? "has-card-color" : ""} ${isDragging ? "issue-card-dragging" : ""} ${draggingCompanion ? "issue-card-dragging-companion" : ""} ${highlighted ? "issue-card--highlighted" : ""} ${selected ? "issue-card--selected" : ""}`}
       {...attributes}
       {...listeners}
       onClick={(event) => {
@@ -1274,11 +1403,7 @@ function SortableIssueCard({
       }}
     >
       {selected ? <span className="issue-card-select-chip" aria-hidden>✓</span> : null}
-      <div
-        className="issue-card-header"
-        onPointerDown={(e) => e.stopPropagation()}
-        onClick={(e) => e.stopPropagation()}
-      >
+      <div className="issue-card-header">
         <RefCopyButton
           value={issue.identifier}
           variant="issue"

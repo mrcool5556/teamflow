@@ -444,6 +444,27 @@ export type IssueAttachmentPublic = {
   canStream: boolean;
 };
 
+export type FileLinkReferencePublic = {
+  kind: "issue" | "row";
+  linkId: string;
+  ref: string;
+  name: string;
+};
+
+export type TeamFilePublic = {
+  fileId: string;
+  fileRef: string;
+  filename: string;
+  mimeType: string;
+  sizeBytes: number;
+  kind: AttachmentKind;
+  uploaderId: string;
+  uploaderName: string;
+  createdAt: string;
+  linkCount: number;
+  references: FileLinkReferencePublic[];
+};
+
 export type ApiTokenCreated = {
   id: string;
   name: string;

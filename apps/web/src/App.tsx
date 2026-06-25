@@ -28,12 +28,14 @@ import {
   mergeWithLegacyDefaults,
 } from "./profile";
 import { KanbanBoard } from "./KanbanBoard";
+import { usePanScroll } from "./lib/usePanScroll";
 import { QuickAddModal } from "./components/QuickAddModal";
 import { BoardLayoutPreview } from "./components/BoardLayoutPreview";
 import { ChangeHistoryPanel } from "./components/ChangeHistoryPanel";
 import { GoToRefBar } from "./components/GoToRefBar";
 import { IssueDrawer } from "./components/IssueDrawer";
 import { RowFilesDrawer } from "./components/RowFilesDrawer";
+import { TeamFilesDrawer } from "./components/TeamFilesDrawer";
 import { RoadmapPanel } from "./components/RoadmapPanel";
 import { CreateTeamSection } from "./components/CreateTeamSection";
 import { AdvancedProfileSettingsSection } from "./components/AdvancedProfileSettingsSection";
@@ -64,6 +66,12 @@ import {
   syncInviteInLocation,
   takePendingInvite,
 } from "./lib/inviteLinks";
+import {
+  clearRefBackStack,
+  peekRefBack,
+  popRefBack,
+  pushRefBack,
+} from "./lib/refBackStack";
 
 type View = "login" | "board" | "settings" | "roadmap";
 
@@ -87,6 +95,8 @@ export function App() {
   const [teamId, setTeamId] = useState<string | null>(null);
   const [selectedIssue, setSelectedIssue] = useState<IssuePublic | null>(null);
   const [rowFilesRow, setRowFilesRow] = useState<BoardRowPublic | null>(null);
+  const [teamFilesOpen, setTeamFilesOpen] = useState(false);
+  const [refBackLabel, setRefBackLabel] = useState<string | null>(() => peekRefBack()?.label ?? null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [patName, setPatName] = useState("Cursor MCP");
@@ -103,6 +113,7 @@ export function App() {
   const [refNotice, setRefNotice] = useState<string | null>(null);
   const [refNavActive, setRefNavActive] = useState(false);
   const refNavTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const boardScrollRef = useRef<HTMLDivElement | null>(null);
   const pendingRefHandledRef = useRef(false);
   const pendingInviteHandledRef = useRef(false);
   const {
@@ -321,6 +332,8 @@ export function App() {
       if (!nextTeamId) return;
       setTeamId(nextTeamId);
       setSelectedIssue(null);
+      clearRefBackStack();
+      setRefBackLabel(null);
       updateProfile(
         mergeUserProfile(profileRef.current, { ui: { lastTeamId: nextTeamId } }),
       );
@@ -1021,10 +1034,35 @@ export function App() {
     }
   }
 
-  async function goToRef(rawRef: string) {
+  function refreshRefBackLabel() {
+    setRefBackLabel(peekRefBack()?.label ?? null);
+  }
+
+  function captureRefBackEntry(): { ref: string; label: string } | null {
+    if (selectedIssue) {
+      return {
+        ref: selectedIssue.identifier,
+        label: selectedIssue.identifier,
+      };
+    }
+    if (refNotice) {
+      return { ref: refNotice, label: refNotice };
+    }
+    return null;
+  }
+
+  async function goToRef(rawRef: string, options?: { skipBackPush?: boolean }) {
     if (!teamId) return;
     const ref = normalizeRefInput(rawRef);
     if (!ref) return;
+
+    if (!options?.skipBackPush) {
+      const current = captureRefBackEntry();
+      if (current && current.ref !== ref) {
+        pushRefBack(current);
+        refreshRefBackLabel();
+      }
+    }
 
     setError(null);
     setRefNotice(null);
@@ -1078,6 +1116,13 @@ export function App() {
       setError(err instanceof Error ? err.message : "Reference not found");
       syncRefInLocation(null);
     }
+  }
+
+  function goBackRef() {
+    const entry = popRefBack();
+    refreshRefBackLabel();
+    if (!entry) return;
+    void goToRef(entry.ref, { skipBackPush: true });
   }
 
   async function exportProfileFile() {
@@ -1152,6 +1197,8 @@ export function App() {
   const overlayOpen = settingsOpen || roadmapOpen;
   const useSamplePreview = settingsOpen && rows.length === 0;
 
+  usePanScroll(boardScrollRef, !settingsOpen);
+
   const boardPanel = (
     <div
       className={`board-wrap ${settingsOpen ? "board-wrap--preview" : ""} ${refNavActive ? "board-wrap--ref-nav" : ""}`}
@@ -1173,12 +1220,16 @@ export function App() {
             + Add row
           </button>
           <span className="board-toolbar-hint">
-            Ctrl+Click or Shift+Click cards to multi-select. Each row has its own columns.
+            Ctrl/Shift+Click to multi-select · drag a selected card to move all · Alt+drag or
+            middle-click to pan · wheel scroll passes through columns
           </span>
         </div>
       )}
 
-      <div className={`board-scroll ${settingsOpen ? "board-scroll--preview" : ""}`}>
+      <div
+        ref={boardScrollRef}
+        className={`board-scroll ${settingsOpen ? "board-scroll--preview" : ""}`}
+      >
         <div className={settingsOpen ? "board-preview-surface" : undefined}>
           {useSamplePreview ? (
             <BoardLayoutPreview />
@@ -1281,6 +1332,16 @@ export function App() {
           <h1>{teams.find((t) => t.id === teamId)?.name ?? "Board"}</h1>
         </div>
         <div className="topbar-actions">
+          {!overlayOpen && refBackLabel ? (
+            <button
+              type="button"
+              className="secondary ref-back-btn"
+              title={`Back to ${refBackLabel}`}
+              onClick={goBackRef}
+            >
+              ← Back
+            </button>
+          ) : null}
           {!overlayOpen && (
             <GoToRefBar disabled={!teamId || loading} onGo={(ref) => void goToRef(ref)} />
           )}
@@ -1311,6 +1372,11 @@ export function App() {
           >
             Recent{changeHistory.length > 0 ? ` (${changeHistory.length})` : ""}
           </button>
+          {!overlayOpen && teamId ? (
+            <button type="button" onClick={() => setTeamFilesOpen(true)}>
+              Files
+            </button>
+          ) : null}
           <button
             type="button"
             className={roadmapOpen ? "active" : undefined}
@@ -1511,6 +1577,18 @@ export function App() {
           row={rowFilesRow}
           onClose={() => setRowFilesRow(null)}
           onNavigateRef={(ref) => void goToRef(ref)}
+        />
+      )}
+
+      {teamFilesOpen && teamId && !overlayOpen && (
+        <TeamFilesDrawer
+          teamId={teamId}
+          open={teamFilesOpen}
+          onClose={() => setTeamFilesOpen(false)}
+          onNavigateRef={(ref) => {
+            setTeamFilesOpen(false);
+            void goToRef(ref);
+          }}
         />
       )}
       {selectedIssue && !overlayOpen && (
