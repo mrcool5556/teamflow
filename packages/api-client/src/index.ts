@@ -21,7 +21,6 @@ import type {
   ResetPasswordInput,
   ForgotPasswordInput,
   AuthConfigPublic,
-  ResolvedRef,
   TeamInvitePreview,
   TeamInvitePublic,
   TeamDiscordSettingsPublic,
@@ -729,6 +728,16 @@ export class TeamflowClient {
     );
   }
 
+  linkRowAttachment(rowId: string, fileId: string) {
+    return this.request<{ attachment: IssueAttachmentPublic }>(
+      `/rows/${rowId}/attachments/link`,
+      {
+        method: "POST",
+        body: JSON.stringify({ fileId }),
+      },
+    );
+  }
+
   listRowAttachments(rowId: string) {
     return this.request<{
       attachments: IssueAttachmentPublic[];
@@ -879,10 +888,17 @@ export class TeamflowClient {
   resolveRef(teamId: string, ref: string) {
     const query = encodeURIComponent(ref);
     return this.request<{
-      resolved: ResolvedRef;
+      resolved: import("@teamflow/core").ResolvedRef;
       issue?: IssuePublic;
       row?: BoardRowPublic;
       status?: IssueStatusPublic;
+      file?: {
+        fileId: string;
+        fileRef: string;
+        filename: string;
+        mimeType: string;
+        sizeBytes: number;
+      };
     }>(`/teams/${teamId}/resolve?ref=${query}`);
   }
 }

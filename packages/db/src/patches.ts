@@ -91,6 +91,7 @@ export function applySchemaPatches(sqlite: Database.Database) {
   ensurePasswordResetTokensTable(sqlite);
   ensureIssueAttachmentsTable(sqlite);
   ensureStoredFilesTables(sqlite);
+  ensureStoredFileRefKeys(sqlite);
   ensureRowFileLinksTable(sqlite);
   purgeExpiredDeletedIssues(sqlite);
 }
@@ -111,6 +112,47 @@ function ensureIssueAttachmentsTable(sqlite: Database.Database) {
   sqlite.exec(
     `CREATE INDEX IF NOT EXISTS issue_attachments_issue_id_idx ON issue_attachments(issue_id)`,
   );
+}
+
+function randomFileRefKey() {
+  const chars = "abcdefghijklmnopqrstuvwxyz0123456789";
+  let suffix = "";
+  for (let i = 0; i < 8; i++) {
+    suffix += chars[Math.floor(Math.random() * chars.length)]!;
+  }
+  return `file_${suffix}`;
+}
+
+function ensureStoredFileRefKeys(sqlite: Database.Database) {
+  const cols = sqlite
+    .prepare("PRAGMA table_info(stored_files)")
+    .all() as { name: string }[];
+
+  if (!cols.some((col) => col.name === "key")) {
+    sqlite.exec(`ALTER TABLE stored_files ADD COLUMN key TEXT`);
+    console.log("Added stored_files.key column");
+  }
+
+  const missing = sqlite
+    .prepare("SELECT id FROM stored_files WHERE key IS NULL OR key = ''")
+    .all() as { id: string }[];
+
+  const update = sqlite.prepare("UPDATE stored_files SET key = ? WHERE id = ?");
+  const exists = sqlite.prepare("SELECT id FROM stored_files WHERE key = ? LIMIT 1");
+
+  for (const row of missing) {
+    let key = randomFileRefKey();
+    while (exists.get(key)) {
+      key = randomFileRefKey();
+    }
+    update.run(key, row.id);
+  }
+
+  sqlite.exec(`CREATE UNIQUE INDEX IF NOT EXISTS stored_files_key_idx ON stored_files(key)`);
+
+  if (missing.length > 0) {
+    console.log(`Backfilled stored_files.key for ${missing.length} file(s)`);
+  }
 }
 
 function ensureStoredFilesTables(sqlite: Database.Database) {

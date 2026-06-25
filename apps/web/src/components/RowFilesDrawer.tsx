@@ -1,11 +1,4 @@
-import {
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-  type ChangeEvent,
-  type DragEvent,
-} from "react";
+import { useEffect, useMemo, useRef, useState, type ChangeEvent, type DragEvent } from "react";
 import type { BoardRowPublic, IssueAttachmentPublic } from "@teamflow/core";
 import {
   DEFAULT_ATTACHMENT_LIMITS,
@@ -14,6 +7,8 @@ import {
 } from "@teamflow/core";
 import type { AttachmentLimitsPublic } from "@teamflow/core";
 import { client } from "../api";
+import { FileRefCopyButton } from "./FileRefCopyButton";
+import { LinkFromFileRef } from "./LinkFromFileRef";
 import { RefCopyButton } from "./RefCopyButton";
 import {
   AttachmentImageThumbnail,
@@ -69,6 +64,7 @@ export function RowFilesDrawer({ row, onClose, onNavigateRef }: RowFilesDrawerPr
     imageUrl: string;
   } | null>(null);
   const [attachmentVideo, setAttachmentVideo] = useState<IssueAttachmentPublic | null>(null);
+  const [fileSearch, setFileSearch] = useState("");
   const attachmentBlobCache = useMemo(() => createAttachmentBlobCache(), []);
   const attachmentInputRef = useRef<HTMLInputElement>(null);
 
@@ -106,6 +102,20 @@ export function RowFilesDrawer({ row, onClose, onNavigateRef }: RowFilesDrawerPr
   useEffect(() => {
     return () => attachmentBlobCache.revokeAll();
   }, [attachmentBlobCache]);
+
+  const linkedFileIds = useMemo(
+    () => new Set(attachments.map((attachment) => attachment.fileId)),
+    [attachments],
+  );
+
+  const filteredAttachments = useMemo(() => {
+    const q = fileSearch.trim().toLowerCase();
+    if (!q) return attachments;
+    return attachments.filter((attachment) => {
+      const hay = `${attachment.filename} ${attachment.fileRef} ${attachment.uploaderName}`.toLowerCase();
+      return hay.includes(q);
+    });
+  }, [attachments, fileSearch]);
 
   async function openImagePreview(attachment: IssueAttachmentPublic) {
     try {
@@ -219,13 +229,30 @@ export function RowFilesDrawer({ row, onClose, onNavigateRef }: RowFilesDrawerPr
             <p className="muted" style={{ marginTop: 0 }}>
               Tools, docs, and assets for everyone working in this row.
             </p>
+            <p className="muted" style={{ marginTop: 0 }}>
+              Tools, docs, and assets for everyone working in this row.
+            </p>
+
+            {attachments.length > 0 ? (
+              <div className="row-files-search">
+                <input
+                  type="search"
+                  value={fileSearch}
+                  placeholder="Search row files…"
+                  onChange={(e) => setFileSearch(e.target.value)}
+                />
+              </div>
+            ) : null}
+
             {attachmentsLoading ? (
               <p className="muted">Loading files…</p>
             ) : attachments.length === 0 ? (
               <p className="muted">No files yet.</p>
+            ) : filteredAttachments.length === 0 ? (
+              <p className="muted">No files match your search.</p>
             ) : (
               <ul className="issue-attachment-list">
-                {attachments.map((attachment) => (
+                {filteredAttachments.map((attachment) => (
                   <li key={attachment.id} className="issue-attachment">
                     {isVideoAttachment(attachment) ? (
                       <AttachmentVideoThumbnail
@@ -260,11 +287,13 @@ export function RowFilesDrawer({ row, onClose, onNavigateRef }: RowFilesDrawerPr
                         {attachment.filename}
                       </button>
                       <span className="issue-attachment-meta muted">
-                        {formatFileSize(attachment.sizeBytes)} · {attachment.uploaderName} ·{" "}
-                        {formatTimestamp(attachment.createdAt)}
+                        {attachment.fileRef} · {formatFileSize(attachment.sizeBytes)} ·{" "}
+                        {attachment.uploaderName} · {formatTimestamp(attachment.createdAt)}
                       </span>
                     </div>
-                    <button
+                    <div className="issue-attachment-actions">
+                      <FileRefCopyButton fileRef={attachment.fileRef} filename={attachment.filename} />
+                      <button
                       type="button"
                       className="ghost issue-attachment-delete"
                       disabled={deletingAttachmentId === attachment.id}
@@ -274,10 +303,24 @@ export function RowFilesDrawer({ row, onClose, onNavigateRef }: RowFilesDrawerPr
                     >
                       {deletingAttachmentId === attachment.id ? "…" : "Remove"}
                     </button>
+                    </div>
                   </li>
                 ))}
               </ul>
             )}
+
+            <LinkFromFileRef
+              teamId={row.teamId}
+              label="Link file from ref (another row or issue)"
+              onLinkFileId={async (fileId) => {
+                if (linkedFileIds.has(fileId)) return;
+                const { attachment } = await client.linkRowAttachment(row.id, fileId);
+                setAttachments((prev) => {
+                  if (prev.some((item) => item.fileId === attachment.fileId)) return prev;
+                  return [...prev, attachment];
+                });
+              }}
+            />
 
             <div
               className={`issue-attachment-drop${attachmentDragOver ? " issue-attachment-drop--active" : ""}`}

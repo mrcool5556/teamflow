@@ -105,6 +105,7 @@ import {
   getAttachmentLimits,
   getFileTeamId,
   linkFileToIssue,
+  linkFileToRow,
   listIssueAttachments,
   listRowAttachments,
   moveIssueAttachment,
@@ -2330,6 +2331,44 @@ app.delete("/rows/:rowId/attachments/:id", async (c) => {
   if (!deleted) return c.json({ error: "Attachment not found" }, 404);
 
   return c.body(null, 204);
+});
+
+app.post("/rows/:rowId/attachments/link", async (c) => {
+  const result = await requireAuth(c);
+  if ("error" in result) return result.error;
+  requireWrite(result.auth);
+
+  const rowId = c.req.param("rowId");
+  const body = parseLinkAttachment(await c.req.json());
+  if (!body) {
+    return c.json({ error: "Invalid input" }, 400);
+  }
+
+  const [row] = await db
+    .select()
+    .from(schema.boardRows)
+    .where(eq(schema.boardRows.id, rowId))
+    .limit(1);
+
+  if (!row) return c.json({ error: "Row not found" }, 404);
+  if (!(await userHasTeamAccess(db, result.auth.userId, row.teamId))) {
+    return c.json({ error: "Team access denied" }, 403);
+  }
+
+  const fileTeamId = await getFileTeamId(db, body.fileId);
+  if (!fileTeamId || fileTeamId !== row.teamId) {
+    return c.json({ error: "File not found on this team" }, 404);
+  }
+
+  try {
+    const attachment = await linkFileToRow(db, rowId, body.fileId);
+    return c.json({ attachment }, 201);
+  } catch (error) {
+    if (error instanceof AttachmentError) {
+      return c.json({ error: error.message }, error.status as 404);
+    }
+    throw error;
+  }
 });
 
 app.post("/issues/:issueId/attachments/:id/move", async (c) => {

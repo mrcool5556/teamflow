@@ -7,6 +7,7 @@ import { pipeline } from "node:stream/promises";
 import {
   attachmentFileKind,
   DEFAULT_ATTACHMENT_LIMITS,
+  generateEntityKey,
   isStreamableAttachmentFile,
   maxBytesForAttachmentFile,
   type AttachmentLimitsPublic,
@@ -96,11 +97,25 @@ function limitErrorMessage(filename: string, mimeType: string, maxBytes: number)
   return `${label} are limited to ${mb} MB (${filename})`;
 }
 
+async function createUniqueFileKey(db: Db) {
+  for (let attempt = 0; attempt < 12; attempt += 1) {
+    const key = generateEntityKey("file");
+    const [existing] = await db
+      .select({ id: schema.storedFiles.id })
+      .from(schema.storedFiles)
+      .where(eq(schema.storedFiles.key, key))
+      .limit(1);
+    if (!existing) return key;
+  }
+  throw new AttachmentError("Could not allocate file reference", 500);
+}
+
 export function mapAttachmentPublic(row: {
   linkId: string;
   issueId?: string | null;
   rowId?: string | null;
   fileId: string;
+  fileRef: string;
   filename: string;
   mimeType: string;
   sizeBytes: number;
@@ -114,6 +129,7 @@ export function mapAttachmentPublic(row: {
     issueId: row.issueId ?? null,
     rowId: row.rowId ?? null,
     fileId: row.fileId,
+    fileRef: row.fileRef,
     filename: row.filename,
     mimeType: row.mimeType,
     sizeBytes: row.sizeBytes,
@@ -132,6 +148,7 @@ async function attachmentRowsForIssue(db: Db, issueId: string) {
       linkId: schema.issueFileLinks.id,
       issueId: schema.issueFileLinks.issueId,
       fileId: schema.storedFiles.id,
+      fileRef: schema.storedFiles.key,
       filename: schema.storedFiles.filename,
       mimeType: schema.storedFiles.mimeType,
       sizeBytes: schema.storedFiles.sizeBytes,
@@ -160,6 +177,7 @@ export async function getAttachmentLinkContext(db: Db, linkId: string) {
       linkId: schema.issueFileLinks.id,
       issueId: schema.issueFileLinks.issueId,
       fileId: schema.storedFiles.id,
+      fileRef: schema.storedFiles.key,
       filename: schema.storedFiles.filename,
       mimeType: schema.storedFiles.mimeType,
       sizeBytes: schema.storedFiles.sizeBytes,
@@ -192,6 +210,7 @@ export async function getAttachmentLinkContext(db: Db, linkId: string) {
       linkId: schema.rowFileLinks.id,
       rowId: schema.rowFileLinks.rowId,
       fileId: schema.storedFiles.id,
+      fileRef: schema.storedFiles.key,
       filename: schema.storedFiles.filename,
       mimeType: schema.storedFiles.mimeType,
       sizeBytes: schema.storedFiles.sizeBytes,
@@ -309,6 +328,7 @@ export async function linkFileToIssue(
       linkId: schema.issueFileLinks.id,
       issueId: schema.issueFileLinks.issueId,
       fileId: schema.storedFiles.id,
+      fileRef: schema.storedFiles.key,
       filename: schema.storedFiles.filename,
       mimeType: schema.storedFiles.mimeType,
       sizeBytes: schema.storedFiles.sizeBytes,
@@ -362,6 +382,7 @@ export async function linkFileToIssue(
     issueId,
     rowId: null,
     fileId,
+    fileRef: file.key,
     filename: file.filename,
     mimeType: file.mimeType,
     sizeBytes: file.sizeBytes,
@@ -369,6 +390,88 @@ export async function linkFileToIssue(
     uploaderName: uploader!.name,
     createdAt: now,
   });
+}
+
+export async function linkFileToRow(db: Db, rowId: string, fileId: string) {
+  const [existing] = await db
+    .select({
+      linkId: schema.rowFileLinks.id,
+      rowId: schema.rowFileLinks.rowId,
+      fileId: schema.storedFiles.id,
+      fileRef: schema.storedFiles.key,
+      filename: schema.storedFiles.filename,
+      mimeType: schema.storedFiles.mimeType,
+      sizeBytes: schema.storedFiles.sizeBytes,
+      uploaderId: schema.storedFiles.uploaderId,
+      createdAt: schema.rowFileLinks.createdAt,
+      uploaderName: schema.users.name,
+    })
+    .from(schema.rowFileLinks)
+    .innerJoin(
+      schema.storedFiles,
+      eq(schema.storedFiles.id, schema.rowFileLinks.fileId),
+    )
+    .innerJoin(schema.users, eq(schema.users.id, schema.storedFiles.uploaderId))
+    .where(
+      and(eq(schema.rowFileLinks.rowId, rowId), eq(schema.rowFileLinks.fileId, fileId)),
+    )
+    .limit(1);
+
+  if (existing) {
+    return mapAttachmentPublic({ ...existing, issueId: null });
+  }
+
+  const [file] = await db
+    .select()
+    .from(schema.storedFiles)
+    .where(eq(schema.storedFiles.id, fileId))
+    .limit(1);
+
+  if (!file) throw new AttachmentError("File not found", 404);
+
+  const linkId = randomUUID();
+  const now = new Date().toISOString();
+  await db.insert(schema.rowFileLinks).values({
+    id: linkId,
+    rowId,
+    fileId,
+    createdAt: now,
+  });
+
+  const [uploader] = await db
+    .select()
+    .from(schema.users)
+    .where(eq(schema.users.id, file.uploaderId))
+    .limit(1);
+
+  return mapAttachmentPublic({
+    linkId,
+    issueId: null,
+    rowId,
+    fileId,
+    fileRef: file.key,
+    filename: file.filename,
+    mimeType: file.mimeType,
+    sizeBytes: file.sizeBytes,
+    uploaderId: file.uploaderId,
+    uploaderName: uploader!.name,
+    createdAt: now,
+  });
+}
+
+export async function getStoredFileByRef(db: Db, teamId: string, ref: string) {
+  const [file] = await db
+    .select()
+    .from(schema.storedFiles)
+    .where(eq(schema.storedFiles.key, ref))
+    .limit(1);
+
+  if (!file) return null;
+
+  const fileTeamId = await getFileTeamId(db, file.id);
+  if (!fileTeamId || fileTeamId !== teamId) return null;
+
+  return file;
 }
 
 export async function createStoredFileFromPath(
@@ -393,6 +496,7 @@ export async function createStoredFileFromPath(
   await fs.rename(absolutePath, finalPath);
 
   const now = new Date().toISOString();
+  const fileKey = await createUniqueFileKey(db);
   await db.insert(schema.storedFiles).values({
     id: fileId,
     uploaderId,
@@ -400,6 +504,7 @@ export async function createStoredFileFromPath(
     mimeType,
     sizeBytes,
     storagePath: relativePath,
+    key: fileKey,
     createdAt: now,
   });
 
@@ -430,6 +535,7 @@ export async function createStoredFileFromPath(
     issueId: "issueId" in target ? target.issueId : null,
     rowId: "rowId" in target ? target.rowId : null,
     fileId,
+    fileRef: fileKey,
     filename: safeName,
     mimeType,
     sizeBytes,
@@ -479,6 +585,7 @@ export async function saveIssueAttachment(
 
   const now = new Date().toISOString();
   const relativePath = path.join(issueId, storageName);
+  const fileKey = await createUniqueFileKey(db);
 
   await db.insert(schema.storedFiles).values({
     id: fileId,
@@ -487,6 +594,7 @@ export async function saveIssueAttachment(
     mimeType,
     sizeBytes: buffer.length,
     storagePath: relativePath,
+    key: fileKey,
     createdAt: now,
   });
   await db.insert(schema.issueFileLinks).values({
@@ -507,6 +615,7 @@ export async function saveIssueAttachment(
     issueId,
     rowId: null,
     fileId,
+    fileRef: fileKey,
     filename,
     mimeType,
     sizeBytes: buffer.length,
@@ -522,6 +631,7 @@ export async function listRowAttachments(db: Db, rowId: string) {
       linkId: schema.rowFileLinks.id,
       rowId: schema.rowFileLinks.rowId,
       fileId: schema.storedFiles.id,
+      fileRef: schema.storedFiles.key,
       filename: schema.storedFiles.filename,
       mimeType: schema.storedFiles.mimeType,
       sizeBytes: schema.storedFiles.sizeBytes,
@@ -576,6 +686,7 @@ export async function saveRowAttachment(
 
   const now = new Date().toISOString();
   const relativePath = path.join(relativeDir, storageName);
+  const fileKey = await createUniqueFileKey(db);
 
   await db.insert(schema.storedFiles).values({
     id: fileId,
@@ -584,6 +695,7 @@ export async function saveRowAttachment(
     mimeType,
     sizeBytes: buffer.length,
     storagePath: relativePath,
+    key: fileKey,
     createdAt: now,
   });
   await db.insert(schema.rowFileLinks).values({
@@ -604,6 +716,7 @@ export async function saveRowAttachment(
     issueId: null,
     rowId,
     fileId,
+    fileRef: fileKey,
     filename,
     mimeType,
     sizeBytes: buffer.length,

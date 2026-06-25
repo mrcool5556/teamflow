@@ -1,15 +1,11 @@
 import { useEffect, useMemo, useState } from "react";
 import type { BoardRowPublic, IssueAttachmentPublic } from "@teamflow/core";
 import { client } from "../api";
-
-function formatFileSize(bytes: number) {
-  if (bytes < 1024) return `${bytes} B`;
-  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
-  if (bytes < 1024 * 1024 * 1024) return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
-  return `${(bytes / (1024 * 1024 * 1024)).toFixed(1)} GB`;
-}
+import { LinkFromFileRef } from "./LinkFromFileRef";
+import { SharedFileBrowser } from "./SharedFileBrowser";
 
 type LinkRowFilePanelProps = {
+  teamId: string;
   issueId: string;
   row: BoardRowPublic | null;
   linkedFileIds: ReadonlySet<string>;
@@ -17,11 +13,13 @@ type LinkRowFilePanelProps = {
 };
 
 export function LinkRowFilePanel({
+  teamId,
   issueId,
   row,
   linkedFileIds,
   onLinked,
 }: LinkRowFilePanelProps) {
+  const [browserOpen, setBrowserOpen] = useState(false);
   const [rowFiles, setRowFiles] = useState<IssueAttachmentPublic[]>([]);
   const [loading, setLoading] = useState(false);
   const [linkingFileId, setLinkingFileId] = useState<string | null>(null);
@@ -30,9 +28,26 @@ export function LinkRowFilePanel({
   useEffect(() => {
     if (!row) {
       setRowFiles([]);
-      setError(null);
       return;
     }
+
+    let cancelled = false;
+    void client
+      .listRowAttachments(row.id)
+      .then(({ attachments }) => {
+        if (!cancelled) setRowFiles(attachments);
+      })
+      .catch(() => {
+        if (!cancelled) setRowFiles([]);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [row?.id]);
+
+  useEffect(() => {
+    if (!browserOpen || !row) return;
 
     let cancelled = false;
     setLoading(true);
@@ -56,67 +71,72 @@ export function LinkRowFilePanel({
     return () => {
       cancelled = true;
     };
-  }, [row?.id]);
+  }, [browserOpen, row?.id]);
 
-  const linkableFiles = useMemo(
-    () => rowFiles.filter((file) => !linkedFileIds.has(file.fileId)),
+  const linkableCount = useMemo(
+    () => rowFiles.filter((file) => !linkedFileIds.has(file.fileId)).length,
     [rowFiles, linkedFileIds],
   );
 
-  async function linkFile(file: IssueAttachmentPublic) {
-    if (linkingFileId) return;
-    setLinkingFileId(file.fileId);
+  async function linkFileId(fileId: string) {
+    setLinkingFileId(fileId);
     setError(null);
     try {
-      const { attachment } = await client.linkIssueAttachment(issueId, file.fileId);
+      const { attachment } = await client.linkIssueAttachment(issueId, fileId);
       onLinked(attachment);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not link file");
+      throw err;
     } finally {
       setLinkingFileId(null);
     }
   }
 
+  async function linkFile(file: IssueAttachmentPublic) {
+    await linkFileId(file.fileId);
+  }
+
   if (!row) {
     return (
       <p className="muted issue-link-row-files-empty">
-        Put this issue on a row to link files from that row&apos;s shared folder.
+        Put this issue on a row to browse that row&apos;s shared files, or paste a file ref below.
       </p>
     );
   }
 
   return (
     <div className="issue-link-row-files">
-      <p className="issue-link-row-files-head">
-        Link from <strong>{row.name}</strong> shared files
-      </p>
-      {loading ? (
-        <p className="muted">Loading row files…</p>
-      ) : rowFiles.length === 0 ? (
-        <p className="muted">No shared files on this row yet. Use the row Files button to upload.</p>
-      ) : linkableFiles.length === 0 ? (
-        <p className="muted">All row shared files are already linked on this issue.</p>
-      ) : (
-        <ul className="issue-link-row-files-list">
-          {linkableFiles.map((file) => (
-            <li key={file.fileId} className="issue-link-row-files-item">
-              <div className="issue-link-row-files-meta">
-                <span className="issue-link-row-files-name">{file.filename}</span>
-                <span className="muted">{formatFileSize(file.sizeBytes)}</span>
-              </div>
-              <button
-                type="button"
-                className="secondary compact"
-                disabled={linkingFileId === file.fileId}
-                onClick={() => void linkFile(file)}
-              >
-                {linkingFileId === file.fileId ? "Linking…" : "Link"}
-              </button>
-            </li>
-          ))}
-        </ul>
-      )}
+      <div className="issue-link-row-files-toolbar">
+        <button type="button" className="secondary" onClick={() => setBrowserOpen(true)}>
+          View row files
+          {rowFiles.length > 0 ? ` (${linkableCount} linkable)` : ""}
+        </button>
+        <p className="muted issue-link-row-files-hint">
+          Search and link from <strong>{row.name}</strong>, or paste a file ref from any row/issue.
+        </p>
+      </div>
+
+      <LinkFromFileRef
+        teamId={teamId}
+        onLinkFileId={linkFileId}
+        disabled={Boolean(linkingFileId)}
+      />
+
       {error ? <p className="issue-link-row-files-error">{error}</p> : null}
+
+      <SharedFileBrowser
+        open={browserOpen}
+        title={`${row.name} — shared files`}
+        subtitle="Link to this issue or copy a file ref to share elsewhere."
+        files={rowFiles}
+        loading={loading}
+        linkedFileIds={linkedFileIds}
+        linkingFileId={linkingFileId}
+        onClose={() => setBrowserOpen(false)}
+        onLink={(file) => {
+          void linkFile(file).then(() => setBrowserOpen(false));
+        }}
+      />
     </div>
   );
 }
