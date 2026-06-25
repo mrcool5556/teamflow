@@ -1,6 +1,7 @@
 import {
   ROADMAP_ACCOUNTS,
   ROADMAP_DEPLOY_STEPS,
+  ROADMAP_FILESYSTEM_ORDER,
   ROADMAP_FOCUS,
   ROADMAP_IDEAS,
   ROADMAP_META,
@@ -87,6 +88,25 @@ export function RoadmapPanel() {
             <FocusCard key={item.id} item={item} />
           ))}
         </div>
+      </section>
+
+      <section className="roadmap-section roadmap-section--panel">
+        <h3>Filesystem — suggested build order</h3>
+        <p className="roadmap-section-copy muted">
+          Issue and row uploads work today. Build these in order when extending the file system.
+        </p>
+        <ol className="roadmap-steps">
+          {ROADMAP_FILESYSTEM_ORDER.map((item) => (
+            <li key={item.id} className="roadmap-step">
+              <span className="roadmap-step-label">{item.priority}</span>
+              <div>
+                <strong>{item.title}</strong>
+                <StatusBadge status={item.status} />
+                {item.notes && <p className="muted">{item.notes}</p>}
+              </div>
+            </li>
+          ))}
+        </ol>
       </section>
 
       <div className="roadmap-columns">

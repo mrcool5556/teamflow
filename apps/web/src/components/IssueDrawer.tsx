@@ -32,6 +32,7 @@ import {
   AttachmentVideoThumbnail,
   isVideoAttachment,
 } from "./AttachmentVideoPlayer";
+import { LinkRowFilePanel } from "./LinkRowFilePanel";
 
 function describeAttachmentLimits(limits: AttachmentLimitsPublic) {
   return `Images ${formatFileSize(limits.imageBytes)}, videos ${formatFileSize(limits.videoBytes)}, ZIPs ${formatFileSize(limits.zipBytes)}`;
@@ -144,6 +145,16 @@ export function IssueDrawer({
   const rowStatuses = statuses
     .filter((status) => status.rowId === issue.rowId)
     .sort((a, b) => a.position - b.position);
+
+  const issueRow = useMemo(
+    () => (issue.rowId ? rows.find((row) => row.id === issue.rowId) ?? null : null),
+    [issue.rowId, rows],
+  );
+
+  const linkedFileIds = useMemo(
+    () => new Set(attachments.map((attachment) => attachment.fileId)),
+    [attachments],
+  );
 
   const patchIssue = useCallback(
     async (patch: UpdateIssueInput) => {
@@ -624,6 +635,18 @@ export function IssueDrawer({
               ))}
             </ul>
           )}
+
+          <LinkRowFilePanel
+            issueId={issue.id}
+            row={issueRow}
+            linkedFileIds={linkedFileIds}
+            onLinked={(attachment) => {
+              setAttachments((prev) => {
+                if (prev.some((item) => item.fileId === attachment.fileId)) return prev;
+                return [...prev, attachment];
+              });
+            }}
+          />
 
           <div
             className={`issue-attachment-drop${attachmentDragOver ? " issue-attachment-drop--active" : ""}`}

@@ -36,7 +36,7 @@ type ShippedItem = {
 
 export const ROADMAP_META = {
   title: "Teamflow plan",
-  updated: "2026-06-21",
+  updated: "2026-06-17",
   tagline: "What ships next, what already works, and what is on the backlog.",
 };
 
@@ -72,6 +72,82 @@ export const ROADMAP_FOCUS: RoadmapItem[] = [
     status: "done",
     priority: 3,
     tags: ["integrations"],
+  },
+];
+
+/** Suggested build order for filesystem / attachments work. */
+export const ROADMAP_FILESYSTEM_ORDER: RoadmapItem[] = [
+  {
+    id: "fs-link-row",
+    title: "Link row file to issue",
+    status: "done",
+    priority: 1,
+    notes: "Picker in issue drawer Attachments; links by fileId without re-uploading.",
+    tags: ["files"],
+  },
+  {
+    id: "fs-move",
+    title: "Move attachment between issues",
+    status: "partial",
+    priority: 2,
+    notes: "Server move API exists; needs api-client methods and drawer UI.",
+    tags: ["files"],
+  },
+  {
+    id: "fs-paste-comment",
+    title: "Paste images in comments",
+    status: "planned",
+    priority: 3,
+    notes: "Attach from clipboard when posting a comment.",
+    tags: ["files", "rich-text"],
+  },
+  {
+    id: "fs-trash",
+    title: "File soft-delete bin (7-day)",
+    status: "planned",
+    priority: 4,
+    notes: "Recover removed files; permanent delete after retention.",
+    tags: ["files"],
+  },
+  {
+    id: "fs-chunk-ux",
+    title: "Resume / cancel chunked uploads",
+    status: "partial",
+    priority: 5,
+    notes: "api-client supports resumeSessionId and abort; wire into upload UI.",
+    tags: ["files", "video"],
+  },
+  {
+    id: "fs-row-badge",
+    title: "File count badge on row Files button",
+    status: "planned",
+    priority: 6,
+    notes: "Show how many shared files live on each row without opening the drawer.",
+    tags: ["files", "ui"],
+  },
+  {
+    id: "fs-cross-links",
+    title: "Cross-link indicators on files",
+    status: "planned",
+    priority: 7,
+    notes: "Show when a file is also linked on row X or issue Y.",
+    tags: ["files", "ui"],
+  },
+  {
+    id: "fs-team-area",
+    title: "Team-wide file area",
+    status: "planned",
+    priority: 8,
+    notes: "Shared files at team scope, not only per issue or row.",
+    tags: ["files"],
+  },
+  {
+    id: "fs-folders",
+    title: "Folders / directory tree",
+    status: "planned",
+    priority: 9,
+    notes: "Organize uploads into folders instead of flat lists.",
+    tags: ["files"],
   },
 ];
 
@@ -258,12 +334,43 @@ export const ROADMAP_IDEAS: RoadmapIdeaGroup[] = [
   {
     id: "attachments",
     title: "File attachments",
+    summary: "Issue + row uploads today. See Filesystem build order for what ships next.",
     items: [
       { id: "a-issue", title: "Upload on issue (v1)", status: "done" },
+      { id: "a-row", title: "Upload on row (shared files drawer)", status: "done" },
+      {
+        id: "a-chunk",
+        title: "Chunked upload and seekable video (server)",
+        status: "done",
+        notes: "UI resume/cancel still in filesystem order.",
+      },
+      {
+        id: "a-link-row",
+        title: "Link row file to issue",
+        status: "done",
+        notes: "Issue drawer → Attachments → link from row shared files.",
+      },
+      {
+        id: "a-move",
+        title: "Move attachment between issues",
+        status: "partial",
+        notes: "Server API only today.",
+      },
       { id: "a-comment-img", title: "Attach / paste images in comments", status: "planned" },
       { id: "a-desc-img", title: "Attach / paste images in description", status: "planned" },
-      { id: "a-row", title: "Upload on row (v2)", status: "planned" },
       { id: "a-trash", title: "Soft delete plus 7-day bin plus permanent delete", status: "planned" },
+      {
+        id: "a-row-badge",
+        title: "File count badge on row Files button",
+        status: "planned",
+      },
+      {
+        id: "a-cross-links",
+        title: "Cross-link indicators (also on row X / issue Y)",
+        status: "planned",
+      },
+      { id: "a-team", title: "Team-wide file area", status: "planned" },
+      { id: "a-folders", title: "Folders / directory tree", status: "planned" },
     ],
   },
   {
@@ -353,7 +460,7 @@ export const ROADMAP_SHIPPED: ShippedItem[] = [
 
 export const ROADMAP_DEPLOY_STEPS: DeployStep[] = [
   { step: "Done", label: "Proxmox LXC + Cloudflare", detail: "git clone, install.sh, sudo update, teamflow-smtp." },
-  { step: "Done", label: "File attachments", detail: "Upload files on issues; backup data/uploads/ with the DB." },
+  { step: "Done", label: "File attachments", detail: "Issue + row uploads; backup data/uploads/ with the DB." },
   { step: "Always", label: "Backup teamflow.db + data/uploads/", detail: "That is your project data." },
 ];
 

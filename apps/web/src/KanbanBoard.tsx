@@ -663,16 +663,6 @@ function uniqueAssigneeIdsFromIssues(issues: IssuePublic[]) {
   return ids;
 }
 
-function assigneeNamesLabel(entity: {
-  assignees?: { name: string }[];
-  assigneeName: string | null;
-}) {
-  if (entity.assignees && entity.assignees.length > 0) {
-    return entity.assignees.map((assignee) => assignee.name).join(", ");
-  }
-  return entity.assigneeName;
-}
-
 function RowSeparatorBar({
   row,
   rowSearch,
@@ -1284,7 +1274,11 @@ function SortableIssueCard({
       }}
     >
       {selected ? <span className="issue-card-select-chip" aria-hidden>✓</span> : null}
-      <div className="issue-card-header">
+      <div
+        className="issue-card-header"
+        onPointerDown={(e) => e.stopPropagation()}
+        onClick={(e) => e.stopPropagation()}
+      >
         <RefCopyButton
           value={issue.identifier}
           variant="issue"
@@ -1293,11 +1287,23 @@ function SortableIssueCard({
           title={`Issue ${issue.identifier}`}
           onGo={onGoToRef ? () => onGoToRef(issue.identifier) : undefined}
         />
-        <div
-          className="issue-card-header-actions"
-          onPointerDown={(e) => e.stopPropagation()}
-          onClick={(e) => e.stopPropagation()}
-        >
+        <div className="issue-card-header-meta">
+          <MultiAssigneePicker
+            members={members}
+            assigneeIds={assigneeIdsFromEntity(issue)}
+            compact
+            panelPlacement="top"
+            floatingPanel
+            onChange={(assigneeIds) => onAssignIssue(issue, assigneeIds)}
+          />
+          <IssueTimer
+            issue={issue}
+            compact
+            floatingPanel
+            onUpdate={(patch) => onUpdateIssueTimer(issue, patch)}
+          />
+        </div>
+        <div className="issue-card-header-actions">
           <BoardColorPicker
             color={issue.color}
             onSelect={(color) => onUpdateIssueColor(issue, color)}
@@ -1328,29 +1334,6 @@ function SortableIssueCard({
         </div>
       </div>
       <h3 className="issue-card-title">{issue.title}</h3>
-      {assigneeNamesLabel(issue) && (
-        <p className="issue-card-assignee">{assigneeNamesLabel(issue)}</p>
-      )}
-      <footer
-        className="issue-card-footer"
-        onPointerDown={(e) => e.stopPropagation()}
-        onClick={(e) => e.stopPropagation()}
-      >
-        <MultiAssigneePicker
-          members={members}
-          assigneeIds={assigneeIdsFromEntity(issue)}
-          compact
-          panelPlacement="top"
-          floatingPanel
-          onChange={(assigneeIds) => onAssignIssue(issue, assigneeIds)}
-        />
-        <IssueTimer
-          issue={issue}
-          compact
-          floatingPanel
-          onUpdate={(patch) => onUpdateIssueTimer(issue, patch)}
-        />
-      </footer>
     </article>
   );
 }
