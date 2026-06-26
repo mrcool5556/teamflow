@@ -121,6 +121,16 @@ export function buildFriendlyFilename(label: string, originalFilename: string) {
   return `${slug}${ext}`;
 }
 
+export function normalizeRenamedFilename(next: string, previousFilename: string) {
+  const trimmed = next.trim();
+  if (!trimmed) return previousFilename;
+  const ext = fileExtension(previousFilename);
+  if (ext && !fileExtension(trimmed)) {
+    return `${trimmed}${ext}`;
+  }
+  return trimmed;
+}
+
 export function getTeamFileDisplayName(file: {
   filename: string;
   references: ReadonlyArray<{ name: string }>;

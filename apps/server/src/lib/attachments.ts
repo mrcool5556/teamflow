@@ -1068,6 +1068,59 @@ export async function softDeleteTeamFile(db: Db, teamId: string, fileId: string)
   return { fileId, deletedAt: now, purgeAt: purgeAtFromDeletedAt(now) };
 }
 
+export async function renameTeamFile(
+  db: Db,
+  teamId: string,
+  fileId: string,
+  filename: string,
+) {
+  const fileTeamId = await getFileTeamId(db, fileId);
+  if (!fileTeamId || fileTeamId !== teamId) {
+    throw new AttachmentError("File not found", 404);
+  }
+
+  const [file] = await db
+    .select()
+    .from(schema.storedFiles)
+    .where(eq(schema.storedFiles.id, fileId))
+    .limit(1);
+
+  if (!file) throw new AttachmentError("File not found", 404);
+  if (file.deletedAt) throw new AttachmentError("Cannot rename a file in trash", 400);
+
+  const safeName = sanitizeFilename(filename);
+  if (!safeName) throw new AttachmentError("Invalid filename", 400);
+  if (safeName === file.filename) {
+    return { fileId, filename: safeName, fileRef: file.key };
+  }
+
+  const uploadDir = getUploadDir();
+  const oldFullPath = path.join(uploadDir, file.storagePath);
+  const storageDir = path.dirname(file.storagePath);
+  const newStorageName = `${file.id}_${safeName}`;
+  const newRelativePath = path.join(storageDir, newStorageName);
+  const newFullPath = path.join(uploadDir, newRelativePath);
+
+  try {
+    await fs.access(oldFullPath);
+  } catch {
+    throw new AttachmentError("File missing on disk", 500);
+  }
+
+  try {
+    await fs.rename(oldFullPath, newFullPath);
+  } catch {
+    throw new AttachmentError("Could not rename file on disk", 500);
+  }
+
+  await db
+    .update(schema.storedFiles)
+    .set({ filename: safeName, storagePath: newRelativePath })
+    .where(eq(schema.storedFiles.id, fileId));
+
+  return { fileId, filename: safeName, fileRef: file.key };
+}
+
 export async function restoreTeamFile(db: Db, teamId: string, fileId: string) {
   const fileTeamId = await getFileTeamId(db, fileId);
   if (!fileTeamId || fileTeamId !== teamId) {
