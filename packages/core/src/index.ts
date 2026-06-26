@@ -470,6 +470,12 @@ export type TeamFilePublic = {
 
 export const FILE_TRASH_RETENTION_DAYS = 7;
 
+export const renameTeamFileSchema = z.object({
+  filename: z.string().min(1).max(200),
+});
+
+export type RenameTeamFileInput = z.input<typeof renameTeamFileSchema>;
+
 export type ApiTokenCreated = {
   id: string;
   name: string;

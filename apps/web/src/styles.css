@@ -2185,6 +2185,41 @@ body.board-pan-active {
   word-break: break-word;
 }
 
+.team-files-item-name--editable {
+  flex: 1;
+  min-width: 0;
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  font-weight: 600;
+  text-align: left;
+  cursor: text;
+}
+
+.team-files-item-name--editable:hover:not(:disabled) {
+  color: var(--accent);
+  text-decoration: underline;
+  text-decoration-style: dashed;
+  text-underline-offset: 0.15rem;
+}
+
+.team-files-item-name--editable:disabled {
+  cursor: default;
+}
+
+.team-files-item-name-input {
+  flex: 1;
+  min-width: 0;
+  font: inherit;
+  font-weight: 600;
+  padding: 0.1rem 0.35rem;
+  border: 2px solid var(--accent);
+  background: var(--bg);
+  color: var(--text);
+}
+
 .team-files-item-meta {
   font-size: 0.78rem;
 }

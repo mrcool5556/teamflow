@@ -805,6 +805,16 @@ export class TeamflowClient {
     });
   }
 
+  renameTeamFile(teamId: string, fileId: string, input: { filename: string }) {
+    return this.request<{ fileId: string; filename: string; fileRef: string }>(
+      `/teams/${teamId}/files/${fileId}`,
+      {
+        method: "PATCH",
+        body: JSON.stringify(input),
+      },
+    );
+  }
+
   uploadRowAttachment(
     rowId: string,
     file: File,

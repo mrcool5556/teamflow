@@ -6,6 +6,7 @@ import { getSharedTeamFilePreviewCache } from "../lib/teamFilePreviewCache";
 import { AttachmentLightbox } from "./AttachmentImagePreview";
 import { AttachmentVideoLightbox } from "./AttachmentVideoPlayer";
 import { FileRefCopyButton } from "./FileRefCopyButton";
+import { TeamFileEditableName } from "./TeamFileEditableName";
 import { filePreviewAttachment, TeamFilePreview } from "./TeamFilePreview";
 
 function formatFileSize(bytes: number) {
@@ -193,6 +194,12 @@ export function TeamFilesDrawer({
     }
   }
 
+  function handleFileRenamed(fileId: string, filename: string) {
+    setFiles((current) =>
+      current.map((file) => (file.fileId === fileId ? { ...file, filename } : file)),
+    );
+  }
+
   async function downloadAttachment(attachment: IssueAttachmentPublic) {
     const blob = await client.downloadAttachment(attachment.id);
     const url = URL.createObjectURL(blob);
@@ -293,9 +300,13 @@ export function TeamFilesDrawer({
                       <div className="team-files-item-center">
                         <div className="team-files-item-copy">
                           <div className="team-files-item-title-row">
-                            <span className="team-files-item-name" title={displayName}>
-                              {displayName}
-                            </span>
+                            <TeamFileEditableName
+                              teamId={teamId}
+                              file={file}
+                              disabled={tab === "trash" || busyFileId === file.fileId}
+                              onRenamed={handleFileRenamed}
+                              onError={setError}
+                            />
                             <span className="team-files-link-badge">
                               {file.linkCount} link{file.linkCount === 1 ? "" : "s"}
                             </span>
