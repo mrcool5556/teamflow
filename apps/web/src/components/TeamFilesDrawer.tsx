@@ -1,11 +1,12 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type { IssueAttachmentPublic, TeamFilePublic } from "@teamflow/core";
-import { FILE_TRASH_RETENTION_DAYS } from "@teamflow/core";
+import { FILE_TRASH_RETENTION_DAYS, getTeamFileDisplayName, isZipAttachmentFile } from "@teamflow/core";
 import { client } from "../api";
-import { AttachmentLightbox, createAttachmentBlobCache } from "./AttachmentImagePreview";
+import { getSharedTeamFilePreviewCache } from "../lib/teamFilePreviewCache";
+import { AttachmentLightbox } from "./AttachmentImagePreview";
 import { AttachmentVideoLightbox } from "./AttachmentVideoPlayer";
 import { FileRefCopyButton } from "./FileRefCopyButton";
-import { TeamFilePreview } from "./TeamFilePreview";
+import { filePreviewAttachment, TeamFilePreview } from "./TeamFilePreview";
 
 function formatFileSize(bytes: number) {
   if (bytes < 1024) return `${bytes} B`;
@@ -28,7 +29,7 @@ function fileDescription(file: TeamFilePublic, inTrash: boolean) {
   }
 
   if (file.references.length === 0) {
-    return `${file.fileRef} · ${formatFileSize(file.sizeBytes)}`;
+    return `${formatFileSize(file.sizeBytes)} · not linked yet`;
   }
 
   const linked = file.references
@@ -43,6 +44,10 @@ function fileDescription(file: TeamFilePublic, inTrash: boolean) {
   }
 
   return linked;
+}
+
+function canDownloadFile(file: TeamFilePublic) {
+  return file.references.length > 0;
 }
 
 type TeamFilesDrawerProps = {
@@ -69,12 +74,13 @@ export function TeamFilesDrawer({
   const [query, setQuery] = useState("");
   const [sort, setSort] = useState<SortMode>("size");
   const [busyFileId, setBusyFileId] = useState<string | null>(null);
+  const [downloadingFileId, setDownloadingFileId] = useState<string | null>(null);
   const [imageLightbox, setImageLightbox] = useState<{
     attachment: IssueAttachmentPublic;
     imageUrl: string;
   } | null>(null);
   const [videoLightbox, setVideoLightbox] = useState<IssueAttachmentPublic | null>(null);
-  const blobCache = useMemo(() => createAttachmentBlobCache(), []);
+  const previewCache = useMemo(() => getSharedTeamFilePreviewCache(), []);
 
   const loadFiles = useCallback(async () => {
     setLoading(true);
@@ -97,18 +103,15 @@ export function TeamFilesDrawer({
     void loadFiles();
   }, [open, loadFiles]);
 
-  useEffect(() => {
-    if (!open) return;
-    return () => blobCache.revokeAll();
-  }, [blobCache, open]);
-
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
     let next = files;
     if (q) {
       next = files.filter((file) => {
+        const displayName = getTeamFileDisplayName(file);
         const haystack = [
           file.filename,
+          displayName,
           file.fileRef,
           file.uploaderName,
           ...file.references.map((ref) => `${ref.ref} ${ref.name}`),
@@ -120,13 +123,15 @@ export function TeamFilesDrawer({
     }
 
     return [...next].sort((a, b) => {
-      if (sort === "name") return a.filename.localeCompare(b.filename);
+      const aName = getTeamFileDisplayName(a);
+      const bName = getTeamFileDisplayName(b);
+      if (sort === "name") return aName.localeCompare(bName);
       if (sort === "refs") {
         if (b.linkCount !== a.linkCount) return b.linkCount - a.linkCount;
         return b.sizeBytes - a.sizeBytes;
       }
       if (b.sizeBytes !== a.sizeBytes) return b.sizeBytes - a.sizeBytes;
-      return a.filename.localeCompare(b.filename);
+      return aName.localeCompare(bName);
     });
   }, [files, query, sort]);
 
@@ -137,12 +142,12 @@ export function TeamFilesDrawer({
     setTab("active");
     setImageLightbox(null);
     setVideoLightbox(null);
-    blobCache.revokeAll();
     onClose();
   }
 
   async function softDelete(file: TeamFilePublic) {
-    if (!window.confirm(`Move ${file.filename} to trash for ${FILE_TRASH_RETENTION_DAYS} days?`)) {
+    const displayName = getTeamFileDisplayName(file);
+    if (!window.confirm(`Move ${displayName} to trash for ${FILE_TRASH_RETENTION_DAYS} days?`)) {
       return;
     }
     setBusyFileId(file.fileId);
@@ -165,6 +170,26 @@ export function TeamFilesDrawer({
       setError(err instanceof Error ? err.message : "Could not restore file");
     } finally {
       setBusyFileId(null);
+    }
+  }
+
+  async function downloadFile(file: TeamFilePublic) {
+    const attachment = filePreviewAttachment(file);
+    if (!attachment) return;
+
+    setDownloadingFileId(file.fileId);
+    try {
+      const blob = await client.downloadAttachment(attachment.id);
+      const url = URL.createObjectURL(blob);
+      const anchor = document.createElement("a");
+      anchor.href = url;
+      anchor.download = getTeamFileDisplayName(file);
+      anchor.click();
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Download failed");
+    } finally {
+      setDownloadingFileId(null);
     }
   }
 
@@ -245,81 +270,117 @@ export function TeamFilesDrawer({
             </p>
           ) : (
             <ul className="team-files-list">
-              {filtered.map((file) => (
-                <li key={file.fileId} className="team-files-item">
-                  <div className="team-files-item-main">
-                    <div className="team-files-item-preview-wrap">
-                      <TeamFilePreview
-                        file={file}
-                        blobCache={blobCache}
-                        onImageOpen={(attachment, imageUrl) =>
-                          setImageLightbox({ attachment, imageUrl })
-                        }
-                        onVideoOpen={setVideoLightbox}
-                      />
-                    </div>
+              {filtered.map((file) => {
+                const displayName = getTeamFileDisplayName(file);
+                const showDownload =
+                  canDownloadFile(file) &&
+                  (isZipAttachmentFile(file.filename, file.mimeType) || file.kind === "other");
 
-                    <div className="team-files-item-center">
-                      <div className="team-files-item-title-row">
-                        <span className="team-files-item-name" title={file.filename}>
-                          {file.filename}
-                        </span>
-                        <span className="team-files-link-badge">
-                          {file.linkCount} link{file.linkCount === 1 ? "" : "s"}
-                        </span>
+                return (
+                  <li key={file.fileId} className="team-files-item">
+                    <div className="team-files-item-main">
+                      <div className="team-files-item-preview-wrap">
+                        <TeamFilePreview
+                          file={file}
+                          previewCache={previewCache}
+                          onImageOpen={(attachment, imageUrl) =>
+                            setImageLightbox({ attachment, imageUrl })
+                          }
+                          onVideoOpen={setVideoLightbox}
+                        />
                       </div>
-                      <p className="team-files-item-description muted" title={fileDescription(file, tab === "trash")}>
-                        {fileDescription(file, tab === "trash")}
-                      </p>
-                      <p className="team-files-item-uploader muted">by {file.uploaderName}</p>
-                    </div>
 
-                    <div className="team-files-item-actions">
-                      {file.references.length > 0 && onNavigateRef ? (
-                        <label className="team-files-ref-select">
-                          <span className="sr-only">Jump to linked location for {file.filename}</span>
-                          <select
-                            defaultValue=""
-                            onChange={(event) => {
-                              const ref = event.target.value;
-                              if (!ref) return;
-                              onNavigateRef(ref);
-                              event.target.value = "";
-                            }}
+                      <div className="team-files-item-center">
+                        <div className="team-files-item-copy">
+                          <div className="team-files-item-title-row">
+                            <span className="team-files-item-name" title={displayName}>
+                              {displayName}
+                            </span>
+                            <span className="team-files-link-badge">
+                              {file.linkCount} link{file.linkCount === 1 ? "" : "s"}
+                            </span>
+                          </div>
+                          <p
+                            className="team-files-item-description muted"
+                            title={fileDescription(file, tab === "trash")}
                           >
-                            <option value="">Linked on…</option>
-                            {file.references.map((ref) => (
-                              <option key={`${ref.kind}-${ref.linkId}`} value={ref.ref}>
-                                {ref.kind === "issue" ? "Issue" : "Row"} {ref.ref} — {ref.name}
-                              </option>
-                            ))}
-                          </select>
-                        </label>
-                      ) : null}
-                      <FileRefCopyButton fileRef={file.fileRef} filename={file.filename} compact={false} />
-                      {tab === "active" ? (
-                        <button
-                          type="button"
-                          className="ghost team-files-delete-btn"
-                          disabled={busyFileId === file.fileId}
-                          onClick={() => void softDelete(file)}
-                        >
-                          {busyFileId === file.fileId ? "…" : "Delete"}
-                        </button>
-                      ) : (
-                        <button
-                          type="button"
-                          className="secondary compact"
-                          disabled={busyFileId === file.fileId}
-                          onClick={() => void restore(file)}
-                        >
-                          {busyFileId === file.fileId ? "…" : "Restore"}
-                        </button>
-                      )}
+                            {fileDescription(file, tab === "trash")}
+                          </p>
+                        </div>
+                        <div className="team-files-item-footer">
+                          <span className="team-files-item-uploader muted">by {file.uploaderName}</span>
+                          <code className="team-files-item-fileref" title="Assigned file link name">
+                            {file.fileRef}
+                          </code>
+                        </div>
+                      </div>
+
+                      <div className="team-files-item-actions">
+                        {file.references.length > 0 && onNavigateRef ? (
+                          <label className="team-files-ref-select team-files-action-btn">
+                            <span className="sr-only">Jump to linked location for {displayName}</span>
+                            <select
+                              defaultValue=""
+                              onChange={(event) => {
+                                const ref = event.target.value;
+                                if (!ref) return;
+                                onNavigateRef(ref);
+                                event.target.value = "";
+                              }}
+                            >
+                              <option value="">Linked on…</option>
+                              {file.references.map((ref) => (
+                                <option key={`${ref.kind}-${ref.linkId}`} value={ref.ref}>
+                                  {ref.kind === "issue" ? "Issue" : "Row"} {ref.ref} — {ref.name}
+                                </option>
+                              ))}
+                            </select>
+                          </label>
+                        ) : (
+                          <span className="team-files-action-btn team-files-action-btn--placeholder muted">
+                            Not linked
+                          </span>
+                        )}
+                        <FileRefCopyButton
+                          fileRef={file.fileRef}
+                          filename={displayName}
+                          compact={false}
+                          className="team-files-action-btn"
+                        />
+                        {showDownload ? (
+                          <button
+                            type="button"
+                            className="secondary team-files-action-btn"
+                            disabled={downloadingFileId === file.fileId}
+                            onClick={() => void downloadFile(file)}
+                          >
+                            {downloadingFileId === file.fileId ? "…" : "Download"}
+                          </button>
+                        ) : null}
+                        {tab === "active" ? (
+                          <button
+                            type="button"
+                            className="ghost team-files-delete-btn team-files-action-btn"
+                            disabled={busyFileId === file.fileId}
+                            onClick={() => void softDelete(file)}
+                          >
+                            {busyFileId === file.fileId ? "…" : "Delete"}
+                          </button>
+                        ) : (
+                          <button
+                            type="button"
+                            className="secondary team-files-action-btn"
+                            disabled={busyFileId === file.fileId}
+                            onClick={() => void restore(file)}
+                          >
+                            {busyFileId === file.fileId ? "…" : "Restore"}
+                          </button>
+                        )}
+                      </div>
                     </div>
-                  </div>
-                </li>
-              ))}
+                  </li>
+                );
+              })}
             </ul>
           )}
         </div>

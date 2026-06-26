@@ -77,6 +77,60 @@ export const DEFAULT_ATTACHMENT_LIMITS: AttachmentLimitsPublic = {
   chunkThresholdBytes: 8 * MB,
 };
 
+const OPAQUE_BASENAME =
+  /^(?:[A-Za-z0-9]{6,24}|[a-f0-9]{8,})(?: \(\d+\))?$/i;
+
+export function fileExtension(filename: string) {
+  const dot = filename.lastIndexOf(".");
+  if (dot <= 0 || dot === filename.length - 1) return "";
+  return filename.slice(dot);
+}
+
+export function fileBasename(filename: string) {
+  const ext = fileExtension(filename);
+  return ext ? filename.slice(0, -ext.length) : filename;
+}
+
+export function isOpaqueUploadFilename(filename: string) {
+  const base = fileBasename(filename);
+  if (!base || base.length < 6) return false;
+  if (/^(?:image|img|photo|file|download|upload|attachment)(?:[-_\s]?\d+)?$/i.test(base)) {
+    return false;
+  }
+  if (/\s/.test(base) && base.length > 12) return false;
+  if (/^[A-Za-z0-9][A-Za-z0-9._\- ()[\]]{4,}$/.test(base) && /[a-z][A-Z]|[A-Z][a-z]/.test(base)) {
+    return false;
+  }
+  return OPAQUE_BASENAME.test(base);
+}
+
+export function slugifyFilenamePart(value: string, maxLength = 80) {
+  const slug = value
+    .trim()
+    .replace(/[^\w.\- ()[\]]+/g, " ")
+    .replace(/\s+/g, "-")
+    .replace(/-+/g, "-")
+    .replace(/^[-.]+|[-.]+$/g, "")
+    .slice(0, maxLength);
+  return slug || "file";
+}
+
+export function buildFriendlyFilename(label: string, originalFilename: string) {
+  const ext = fileExtension(originalFilename).toLowerCase() || "";
+  const slug = slugifyFilenamePart(label);
+  return `${slug}${ext}`;
+}
+
+export function getTeamFileDisplayName(file: {
+  filename: string;
+  references: ReadonlyArray<{ name: string }>;
+}) {
+  if (!isOpaqueUploadFilename(file.filename)) return file.filename;
+  const label = file.references[0]?.name?.trim();
+  if (!label) return file.filename;
+  return buildFriendlyFilename(label, file.filename);
+}
+
 export type UploadSessionPublic = {
   sessionId: string;
   issueId: string | null;
