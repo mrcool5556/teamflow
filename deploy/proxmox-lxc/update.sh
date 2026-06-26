@@ -83,12 +83,17 @@ fi
 
 cd "$APP_DIR"
 
+# Local sed/chmod on deploy scripts (e.g. CRLF fixes) must not block updates.
+if [[ -d "$APP_DIR/.git" ]]; then
+  sudo -u "$APP_USER" git -C "$APP_DIR" checkout -- deploy/proxmox-lxc/*.sh 2>/dev/null || true
+fi
+
 if [[ -n "$BRANCH" ]]; then
-  sudo -u "$APP_USER" git fetch origin
-  sudo -u "$APP_USER" git checkout "$BRANCH"
-  sudo -u "$APP_USER" git pull origin "$BRANCH"
+  sudo -u "$APP_USER" git -C "$APP_DIR" fetch origin
+  sudo -u "$APP_USER" git -C "$APP_DIR" checkout "$BRANCH"
+  sudo -u "$APP_USER" git -C "$APP_DIR" pull origin "$BRANCH"
 else
-  sudo -u "$APP_USER" git pull
+  sudo -u "$APP_USER" git -C "$APP_DIR" pull
 fi
 
 sudo -u "$APP_USER" pnpm install

@@ -161,13 +161,25 @@ async function listBackups(): Promise<MaintenanceBackupPublic[]> {
 }
 
 const BASH_PATH = "/usr/bin/bash";
+const INSTALLED_SCRIPT_PREFIX = "/usr/local/bin/";
+
+function scriptUsesDirectSudo(script: string) {
+  return script.startsWith(INSTALLED_SCRIPT_PREFIX);
+}
+
+function formatCommand(command: string, args: string[]) {
+  return [command, ...args].join(" ");
+}
 
 function buildSpawnArgs(script: string, args: string[]) {
-  if (useSudo() && process.platform !== "win32") {
-    return { command: "sudo", args: ["-n", BASH_PATH, script, ...args] };
-  }
   if (process.platform === "win32") {
     return { command: "bash", args: [script, ...args] };
+  }
+  if (useSudo()) {
+    if (scriptUsesDirectSudo(script)) {
+      return { command: "sudo", args: ["-n", script, ...args] };
+    }
+    return { command: "sudo", args: ["-n", BASH_PATH, script, ...args] };
   }
   return { command: BASH_PATH, args: [script, ...args] };
 }
@@ -175,7 +187,38 @@ function buildSpawnArgs(script: string, args: string[]) {
 function appendSudoHint(chunk: Buffer) {
   const text = chunk.toString("utf8");
   if (!/sudo:.*password is required/i.test(text)) return text;
-  return `${text}\nHint: run sudo bash /opt/teamflow/deploy/proxmox-lxc/setup-maintenance-sudo.sh on the server.\n`;
+  return `${text}\nHint: run sudo bash /opt/teamflow/deploy/proxmox-lxc/setup-maintenance-sudo.sh as root, then systemctl restart teamflow.\nIf that script is missing, allow /usr/local/bin/teamflow-backup and teamflow-update in /etc/sudoers.d/teamflow-maintenance.\n`;
+}
+
+async function probeSudo(script: string): Promise<{ ready: boolean; command: string; detail: string }> {
+  if (!useSudo() || process.platform === "win32") {
+    return { ready: true, command: "", detail: "sudo not required" };
+  }
+  if (!existsSync(script)) {
+    return { ready: false, command: "", detail: `Script missing: ${script}` };
+  }
+
+  const { command, args } = buildSpawnArgs(script, ["--help"]);
+  const cmdline = formatCommand(command, args);
+
+  return new Promise((resolve) => {
+    const child = spawn(command, args, { stdio: ["ignore", "pipe", "pipe"] });
+    let stderr = "";
+    child.stderr?.on("data", (chunk: Buffer) => {
+      stderr += chunk.toString("utf8");
+    });
+    child.on("error", (err) => {
+      resolve({ ready: false, command: cmdline, detail: err.message });
+    });
+    child.on("close", (code) => {
+      if (code === 0) {
+        resolve({ ready: true, command: cmdline, detail: "ok" });
+        return;
+      }
+      const detail = stderr.trim() || `exit ${code ?? "unknown"}`;
+      resolve({ ready: false, command: cmdline, detail });
+    });
+  });
 }
 
 async function assertJobIdle() {
@@ -214,6 +257,8 @@ async function startJob(
     APP_DIR: getAppDir(),
     BACKUP_DIR: getBackupDir(),
   };
+
+  await fs.appendFile(logPath, `> ${formatCommand(command, spawnArgs)}\n`);
 
   const child = spawn(command, spawnArgs, {
     env,
@@ -267,6 +312,7 @@ export async function getMaintenanceStatus(): Promise<MaintenanceStatusPublic> {
   const enabled = reason === null;
   const backups = enabled ? await listBackups() : [];
   const job = await mapJob(await readStoredJob());
+  const sudoProbe = enabled ? await probeSudo(backupScript) : { ready: false, command: "", detail: reason };
 
   return {
     enabled,
@@ -274,6 +320,14 @@ export async function getMaintenanceStatus(): Promise<MaintenanceStatusPublic> {
     platform: process.platform,
     backupScriptReady: existsSync(backupScript),
     updateScriptReady: existsSync(updateScript),
+    backupScript: enabled ? backupScript : null,
+    updateScript: enabled ? updateScript : null,
+    sudoReady: sudoProbe.ready,
+    sudoDetail: enabled
+      ? sudoProbe.ready
+        ? null
+        : `${sudoProbe.detail}${sudoProbe.command ? ` (${sudoProbe.command})` : ""}`
+      : null,
     backupDir: enabled ? getBackupDir() : null,
     backups,
     job,
