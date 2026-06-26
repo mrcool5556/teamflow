@@ -927,6 +927,173 @@ select {
   margin-bottom: 0.75rem;
 }
 
+.maintenance-status-card {
+  border: 2px solid var(--border);
+  background: linear-gradient(135deg, var(--bg) 0%, color-mix(in srgb, var(--accent) 6%, var(--bg)) 100%);
+  padding: 1rem 1.1rem;
+  margin-bottom: 1.25rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.maintenance-status-card-top {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 1rem;
+  align-items: flex-start;
+}
+
+.maintenance-version-line {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.5rem 0.75rem;
+  margin-top: 0.15rem;
+}
+
+.maintenance-version-tag {
+  font-size: 1.35rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+
+.maintenance-version-meta {
+  font-size: 0.95rem;
+  color: var(--muted);
+  text-transform: lowercase;
+}
+
+.maintenance-version-sha {
+  font-size: 0.85rem;
+  padding: 0.1rem 0.35rem;
+  border: 1px solid var(--border);
+  background: var(--bg);
+}
+
+.maintenance-version-deployed,
+.maintenance-version-behind {
+  margin-top: 0.35rem;
+  margin-bottom: 0;
+}
+
+.maintenance-status-pills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  justify-content: flex-end;
+}
+
+.maintenance-pill {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.2rem 0.55rem;
+  font-size: 0.78rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  border: 2px solid var(--border);
+  background: var(--bg);
+}
+
+.maintenance-pill--online,
+.maintenance-pill--ok {
+  border-color: color-mix(in srgb, #2d8a4e 55%, var(--border));
+  background: color-mix(in srgb, #2d8a4e 12%, var(--bg));
+}
+
+.maintenance-pill--update-available {
+  border-color: color-mix(in srgb, var(--accent) 70%, var(--border));
+  background: color-mix(in srgb, var(--accent) 14%, var(--bg));
+}
+
+.maintenance-pill--updating,
+.maintenance-pill--busy,
+.maintenance-pill--restarting {
+  border-color: color-mix(in srgb, #c98a1a 60%, var(--border));
+  background: color-mix(in srgb, #c98a1a 14%, var(--bg));
+}
+
+.maintenance-pill--warn {
+  border-color: color-mix(in srgb, #c94a1a 55%, var(--border));
+  background: color-mix(in srgb, #c94a1a 12%, var(--bg));
+}
+
+.maintenance-stepper {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(5.5rem, 1fr));
+  gap: 0.5rem;
+}
+
+.maintenance-step {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.35rem;
+  text-align: center;
+  opacity: 0.45;
+}
+
+.maintenance-step--done {
+  opacity: 0.85;
+}
+
+.maintenance-step--active {
+  opacity: 1;
+}
+
+.maintenance-step--failed .maintenance-step-marker {
+  border-color: color-mix(in srgb, #c94a1a 70%, var(--border));
+  background: color-mix(in srgb, #c94a1a 16%, var(--bg));
+}
+
+.maintenance-step-marker {
+  width: 1.65rem;
+  height: 1.65rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 2px solid var(--border);
+  border-radius: 999px;
+  font-size: 0.75rem;
+  font-weight: 700;
+  background: var(--bg);
+}
+
+.maintenance-step--active .maintenance-step-marker {
+  border-color: color-mix(in srgb, var(--accent) 70%, var(--border));
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 18%, transparent);
+}
+
+.maintenance-step--done .maintenance-step-marker {
+  border-color: color-mix(in srgb, #2d8a4e 60%, var(--border));
+  background: color-mix(in srgb, #2d8a4e 14%, var(--bg));
+}
+
+.maintenance-step-label {
+  font-size: 0.72rem;
+  line-height: 1.2;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.maintenance-restart-banner {
+  margin: 0;
+  padding: 0.55rem 0.65rem;
+  border: 2px dashed color-mix(in srgb, #c98a1a 50%, var(--border));
+  background: color-mix(in srgb, #c98a1a 10%, var(--bg));
+  font-size: 0.9rem;
+}
+
+.maintenance-status-card-actions {
+  display: flex;
+  justify-content: flex-end;
+}
+
 .maintenance-backup-table {
   width: 100%;
   border-collapse: collapse;

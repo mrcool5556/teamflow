@@ -11,6 +11,7 @@ import type {
   RunMaintenanceUpdateInput,
 } from "@teamflow/core";
 import { findRepoRoot } from "@teamflow/db";
+import { getMaintenanceVersionInfo } from "./versionInfo.js";
 
 const JOB_FILE = "maintenance-job.json";
 const LOG_FILE = "maintenance.log";
@@ -313,6 +314,7 @@ export async function getMaintenanceStatus(): Promise<MaintenanceStatusPublic> {
   const backups = enabled ? await listBackups() : [];
   const job = await mapJob(await readStoredJob());
   const sudoProbe = enabled ? await probeSudo(backupScript) : { ready: false, command: "", detail: reason };
+  const version = await getMaintenanceVersionInfo();
 
   return {
     enabled,
@@ -331,6 +333,7 @@ export async function getMaintenanceStatus(): Promise<MaintenanceStatusPublic> {
     backupDir: enabled ? getBackupDir() : null,
     backups,
     job,
+    version,
   };
 }
 

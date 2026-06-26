@@ -1,5 +1,10 @@
 import { useCallback, useEffect, useState } from "react";
 import type { MaintenanceJobPublic, MaintenanceStatusPublic } from "@teamflow/core";
+import {
+  MAINTENANCE_UPDATE_STEPS,
+  inferUpdatePhase,
+  updatePhaseIndex,
+} from "@teamflow/core";
 import { client } from "../api";
 
 type ServerMaintenanceSettingsSectionProps = {
@@ -30,6 +35,137 @@ function jobLabel(job: MaintenanceJobPublic) {
   return "Update";
 }
 
+function MaintenanceStatusCard({
+  status,
+  serverUnreachable,
+  refreshing,
+  onRefresh,
+}: {
+  status: MaintenanceStatusPublic;
+  serverUnreachable: boolean;
+  refreshing: boolean;
+  onRefresh: () => void;
+}) {
+  const { version, job } = status;
+  const jobRunning = job?.status === "running";
+  const updateRunning = jobRunning && job?.type === "update";
+  const phase = job ? inferUpdatePhase(job.logTail, job) : null;
+  const phaseIdx = phase !== null ? updatePhaseIndex(phase) : -1;
+
+  const deployState = serverUnreachable
+    ? "restarting"
+    : updateRunning
+      ? "updating"
+      : jobRunning
+        ? "busy"
+        : version.updateAvailable
+          ? "update-available"
+          : "online";
+
+  const deployLabel =
+    deployState === "restarting"
+      ? "Restarting"
+      : deployState === "updating"
+        ? "Updating"
+        : deployState === "busy"
+          ? "Running job"
+          : deployState === "update-available"
+            ? "Update available"
+            : "Up to date";
+
+  return (
+    <section className="maintenance-status-card">
+      <div className="maintenance-status-card-top">
+        <div>
+          <p className="eyebrow">Deployed version</p>
+          <div className="maintenance-version-line">
+            <span className="maintenance-version-tag">v{version.version}</span>
+            {version.branch ? (
+              <span className="maintenance-version-meta">{version.branch}</span>
+            ) : null}
+            {version.commitShort ? (
+              <code className="maintenance-version-sha">{version.commitShort}</code>
+            ) : null}
+          </div>
+          {version.commitDate ? (
+            <p className="settings-copy muted maintenance-version-deployed">
+              Deployed {formatWhen(version.commitDate)}
+            </p>
+          ) : null}
+          {version.updateAvailable && version.latestCommitShort ? (
+            <p className="settings-copy maintenance-version-behind">
+              Origin has <code>{version.latestCommitShort}</code>
+              {version.commitsBehind && version.commitsBehind > 0
+                ? ` · ${version.commitsBehind} commit${version.commitsBehind === 1 ? "" : "s"} behind`
+                : null}
+            </p>
+          ) : !version.gitError && version.latestCommitShort && version.commitShort ? (
+            <p className="settings-copy muted">Matches latest on origin.</p>
+          ) : null}
+          {version.gitError ? (
+            <p className="settings-copy issue-link-row-files-error">{version.gitError}</p>
+          ) : null}
+        </div>
+        <div className="maintenance-status-pills">
+          <span className={`maintenance-pill maintenance-pill--${deployState}`}>{deployLabel}</span>
+          {status.enabled ? (
+            <span
+              className={`maintenance-pill maintenance-pill--${status.sudoReady ? "ok" : "warn"}`}
+            >
+              {status.sudoReady ? "Sudo ready" : "Sudo missing"}
+            </span>
+          ) : null}
+          {!status.backupScriptReady || !status.updateScriptReady ? (
+            <span className="maintenance-pill maintenance-pill--warn">Scripts incomplete</span>
+          ) : null}
+        </div>
+      </div>
+
+      {updateRunning && phase !== null ? (
+        <ol className="maintenance-stepper" aria-label="Update progress">
+          {MAINTENANCE_UPDATE_STEPS.filter((step) => step.id !== "done").map((step, index) => {
+            const stepIdx = updatePhaseIndex(step.id);
+            const done = phaseIdx > stepIdx;
+            const active = phase === step.id || (phase === "failed" && step.id === "health");
+            const failed = phase === "failed" && active;
+            return (
+              <li
+                key={step.id}
+                className={[
+                  "maintenance-step",
+                  done ? "maintenance-step--done" : "",
+                  active ? "maintenance-step--active" : "",
+                  failed ? "maintenance-step--failed" : "",
+                ]
+                  .filter(Boolean)
+                  .join(" ")}
+              >
+                <span className="maintenance-step-marker" aria-hidden>
+                  {done ? "✓" : failed ? "!" : index + 1}
+                </span>
+                <span className="maintenance-step-label">{step.label}</span>
+              </li>
+            );
+          })}
+        </ol>
+      ) : null}
+
+      {serverUnreachable ? (
+        <p className="maintenance-restart-banner">
+          Server is restarting — status polling will resume automatically. This is normal during
+          updates.
+        </p>
+      ) : null}
+
+      <div className="maintenance-status-card-actions">
+        <button type="button" className="ghost" disabled={refreshing} onClick={onRefresh}>
+          {refreshing ? "Refreshing…" : "Refresh status"}
+        </button>
+      </div>
+    </section>
+  );
+}
+
 export function ServerMaintenanceSettingsSection({
   teamId,
   canRun,
@@ -37,33 +173,48 @@ export function ServerMaintenanceSettingsSection({
 }: ServerMaintenanceSettingsSectionProps) {
   const [status, setStatus] = useState<MaintenanceStatusPublic | null>(null);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const [serverUnreachable, setServerUnreachable] = useState(false);
   const [runningAction, setRunningAction] = useState<string | null>(null);
   const [updateBranch, setUpdateBranch] = useState("");
 
-  const loadStatus = useCallback(async () => {
-    try {
-      const { status: next } = await client.getServerMaintenanceStatus(teamId);
-      setStatus(next);
-      return next;
-    } catch (err) {
-      onMessage(err instanceof Error ? err.message : "Failed to load maintenance status");
-      return null;
-    } finally {
-      setLoading(false);
-    }
-  }, [onMessage, teamId]);
+  const loadStatus = useCallback(
+    async (options?: { silent?: boolean }) => {
+      if (!options?.silent) setRefreshing(true);
+      try {
+        const { status: next } = await client.getServerMaintenanceStatus(teamId);
+        setStatus(next);
+        setServerUnreachable(false);
+        return next;
+      } catch (err) {
+        setStatus((current) => {
+          if (current?.job?.status === "running") {
+            setServerUnreachable(true);
+            return current;
+          }
+          onMessage(err instanceof Error ? err.message : "Failed to load maintenance status");
+          return current;
+        });
+        return null;
+      } finally {
+        setLoading(false);
+        if (!options?.silent) setRefreshing(false);
+      }
+    },
+    [onMessage, teamId],
+  );
 
   useEffect(() => {
     void loadStatus();
   }, [loadStatus]);
 
   useEffect(() => {
-    if (status?.job?.status !== "running") return;
+    if (status?.job?.status !== "running" && !serverUnreachable) return;
     const timer = window.setInterval(() => {
-      void loadStatus();
+      void loadStatus({ silent: true });
     }, 2000);
     return () => window.clearInterval(timer);
-  }, [loadStatus, status?.job?.status]);
+  }, [loadStatus, serverUnreachable, status?.job?.status]);
 
   async function runAction(
     label: string,
@@ -88,7 +239,7 @@ export function ServerMaintenanceSettingsSection({
           : current,
       );
       onMessage(`${label} started.`);
-      void loadStatus();
+      void loadStatus({ silent: true });
     } catch (err) {
       onMessage(err instanceof Error ? err.message : `Failed to start ${label.toLowerCase()}`);
     } finally {
@@ -114,42 +265,28 @@ export function ServerMaintenanceSettingsSection({
 
       {!loading && status ? (
         <>
+          <MaintenanceStatusCard
+            status={status}
+            serverUnreachable={serverUnreachable}
+            refreshing={refreshing}
+            onRefresh={() => void loadStatus()}
+          />
+
           <section className="settings-section">
             <h3>Host status</h3>
             {status.enabled ? (
               <p className="settings-copy">
                 Maintenance is enabled on this host.
-                {!status.backupScriptReady || !status.updateScriptReady ? (
+                {status.sudoDetail ? (
                   <>
                     {" "}
-                    Scripts: backup {status.backupScriptReady ? "ok" : "missing"}, update{" "}
-                    {status.updateScriptReady ? "ok" : "missing"}.
-                  </>
-                ) : null}
-                {status.sudoReady === false ? (
-                  <>
-                    {" "}
-                    <strong>Sudo not configured</strong> — in-app backup/update will fail until passwordless
-                    sudo is installed on the server.
+                    <span className="issue-link-row-files-error">{status.sudoDetail}</span>
                   </>
                 ) : null}
               </p>
             ) : (
               <p className="settings-copy settings-hint">{status.reason}</p>
             )}
-            {status.sudoDetail ? (
-              <p className="settings-copy issue-link-row-files-error">{status.sudoDetail}</p>
-            ) : null}
-            {status.backupScript ? (
-              <p className="settings-copy muted">
-                Backup command: <code>{status.backupScript}</code>
-              </p>
-            ) : null}
-            {status.updateScript ? (
-              <p className="settings-copy muted">
-                Update command: <code>{status.updateScript}</code>
-              </p>
-            ) : null}
             {status.backupDir ? (
               <p className="settings-copy muted">
                 Backup folder: <code>{status.backupDir}</code>
@@ -162,9 +299,13 @@ export function ServerMaintenanceSettingsSection({
               <h3>Actions</h3>
               <p className="settings-copy">
                 Database-only backups are fast and run before updates by default. Full backups include
-                uploaded files. On the server, run{" "}
-                <code>sudo bash deploy/proxmox-lxc/setup-maintenance-sudo.sh</code> once so updates work
-                without a password prompt.
+                uploaded files.
+                {status.version.updateAvailable ? (
+                  <>
+                    {" "}
+                    <strong>An update is available</strong> — use Update app below to deploy it.
+                  </>
+                ) : null}
               </p>
               <div className="maintenance-actions row">
                 <button
@@ -193,12 +334,17 @@ export function ServerMaintenanceSettingsSection({
               <div className="maintenance-actions row">
                 <button
                   type="button"
+                  className={status.version.updateAvailable ? "" : undefined}
                   disabled={actionsDisabled || !status.updateScriptReady}
                   onClick={() =>
                     void runAction("Update", () => client.runServerMaintenanceUpdate(teamId, {}))
                   }
                 >
-                  {runningAction === "Update" ? "Starting…" : "Update app"}
+                  {runningAction === "Update"
+                    ? "Starting…"
+                    : status.version.updateAvailable
+                      ? "Update app (new version)"
+                      : "Update app"}
                 </button>
                 <button
                   type="button"
