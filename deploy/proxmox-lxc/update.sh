@@ -100,6 +100,7 @@ systemctl start teamflow
 install -m 755 "$APP_DIR/deploy/proxmox-lxc/update.sh" /usr/local/bin/teamflow-update
 install -m 755 "$APP_DIR/deploy/proxmox-lxc/backup.sh" /usr/local/bin/teamflow-backup
 ln -sf teamflow-update /usr/local/bin/update
+bash "$APP_DIR/deploy/proxmox-lxc/setup-maintenance-sudo.sh" || true
 
 wait_for_health() {
   local url="http://127.0.0.1:3000/health"

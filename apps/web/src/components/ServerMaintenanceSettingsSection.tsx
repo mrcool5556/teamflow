@@ -141,7 +141,9 @@ export function ServerMaintenanceSettingsSection({
               <h3>Actions</h3>
               <p className="settings-copy">
                 Database-only backups are fast and run before updates by default. Full backups include
-                uploaded files.
+                uploaded files. On the server, run{" "}
+                <code>sudo bash deploy/proxmox-lxc/setup-maintenance-sudo.sh</code> once so updates work
+                without a password prompt.
               </p>
               <div className="maintenance-actions row">
                 <button
