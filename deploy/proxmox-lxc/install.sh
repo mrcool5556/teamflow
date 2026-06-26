@@ -33,6 +33,11 @@ fi
 cd "$APP_DIR"
 chown -R "$APP_USER:$APP_USER" "$APP_DIR"
 
+if [[ -d "$APP_DIR/.git" ]]; then
+  git config --system --add safe.directory "$APP_DIR" 2>/dev/null || true
+  sudo -u "$APP_USER" git config --global --add safe.directory "$APP_DIR" 2>/dev/null || true
+fi
+
 sudo -u postgres psql -tc "SELECT 1 FROM pg_roles WHERE rolname='$APP_USER'" | grep -q 1 || \
   sudo -u postgres createuser "$APP_USER"
 sudo -u postgres psql -tc "SELECT 1 FROM pg_database WHERE datname='teamflow'" | grep -q 1 || \
@@ -92,6 +97,7 @@ install -m 755 "$APP_DIR/deploy/proxmox-lxc/update.sh" /usr/local/bin/teamflow-u
 ln -sf teamflow-update /usr/local/bin/update
 install -m 755 "$APP_DIR/deploy/proxmox-lxc/backup.sh" /usr/local/bin/teamflow-backup
 install -m 755 "$APP_DIR/deploy/proxmox-lxc/configure-smtp.sh" /usr/local/bin/teamflow-smtp
+bash "$APP_DIR/deploy/proxmox-lxc/setup-maintenance-sudo.sh" || true
 
 echo ""
 echo "Install complete."

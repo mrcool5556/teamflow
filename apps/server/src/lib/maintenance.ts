@@ -40,20 +40,29 @@ function getBackupDir() {
   return "/var/backups/teamflow";
 }
 
-function getBackupScript() {
-  const configured = process.env.TEAMFLOW_BACKUP_SCRIPT?.trim();
-  if (configured) {
-    return path.isAbsolute(configured) ? configured : path.resolve(getAppDir(), configured);
+function resolveScriptPath(configured: string | undefined, installedPath: string, repoRelative: string) {
+  if (configured?.trim()) {
+    const value = configured.trim();
+    return path.isAbsolute(value) ? value : path.resolve(getAppDir(), value);
   }
-  return path.join(getAppDir(), "deploy", "proxmox-lxc", "backup.sh");
+  if (existsSync(installedPath)) return installedPath;
+  return path.join(getAppDir(), repoRelative);
+}
+
+function getBackupScript() {
+  return resolveScriptPath(
+    process.env.TEAMFLOW_BACKUP_SCRIPT,
+    "/usr/local/bin/teamflow-backup",
+    "deploy/proxmox-lxc/backup.sh",
+  );
 }
 
 function getUpdateScript() {
-  const configured = process.env.TEAMFLOW_UPDATE_SCRIPT?.trim();
-  if (configured) {
-    return path.isAbsolute(configured) ? configured : path.resolve(getAppDir(), configured);
-  }
-  return path.join(getAppDir(), "deploy", "proxmox-lxc", "update.sh");
+  return resolveScriptPath(
+    process.env.TEAMFLOW_UPDATE_SCRIPT,
+    "/usr/local/bin/teamflow-update",
+    "deploy/proxmox-lxc/update.sh",
+  );
 }
 
 function useSudo() {
@@ -151,11 +160,22 @@ async function listBackups(): Promise<MaintenanceBackupPublic[]> {
   return backups.sort((a, b) => Date.parse(b.createdAt) - Date.parse(a.createdAt));
 }
 
+const BASH_PATH = "/usr/bin/bash";
+
 function buildSpawnArgs(script: string, args: string[]) {
   if (useSudo() && process.platform !== "win32") {
-    return { command: "sudo", args: ["-n", "bash", script, ...args] };
+    return { command: "sudo", args: ["-n", BASH_PATH, script, ...args] };
   }
-  return { command: "bash", args: [script, ...args] };
+  if (process.platform === "win32") {
+    return { command: "bash", args: [script, ...args] };
+  }
+  return { command: BASH_PATH, args: [script, ...args] };
+}
+
+function appendSudoHint(chunk: Buffer) {
+  const text = chunk.toString("utf8");
+  if (!/sudo:.*password is required/i.test(text)) return text;
+  return `${text}\nHint: run sudo bash /opt/teamflow/deploy/proxmox-lxc/setup-maintenance-sudo.sh on the server.\n`;
 }
 
 async function assertJobIdle() {
@@ -202,7 +222,7 @@ async function startJob(
   });
 
   const append = async (chunk: Buffer) => {
-    await fs.appendFile(logPath, chunk);
+    await fs.appendFile(logPath, appendSudoHint(chunk));
   };
 
   child.stdout?.on("data", (chunk: Buffer) => {
