@@ -345,7 +345,9 @@ export async function getMaintenanceStatus(): Promise<MaintenanceStatusPublic> {
   const backups = enabled ? await listBackups() : [];
   const job = await mapJob(await readStoredJob());
   const sudoProbe = enabled ? await probeSudo(backupScript) : { ready: false, command: "", detail: reason };
-  const version = await getMaintenanceVersionInfo();
+  const version = await getMaintenanceVersionInfo({
+    skipOriginCheck: job?.status === "running",
+  });
 
   return {
     enabled,

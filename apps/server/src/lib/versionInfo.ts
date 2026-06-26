@@ -119,18 +119,28 @@ async function compareWithOrigin(
     return { updateAvailable: false, commitsBehind: 0 };
   }
 
+  const localExists = await gitCommitExists(appDir, localCommit);
+  const originExists = await gitCommitExists(appDir, originCommit);
+  if (!localExists || !originExists) {
+    return { updateAvailable: localCommit !== originCommit, commitsBehind: null };
+  }
+
   try {
     await runGit(appDir, ["merge-base", "--is-ancestor", localCommit, originCommit]);
-    const count = await runGit(appDir, [
-      "rev-list",
-      "--count",
-      `${localCommit}..${originCommit}`,
-    ]);
-    const parsed = Number(count);
-    return {
-      updateAvailable: true,
-      commitsBehind: Number.isFinite(parsed) ? parsed : null,
-    };
+    try {
+      const count = await runGit(appDir, [
+        "rev-list",
+        "--count",
+        `${localCommit}..${originCommit}`,
+      ]);
+      const parsed = Number(count);
+      return {
+        updateAvailable: true,
+        commitsBehind: Number.isFinite(parsed) ? parsed : null,
+      };
+    } catch {
+      return { updateAvailable: true, commitsBehind: null };
+    }
   } catch {
     // Not strictly behind — check if local is ahead of origin instead.
   }
@@ -143,7 +153,9 @@ async function compareWithOrigin(
   }
 }
 
-export async function getMaintenanceVersionInfo(): Promise<MaintenanceVersionPublic> {
+export async function getMaintenanceVersionInfo(options?: {
+  skipOriginCheck?: boolean;
+}): Promise<MaintenanceVersionPublic> {
   const appDir = getAppDir();
   const version = readPackageVersion(appDir);
 
@@ -170,6 +182,21 @@ export async function getMaintenanceVersionInfo(): Promise<MaintenanceVersionPub
     let latestCommit: string | null = null;
     let commitsBehind: number | null = null;
     let gitError: string | null = null;
+
+    if (options?.skipOriginCheck) {
+      return {
+        version,
+        branch,
+        commit,
+        commitShort: shortSha(commit),
+        commitDate: commitDate || null,
+        latestCommit: null,
+        latestCommitShort: null,
+        updateAvailable: false,
+        commitsBehind: null,
+        gitError: null,
+      };
+    }
 
     try {
       const remoteUrl = await runGit(appDir, ["remote", "get-url", "origin"]);
