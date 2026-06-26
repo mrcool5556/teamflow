@@ -261,6 +261,12 @@ export function TeamSettingsSection({
             {permissions.permissions.includes("integrations.discord.manage") ? (
               <li>Manage Discord integration settings</li>
             ) : null}
+            {permissions.permissions.includes("server.maintenance.view") ? (
+              <li>View backups and update status</li>
+            ) : null}
+            {permissions.permissions.includes("server.maintenance.run") ? (
+              <li>Run backups and install updates</li>
+            ) : null}
             {permissions.permissions.length === 1 &&
             permissions.permissions[0] === "team.members.view" ? (
               <li>View team members only</li>

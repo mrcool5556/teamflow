@@ -905,14 +905,7 @@ function migrateStatusesToRows(sqlite: Database.Database) {
   const promoteFirstAdmin = sqlite.prepare(`
     UPDATE team_members
     SET role_id = ?, role = 'owner'
-    WHERE id = (
-      SELECT tm.id
-      FROM team_members tm
-      INNER JOIN team_roles tr ON tr.id = tm.role_id
-      WHERE tm.team_id = ? AND tr.slug = 'admin'
-      ORDER BY tm.created_at ASC
-      LIMIT 1
-    )
+    WHERE id = ?
   `);
 
   for (const team of ownerTeams) {
@@ -922,7 +915,52 @@ function migrateStatusesToRows(sqlite: Database.Database) {
     bumpRolePositions.run(team.id);
     const ownerRoleId = randomUUID();
     insertOwnerRole.run(ownerRoleId, team.id, ownerPermissions);
-    promoteFirstAdmin.run(ownerRoleId, team.id);
+    const firstAdmin = sqlite
+      .prepare(
+        `SELECT tm.id
+         FROM team_members tm
+         INNER JOIN team_roles tr ON tr.id = tm.role_id
+         WHERE tm.team_id = ? AND tr.slug = 'admin'
+         ORDER BY tm.created_at ASC
+         LIMIT 1`,
+      )
+      .get(team.id) as { id: string } | undefined;
+    if (firstAdmin) {
+      promoteFirstAdmin.run(ownerRoleId, firstAdmin.id);
+    }
     console.log(`Seeded owner role for team ${team.id}`);
+  }
+
+  const teamsWithoutOwnerMember = sqlite
+    .prepare(
+      `SELECT t.id AS team_id, owner_role.id AS owner_role_id
+       FROM teams t
+       INNER JOIN team_roles owner_role
+         ON owner_role.team_id = t.id AND owner_role.slug = 'owner'
+       WHERE NOT EXISTS (
+         SELECT 1
+         FROM team_members tm
+         INNER JOIN team_roles tr ON tr.id = tm.role_id
+         WHERE tm.team_id = t.id AND tr.slug = 'owner'
+       )`,
+    )
+    .all() as { team_id: string; owner_role_id: string }[];
+
+  const findFirstAdminMember = sqlite.prepare(
+    `SELECT tm.id
+     FROM team_members tm
+     INNER JOIN team_roles tr ON tr.id = tm.role_id
+     WHERE tm.team_id = ? AND tr.slug = 'admin'
+     ORDER BY tm.created_at ASC
+     LIMIT 1`,
+  );
+
+  for (const team of teamsWithoutOwnerMember) {
+    const firstAdmin = findFirstAdminMember.get(team.team_id) as { id: string } | undefined;
+    if (!firstAdmin) continue;
+    const result = promoteFirstAdmin.run(team.owner_role_id, firstAdmin.id);
+    if (result.changes > 0) {
+      console.log(`Promoted first admin to owner for team ${team.team_id}`);
+    }
   }
 }
