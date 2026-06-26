@@ -100,6 +100,31 @@ chmod 440 /etc/sudoers.d/teamflow-maintenance
 visudo -cf /etc/sudoers.d/teamflow-maintenance
 ```
 
+If the site shows **502 Bad Gateway** after an in-app update, the service was stopped and may not have restarted (often a failed `pnpm build`). On the server:
+
+```bash
+systemctl status teamflow
+journalctl -u teamflow -n 80 --no-pager
+cat /opt/teamflow/data/maintenance.log
+curl -s http://127.0.0.1:3000/health
+```
+
+Bring it back:
+
+```bash
+# If the service is inactive, try starting it
+systemctl start teamflow
+
+# If start fails, rebuild and start
+cd /opt/teamflow
+sudo -u teamflow pnpm install
+sudo -u teamflow pnpm -r build
+sudo -u teamflow pnpm db:migrate
+systemctl restart teamflow
+```
+
+Or fix git/deploy script drift and run `sudo update` from SSH.
+
 **Requires a git clone** at `/opt/teamflow` (not a snapshot copy without `.git`).
 
 ## SMTP (password reset)

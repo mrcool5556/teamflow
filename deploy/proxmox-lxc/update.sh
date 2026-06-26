@@ -66,7 +66,20 @@ fi
 echo "==> Teamflow update"
 echo "    App dir: $APP_DIR"
 
+SERVICE_STOPPED=false
+
+ensure_teamflow_running() {
+  if [[ "$SERVICE_STOPPED" == true ]]; then
+    echo ""
+    echo "==> Update did not finish cleanly — attempting to start teamflow anyway."
+    systemctl start teamflow || true
+  fi
+}
+
+trap ensure_teamflow_running EXIT
+
 systemctl stop teamflow
+SERVICE_STOPPED=true
 
 if [[ "$SKIP_BACKUP" != true ]]; then
   if [[ ! -f "$BACKUP_SCRIPT" ]]; then
@@ -101,6 +114,8 @@ sudo -u "$APP_USER" pnpm -r build
 sudo -u "$APP_USER" pnpm db:migrate
 
 systemctl start teamflow
+SERVICE_STOPPED=false
+trap - EXIT
 
 install -m 755 "$APP_DIR/deploy/proxmox-lxc/update.sh" /usr/local/bin/teamflow-update
 install -m 755 "$APP_DIR/deploy/proxmox-lxc/backup.sh" /usr/local/bin/teamflow-backup
