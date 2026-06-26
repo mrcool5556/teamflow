@@ -97,7 +97,8 @@ export function ServerMaintenanceSettingsSection({
   }
 
   const jobRunning = status?.job?.status === "running";
-  const actionsDisabled = !canRun || !status?.enabled || jobRunning || Boolean(runningAction);
+  const actionsDisabled =
+    !canRun || !status?.enabled || !status.sudoReady || jobRunning || Boolean(runningAction);
 
   return (
     <div className="settings-panel">
@@ -125,10 +126,30 @@ export function ServerMaintenanceSettingsSection({
                     {status.updateScriptReady ? "ok" : "missing"}.
                   </>
                 ) : null}
+                {status.sudoReady === false ? (
+                  <>
+                    {" "}
+                    <strong>Sudo not configured</strong> — in-app backup/update will fail until passwordless
+                    sudo is installed on the server.
+                  </>
+                ) : null}
               </p>
             ) : (
               <p className="settings-copy settings-hint">{status.reason}</p>
             )}
+            {status.sudoDetail ? (
+              <p className="settings-copy issue-link-row-files-error">{status.sudoDetail}</p>
+            ) : null}
+            {status.backupScript ? (
+              <p className="settings-copy muted">
+                Backup command: <code>{status.backupScript}</code>
+              </p>
+            ) : null}
+            {status.updateScript ? (
+              <p className="settings-copy muted">
+                Update command: <code>{status.updateScript}</code>
+              </p>
+            ) : null}
             {status.backupDir ? (
               <p className="settings-copy muted">
                 Backup folder: <code>{status.backupDir}</code>

@@ -40,7 +40,9 @@ ln -sf teamflow-update /usr/local/bin/update
 
 cat >"$SUDOERS_FILE" <<EOF
 # Teamflow in-app maintenance (Settings → Updates)
-$APP_USER ALL=(root) NOPASSWD: $BASH_BIN $BACKUP_REPO *, $BASH_BIN $UPDATE_REPO *, $BACKUP_BIN *, $UPDATE_BIN *
+# Installed wrappers: sudo /usr/local/bin/teamflow-backup (no bash prefix)
+# Repo scripts: sudo /usr/bin/bash /opt/teamflow/deploy/.../backup.sh
+$APP_USER ALL=(root) NOPASSWD: $BACKUP_BIN *, $UPDATE_BIN *, $BASH_BIN $BACKUP_REPO *, $BASH_BIN $UPDATE_REPO *
 EOF
 
 chmod 440 "$SUDOERS_FILE"
@@ -55,7 +57,7 @@ echo "Installed passwordless sudo for $APP_USER:"
 echo "  $SUDOERS_FILE"
 echo ""
 echo "Test:"
-echo "  sudo -u $APP_USER sudo -n $BASH_BIN $BACKUP_REPO --db-only"
 echo "  sudo -u $APP_USER sudo -n $BACKUP_BIN --db-only"
+echo "  sudo -u $APP_USER sudo -n $UPDATE_BIN --help"
 echo ""
 echo "Restart Teamflow: systemctl restart teamflow"

@@ -32,6 +32,10 @@ export type MaintenanceStatusPublic = {
   platform: string;
   backupScriptReady: boolean;
   updateScriptReady: boolean;
+  backupScript: string | null;
+  updateScript: string | null;
+  sudoReady: boolean;
+  sudoDetail: string | null;
   backupDir: string | null;
   backups: MaintenanceBackupPublic[];
   job: MaintenanceJobPublic | null;

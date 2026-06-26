@@ -65,6 +65,13 @@ git config --global --add safe.directory /opt/teamflow
 
 `sudo update` already runs `git pull` as `teamflow` — use that for routine updates.
 
+If `git pull` fails with **local changes would be overwritten** on `deploy/proxmox-lxc/*.sh` (common after `sed` CRLF fixes on the server), reset those scripts and update again:
+
+```bash
+sudo -u teamflow git -C /opt/teamflow checkout -- deploy/proxmox-lxc/*.sh
+sudo update
+```
+
 Manual backup anytime: `sudo teamflow-backup` (DB + uploads) or `sudo teamflow-backup --db-only`
 
 **In-app updates (Settings → Updates):** enable `TEAMFLOW_MAINTENANCE_ENABLED=true` in `.env`, grant the **Owner** role, then install passwordless sudo for the `teamflow` user:
@@ -74,12 +81,11 @@ sudo bash /opt/teamflow/deploy/proxmox-lxc/setup-maintenance-sudo.sh
 systemctl restart teamflow
 ```
 
-Test (either form should work):
+Test (must match how the app invokes sudo — direct wrapper, no bash prefix):
 
 ```bash
-sudo -u teamflow sudo -n /usr/bin/bash /opt/teamflow/deploy/proxmox-lxc/backup.sh --db-only
-# or
 sudo -u teamflow sudo -n /usr/local/bin/teamflow-backup --db-only
+sudo -u teamflow sudo -n /usr/local/bin/teamflow-update --help
 ```
 
 If you see `command not found`, the script may have Windows line endings or is not executable — re-run `setup-maintenance-sudo.sh` (it fixes both).
@@ -88,7 +94,7 @@ Manual sudoers (only if you prefer not to use the helper):
 
 ```bash
 cat >/etc/sudoers.d/teamflow-maintenance <<'EOF'
-teamflow ALL=(root) NOPASSWD: /usr/bin/bash /opt/teamflow/deploy/proxmox-lxc/backup.sh *, /usr/bin/bash /opt/teamflow/deploy/proxmox-lxc/update.sh *, /usr/local/bin/teamflow-backup *, /usr/local/bin/teamflow-update *
+teamflow ALL=(root) NOPASSWD: /usr/local/bin/teamflow-backup *, /usr/local/bin/teamflow-update *, /usr/bin/bash /opt/teamflow/deploy/proxmox-lxc/backup.sh *, /usr/bin/bash /opt/teamflow/deploy/proxmox-lxc/update.sh *
 EOF
 chmod 440 /etc/sudoers.d/teamflow-maintenance
 visudo -cf /etc/sudoers.d/teamflow-maintenance
