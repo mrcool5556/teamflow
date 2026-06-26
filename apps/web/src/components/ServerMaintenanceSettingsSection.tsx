@@ -95,12 +95,25 @@ function MaintenanceStatusCard({
           {version.updateAvailable && version.latestCommitShort ? (
             <p className="settings-copy maintenance-version-behind">
               Origin has <code>{version.latestCommitShort}</code>
-              {version.commitsBehind && version.commitsBehind > 0
+              {version.commitsBehind != null && version.commitsBehind > 0
                 ? ` · ${version.commitsBehind} commit${version.commitsBehind === 1 ? "" : "s"} behind`
-                : null}
+                : version.commitsBehind == null
+                  ? " · update pending"
+                  : null}
             </p>
-          ) : !version.gitError && version.latestCommitShort && version.commitShort ? (
+          ) : !version.gitError &&
+            version.latestCommitShort &&
+            version.commitShort === version.latestCommitShort ? (
             <p className="settings-copy muted">Matches latest on origin.</p>
+          ) : !version.gitError &&
+            version.latestCommitShort &&
+            version.commitShort &&
+            version.commitShort !== version.latestCommitShort &&
+            !version.updateAvailable ? (
+            <p className="settings-copy muted">
+              Local branch is ahead of origin (<code>{version.commitShort}</code> vs{" "}
+              <code>{version.latestCommitShort}</code>).
+            </p>
           ) : null}
           {version.gitError ? (
             <p className="settings-copy issue-link-row-files-error">{version.gitError}</p>

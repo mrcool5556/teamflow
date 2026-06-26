@@ -142,6 +142,7 @@ import {
 import { assertBotConfigKey } from "./lib/secretsCrypto.js";
 import {
   getMaintenanceJob,
+  dismissMaintenanceJob,
   getMaintenanceStatus,
   runMaintenanceBackup,
   runMaintenanceUpdate,
@@ -1231,6 +1232,28 @@ app.post("/teams/:teamId/server/maintenance/update", async (c) => {
     return c.json({ job }, 202);
   } catch (err) {
     const message = err instanceof Error ? err.message : "Failed to start update";
+    return c.json({ error: message }, 400);
+  }
+});
+
+app.post("/teams/:teamId/server/maintenance/job/dismiss", async (c) => {
+  const result = await requireAuth(c);
+  if ("error" in result) return result.error;
+  requireWrite(result.auth);
+
+  const teamId = c.req.param("teamId");
+  if (!(await userHasTeamAccess(db, result.auth.userId, teamId))) {
+    return c.json({ error: "Team access denied" }, 403);
+  }
+  if (!(await userHasTeamPermission(db, result.auth.userId, teamId, "server.maintenance.run"))) {
+    return c.json({ error: "Permission denied" }, 403);
+  }
+
+  try {
+    const job = await dismissMaintenanceJob();
+    return c.json({ job });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "Failed to dismiss job";
     return c.json({ error: message }, 400);
   }
 });
