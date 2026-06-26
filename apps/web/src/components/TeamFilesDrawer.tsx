@@ -1,7 +1,11 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { FILE_TRASH_RETENTION_DAYS, type TeamFilePublic } from "@teamflow/core";
+import type { IssueAttachmentPublic, TeamFilePublic } from "@teamflow/core";
+import { FILE_TRASH_RETENTION_DAYS } from "@teamflow/core";
 import { client } from "../api";
+import { AttachmentLightbox, createAttachmentBlobCache } from "./AttachmentImagePreview";
+import { AttachmentVideoLightbox } from "./AttachmentVideoPlayer";
 import { FileRefCopyButton } from "./FileRefCopyButton";
+import { TeamFilePreview } from "./TeamFilePreview";
 
 function formatFileSize(bytes: number) {
   if (bytes < 1024) return `${bytes} B`;
@@ -15,6 +19,30 @@ function formatPurgeDate(iso: string | null | undefined) {
   const date = new Date(iso);
   if (Number.isNaN(date.getTime())) return null;
   return date.toLocaleDateString(undefined, { month: "short", day: "numeric" });
+}
+
+function fileDescription(file: TeamFilePublic, inTrash: boolean) {
+  if (inTrash && file.purgeAt) {
+    const when = formatPurgeDate(file.purgeAt);
+    return when ? `Purges ${when}` : "Purges soon";
+  }
+
+  if (file.references.length === 0) {
+    return `${file.fileRef} · ${formatFileSize(file.sizeBytes)}`;
+  }
+
+  const linked = file.references
+    .slice(0, 2)
+    .map((ref) =>
+      ref.kind === "issue" ? `${ref.ref} — ${ref.name}` : `Row ${ref.ref} — ${ref.name}`,
+    )
+    .join(" · ");
+
+  if (file.references.length > 2) {
+    return `${linked} · +${file.references.length - 2} more`;
+  }
+
+  return linked;
 }
 
 type TeamFilesDrawerProps = {
@@ -41,6 +69,12 @@ export function TeamFilesDrawer({
   const [query, setQuery] = useState("");
   const [sort, setSort] = useState<SortMode>("size");
   const [busyFileId, setBusyFileId] = useState<string | null>(null);
+  const [imageLightbox, setImageLightbox] = useState<{
+    attachment: IssueAttachmentPublic;
+    imageUrl: string;
+  } | null>(null);
+  const [videoLightbox, setVideoLightbox] = useState<IssueAttachmentPublic | null>(null);
+  const blobCache = useMemo(() => createAttachmentBlobCache(), []);
 
   const loadFiles = useCallback(async () => {
     setLoading(true);
@@ -62,6 +96,11 @@ export function TeamFilesDrawer({
     if (!open) return;
     void loadFiles();
   }, [open, loadFiles]);
+
+  useEffect(() => {
+    if (!open) return;
+    return () => blobCache.revokeAll();
+  }, [blobCache, open]);
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -96,6 +135,9 @@ export function TeamFilesDrawer({
   function handleClose() {
     setQuery("");
     setTab("active");
+    setImageLightbox(null);
+    setVideoLightbox(null);
+    blobCache.revokeAll();
     onClose();
   }
 
@@ -124,6 +166,16 @@ export function TeamFilesDrawer({
     } finally {
       setBusyFileId(null);
     }
+  }
+
+  async function downloadAttachment(attachment: IssueAttachmentPublic) {
+    const blob = await client.downloadAttachment(attachment.id);
+    const url = URL.createObjectURL(blob);
+    const anchor = document.createElement("a");
+    anchor.href = url;
+    anchor.download = attachment.filename;
+    anchor.click();
+    URL.revokeObjectURL(url);
   }
 
   return (
@@ -196,16 +248,30 @@ export function TeamFilesDrawer({
               {filtered.map((file) => (
                 <li key={file.fileId} className="team-files-item">
                   <div className="team-files-item-main">
-                    <div className="team-files-item-copy">
-                      <span className="team-files-item-name">{file.filename}</span>
-                      <span className="team-files-item-meta muted">
-                        {file.fileRef} · {formatFileSize(file.sizeBytes)} · {file.linkCount} link
-                        {file.linkCount === 1 ? "" : "s"}
-                        {tab === "trash" && file.purgeAt
-                          ? ` · purges ${formatPurgeDate(file.purgeAt) ?? "soon"}`
-                          : ""}
-                      </span>
-                      <span className="muted team-files-item-uploader">by {file.uploaderName}</span>
+                    <div className="team-files-item-preview-wrap">
+                      <TeamFilePreview
+                        file={file}
+                        blobCache={blobCache}
+                        onImageOpen={(attachment, imageUrl) =>
+                          setImageLightbox({ attachment, imageUrl })
+                        }
+                        onVideoOpen={setVideoLightbox}
+                      />
+                    </div>
+
+                    <div className="team-files-item-center">
+                      <div className="team-files-item-title-row">
+                        <span className="team-files-item-name" title={file.filename}>
+                          {file.filename}
+                        </span>
+                        <span className="team-files-link-badge">
+                          {file.linkCount} link{file.linkCount === 1 ? "" : "s"}
+                        </span>
+                      </div>
+                      <p className="team-files-item-description muted" title={fileDescription(file, tab === "trash")}>
+                        {fileDescription(file, tab === "trash")}
+                      </p>
+                      <p className="team-files-item-uploader muted">by {file.uploaderName}</p>
                     </div>
 
                     <div className="team-files-item-actions">
@@ -230,7 +296,7 @@ export function TeamFilesDrawer({
                           </select>
                         </label>
                       ) : null}
-                      <FileRefCopyButton fileRef={file.fileRef} filename={file.filename} />
+                      <FileRefCopyButton fileRef={file.fileRef} filename={file.filename} compact={false} />
                       {tab === "active" ? (
                         <button
                           type="button"
@@ -258,6 +324,23 @@ export function TeamFilesDrawer({
           )}
         </div>
       </aside>
+
+      {imageLightbox ? (
+        <AttachmentLightbox
+          attachment={imageLightbox.attachment}
+          imageUrl={imageLightbox.imageUrl}
+          onClose={() => setImageLightbox(null)}
+          onDownload={() => void downloadAttachment(imageLightbox.attachment)}
+        />
+      ) : null}
+
+      {videoLightbox ? (
+        <AttachmentVideoLightbox
+          attachment={videoLightbox}
+          onClose={() => setVideoLightbox(null)}
+          onDownload={() => void downloadAttachment(videoLightbox)}
+        />
+      ) : null}
     </div>
   );
 }
