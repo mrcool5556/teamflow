@@ -113,6 +113,9 @@ else
   sudo -u "$APP_USER" git -C "$APP_DIR" pull
 fi
 
+# Root-owned build artifacts (from manual root builds) break vite as teamflow.
+chown -R "$APP_USER:$APP_USER" "$APP_DIR"
+
 sudo -u "$APP_USER" pnpm install
 sudo -u "$APP_USER" pnpm -r build
 sudo -u "$APP_USER" pnpm db:migrate

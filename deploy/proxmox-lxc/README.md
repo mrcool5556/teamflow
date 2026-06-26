@@ -117,11 +117,14 @@ systemctl start teamflow
 
 # If start fails, rebuild and start
 cd /opt/teamflow
+chown -R teamflow:teamflow /opt/teamflow   # fix root-owned dist/node_modules from manual root builds
 sudo -u teamflow pnpm install
 sudo -u teamflow pnpm -r build
 sudo -u teamflow pnpm db:migrate
 systemctl restart teamflow
 ```
+
+If `pnpm -r build` fails with **EACCES** on `apps/web/dist`, run the `chown` line above first — some files were created as root.
 
 Or fix git/deploy script drift and run `sudo update` from SSH.
 
