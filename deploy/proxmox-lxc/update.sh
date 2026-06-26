@@ -97,11 +97,30 @@ sudo -u "$APP_USER" pnpm db:migrate
 
 systemctl start teamflow
 
+install -m 755 "$APP_DIR/deploy/proxmox-lxc/update.sh" /usr/local/bin/teamflow-update
+install -m 755 "$APP_DIR/deploy/proxmox-lxc/backup.sh" /usr/local/bin/teamflow-backup
+ln -sf teamflow-update /usr/local/bin/update
+
+wait_for_health() {
+  local url="http://127.0.0.1:3000/health"
+  local attempt
+  for attempt in $(seq 1 30); do
+    if curl -sf "$url" >/dev/null; then
+      return 0
+    fi
+    sleep 1
+  done
+  return 1
+}
+
 echo ""
 echo "Update complete."
-if curl -sf "http://localhost:3000/health" >/dev/null; then
+if wait_for_health; then
   echo "Health: ok"
 else
-  echo "Health check failed — run: journalctl -u teamflow -n 50"
+  echo "Health check failed after 30s — the service may still be starting."
+  echo "Run: systemctl status teamflow"
+  echo "Run: journalctl -u teamflow -n 50"
+  echo "Run: curl http://127.0.0.1:3000/health"
   exit 1
 fi

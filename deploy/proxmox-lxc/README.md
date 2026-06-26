@@ -47,6 +47,8 @@ sudo install -m 755 /opt/teamflow/deploy/proxmox-lxc/backup.sh /usr/local/bin/te
 sudo ln -sf teamflow-update /usr/local/bin/update
 ```
 
+Each `sudo update` refreshes these wrappers from the repo automatically.
+
 Manual backup anytime: `sudo teamflow-backup` (DB + uploads) or `sudo teamflow-backup --db-only`
 
 **In-app updates (Settings → Updates):** enable `TEAMFLOW_MAINTENANCE_ENABLED=true` in `.env` and grant the **Owner** role. The API runs the same scripts via passwordless sudo:
