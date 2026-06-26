@@ -6,6 +6,7 @@ type FileRefCopyButtonProps = {
   filename?: string;
   compact?: boolean;
   share?: boolean;
+  className?: string;
 };
 
 export function FileRefCopyButton({
@@ -13,6 +14,7 @@ export function FileRefCopyButton({
   filename,
   compact = true,
   share = true,
+  className,
 }: FileRefCopyButtonProps) {
   const [copied, setCopied] = useState(false);
   const copyValue = share ? buildRefShareUrl(fileRef) : fileRef;
@@ -33,7 +35,7 @@ export function FileRefCopyButton({
   return (
     <button
       type="button"
-      className={`file-ref-copy-btn ${compact ? "compact" : ""} ${copied ? "copied" : ""}`}
+      className={`file-ref-copy-btn ${compact ? "compact" : ""} ${copied ? "copied" : ""} ${className ?? ""}`.trim()}
       title={label}
       aria-label={label}
       onClick={copyRef}

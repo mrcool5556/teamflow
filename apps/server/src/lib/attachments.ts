@@ -6,8 +6,10 @@ import { finished } from "node:stream/promises";
 import { pipeline } from "node:stream/promises";
 import {
   attachmentFileKind,
+  buildFriendlyFilename,
   DEFAULT_ATTACHMENT_LIMITS,
   generateEntityKey,
+  isOpaqueUploadFilename,
   isStreamableAttachmentFile,
   maxBytesForAttachmentFile,
   type AttachmentLimitsPublic,
@@ -95,6 +97,83 @@ export function getUploadTempDir() {
 function sanitizeFilename(name: string) {
   const base = path.basename(name).replace(/[^\w.\- ()[\]]+/g, "_");
   return base.slice(0, 200) || "file";
+}
+
+async function resolveFriendlyUploadFilename(
+  db: Db,
+  originalFilename: string,
+  target: { issueId: string } | { rowId: string },
+) {
+  const sanitized = sanitizeFilename(originalFilename);
+  if (!isOpaqueUploadFilename(sanitized)) return sanitized;
+
+  if ("issueId" in target) {
+    const [issue] = await db
+      .select({ title: schema.issues.title })
+      .from(schema.issues)
+      .where(eq(schema.issues.id, target.issueId))
+      .limit(1);
+    if (issue?.title?.trim()) {
+      return sanitizeFilename(buildFriendlyFilename(issue.title, sanitized));
+    }
+  } else {
+    const [row] = await db
+      .select({ name: schema.boardRows.name })
+      .from(schema.boardRows)
+      .where(eq(schema.boardRows.id, target.rowId))
+      .limit(1);
+    if (row?.name?.trim()) {
+      return sanitizeFilename(buildFriendlyFilename(row.name, sanitized));
+    }
+  }
+
+  return sanitized;
+}
+
+async function renameStoredFileIfNeeded(db: Db, fileId: string, nextFilename: string) {
+  const [file] = await db
+    .select()
+    .from(schema.storedFiles)
+    .where(eq(schema.storedFiles.id, fileId))
+    .limit(1);
+  if (!file) return null;
+
+  const safeName = sanitizeFilename(nextFilename);
+  if (safeName === file.filename) return file;
+
+  const uploadDir = getUploadDir();
+  const oldFullPath = path.join(uploadDir, file.storagePath);
+  const storageDir = path.dirname(file.storagePath);
+  const newStorageName = `${file.id}_${safeName}`;
+  const newRelativePath = path.join(storageDir, newStorageName);
+  const newFullPath = path.join(uploadDir, newRelativePath);
+
+  try {
+    await fs.rename(oldFullPath, newFullPath);
+  } catch {
+    return file;
+  }
+
+  await db
+    .update(schema.storedFiles)
+    .set({ filename: safeName, storagePath: newRelativePath })
+    .where(eq(schema.storedFiles.id, fileId));
+
+  return { ...file, filename: safeName, storagePath: newRelativePath };
+}
+
+async function ensureFriendlyFilenameForTeamFile(
+  db: Db,
+  fileId: string,
+  currentFilename: string,
+  references: FileLinkReferencePublic[],
+) {
+  if (!isOpaqueUploadFilename(currentFilename)) return currentFilename;
+  const label = references[0]?.name?.trim();
+  if (!label) return currentFilename;
+  const next = sanitizeFilename(buildFriendlyFilename(label, currentFilename));
+  const updated = await renameStoredFileIfNeeded(db, fileId, next);
+  return updated?.filename ?? currentFilename;
 }
 
 function limitErrorMessage(filename: string, mimeType: string, maxBytes: number) {
@@ -511,7 +590,7 @@ export async function createStoredFileFromPath(
 ) {
   const fileId = randomUUID();
   const linkId = randomUUID();
-  const safeName = sanitizeFilename(filename);
+  const safeName = await resolveFriendlyUploadFilename(db, filename, target);
   const relativeDir =
     "issueId" in target ? target.issueId : path.join("rows", target.rowId);
   const storageName = `${fileId}_${safeName}`;
@@ -595,7 +674,7 @@ export async function saveIssueAttachment(
 
   const fileId = randomUUID();
   const linkId = randomUUID();
-  const filename = sanitizeFilename(file.name);
+  const filename = await resolveFriendlyUploadFilename(db, file.name, { issueId });
   const issueDir = path.join(getUploadDir(), issueId);
   await fs.mkdir(issueDir, { recursive: true });
 
@@ -695,7 +774,7 @@ export async function saveRowAttachment(
 
   const fileId = randomUUID();
   const linkId = randomUUID();
-  const filename = sanitizeFilename(file.name);
+  const filename = await resolveFriendlyUploadFilename(db, file.name, { rowId });
   const relativeDir = path.join("rows", rowId);
   const rowDir = path.join(getUploadDir(), relativeDir);
   await fs.mkdir(rowDir, { recursive: true });
@@ -937,7 +1016,7 @@ export async function listTeamFiles(
     byFile.set(row.fileId, entry);
   }
 
-  return [...byFile.values()]
+  const files = [...byFile.values()]
     .map(({ file, references }) => ({
       ...file,
       linkCount: references.length,
@@ -952,6 +1031,17 @@ export async function listTeamFiles(
       if (b.sizeBytes !== a.sizeBytes) return b.sizeBytes - a.sizeBytes;
       return a.filename.localeCompare(b.filename);
     });
+
+  for (const file of files) {
+    file.filename = await ensureFriendlyFilenameForTeamFile(
+      db,
+      file.fileId,
+      file.filename,
+      file.references,
+    );
+  }
+
+  return files;
 }
 
 export async function softDeleteTeamFile(db: Db, teamId: string, fileId: string) {
