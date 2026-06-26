@@ -109,6 +109,26 @@ export function inferUpdatePhase(
   return "starting";
 }
 
+export function inferMaintenanceJobOutcome(
+  type: MaintenanceJobPublic["type"],
+  log: string,
+): MaintenanceJobStatus {
+  if (type === "update") {
+    if (log.includes("Health: ok")) return "success";
+    return "failed";
+  }
+
+  if (
+    log.includes("SQLite backup:") ||
+    log.includes("PostgreSQL backup:") ||
+    log.includes("Uploads backup:")
+  ) {
+    return "success";
+  }
+
+  return "failed";
+}
+
 export function updatePhaseIndex(phase: MaintenanceUpdatePhase) {
   const order = MAINTENANCE_UPDATE_STEPS.map((step) => step.id);
   if (phase === "failed") return -1;

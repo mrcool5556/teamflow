@@ -1,6 +1,5 @@
 import { execFile } from "node:child_process";
-import { readFileSync } from "node:fs";
-import { existsSync } from "node:fs";
+import { readFileSync, existsSync } from "node:fs";
 import path from "node:path";
 import { promisify } from "node:util";
 import type { MaintenanceVersionPublic } from "@teamflow/core";
@@ -39,6 +38,111 @@ function shortSha(full: string | null) {
   return full.slice(0, 7);
 }
 
+function formatGitError(err: unknown) {
+  if (!(err instanceof Error)) return "Could not check origin";
+
+  const msg = err.message
+    .replace(/^Command failed:[^\n]*\n?/i, "")
+    .replace(/\s+/g, " ")
+    .trim();
+
+  if (!msg) return "Could not check origin";
+  if (/invalid revision range/i.test(msg)) {
+    return "Could not compare with origin — local history may have diverged.";
+  }
+  if (/could not read from remote|unable to access|network is unreachable/i.test(msg)) {
+    return "Could not reach origin — check server network access to GitHub.";
+  }
+  if (/authentication failed|403|401/i.test(msg)) {
+    return "Could not authenticate with origin.";
+  }
+
+  const firstLine = msg.split("\n")[0]?.trim() ?? msg;
+  return firstLine.length > 140 ? `${firstLine.slice(0, 137)}…` : firstLine;
+}
+
+async function gitCommitExists(appDir: string, rev: string) {
+  try {
+    await runGit(appDir, ["cat-file", "-e", `${rev}^{commit}`], 5_000);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+async function fetchOriginBranch(appDir: string, branch: string) {
+  try {
+    await runGit(
+      appDir,
+      ["fetch", "origin", `${branch}:refs/remotes/origin/${branch}`, "--quiet", "--prune"],
+      30_000,
+    );
+    return true;
+  } catch {
+    try {
+      await runGit(appDir, ["fetch", "origin", branch, "--quiet"], 30_000);
+      return true;
+    } catch {
+      return false;
+    }
+  }
+}
+
+async function resolveOriginCommit(
+  appDir: string,
+  branch: string,
+  lsRemoteCommit: string,
+): Promise<string | null> {
+  if (await gitCommitExists(appDir, lsRemoteCommit)) {
+    return lsRemoteCommit;
+  }
+
+  await fetchOriginBranch(appDir, branch);
+
+  if (await gitCommitExists(appDir, lsRemoteCommit)) {
+    return lsRemoteCommit;
+  }
+
+  try {
+    return await runGit(appDir, ["rev-parse", `origin/${branch}`]);
+  } catch {
+    return lsRemoteCommit;
+  }
+}
+
+async function compareWithOrigin(
+  appDir: string,
+  localCommit: string,
+  originCommit: string,
+): Promise<{ updateAvailable: boolean; commitsBehind: number | null }> {
+  if (localCommit === originCommit) {
+    return { updateAvailable: false, commitsBehind: 0 };
+  }
+
+  try {
+    await runGit(appDir, ["merge-base", "--is-ancestor", localCommit, originCommit]);
+    const count = await runGit(appDir, [
+      "rev-list",
+      "--count",
+      `${localCommit}..${originCommit}`,
+    ]);
+    const parsed = Number(count);
+    return {
+      updateAvailable: true,
+      commitsBehind: Number.isFinite(parsed) ? parsed : null,
+    };
+  } catch {
+    // Not strictly behind — check if local is ahead of origin instead.
+  }
+
+  try {
+    await runGit(appDir, ["merge-base", "--is-ancestor", originCommit, localCommit]);
+    return { updateAvailable: false, commitsBehind: 0 };
+  } catch {
+    return { updateAvailable: true, commitsBehind: null };
+  }
+}
+
 export async function getMaintenanceVersionInfo(): Promise<MaintenanceVersionPublic> {
   const appDir = getAppDir();
   const version = readPackageVersion(appDir);
@@ -74,29 +178,34 @@ export async function getMaintenanceVersionInfo(): Promise<MaintenanceVersionPub
         ["ls-remote", remoteUrl, `refs/heads/${branch}`],
         { timeout: 15_000, maxBuffer: 64 * 1024 },
       );
-      latestCommit = lsRemote.split(/\s+/)[0]?.trim() || null;
+      const lsRemoteCommit = lsRemote.split(/\s+/)[0]?.trim() || null;
 
-      if (latestCommit && latestCommit !== commit) {
-        const behind = await runGit(appDir, [
-          "rev-list",
-          "--count",
-          `${commit}..${latestCommit}`,
-        ]);
-        commitsBehind = Number(behind);
-        if (!Number.isFinite(commitsBehind)) commitsBehind = null;
+      if (!lsRemoteCommit) {
+        gitError = `Origin has no branch named ${branch}.`;
       } else {
-        commitsBehind = 0;
+        latestCommit = await resolveOriginCommit(appDir, branch, lsRemoteCommit);
+        const resolvedOrigin = latestCommit ?? lsRemoteCommit;
+        const comparison = await compareWithOrigin(appDir, commit, resolvedOrigin);
+        commitsBehind = comparison.commitsBehind;
+
+        return {
+          version,
+          branch,
+          commit,
+          commitShort: shortSha(commit),
+          commitDate: commitDate || null,
+          latestCommit: resolvedOrigin,
+          latestCommitShort: shortSha(resolvedOrigin),
+          updateAvailable: comparison.updateAvailable,
+          commitsBehind: comparison.updateAvailable ? commitsBehind : commitsBehind ?? 0,
+          gitError: null,
+        };
       }
     } catch (err) {
-      gitError =
-        err instanceof Error
-          ? `Could not reach origin (${err.message})`
-          : "Could not reach origin";
+      gitError = formatGitError(err);
     }
 
-    const updateAvailable = Boolean(
-      latestCommit && commit && latestCommit !== commit && (commitsBehind ?? 0) > 0,
-    );
+    const updateAvailable = Boolean(latestCommit && commit && latestCommit !== commit);
 
     return {
       version,
@@ -121,7 +230,7 @@ export async function getMaintenanceVersionInfo(): Promise<MaintenanceVersionPub
       latestCommitShort: null,
       updateAvailable: false,
       commitsBehind: null,
-      gitError: err instanceof Error ? err.message : "Git version check failed",
+      gitError: formatGitError(err),
     };
   }
 }

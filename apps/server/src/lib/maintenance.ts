@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { spawn } from "node:child_process";
 import { existsSync } from "node:fs";
+import { open } from "node:fs/promises";
 import fs from "node:fs/promises";
 import path from "node:path";
 import type {
@@ -10,6 +11,7 @@ import type {
   RunMaintenanceBackupInput,
   RunMaintenanceUpdateInput,
 } from "@teamflow/core";
+import { inferMaintenanceJobOutcome } from "@teamflow/core";
 import { findRepoRoot } from "@teamflow/db";
 import { getMaintenanceVersionInfo } from "./versionInfo.js";
 
@@ -103,7 +105,49 @@ async function readLogTail(): Promise<string> {
   }
 }
 
-type StoredJob = Omit<MaintenanceJobPublic, "logTail">;
+type StoredJob = Omit<MaintenanceJobPublic, "logTail"> & {
+  pid?: number;
+};
+
+function isProcessRunning(pid: number) {
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+async function reconcileStaleJob() {
+  const job = await readStoredJob();
+  if (!job || job.status !== "running") return;
+
+  if (job.pid && isProcessRunning(job.pid)) return;
+
+  const logPath = path.join(getDataDir(), LOG_FILE);
+  const log = await readLogTail();
+  const outcome = inferMaintenanceJobOutcome(job.type, log);
+
+  if (
+    job.type === "update" &&
+    outcome === "failed" &&
+    log.includes("App dir:") &&
+    !log.includes("Health:") &&
+    !log.includes("SQLite backup") &&
+    !log.includes("PostgreSQL backup")
+  ) {
+    await fs.appendFile(
+      logPath,
+      "\nUpdate stopped when the app restarted itself (fixed in newer builds — deploy latest, then retry).\n",
+    );
+  }
+
+  await writeStoredJob({
+    ...job,
+    status: outcome,
+    finishedAt: new Date().toISOString(),
+  });
+}
 
 async function readStoredJob(): Promise<StoredJob | null> {
   const jobPath = path.join(getDataDir(), JOB_FILE);
@@ -185,12 +229,6 @@ function buildSpawnArgs(script: string, args: string[]) {
   return { command: BASH_PATH, args: [script, ...args] };
 }
 
-function appendSudoHint(chunk: Buffer) {
-  const text = chunk.toString("utf8");
-  if (!/sudo:.*password is required/i.test(text)) return text;
-  return `${text}\nHint: run sudo bash /opt/teamflow/deploy/proxmox-lxc/setup-maintenance-sudo.sh as root, then systemctl restart teamflow.\nIf that script is missing, allow /usr/local/bin/teamflow-backup and teamflow-update in /etc/sudoers.d/teamflow-maintenance.\n`;
-}
-
 async function probeSudo(script: string): Promise<{ ready: boolean; command: string; detail: string }> {
   if (!useSudo() || process.platform === "win32") {
     return { ready: true, command: "", detail: "sudo not required" };
@@ -223,6 +261,7 @@ async function probeSudo(script: string): Promise<{ ready: boolean; command: str
 }
 
 async function assertJobIdle() {
+  await reconcileStaleJob();
   const current = await readStoredJob();
   if (current?.status === "running") {
     throw new Error("A maintenance job is already running. Wait for it to finish.");
@@ -257,56 +296,48 @@ async function startJob(
     ...process.env,
     APP_DIR: getAppDir(),
     BACKUP_DIR: getBackupDir(),
+    MAINTENANCE_LOG: logPath,
   };
 
   await fs.appendFile(logPath, `> ${formatCommand(command, spawnArgs)}\n`);
 
-  const child = spawn(command, spawnArgs, {
-    env,
-    stdio: ["ignore", "pipe", "pipe"],
-    windowsHide: true,
-  });
+  const logHandle = await open(logPath, "a");
+  try {
+    const child = spawn(command, spawnArgs, {
+      detached: true,
+      stdio: ["ignore", logHandle.fd, logHandle.fd],
+      env,
+      windowsHide: true,
+    });
 
-  const append = async (chunk: Buffer) => {
-    await fs.appendFile(logPath, appendSudoHint(chunk));
-  };
+    child.on("error", (err) => {
+      void (async () => {
+        await fs.appendFile(logPath, `\n${err.message}\n`);
+        const latest = await readStoredJob();
+        if (!latest || latest.id !== job.id) return;
+        await writeStoredJob({
+          ...latest,
+          status: "failed",
+          finishedAt: new Date().toISOString(),
+        });
+      })();
+    });
 
-  child.stdout?.on("data", (chunk: Buffer) => {
-    void append(chunk);
-  });
-  child.stderr?.on("data", (chunk: Buffer) => {
-    void append(chunk);
-  });
+    if (!child.pid) {
+      throw new Error("Failed to start maintenance process");
+    }
 
-  child.on("close", (code) => {
-    void (async () => {
-      const latest = await readStoredJob();
-      if (!latest || latest.id !== job.id) return;
-      await writeStoredJob({
-        ...latest,
-        status: code === 0 ? "success" : "failed",
-        finishedAt: new Date().toISOString(),
-      });
-    })();
-  });
+    await writeStoredJob({ ...job, pid: child.pid });
+    child.unref();
+  } finally {
+    await logHandle.close();
+  }
 
-  child.on("error", (err) => {
-    void (async () => {
-      await fs.appendFile(logPath, `\n${err.message}\n`);
-      const latest = await readStoredJob();
-      if (!latest || latest.id !== job.id) return;
-      await writeStoredJob({
-        ...latest,
-        status: "failed",
-        finishedAt: new Date().toISOString(),
-      });
-    })();
-  });
-
-  return mapJob(job);
+  return mapJob(await readStoredJob());
 }
 
 export async function getMaintenanceStatus(): Promise<MaintenanceStatusPublic> {
+  await reconcileStaleJob();
   const reason = disabledReason();
   const backupScript = getBackupScript();
   const updateScript = getUpdateScript();
@@ -378,5 +409,27 @@ export async function runMaintenanceUpdate(input: RunMaintenanceUpdateInput) {
 }
 
 export async function getMaintenanceJob() {
+  await reconcileStaleJob();
+  return mapJob(await readStoredJob());
+}
+
+export async function dismissMaintenanceJob() {
+  await reconcileStaleJob();
+  const job = await readStoredJob();
+  if (!job) return null;
+
+  if (job.status === "running") {
+    if (job.pid && isProcessRunning(job.pid)) {
+      throw new Error("Job is still running on the server.");
+    }
+    const log = await readLogTail();
+    const outcome = inferMaintenanceJobOutcome(job.type, log);
+    await writeStoredJob({
+      ...job,
+      status: outcome,
+      finishedAt: new Date().toISOString(),
+    });
+  }
+
   return mapJob(await readStoredJob());
 }
