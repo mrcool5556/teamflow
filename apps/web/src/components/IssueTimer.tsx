@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, type WheelEvent } from "react";
 import { createPortal } from "react-dom";
 import type { IssuePublic } from "@teamflow/core";
 import { useFloatingPanelStyle } from "../hooks/useFloatingPanelStyle";
+import { useDismissOnClickOutside } from "../hooks/useDismissOnClickOutside";
 import {
   EMPTY_TIMER_PARTS,
   TIMER_FIELD_LABELS,
@@ -105,19 +106,7 @@ export function IssueTimer({ issue, onUpdate, compact = false, floatingPanel = f
     return () => window.clearInterval(id);
   }, [issue.timerActiveAt]);
 
-  useEffect(() => {
-    if (!open) return;
-
-    function handlePointerDown(event: PointerEvent) {
-      const target = event.target as Node;
-      if (rootRef.current?.contains(target)) return;
-      if (floatingPanel && panelRef.current?.contains(target)) return;
-      setOpen(false);
-    }
-
-    window.addEventListener("pointerdown", handlePointerDown, true);
-    return () => window.removeEventListener("pointerdown", handlePointerDown, true);
-  }, [open, floatingPanel]);
+  useDismissOnClickOutside(open, [rootRef, panelRef], () => setOpen(false));
 
   useEffect(() => {
     if (!open || isCountdown) return;

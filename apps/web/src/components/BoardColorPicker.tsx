@@ -1,7 +1,8 @@
 import { BOARD_COLOR_PRESETS } from "@teamflow/core";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { useFloatingPanelStyle } from "../hooks/useFloatingPanelStyle";
+import { useDismissOnClickOutside } from "../hooks/useDismissOnClickOutside";
 
 type BoardColorPickerProps = {
   color: string | null;
@@ -36,19 +37,7 @@ export function BoardColorPicker({
     setOpen(false);
   }, []);
 
-  useEffect(() => {
-    if (!open) return;
-
-    function handleClick(event: MouseEvent) {
-      const target = event.target as Node;
-      if (rootRef.current?.contains(target)) return;
-      if (useFloating && panelRef.current?.contains(target)) return;
-      closePanel();
-    }
-
-    window.addEventListener("click", handleClick, true);
-    return () => window.removeEventListener("click", handleClick, true);
-  }, [open, useFloating, closePanel]);
+  useDismissOnClickOutside(open, [rootRef, panelRef], closePanel);
 
   function stopBubble(event: React.SyntheticEvent) {
     event.stopPropagation();

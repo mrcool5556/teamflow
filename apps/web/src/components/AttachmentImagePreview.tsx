@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { createPortal } from "react-dom";
 import type { IssueAttachmentPublic } from "@teamflow/core";
 import { isImageAttachmentFile } from "@teamflow/core";
 import { client } from "../api";
@@ -118,10 +119,13 @@ export function AttachmentLightbox({
     return () => window.removeEventListener("keydown", onKeyDown);
   }, [onClose]);
 
-  return (
+  return createPortal(
     <div
       className="attachment-lightbox-backdrop"
-      onClick={onClose}
+      onClick={(event) => {
+        event.stopPropagation();
+        if (event.target === event.currentTarget) onClose();
+      }}
       role="presentation"
     >
       <figure
@@ -143,6 +147,7 @@ export function AttachmentLightbox({
           </span>
         </figcaption>
       </figure>
-    </div>
+    </div>,
+    document.body,
   );
 }

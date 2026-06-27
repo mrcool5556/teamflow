@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import type { IssueAttachmentPublic, TeamFilePublic } from "@teamflow/core";
 import { FILE_TRASH_RETENTION_DAYS, getTeamFileDisplayName, isZipAttachmentFile } from "@teamflow/core";
 import { client } from "../api";
+import { useBackdropDismiss } from "../hooks/useBackdropDismiss";
 import { getSharedTeamFilePreviewCache } from "../lib/teamFilePreviewCache";
 import { AttachmentLightbox } from "./AttachmentImagePreview";
 import { AttachmentVideoLightbox } from "./AttachmentVideoPlayer";
@@ -136,15 +137,17 @@ export function TeamFilesDrawer({
     });
   }, [files, query, sort]);
 
-  if (!open) return null;
-
-  function handleClose() {
+  const handleClose = useCallback(() => {
     setQuery("");
     setTab("active");
     setImageLightbox(null);
     setVideoLightbox(null);
     onClose();
-  }
+  }, [onClose]);
+
+  const { markContentPointerDown, backdropProps } = useBackdropDismiss(handleClose);
+
+  if (!open) return null;
 
   async function softDelete(file: TeamFilePublic) {
     const displayName = getTeamFileDisplayName(file);
@@ -211,8 +214,12 @@ export function TeamFilesDrawer({
   }
 
   return (
-    <div className="drawer-backdrop" onClick={handleClose}>
-      <aside className="drawer issue-drawer team-files-drawer" onClick={(e) => e.stopPropagation()}>
+    <div className="drawer-backdrop" {...backdropProps}>
+      <aside
+        className="drawer issue-drawer team-files-drawer"
+        onPointerDown={markContentPointerDown}
+        onClick={(e) => e.stopPropagation()}
+      >
         <header className="issue-drawer-header">
           <div>
             <p className="eyebrow">Team files</p>

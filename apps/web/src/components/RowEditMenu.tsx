@@ -1,6 +1,7 @@
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { useRef, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { useFloatingPanelStyle } from "../hooks/useFloatingPanelStyle";
+import { useDismissOnClickOutside } from "../hooks/useDismissOnClickOutside";
 
 type RowEditMenuProps = {
   children: ReactNode;
@@ -11,22 +12,10 @@ export function RowEditMenu({ children }: RowEditMenuProps) {
   const rootRef = useRef<HTMLDivElement>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
   const panelRef = useRef<HTMLDivElement>(null);
-  const panelStyle = useFloatingPanelStyle(open, triggerRef, "bottom", "right", 224);
+  const panelStyle = useFloatingPanelStyle(open, triggerRef, "bottom", "left", 224);
   const panelPositioned = Boolean(panelStyle.position);
 
-  useEffect(() => {
-    if (!open) return;
-
-    function handlePointerDown(event: MouseEvent) {
-      const target = event.target as Node;
-      if (rootRef.current?.contains(target)) return;
-      if (panelRef.current?.contains(target)) return;
-      setOpen(false);
-    }
-
-    window.addEventListener("mousedown", handlePointerDown, true);
-    return () => window.removeEventListener("mousedown", handlePointerDown, true);
-  }, [open]);
+  useDismissOnClickOutside(open, [rootRef, panelRef], () => setOpen(false));
 
   const panel = open ? (
     <div

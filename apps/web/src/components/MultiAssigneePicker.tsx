@@ -1,7 +1,8 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import type { TeamMemberPublic } from "@teamflow/core";
 import { useFloatingPanelStyle } from "../hooks/useFloatingPanelStyle";
+import { useDismissOnClickOutside } from "../hooks/useDismissOnClickOutside";
 import { initials } from "../lib/timer";
 
 type MultiAssigneePickerProps = {
@@ -50,19 +51,7 @@ export function MultiAssigneePicker({
         ? selected[0]!.name
         : `${selected[0]!.name} +${selected.length - 1}`;
 
-  useEffect(() => {
-    if (!open) return;
-
-    function handleClick(event: MouseEvent) {
-      const target = event.target as Node;
-      if (rootRef.current?.contains(target)) return;
-      if (floatingPanel && panelRef.current?.contains(target)) return;
-      closePanel();
-    }
-
-    window.addEventListener("click", handleClick, true);
-    return () => window.removeEventListener("click", handleClick, true);
-  }, [open, floatingPanel, closePanel]);
+  useDismissOnClickOutside(open, [rootRef, panelRef], closePanel);
 
   const filtered = members.filter((member) => {
     const hay = `${member.name} ${member.email}`.toLowerCase();
