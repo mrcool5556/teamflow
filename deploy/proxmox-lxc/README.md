@@ -100,6 +100,23 @@ chmod 440 /etc/sudoers.d/teamflow-maintenance
 visudo -cf /etc/sudoers.d/teamflow-maintenance
 ```
 
+**Critical:** the systemd unit must use `KillMode=process`. Otherwise `systemctl stop teamflow` (run by `teamflow-update`) kills the update script too — the log stops at `App dir:` and the site stays on 502.
+
+```bash
+cp /opt/teamflow/deploy/proxmox-lxc/teamflow.service /etc/systemd/system/teamflow.service
+systemctl daemon-reload
+systemctl restart teamflow
+```
+
+If the unit file on disk is not updated yet:
+
+```bash
+grep -q '^KillMode=process' /etc/systemd/system/teamflow.service || \
+  sed -i '/^ExecStart=/a KillMode=process' /etc/systemd/system/teamflow.service
+systemctl daemon-reload
+systemctl restart teamflow
+```
+
 If the site shows **502 Bad Gateway** after an in-app update, the service was stopped and may not have restarted (often a failed `pnpm build`). On the server:
 
 ```bash

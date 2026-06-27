@@ -9,6 +9,8 @@ User=teamflow
 WorkingDirectory=/opt/teamflow
 EnvironmentFile=/opt/teamflow/.env
 ExecStart=/usr/bin/node /opt/teamflow/apps/server/dist/index.js
+# In-app update spawns teamflow-update before stopping this service; do not kill that child.
+KillMode=process
 Restart=on-failure
 RestartSec=5
 
