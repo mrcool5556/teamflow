@@ -29,8 +29,9 @@ import type {
   IssueStatusPublic,
   TeamMemberPublic,
 } from "@teamflow/core";
-import { mapStatusToRow } from "@teamflow/core";
+import { mapStatusToRow, PRIORITIES, PRIORITY_LABELS } from "@teamflow/core";
 import { BoardSearchInput } from "./components/BoardSearchInput";
+import { ContextMenu, type ContextMenuEntry } from "./components/ContextMenu";
 import { MultiAssigneePicker } from "./components/MultiAssigneePicker";
 import { RefCopyButton } from "./components/RefCopyButton";
 import { RowEditMenu, RowEditMenuItem, RowEditMenuSection } from "./components/RowEditMenu";
@@ -39,7 +40,8 @@ import { RowColorPicker } from "./components/RowColorPicker";
 import { BulkActionBar } from "./components/BulkActionBar";
 import { BoardColorPicker } from "./components/BoardColorPicker";
 import { PriorityPicker } from "./components/PriorityPicker";
-import { issueMatchesBoardSearch } from "./lib/refLinks";
+import { issueMatchesBoardSearch, buildRefShareUrl } from "./lib/refLinks";
+import { copyTextToClipboard } from "./lib/clipboard";
 import type { Priority } from "@teamflow/core";
 
 export const issueDndId = (issueId: string) => `issue:${issueId}`;
@@ -48,6 +50,17 @@ export const columnDndId = (rowId: string, statusId: string) =>
   `column:${rowId}:${statusId}`;
 export const cellDndId = (rowId: string, statusId: string) =>
   `cell:${rowId}:${statusId}`;
+
+type BoardContextMenu =
+  | { kind: "issue"; issue: IssuePublic; x: number; y: number }
+  | {
+      kind: "row";
+      row: BoardRowPublic;
+      x: number;
+      y: number;
+      canRemoveRow: boolean;
+      headersVisible: boolean;
+    };
 export const cellTailDndId = (rowId: string, statusId: string) =>
   `cell-tail:${rowId}:${statusId}`;
 
@@ -331,6 +344,7 @@ export function KanbanBoard({
   const [columnSearchQueries, setColumnSearchQueries] = useState<Record<string, string>>({});
   const [selectedIssueIds, setSelectedIssueIds] = useState<Set<string>>(() => new Set());
   const [columnDropTargetId, setColumnDropTargetId] = useState<string | null>(null);
+  const [contextMenu, setContextMenu] = useState<BoardContextMenu | null>(null);
   const lastSelectedIssueIdRef = useRef<string | null>(null);
   const suppressClickRef = useRef<string | null>(null);
 
@@ -343,6 +357,142 @@ export function KanbanBoard({
     setSelectedIssueIds(new Set());
     lastSelectedIssueIdRef.current = null;
   }, []);
+
+  const closeContextMenu = useCallback(() => {
+    setContextMenu(null);
+  }, []);
+
+  const openIssueContextMenu = useCallback(
+    (issue: IssuePublic, event: React.MouseEvent) => {
+      if (previewMode) return;
+      event.preventDefault();
+      event.stopPropagation();
+      setContextMenu({ kind: "issue", issue, x: event.clientX, y: event.clientY });
+    },
+    [previewMode],
+  );
+
+  const openRowContextMenu = useCallback(
+    (
+      row: BoardRowPublic,
+      event: React.MouseEvent,
+      canRemoveRow: boolean,
+      headersVisible: boolean,
+    ) => {
+      if (previewMode) return;
+      event.preventDefault();
+      event.stopPropagation();
+      setContextMenu({
+        kind: "row",
+        row,
+        x: event.clientX,
+        y: event.clientY,
+        canRemoveRow,
+        headersVisible,
+      });
+    },
+    [previewMode],
+  );
+
+  const contextMenuEntries = useMemo((): ContextMenuEntry[] => {
+    if (!contextMenu) return [];
+
+    if (contextMenu.kind === "issue") {
+      const issue = contextMenu.issue;
+      return [
+        {
+          kind: "item",
+          id: "open",
+          label: "Open issue",
+          onSelect: () => onSelectIssue(issue),
+        },
+        {
+          kind: "item",
+          id: "copy-ref",
+          label: `Copy ${issue.identifier}`,
+          onSelect: () => void copyTextToClipboard(issue.identifier),
+        },
+        {
+          kind: "item",
+          id: "copy-link",
+          label: "Copy share link",
+          onSelect: () => void copyTextToClipboard(buildRefShareUrl(issue.identifier)),
+        },
+        { kind: "separator" },
+        { kind: "heading", label: "Priority" },
+        ...PRIORITIES.map((priority) => ({
+          kind: "item" as const,
+          id: `priority-${priority}`,
+          label: PRIORITY_LABELS[priority],
+          checked: issue.priority === priority,
+          onSelect: () => onUpdateIssuePriority(issue, priority),
+        })),
+        { kind: "separator" },
+        {
+          kind: "item",
+          id: "delete",
+          label: "Delete issue",
+          danger: true,
+          onSelect: () => onDeleteIssue(issue),
+        },
+      ];
+    }
+
+    const { row, canRemoveRow, headersVisible } = contextMenu;
+    const entries: ContextMenuEntry[] = [];
+
+    if (onOpenRowFiles) {
+      entries.push({
+        kind: "item",
+        id: "row-files",
+        label: "Row files…",
+        onSelect: () => onOpenRowFiles(row),
+      });
+    }
+
+    entries.push(
+      {
+        kind: "item",
+        id: "add-column",
+        label: "Add column",
+        onSelect: () => onAddColumn(row.id),
+      },
+      {
+        kind: "item",
+        id: "toggle-headers",
+        label: headersVisible ? "Hide column headers" : "Show column headers",
+        onSelect: () => toggleRowHeaders(row.id),
+      },
+      {
+        kind: "item",
+        id: "copy-row",
+        label: `Copy ${row.key}`,
+        onSelect: () => void copyTextToClipboard(row.key),
+      },
+    );
+
+    if (canRemoveRow) {
+      entries.push({ kind: "separator" });
+      entries.push({
+        kind: "item",
+        id: "remove-row",
+        label: "Remove row",
+        danger: true,
+        onSelect: () => onRemoveRow(row),
+      });
+    }
+
+    return entries;
+  }, [
+    contextMenu,
+    onAddColumn,
+    onDeleteIssue,
+    onOpenRowFiles,
+    onRemoveRow,
+    onSelectIssue,
+    onUpdateIssuePriority,
+    toggleRowHeaders,
+  ]);
 
   const handleIssueCardClick = useCallback(
     (issue: IssuePublic, event: React.MouseEvent, cellIssues: IssuePublic[]) => {
@@ -691,6 +841,8 @@ export function KanbanBoard({
               onGoToRef={onGoToRef}
               selectedIssueIds={selectedIssueIds}
               onIssueCardClick={handleIssueCardClick}
+              onIssueContextMenu={openIssueContextMenu}
+              onRowContextMenu={openRowContextMenu}
               activeDragIssueIds={activeDragIssueIds}
               activeId={activeId}
               columnDropTargetId={columnDropTargetId}
@@ -769,6 +921,16 @@ export function KanbanBoard({
           onClear={clearIssueSelection}
         />
       ) : null}
+
+      {contextMenu ? (
+        <ContextMenu
+          x={contextMenu.x}
+          y={contextMenu.y}
+          entries={contextMenuEntries}
+          onClose={closeContextMenu}
+          ariaLabel={contextMenu.kind === "issue" ? `Issue ${contextMenu.issue.identifier}` : `Row ${contextMenu.row.name}`}
+        />
+      ) : null}
     </DndContext>
   );
 }
@@ -814,6 +976,7 @@ function RowSeparatorBar({
   canRemoveRow,
   onRemoveRow,
   onOpenRowFiles,
+  onRowContextMenu,
   previewMode = false,
 }: {
   row: BoardRowPublic;
@@ -832,10 +995,21 @@ function RowSeparatorBar({
   canRemoveRow: boolean;
   onRemoveRow: (row: BoardRowPublic) => void;
   onOpenRowFiles?: (row: BoardRowPublic) => void;
+  onRowContextMenu?: (
+    row: BoardRowPublic,
+    event: React.MouseEvent,
+    canRemoveRow: boolean,
+    headersVisible: boolean,
+  ) => void;
   previewMode?: boolean;
 }) {
   return (
-    <div className="row-separator-bar">
+    <div
+      className="row-separator-bar"
+      onContextMenu={(event) => {
+        onRowContextMenu?.(row, event, canRemoveRow, headersVisible);
+      }}
+    >
       <div className="row-separator-main">
         <div className="row-separator-title">
           <button
@@ -961,6 +1135,8 @@ function SortableBoardRow({
   previewMode = false,
   issueInsertHint = null,
   onOpenRowFiles,
+  onIssueContextMenu,
+  onRowContextMenu,
 }: {
   row: BoardRowPublic;
   statuses: IssueStatusPublic[];
@@ -1012,6 +1188,13 @@ function SortableBoardRow({
   previewMode?: boolean;
   issueInsertHint?: IssueInsertHint | null;
   onOpenRowFiles?: (row: BoardRowPublic) => void;
+  onIssueContextMenu?: (issue: IssuePublic, event: React.MouseEvent) => void;
+  onRowContextMenu?: (
+    row: BoardRowPublic,
+    event: React.MouseEvent,
+    canRemoveRow: boolean,
+    headersVisible: boolean,
+  ) => void;
 }) {
   const {
     attributes,
@@ -1078,6 +1261,7 @@ function SortableBoardRow({
             canRemoveRow={canRemoveRow}
             onRemoveRow={onRemoveRow}
             onOpenRowFiles={onOpenRowFiles}
+            onRowContextMenu={onRowContextMenu}
             previewMode={previewMode}
           />
         </div>
@@ -1112,6 +1296,7 @@ function SortableBoardRow({
           canRemoveRow={canRemoveRow}
           onRemoveRow={onRemoveRow}
           onOpenRowFiles={onOpenRowFiles}
+          onRowContextMenu={onRowContextMenu}
           previewMode={previewMode}
         />
       </div>
@@ -1226,6 +1411,7 @@ function SortableBoardRow({
                             onUpdateIssuePriority={onUpdateIssuePriority}
                             onUpdateIssueTimer={onUpdateIssueTimer}
                             onGoToRef={onGoToRef}
+                            onContextMenu={(event) => onIssueContextMenu?.(issue, event)}
                           />
                           {columnHint?.anchorIssueId === issue.id &&
                             columnHint.insertAfter && <IssueDropIndicator />}
@@ -1364,6 +1550,7 @@ function SortableIssueCard({
   onUpdateIssuePriority,
   onUpdateIssueTimer,
   onGoToRef,
+  onContextMenu,
 }: {
   issue: IssuePublic;
   members: TeamMemberPublic[];
@@ -1386,6 +1573,7 @@ function SortableIssueCard({
     },
   ) => void;
   onGoToRef?: (ref: string) => void;
+  onContextMenu?: (event: React.MouseEvent) => void;
 }) {
   const {
     attributes,
@@ -1425,6 +1613,9 @@ function SortableIssueCard({
         if (event.shiftKey || event.ctrlKey || event.metaKey) {
           event.preventDefault();
         }
+      }}
+      onContextMenu={(event) => {
+        onContextMenu?.(event);
       }}
     >
       {selected ? <span className="issue-card-select-chip" aria-hidden>✓</span> : null}

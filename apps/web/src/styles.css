@@ -3414,6 +3414,65 @@ body.board-pan-active {
   color: var(--danger, #f43f5e);
 }
 
+.context-menu {
+  position: fixed;
+  z-index: 620;
+  min-width: 11.5rem;
+  max-width: 18rem;
+  padding: 0.4rem;
+  background: var(--panel);
+  border: 2px solid var(--border-strong);
+  box-shadow: var(--chrome-modal-shadow);
+}
+
+.context-menu-heading {
+  margin: 0.15rem 0.35rem 0.3rem;
+  font-size: 0.68rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--muted);
+}
+
+.context-menu-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  width: 100%;
+  text-align: left;
+  padding: 0.45rem 0.55rem;
+  background: transparent;
+  border: none;
+  color: var(--text);
+  font-size: 0.82rem;
+  cursor: pointer;
+}
+
+.context-menu-item:hover:not(:disabled),
+.context-menu-item.checked {
+  background: color-mix(in srgb, var(--accent) 10%, var(--panel));
+}
+
+.context-menu-item:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.context-menu-item.danger {
+  color: var(--danger, #f43f5e);
+}
+
+.context-menu-check {
+  font-size: 0.72rem;
+  color: var(--accent);
+}
+
+.context-menu-separator {
+  height: 1px;
+  margin: 0.35rem 0.2rem;
+  background: var(--border);
+}
+
 .column-label-head {
   display: flex;
   align-items: center;
