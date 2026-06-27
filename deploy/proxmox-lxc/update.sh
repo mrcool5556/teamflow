@@ -83,8 +83,10 @@ ensure_teamflow_running() {
 
 trap ensure_teamflow_running EXIT
 
+echo "==> Stopping teamflow service…"
 systemctl stop teamflow
 SERVICE_STOPPED=true
+echo "==> Teamflow service stopped."
 
 if [[ "$SKIP_BACKUP" != true ]]; then
   if [[ ! -f "$BACKUP_SCRIPT" ]]; then
@@ -92,35 +94,44 @@ if [[ "$SKIP_BACKUP" != true ]]; then
     echo "Use --skip-backup or run: sudo bash $APP_DIR/deploy/proxmox-lxc/update.sh"
     exit 1
   fi
+  echo "==> Running pre-update backup…"
   if [[ "$BACKUP_FULL" == true ]]; then
     bash "$BACKUP_SCRIPT" --full
   else
     bash "$BACKUP_SCRIPT" --db-only
   fi
+  echo "==> Backup finished."
 fi
 
 cd "$APP_DIR"
 
 # Local sed/chmod on deploy scripts (e.g. CRLF fixes) must not block updates.
 if [[ -d "$APP_DIR/.git" ]]; then
+  echo "==> Resetting deploy script line endings…"
   sudo -u "$APP_USER" git -C "$APP_DIR" checkout -- deploy/proxmox-lxc/*.sh 2>/dev/null || true
 fi
 
 if [[ -n "$BRANCH" ]]; then
+  echo "==> Pulling branch $BRANCH…"
   sudo -u "$APP_USER" git -C "$APP_DIR" fetch origin
   sudo -u "$APP_USER" git -C "$APP_DIR" checkout "$BRANCH"
   sudo -u "$APP_USER" git -C "$APP_DIR" pull origin "$BRANCH"
 else
+  echo "==> Pulling latest from git…"
   sudo -u "$APP_USER" git -C "$APP_DIR" pull
 fi
 
-# Root-owned build artifacts (from manual root builds) break vite as teamflow.
+echo "==> Fixing file ownership for build…"
 chown -R "$APP_USER:$APP_USER" "$APP_DIR"
 
+echo "==> pnpm install…"
 sudo -u "$APP_USER" pnpm install
+echo "==> pnpm build…"
 sudo -u "$APP_USER" pnpm -r build
+echo "==> db migrate…"
 sudo -u "$APP_USER" pnpm db:migrate
 
+echo "==> Starting teamflow service…"
 systemctl start teamflow
 SERVICE_STOPPED=false
 trap - EXIT
