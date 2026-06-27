@@ -22,6 +22,7 @@ import { RichText } from "./RichText";
 import { LinkPasteOffer } from "./LinkPasteOffer";
 import { initials } from "../lib/timer";
 import { useLinkPasteOffer } from "../hooks/useLinkPasteOffer";
+import { useBackdropDismiss } from "../hooks/useBackdropDismiss";
 import {
   AttachmentImageThumbnail,
   AttachmentLightbox,
@@ -389,10 +390,13 @@ export function IssueDrawer({
     onClose();
   }
 
+  const { markContentPointerDown, backdropProps } = useBackdropDismiss(handleDrawerClose);
+
   return (
-    <div className="drawer-backdrop" onClick={handleDrawerClose}>
+    <div className="drawer-backdrop" {...backdropProps}>
       <aside
         className={`drawer issue-drawer ${refNavActive ? "issue-drawer--ref-nav" : ""}`}
+        onPointerDown={markContentPointerDown}
         onClick={(e) => e.stopPropagation()}
       >
         <header className="issue-drawer-header">

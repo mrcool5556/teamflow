@@ -107,6 +107,7 @@ export function App() {
   const [profileMessage, setProfileMessage] = useState<string | null>(null);
   const profileSaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const profileRef = useRef<UserProfile>(createDefaultUserProfile());
+  const settingsPointerDownRef = useRef(false);
   const [historyOpen, setHistoryOpen] = useState(false);
   const [aboutOpen, setAboutOpen] = useState(false);
   const [highlightedIssueId, setHighlightedIssueId] = useState<string | null>(null);
@@ -1206,11 +1207,36 @@ export function App() {
   const overlayOpen = settingsOpen || roadmapOpen;
   const useSamplePreview = settingsOpen && rows.length === 0;
 
+  const closeSettings = useCallback(() => {
+    setView("board");
+  }, []);
+
+  useEffect(() => {
+    if (!settingsOpen) return;
+
+    function onKeyDown(event: KeyboardEvent) {
+      if (event.key === "Escape") closeSettings();
+    }
+
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [settingsOpen, closeSettings]);
+
+  const dismissSettingsFromPreview = useCallback(() => {
+    if (settingsPointerDownRef.current) {
+      settingsPointerDownRef.current = false;
+      return;
+    }
+    closeSettings();
+  }, [closeSettings]);
+
   usePanScroll(boardScrollRef, !settingsOpen);
 
   const boardPanel = (
     <div
       className={`board-wrap ${settingsOpen ? "board-wrap--preview" : ""} ${refNavActive ? "board-wrap--ref-nav" : ""}`}
+      onClick={settingsOpen ? dismissSettingsFromPreview : undefined}
+      title={settingsOpen ? "Click board to close settings" : undefined}
     >
       {settingsOpen ? (
         <div className="board-preview-banner">
@@ -1219,9 +1245,19 @@ export function App() {
             <p className="settings-copy board-preview-copy">
               {useSamplePreview
                 ? "Sample row and cards — your board is empty."
-                : "Your real board — theme and layout update as you change settings."}
+                : "Your real board — theme and layout update as you change settings. Click anywhere here to close settings."}
             </p>
           </div>
+          <button
+            type="button"
+            className="ghost board-preview-close"
+            onClick={(event) => {
+              event.stopPropagation();
+              closeSettings();
+            }}
+          >
+            Close
+          </button>
         </div>
       ) : (
         <div className="board-toolbar">
@@ -1415,8 +1451,23 @@ export function App() {
 
       {settingsOpen ? (
         <div className="app-workspace app-workspace--settings">
-          <aside className="settings-sidebar panel settings">
-            <h2>Settings</h2>
+          <aside
+            className="settings-sidebar panel settings"
+            onPointerDown={() => {
+              settingsPointerDownRef.current = true;
+            }}
+          >
+            <div className="settings-sidebar-header">
+              <h2>Settings</h2>
+              <button
+                type="button"
+                className="ghost settings-close-btn"
+                aria-label="Close settings"
+                onClick={closeSettings}
+              >
+                ×
+              </button>
+            </div>
             <div className="settings-shell">
               <SettingsNav
                 panel={settingsPanel}

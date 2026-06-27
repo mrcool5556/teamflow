@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, type ChangeEvent, type DragEvent } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type ChangeEvent, type DragEvent } from "react";
 import type { BoardRowPublic, IssueAttachmentPublic } from "@teamflow/core";
 import {
   DEFAULT_ATTACHMENT_LIMITS,
@@ -7,6 +7,7 @@ import {
 } from "@teamflow/core";
 import type { AttachmentLimitsPublic } from "@teamflow/core";
 import { client } from "../api";
+import { useBackdropDismiss } from "../hooks/useBackdropDismiss";
 import { FileRefCopyButton } from "./FileRefCopyButton";
 import { LinkFromFileRef } from "./LinkFromFileRef";
 import { RefCopyButton } from "./RefCopyButton";
@@ -68,12 +69,14 @@ export function RowFilesDrawer({ row, onClose, onNavigateRef }: RowFilesDrawerPr
   const attachmentBlobCache = useMemo(() => createAttachmentBlobCache(), []);
   const attachmentInputRef = useRef<HTMLInputElement>(null);
 
-  function handleClose() {
+  const handleClose = useCallback(() => {
     setAttachmentLightbox(null);
     setAttachmentVideo(null);
     attachmentBlobCache.revokeAll();
     onClose();
-  }
+  }, [attachmentBlobCache, onClose]);
+
+  const { markContentPointerDown, backdropProps } = useBackdropDismiss(handleClose);
 
   useEffect(() => {
     let cancelled = false;
@@ -201,8 +204,12 @@ export function RowFilesDrawer({ row, onClose, onNavigateRef }: RowFilesDrawerPr
   }
 
   return (
-    <div className="drawer-backdrop" onClick={handleClose}>
-      <aside className="drawer issue-drawer" onClick={(event) => event.stopPropagation()}>
+    <div className="drawer-backdrop" {...backdropProps}>
+      <aside
+        className="drawer issue-drawer"
+        onPointerDown={markContentPointerDown}
+        onClick={(event) => event.stopPropagation()}
+      >
         <header className="issue-drawer-header">
           <div className="issue-drawer-header-ids">
             <div className="issue-drawer-id-row">

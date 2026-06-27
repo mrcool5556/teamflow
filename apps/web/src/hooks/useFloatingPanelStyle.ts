@@ -19,7 +19,7 @@ export function useFloatingPanelStyle(
       if (!anchor) return;
 
       const rect = anchor.getBoundingClientRect();
-      const width = Math.max(rect.width, panelWidth);
+      const width = panelWidth;
       const preferTop =
         placement === "top" ||
         (placement === "auto" &&
@@ -27,7 +27,10 @@ export function useFloatingPanelStyle(
 
       const left =
         align === "right"
-          ? Math.max(12, rect.right - width)
+          ? Math.min(
+              Math.max(12, rect.right - width),
+              window.innerWidth - width - 12,
+            )
           : Math.max(12, Math.min(rect.left, window.innerWidth - width - 12));
 
       setStyle({
@@ -36,7 +39,8 @@ export function useFloatingPanelStyle(
         top: preferTop ? rect.top - 8 : rect.bottom + 6,
         transform: preferTop ? "translateY(-100%)" : undefined,
         zIndex: 500,
-        minWidth: width,
+        width,
+        maxWidth: width,
       });
     }
 

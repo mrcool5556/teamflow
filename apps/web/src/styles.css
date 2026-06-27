@@ -763,6 +763,38 @@ select {
   overflow: hidden;
 }
 
+.board-wrap--preview {
+  cursor: pointer;
+}
+
+.board-preview-banner {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.board-preview-close {
+  flex-shrink: 0;
+}
+
+.settings-sidebar-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.settings-sidebar-header h2 {
+  margin: 0;
+}
+
+.settings-close-btn {
+  font-size: 1.35rem;
+  line-height: 1;
+  padding: 0.2rem 0.45rem;
+}
+
 .app-workspace--settings {
   display: grid;
   grid-template-columns: minmax(420px, 560px) minmax(0, 1fr);
@@ -2861,7 +2893,13 @@ body.board-pan-active {
 .priority-picker-panel--floating.priority-picker-panel--positioned {
   opacity: 1;
   pointer-events: auto;
-  min-width: 11rem;
+  min-width: unset;
+}
+
+.row-edit-menu-panel--floating.row-edit-menu-panel--positioned {
+  opacity: 1;
+  pointer-events: auto;
+  min-width: unset;
 }
 
 .priority-picker-list {
