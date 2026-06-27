@@ -3414,15 +3414,25 @@ body.board-pan-active {
   color: var(--danger, #f43f5e);
 }
 
-.context-menu {
+.context-menu-shell {
   position: fixed;
   z-index: 620;
+}
+
+.context-menu {
+  position: relative;
   min-width: 11.5rem;
   max-width: 18rem;
   padding: 0.4rem;
   background: var(--panel);
   border: 2px solid var(--border-strong);
   box-shadow: var(--chrome-modal-shadow);
+}
+
+.context-menu--flyout {
+  position: absolute;
+  min-width: 10.5rem;
+  z-index: 1;
 }
 
 .context-menu-heading {
@@ -3460,6 +3470,34 @@ body.board-pan-active {
 
 .context-menu-item.danger {
   color: var(--danger, #f43f5e);
+}
+
+.context-menu-item--submenu.open,
+.context-menu-item--submenu:hover,
+.context-menu-item--submenu:focus-visible {
+  background: color-mix(in srgb, var(--accent) 10%, var(--panel));
+}
+
+.context-menu-item-trail {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  margin-left: 1rem;
+}
+
+.context-menu-hint {
+  font-size: 0.72rem;
+  color: var(--muted);
+  max-width: 6rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.context-menu-caret {
+  font-size: 0.9rem;
+  line-height: 1;
+  color: var(--muted);
 }
 
 .context-menu-check {
