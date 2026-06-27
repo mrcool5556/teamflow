@@ -1,4 +1,5 @@
 import { useEffect, useRef } from "react";
+import { useBackdropDismiss } from "../hooks/useBackdropDismiss";
 
 type QuickAddModalProps = {
   open: boolean;
@@ -42,12 +43,15 @@ export function QuickAddModal({
     return () => window.removeEventListener("keydown", onKeyDown);
   }, [open, onClose]);
 
+  const { markContentPointerDown, backdropProps } = useBackdropDismiss(onClose);
+
   if (!open) return null;
 
   return (
-    <div className="quick-add-backdrop" onClick={onClose}>
+    <div className="quick-add-backdrop" {...backdropProps}>
       <form
         className="quick-add-modal"
+        onPointerDown={markContentPointerDown}
         onClick={(e) => e.stopPropagation()}
         onSubmit={(e) => {
           e.preventDefault();
