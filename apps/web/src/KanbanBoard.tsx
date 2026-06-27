@@ -408,25 +408,23 @@ export function KanbanBoard({
         },
         {
           kind: "item",
-          id: "copy-ref",
-          label: `Copy ${issue.identifier}`,
-          onSelect: () => void copyTextToClipboard(issue.identifier),
-        },
-        {
-          kind: "item",
           id: "copy-link",
-          label: "Copy share link",
+          label: "Copy shareable link",
           onSelect: () => void copyTextToClipboard(buildRefShareUrl(issue.identifier)),
         },
-        { kind: "separator" },
-        { kind: "heading", label: "Priority" },
-        ...PRIORITIES.map((priority) => ({
-          kind: "item" as const,
-          id: `priority-${priority}`,
-          label: PRIORITY_LABELS[priority],
-          checked: issue.priority === priority,
-          onSelect: () => onUpdateIssuePriority(issue, priority),
-        })),
+        {
+          kind: "submenu",
+          id: "priority",
+          label: "Priority",
+          hint: PRIORITY_LABELS[issue.priority],
+          entries: PRIORITIES.map((priority) => ({
+            kind: "item" as const,
+            id: `priority-${priority}`,
+            label: PRIORITY_LABELS[priority],
+            checked: issue.priority === priority,
+            onSelect: () => onUpdateIssuePriority(issue, priority),
+          })),
+        },
         { kind: "separator" },
         {
           kind: "item",
@@ -465,9 +463,9 @@ export function KanbanBoard({
       },
       {
         kind: "item",
-        id: "copy-row",
-        label: `Copy ${row.key}`,
-        onSelect: () => void copyTextToClipboard(row.key),
+        id: "copy-row-link",
+        label: "Copy shareable link",
+        onSelect: () => void copyTextToClipboard(buildRefShareUrl(row.key)),
       },
     );
 
