@@ -18,6 +18,8 @@ import {
   UI_COLOR_PRESET_PALETTES,
   mergeUserProfile,
 } from "@teamflow/core";
+import { useEffect, useRef, useState, type MutableRefObject } from "react";
+import { applyUserProfile } from "../profile";
 
 type AppearanceSettingsSectionProps = {
   profile: UserProfile;
@@ -128,13 +130,80 @@ function AppearanceSegmentGroup<T extends string>({
   );
 }
 
+type CustomColorKey = keyof NonNullable<UserProfile["appearance"]["customColors"]>;
+
+function CustomColorField({
+  label,
+  value,
+  profile,
+  colorKey,
+  customDraftRef,
+  onCommit,
+}: {
+  label: string;
+  value: string;
+  profile: UserProfile;
+  colorKey: CustomColorKey;
+  customDraftRef: MutableRefObject<NonNullable<UserProfile["appearance"]["customColors"]>>;
+  onCommit: (profile: UserProfile) => void;
+}) {
+  const [draft, setDraft] = useState(value);
+  const inputRef = useRef<HTMLInputElement>(null);
+  const onCommitRef = useRef(onCommit);
+  const profileRef = useRef(profile);
+  onCommitRef.current = onCommit;
+  profileRef.current = profile;
+
+  useEffect(() => {
+    setDraft(value);
+  }, [value]);
+
+  useEffect(() => {
+    const input = inputRef.current;
+    if (!input) return;
+
+    function handleCommit() {
+      onCommitRef.current(
+        patchAppearance(profileRef.current, { customColors: { ...customDraftRef.current } }),
+      );
+    }
+
+    input.addEventListener("change", handleCommit);
+    return () => input.removeEventListener("change", handleCommit);
+  }, [customDraftRef]);
+
+  return (
+    <label className="appearance-color-field">
+      {label}
+      <input
+        ref={inputRef}
+        type="color"
+        value={draft}
+        onInput={(event) => {
+          const next = event.currentTarget.value;
+          setDraft(next);
+          customDraftRef.current = { ...customDraftRef.current, [colorKey]: next };
+          applyUserProfile(
+            patchAppearance(profile, { customColors: customDraftRef.current }),
+          );
+        }}
+      />
+    </label>
+  );
+}
+
 export function AppearanceSettingsSection({
   profile,
   onProfileChange,
 }: AppearanceSettingsSectionProps) {
   const { appearance } = profile;
   const custom = appearance.customColors;
+  const customDraftRef = useRef({ ...custom });
   const showCustomColors = appearance.colorPreset === "custom";
+
+  useEffect(() => {
+    customDraftRef.current = { ...custom };
+  }, [custom]);
 
   return (
     <section className="settings-section appearance-settings">
@@ -183,62 +252,38 @@ export function AppearanceSettingsSection({
         {showCustomColors ? (
           <div className="appearance-custom-colors">
             <div className="appearance-color-grid">
-              <label className="appearance-color-field">
-                Primary
-                <input
-                  type="color"
-                  value={custom.primary ?? DEFAULT_UI_PRIMARY}
-                  onChange={(e) => {
-                    onProfileChange(
-                      patchAppearance(profile, {
-                        customColors: { ...custom, primary: e.target.value },
-                      }),
-                    );
-                  }}
-                />
-              </label>
-              <label className="appearance-color-field">
-                Accent
-                <input
-                  type="color"
-                  value={custom.accent ?? DEFAULT_UI_ACCENT}
-                  onChange={(e) => {
-                    onProfileChange(
-                      patchAppearance(profile, {
-                        customColors: { ...custom, accent: e.target.value },
-                      }),
-                    );
-                  }}
-                />
-              </label>
-              <label className="appearance-color-field">
-                Text
-                <input
-                  type="color"
-                  value={custom.text ?? (appearance.theme === "light" ? "#141414" : "#ececec")}
-                  onChange={(e) => {
-                    onProfileChange(
-                      patchAppearance(profile, {
-                        customColors: { ...custom, text: e.target.value },
-                      }),
-                    );
-                  }}
-                />
-              </label>
-              <label className="appearance-color-field">
-                Soft text
-                <input
-                  type="color"
-                  value={custom.textSoft ?? (appearance.theme === "light" ? "#404040" : "#b8b8b8")}
-                  onChange={(e) => {
-                    onProfileChange(
-                      patchAppearance(profile, {
-                        customColors: { ...custom, textSoft: e.target.value },
-                      }),
-                    );
-                  }}
-                />
-              </label>
+              <CustomColorField
+                label="Primary"
+                value={custom.primary ?? DEFAULT_UI_PRIMARY}
+                profile={profile}
+                colorKey="primary"
+                customDraftRef={customDraftRef}
+                onCommit={onProfileChange}
+              />
+              <CustomColorField
+                label="Accent"
+                value={custom.accent ?? DEFAULT_UI_ACCENT}
+                profile={profile}
+                colorKey="accent"
+                customDraftRef={customDraftRef}
+                onCommit={onProfileChange}
+              />
+              <CustomColorField
+                label="Text"
+                value={custom.text ?? (appearance.theme === "light" ? "#141414" : "#ececec")}
+                profile={profile}
+                colorKey="text"
+                customDraftRef={customDraftRef}
+                onCommit={onProfileChange}
+              />
+              <CustomColorField
+                label="Soft text"
+                value={custom.textSoft ?? (appearance.theme === "light" ? "#404040" : "#b8b8b8")}
+                profile={profile}
+                colorKey="textSoft"
+                customDraftRef={customDraftRef}
+                onCommit={onProfileChange}
+              />
             </div>
           </div>
         ) : null}
