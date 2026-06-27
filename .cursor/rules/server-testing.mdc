@@ -1,0 +1,20 @@
+---
+description: SSH production diagnostics for Teamflow LXC
+alwaysApply: true
+---
+
+# Production server testing
+
+When debugging deployment, updates, 502s, maintenance jobs, or "works locally but not on server":
+
+1. **SSH is available** — use Host `teamflow` (see [docs/CONNECTIONS.md](../../docs/CONNECTIONS.md) and [docs/SERVER-TESTING.md](../../docs/SERVER-TESTING.md)).
+2. **Run diagnostics yourself** — do not only tell the user what to run. Start with:
+   ```powershell
+   Get-Content deploy/proxmox-lxc/diagnose.sh | ssh teamflow bash
+   ```
+   Or individual checks from SERVER-TESTING.md.
+3. **Read-only first** — status, logs, health, git rev. Ask before restart, update, pull, or build on production.
+4. **Known update failure** — if maintenance.log stops right after `App dir:` and service is dead, check `KillMode=process` in `/etc/systemd/system/teamflow.service` (see deploy/proxmox-lxc/README.md).
+5. **Git on server** — use `sudo -u teamflow git -C /opt/teamflow …`, not bare `git` as root (dubious ownership).
+
+Production app dir: `/opt/teamflow`. Test/dev FiveM servers (`Break-stuff-here-only`, `JamatarsServer`) are unrelated — do not confuse with Teamflow LXC.
