@@ -57,9 +57,10 @@ if [[ $EUID -ne 0 ]]; then
   exit 1
 fi
 
-if [[ -n "${MAINTENANCE_LOG:-}" ]]; then
-  exec >>"$MAINTENANCE_LOG" 2>&1
-fi
+# Always append to the UI log (sudo strips env vars; do not rely on MAINTENANCE_LOG).
+LOG_FILE="$APP_DIR/data/maintenance.log"
+mkdir -p "$(dirname "$LOG_FILE")"
+exec >>"$LOG_FILE" 2>&1
 
 if [[ ! -d "$APP_DIR/.git" ]]; then
   echo "Not a git repo at $APP_DIR."

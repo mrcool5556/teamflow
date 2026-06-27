@@ -42,6 +42,7 @@ cat >"$SUDOERS_FILE" <<EOF
 # Teamflow in-app maintenance (Settings → Updates)
 # Installed wrappers: sudo /usr/local/bin/teamflow-backup (no bash prefix)
 # Repo scripts: sudo /usr/bin/bash /opt/teamflow/deploy/.../backup.sh
+Defaults:$APP_USER env_keep += "APP_DIR BACKUP_DIR"
 $APP_USER ALL=(root) NOPASSWD: $BACKUP_BIN *, $UPDATE_BIN *, $BASH_BIN $BACKUP_REPO *, $BASH_BIN $UPDATE_REPO *
 EOF
 
