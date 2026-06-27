@@ -301,6 +301,39 @@ async function startJob(
 
   await fs.appendFile(logPath, `> ${formatCommand(command, spawnArgs)}\n`);
 
+  const isUpdate = type === "update";
+
+  if (isUpdate) {
+    // Update stops teamflow — must survive as a detached root process with its own log redirect in update.sh.
+    const child = spawn(command, spawnArgs, {
+      detached: true,
+      stdio: "ignore",
+      env,
+      windowsHide: true,
+    });
+
+    child.on("error", (err) => {
+      void (async () => {
+        await fs.appendFile(logPath, `\n${err.message}\n`);
+        const latest = await readStoredJob();
+        if (!latest || latest.id !== job.id) return;
+        await writeStoredJob({
+          ...latest,
+          status: "failed",
+          finishedAt: new Date().toISOString(),
+        });
+      })();
+    });
+
+    if (!child.pid) {
+      throw new Error("Failed to start maintenance process");
+    }
+
+    await writeStoredJob({ ...job, pid: child.pid });
+    child.unref();
+    return mapJob(await readStoredJob());
+  }
+
   const logHandle = await open(logPath, "a");
   try {
     const child = spawn(command, spawnArgs, {
