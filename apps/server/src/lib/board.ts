@@ -1,4 +1,4 @@
-import { and, asc, eq, isNull } from "drizzle-orm";
+import { and, asc, eq, inArray, isNotNull, isNull } from "drizzle-orm";
 import {
   DEFAULT_STATUSES,
   generateEntityKey,
@@ -197,4 +197,30 @@ export async function countStatusIssues(db: Db, statusId: string) {
     .from(schema.issues)
     .where(and(eq(schema.issues.statusId, statusId), isNull(schema.issues.deletedAt)));
   return issues.length;
+}
+
+/** Hard-delete trashed issues still pointing at a column (blocks FK on column removal). */
+export async function purgeTrashedIssuesForStatus(db: Db, statusId: string) {
+  await db
+    .delete(schema.issues)
+    .where(and(eq(schema.issues.statusId, statusId), isNotNull(schema.issues.deletedAt)));
+}
+
+/** Hard-delete trashed issues still pointing at a row or its columns (blocks FK on row removal). */
+export async function purgeTrashedIssuesForRow(db: Db, rowId: string) {
+  const statuses = await db
+    .select({ id: schema.issueStatuses.id })
+    .from(schema.issueStatuses)
+    .where(eq(schema.issueStatuses.rowId, rowId));
+  const statusIds = statuses.map((status) => status.id);
+
+  if (statusIds.length > 0) {
+    await db
+      .delete(schema.issues)
+      .where(and(inArray(schema.issues.statusId, statusIds), isNotNull(schema.issues.deletedAt)));
+  }
+
+  await db
+    .delete(schema.issues)
+    .where(and(eq(schema.issues.rowId, rowId), isNotNull(schema.issues.deletedAt)));
 }
