@@ -9,6 +9,7 @@ export const TEAM_PERMISSIONS = [
   "team.roles.view",
   "team.roles.manage",
   "team.delete",
+  "team.data.transfer",
   "integrations.discord.view",
   "integrations.discord.manage",
   /** Future: store bot token / PAT in Settings instead of .env */
@@ -26,6 +27,7 @@ export const TEAM_PERMISSION_LABELS: Record<TeamPermission, string> = {
   "team.roles.view": "View roles & permissions",
   "team.roles.manage": "Create and edit roles",
   "team.delete": "Delete the team",
+  "team.data.transfer": "Export and import team board bundles",
   "integrations.discord.view": "View Discord integration",
   "integrations.discord.manage": "Edit Discord integration",
   "integrations.discord.secrets": "Manage Discord bot secrets",
@@ -46,6 +48,7 @@ export const TEAM_PERMISSION_GROUPS: {
       "team.roles.view",
       "team.roles.manage",
       "team.delete",
+      "team.data.transfer",
     ],
   },
   {

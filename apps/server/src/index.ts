@@ -25,6 +25,8 @@ import {
   runMaintenanceBackupSchema,
   runMaintenanceUpdateSchema,
   renameTeamFileSchema,
+  teamBundleExportQuerySchema,
+  teamBundleImportOptionsSchema,
   updateTeamMemberRoleSchema,
   updateTeamRoleSchema,
   userProfilePatchSchema,
@@ -149,6 +151,11 @@ import {
   runMaintenanceBackup,
   runMaintenanceUpdate,
 } from "./lib/maintenance.js";
+import {
+  exportTeamBundle,
+  importTeamBundle,
+  TeamBundleError,
+} from "./lib/teamBundle.js";
 import {
   getTeamPermissionsForUser,
   userHasTeamPermission,
@@ -528,6 +535,88 @@ app.delete("/teams/:teamId", async (c) => {
           ? 404
           : 400;
     return c.json({ error: message }, status);
+  }
+});
+
+app.get("/teams/:teamId/export", async (c) => {
+  const result = await requireAuth(c);
+  if ("error" in result) return result.error;
+
+  const teamId = c.req.param("teamId");
+  if (!(await userHasTeamAccess(db, result.auth.userId, teamId))) {
+    return c.json({ error: "Team access denied" }, 403);
+  }
+  if (!(await userHasTeamPermission(db, result.auth.userId, teamId, "team.data.transfer"))) {
+    return c.json({ error: "Permission denied" }, 403);
+  }
+
+  const query = teamBundleExportQuerySchema.safeParse(c.req.query());
+  if (!query.success) {
+    return c.json({ error: query.error.issues[0]?.message ?? "Invalid query" }, 400);
+  }
+
+  try {
+    const { filename, buffer } = await exportTeamBundle(
+      db,
+      teamId,
+      query.data.includeFiles ?? false,
+    );
+    return new Response(buffer, {
+      headers: {
+        "Content-Type": "application/zip",
+        "Content-Disposition": `attachment; filename="${filename}"`,
+      },
+    });
+  } catch (err) {
+    if (err instanceof TeamBundleError) {
+      return c.json({ error: err.message }, err.status as 400 | 404);
+    }
+    throw err;
+  }
+});
+
+app.post("/teams/:teamId/import", async (c) => {
+  const result = await requireAuth(c);
+  if ("error" in result) return result.error;
+  requireWrite(result.auth);
+
+  const teamId = c.req.param("teamId");
+  if (!(await userHasTeamAccess(db, result.auth.userId, teamId))) {
+    return c.json({ error: "Team access denied" }, 403);
+  }
+  if (!(await userHasTeamPermission(db, result.auth.userId, teamId, "team.data.transfer"))) {
+    return c.json({ error: "Permission denied" }, 403);
+  }
+
+  const optionsInput = teamBundleImportOptionsSchema.safeParse({
+    force: c.req.query("force") === "true",
+  });
+  if (!optionsInput.success) {
+    return c.json({ error: optionsInput.error.issues[0]?.message ?? "Invalid options" }, 400);
+  }
+
+  const body = await c.req.parseBody();
+  const bundlePart = body.bundle;
+  if (!bundlePart || typeof bundlePart === "string") {
+    return c.json({ error: "Missing bundle zip file (field: bundle)" }, 400);
+  }
+
+  const buffer = Buffer.from(await bundlePart.arrayBuffer());
+
+  try {
+    const importResult = await importTeamBundle(
+      db,
+      teamId,
+      result.auth.userId,
+      buffer,
+      optionsInput.data,
+    );
+    return c.json({ result: importResult });
+  } catch (err) {
+    if (err instanceof TeamBundleError) {
+      return c.json({ error: err.message }, err.status as 400 | 404);
+    }
+    throw err;
   }
 });
 

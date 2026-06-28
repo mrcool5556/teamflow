@@ -478,6 +478,43 @@ export const activity = sqliteTable("activity", {
     .default(sql`(datetime('now'))`),
 });
 
+export const teamBundleImports = sqliteTable(
+  "team_bundle_imports",
+  {
+    id: text("id")
+      .primaryKey()
+      .$defaultFn(() => crypto.randomUUID()),
+    teamId: text("team_id")
+      .notNull()
+      .references(() => teams.id, { onDelete: "cascade" }),
+    exportId: text("export_id").notNull(),
+    sourceTeamKey: text("source_team_key"),
+    importedAt: text("imported_at")
+      .notNull()
+      .default(sql`(datetime('now'))`),
+  },
+  (table) => [uniqueIndex("team_bundle_imports_team_export").on(table.teamId, table.exportId)],
+);
+
+export const teamBundleImportEntityMap = sqliteTable(
+  "team_bundle_import_entity_map",
+  {
+    importId: text("import_id")
+      .notNull()
+      .references(() => teamBundleImports.id, { onDelete: "cascade" }),
+    entityType: text("entity_type").notNull(),
+    sourceId: text("source_id").notNull(),
+    targetId: text("target_id").notNull(),
+  },
+  (table) => [
+    uniqueIndex("team_bundle_import_entity_unique").on(
+      table.importId,
+      table.entityType,
+      table.sourceId,
+    ),
+  ],
+);
+
 export const teamsRelations = relations(teams, ({ one, many }) => ({
   workspace: one(workspaces, {
     fields: [teams.workspaceId],

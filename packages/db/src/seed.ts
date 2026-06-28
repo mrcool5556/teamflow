@@ -42,6 +42,7 @@ async function seed() {
     "team.roles.view",
     "team.roles.manage",
     "team.delete",
+    "team.data.transfer",
     "integrations.discord.view",
     "integrations.discord.manage",
     "integrations.discord.secrets",

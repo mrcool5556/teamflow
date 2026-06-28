@@ -54,7 +54,7 @@ export async function mapBoardRow(
   };
 }
 
-async function uniqueRowKey(db: Db, teamId: string) {
+export async function uniqueRowKey(db: Db, teamId: string) {
   for (let attempt = 0; attempt < 12; attempt++) {
     const key = generateEntityKey("row");
     const [existing] = await db
@@ -67,7 +67,7 @@ async function uniqueRowKey(db: Db, teamId: string) {
   throw new Error("Failed to generate unique row key");
 }
 
-async function uniqueColumnKey(db: Db, teamId: string) {
+export async function uniqueColumnKey(db: Db, teamId: string) {
   for (let attempt = 0; attempt < 12; attempt++) {
     const key = generateEntityKey("col");
     const [existing] = await db
