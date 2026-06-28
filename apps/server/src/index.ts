@@ -42,6 +42,8 @@ import { cors } from "hono/cors";
 import {
   countRowIssues,
   countStatusIssues,
+  purgeTrashedIssuesForRow,
+  purgeTrashedIssuesForStatus,
   createBoardRowWithKey,
   createDefaultBoardRow,
   createStatusWithKey,
@@ -811,6 +813,8 @@ app.delete("/statuses/:statusId", async (c) => {
   if (issueCount > 0) {
     return c.json({ error: "Column has issues — move or delete them first" }, 409);
   }
+
+  await purgeTrashedIssuesForStatus(db, statusId);
 
   await db
     .delete(schema.issueStatuses)
@@ -1662,6 +1666,8 @@ app.delete("/rows/:rowId", async (c) => {
   if (issueCount > 0) {
     return c.json({ error: "Row has issues — move or delete them first" }, 409);
   }
+
+  await purgeTrashedIssuesForRow(db, rowId);
 
   await db.delete(schema.boardRows).where(eq(schema.boardRows.id, rowId));
 
