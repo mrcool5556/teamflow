@@ -95,6 +95,49 @@ export function applySchemaPatches(sqlite: Database.Database) {
   ensureStoredFileDeletedAt(sqlite);
   ensureRowFileLinksTable(sqlite);
   purgeExpiredDeletedIssues(sqlite);
+  ensureTeamBundleTablesAndPermissions(sqlite);
+}
+
+function ensureTeamBundleTablesAndPermissions(sqlite: Database.Database) {
+  sqlite.exec(`
+    CREATE TABLE IF NOT EXISTS team_bundle_imports (
+      id TEXT PRIMARY KEY,
+      team_id TEXT NOT NULL REFERENCES teams(id) ON DELETE CASCADE,
+      export_id TEXT NOT NULL,
+      source_team_key TEXT,
+      imported_at TEXT NOT NULL DEFAULT (datetime('now')),
+      UNIQUE(team_id, export_id)
+    );
+  `);
+
+  sqlite.exec(`
+    CREATE TABLE IF NOT EXISTS team_bundle_import_entity_map (
+      import_id TEXT NOT NULL REFERENCES team_bundle_imports(id) ON DELETE CASCADE,
+      entity_type TEXT NOT NULL,
+      source_id TEXT NOT NULL,
+      target_id TEXT NOT NULL,
+      UNIQUE(import_id, entity_type, source_id)
+    );
+  `);
+
+  const ownerRoles = sqlite
+    .prepare("SELECT id, permissions FROM team_roles WHERE slug = 'owner'")
+    .all() as { id: string; permissions: string }[];
+
+  for (const role of ownerRoles) {
+    let permissions: string[] = [];
+    try {
+      permissions = JSON.parse(role.permissions) as string[];
+    } catch {
+      permissions = [];
+    }
+    if (!permissions.includes("team.data.transfer")) {
+      permissions.push("team.data.transfer");
+      sqlite
+        .prepare("UPDATE team_roles SET permissions = ?, updated_at = datetime('now') WHERE id = ?")
+        .run(JSON.stringify(permissions), role.id);
+    }
+  }
 }
 
 function ensureIssueAttachmentsTable(sqlite: Database.Database) {
@@ -962,46 +1005,6 @@ function migrateStatusesToRows(sqlite: Database.Database) {
     const result = promoteFirstAdmin.run(team.owner_role_id, firstAdmin.id);
     if (result.changes > 0) {
       console.log(`Promoted first admin to owner for team ${team.team_id}`);
-    }
-  }
-
-  sqlite.exec(`
-    CREATE TABLE IF NOT EXISTS team_bundle_imports (
-      id TEXT PRIMARY KEY,
-      team_id TEXT NOT NULL REFERENCES teams(id) ON DELETE CASCADE,
-      export_id TEXT NOT NULL,
-      source_team_key TEXT,
-      imported_at TEXT NOT NULL DEFAULT (datetime('now')),
-      UNIQUE(team_id, export_id)
-    );
-  `);
-
-  sqlite.exec(`
-    CREATE TABLE IF NOT EXISTS team_bundle_import_entity_map (
-      import_id TEXT NOT NULL REFERENCES team_bundle_imports(id) ON DELETE CASCADE,
-      entity_type TEXT NOT NULL,
-      source_id TEXT NOT NULL,
-      target_id TEXT NOT NULL,
-      UNIQUE(import_id, entity_type, source_id)
-    );
-  `);
-
-  const ownerRoles = sqlite
-    .prepare("SELECT id, permissions FROM team_roles WHERE slug = 'owner'")
-    .all() as { id: string; permissions: string }[];
-
-  for (const role of ownerRoles) {
-    let permissions: string[] = [];
-    try {
-      permissions = JSON.parse(role.permissions) as string[];
-    } catch {
-      permissions = [];
-    }
-    if (!permissions.includes("team.data.transfer")) {
-      permissions.push("team.data.transfer");
-      sqlite
-        .prepare("UPDATE team_roles SET permissions = ?, updated_at = datetime('now') WHERE id = ?")
-        .run(JSON.stringify(permissions), role.id);
     }
   }
 }
