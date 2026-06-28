@@ -2,9 +2,8 @@ import { randomUUID } from "node:crypto";
 import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
-import { createRequire } from "node:module";
 import { PassThrough } from "node:stream";
-import type { Archiver } from "archiver";
+import { ZipArchive } from "archiver";
 import yauzl from "yauzl";
 import { and, asc, eq, inArray, isNull } from "drizzle-orm";
 import {
@@ -25,9 +24,6 @@ import { schema } from "@teamflow/db";
 import { filterValidTeamMemberIds, setBoardRowAssignees, setIssueAssignees } from "./assignees.js";
 import { getUploadDir } from "./attachments.js";
 import { uniqueColumnKey, uniqueRowKey } from "./board.js";
-
-const require = createRequire(import.meta.url);
-const createArchiver = require("archiver") as (format: string, options?: unknown) => Archiver;
 
 export class TeamBundleError extends Error {
   status: number;
@@ -82,7 +78,7 @@ function resolveAssigneeIds(
 }
 
 function zipToBuffer(
-  append: (archive: Archiver) => void | Promise<void>,
+  append: (archive: ZipArchive) => void | Promise<void>,
 ): Promise<Buffer> {
   return new Promise((resolve, reject) => {
     const chunks: Buffer[] = [];
@@ -91,7 +87,7 @@ function zipToBuffer(
     passthrough.on("end", () => resolve(Buffer.concat(chunks)));
     passthrough.on("error", reject);
 
-    const archive = createArchiver("zip", { zlib: { level: 9 } });
+    const archive = new ZipArchive({ zlib: { level: 9 } });
     archive.on("error", reject);
     archive.pipe(passthrough);
 

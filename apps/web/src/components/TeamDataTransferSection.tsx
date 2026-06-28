@@ -14,7 +14,10 @@ function triggerDownload(blob: Blob, filename: string) {
   const anchor = document.createElement("a");
   anchor.href = url;
   anchor.download = filename;
+  anchor.style.display = "none";
+  document.body.appendChild(anchor);
   anchor.click();
+  document.body.removeChild(anchor);
   URL.revokeObjectURL(url);
 }
 
@@ -30,18 +33,25 @@ export function TeamDataTransferSection({
   const [forceImport, setForceImport] = useState(false);
   const [exporting, setExporting] = useState(false);
   const [importing, setImporting] = useState(false);
+  const [statusMessage, setStatusMessage] = useState<string | null>(null);
 
   async function exportBundle() {
     setExporting(true);
+    setStatusMessage(null);
     onMessage(null);
     try {
       const { blob, filename } = await client.exportTeamBundle(teamId, includeFiles);
+      if (blob.size === 0) {
+        throw new Error("Export returned an empty file");
+      }
       triggerDownload(blob, filename);
-      onMessage(
-        `Exported ${teamKey} bundle${includeFiles ? " with files" : ""} for ${teamName}.`,
-      );
+      const message = `Exported ${teamKey} bundle${includeFiles ? " with files" : ""} for ${teamName}.`;
+      setStatusMessage(message);
+      onMessage(message);
     } catch (err) {
-      onMessage(err instanceof Error ? err.message : "Export failed");
+      const message = err instanceof Error ? err.message : "Export failed";
+      setStatusMessage(message);
+      onMessage(message);
     } finally {
       setExporting(false);
     }
@@ -49,21 +59,24 @@ export function TeamDataTransferSection({
 
   async function importBundle(file: File) {
     setImporting(true);
+    setStatusMessage(null);
     onMessage(null);
     try {
       const { result } = await client.importTeamBundle(teamId, file, { force: forceImport });
       if (result.skipped) {
-        onMessage(
-          `This bundle was already imported (export ${result.exportId.slice(0, 8)}…). Enable “Force re-import” to merge again.`,
-        );
+        const message = `This bundle was already imported (export ${result.exportId.slice(0, 8)}…). Enable “Force re-import” to merge again.`;
+        setStatusMessage(message);
+        onMessage(message);
         return;
       }
-      onMessage(
-        `Imported ${result.issuesCreated} issues, ${result.rowsCreated} rows, ${result.commentsCreated} comments, ${result.filesCreated} files into ${teamName}.`,
-      );
+      const message = `Imported ${result.issuesCreated} issues, ${result.rowsCreated} rows, ${result.commentsCreated} comments, ${result.filesCreated} files into ${teamName}.`;
+      setStatusMessage(message);
+      onMessage(message);
       onImported?.();
     } catch (err) {
-      onMessage(err instanceof Error ? err.message : "Import failed");
+      const message = err instanceof Error ? err.message : "Import failed";
+      setStatusMessage(message);
+      onMessage(message);
     } finally {
       setImporting(false);
       if (fileInputRef.current) fileInputRef.current.value = "";
@@ -92,6 +105,7 @@ export function TeamDataTransferSection({
         <button type="button" disabled={exporting} onClick={() => void exportBundle()}>
           {exporting ? "Exporting…" : "Download bundle"}
         </button>
+        {statusMessage ? <p className="settings-hint">{statusMessage}</p> : null}
       </div>
 
       <div className="settings-subsection">
