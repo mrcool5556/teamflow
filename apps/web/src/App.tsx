@@ -1544,6 +1544,9 @@ export function App() {
                       onTeamJoined={(joinedTeamId) => void refreshTeamsAndSwitch(joinedTeamId)}
                       onTeamLeft={(leftTeamId) => void handleTeamLeft(leftTeamId)}
                       onTeamDeleted={(deletedTeamId) => void handleTeamDeleted(deletedTeamId)}
+                      onBoardChanged={() => {
+                        if (teamId) void loadBoard(teamId);
+                      }}
                     />
                   </div>
                 ) : null}

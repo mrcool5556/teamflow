@@ -9,6 +9,7 @@ export * from "./profile.js";
 export * from "./refs.js";
 export * from "./maintenance.js";
 export * from "./permissions.js";
+export * from "./teamBundle.js";
 
 export const PRIORITIES = ["none", "low", "medium", "high", "urgent"] as const;
 export type Priority = (typeof PRIORITIES)[number];

@@ -4,6 +4,7 @@ import { client } from "../api";
 import { useTeamRoles } from "../hooks/useTeamRoles";
 import { buildInviteShareUrl, extractInviteToken } from "../lib/inviteLinks";
 import { hasTeamPermission } from "../lib/teamPermissions";
+import { TeamDataTransferSection } from "./TeamDataTransferSection";
 
 type TeamSettingsSectionProps = {
   teamId: string;
@@ -17,6 +18,7 @@ type TeamSettingsSectionProps = {
   onTeamJoined?: (teamId: string) => void;
   onTeamLeft?: (teamId: string) => void;
   onTeamDeleted?: (teamId: string) => void;
+  onBoardChanged?: () => void;
 };
 
 export function TeamSettingsSection({
@@ -31,6 +33,7 @@ export function TeamSettingsSection({
   onTeamJoined,
   onTeamLeft,
   onTeamDeleted,
+  onBoardChanged,
 }: TeamSettingsSectionProps) {
   const [invites, setInvites] = useState<TeamInvitePublic[]>([]);
   const [invitesLoading, setInvitesLoading] = useState(false);
@@ -50,6 +53,7 @@ export function TeamSettingsSection({
   const canManageMembers = hasTeamPermission(permissions, "team.members.manage");
   const canManageInvites = hasTeamPermission(permissions, "team.invites.manage");
   const canDeleteTeam = hasTeamPermission(permissions, "team.delete");
+  const canTransferData = hasTeamPermission(permissions, "team.data.transfer");
   const { roles } = useTeamRoles(canManageMembers || canManageInvites ? teamId : null);
 
   useEffect(() => {
@@ -267,6 +271,9 @@ export function TeamSettingsSection({
             {permissions.permissions.includes("server.maintenance.run") ? (
               <li>Run backups and install updates</li>
             ) : null}
+            {permissions.permissions.includes("team.data.transfer") ? (
+              <li>Export and import team board bundles</li>
+            ) : null}
             {permissions.permissions.length === 1 &&
             permissions.permissions[0] === "team.members.view" ? (
               <li>View team members only</li>
@@ -411,6 +418,16 @@ export function TeamSettingsSection({
             </ul>
           ) : null}
         </section>
+      ) : null}
+
+      {canTransferData ? (
+        <TeamDataTransferSection
+          teamId={teamId}
+          teamName={teamName}
+          teamKey={teamKey}
+          onMessage={onMessage}
+          onImported={onBoardChanged}
+        />
       ) : null}
 
       {canDeleteTeam ? (

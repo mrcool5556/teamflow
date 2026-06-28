@@ -40,6 +40,7 @@ import type {
   UpdateTeamRoleInput,
   TeamPublic,
   TeamMemberPublic,
+  TeamBundleImportResult,
   UpdateIssueInput,
   UpdateBoardRowInput,
   UserPublic,
@@ -395,6 +396,55 @@ export class TeamflowClient {
       {
         method: "POST",
         body: JSON.stringify(input),
+      },
+    );
+  }
+
+  async exportTeamBundle(teamId: string, includeFiles = false) {
+    const headers = new Headers();
+    if (this.token) {
+      headers.set("Authorization", `Bearer ${this.token}`);
+    }
+
+    const query = includeFiles ? "?includeFiles=true" : "";
+    const response = await this.fetchImpl(
+      `${this.baseUrl}/teams/${teamId}/export${query}`,
+      { headers },
+    );
+
+    if (!response.ok) {
+      let payload: ApiError = { error: response.statusText };
+      const contentType = response.headers.get("content-type") ?? "";
+      if (contentType.includes("application/json")) {
+        try {
+          payload = (await response.json()) as ApiError;
+        } catch {
+          // ignore
+        }
+      }
+      throw new TeamflowApiError(
+        payload.error ?? response.statusText,
+        response.status,
+        payload.code,
+      );
+    }
+
+    const blob = await response.blob();
+    const disposition = response.headers.get("content-disposition") ?? "";
+    const match = disposition.match(/filename="([^"]+)"/i);
+    const filename = match?.[1] ?? `team-${teamId}-bundle.zip`;
+    return { blob, filename };
+  }
+
+  importTeamBundle(teamId: string, file: Blob, options?: { force?: boolean }) {
+    const form = new FormData();
+    form.append("bundle", file);
+    const force = options?.force ? "?force=true" : "";
+    return this.request<{ result: TeamBundleImportResult }>(
+      `/teams/${teamId}/import${force}`,
+      {
+        method: "POST",
+        body: form,
       },
     );
   }
