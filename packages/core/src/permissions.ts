@@ -106,7 +106,9 @@ export const DEFAULT_SYSTEM_ROLE_TEMPLATES: {
     position: 1,
     permissions: TEAM_PERMISSIONS.filter(
       (permission) =>
-        permission !== "server.maintenance.view" && permission !== "server.maintenance.run",
+        permission !== "server.maintenance.view" &&
+        permission !== "server.maintenance.run" &&
+        permission !== "team.data.transfer",
     ),
   },
   {
