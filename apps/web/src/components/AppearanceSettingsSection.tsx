@@ -18,8 +18,8 @@ import {
   UI_COLOR_PRESET_PALETTES,
   mergeUserProfile,
 } from "@teamflow/core";
-import { useEffect, useRef, useState, type MutableRefObject } from "react";
-import { applyUserProfile } from "../profile";
+import { useRef } from "react";
+import { CustomColorField } from "./CustomColorField";
 
 type AppearanceSettingsSectionProps = {
   profile: UserProfile;
@@ -130,68 +130,6 @@ function AppearanceSegmentGroup<T extends string>({
   );
 }
 
-type CustomColorKey = keyof NonNullable<UserProfile["appearance"]["customColors"]>;
-
-function CustomColorField({
-  label,
-  value,
-  profile,
-  colorKey,
-  customDraftRef,
-  onCommit,
-}: {
-  label: string;
-  value: string;
-  profile: UserProfile;
-  colorKey: CustomColorKey;
-  customDraftRef: MutableRefObject<NonNullable<UserProfile["appearance"]["customColors"]>>;
-  onCommit: (profile: UserProfile) => void;
-}) {
-  const [draft, setDraft] = useState(value);
-  const inputRef = useRef<HTMLInputElement>(null);
-  const onCommitRef = useRef(onCommit);
-  const profileRef = useRef(profile);
-  onCommitRef.current = onCommit;
-  profileRef.current = profile;
-
-  useEffect(() => {
-    setDraft(value);
-  }, [value]);
-
-  useEffect(() => {
-    const input = inputRef.current;
-    if (!input) return;
-
-    function handleCommit() {
-      onCommitRef.current(
-        patchAppearance(profileRef.current, { customColors: { ...customDraftRef.current } }),
-      );
-    }
-
-    input.addEventListener("change", handleCommit);
-    return () => input.removeEventListener("change", handleCommit);
-  }, [customDraftRef]);
-
-  return (
-    <label className="appearance-color-field">
-      {label}
-      <input
-        ref={inputRef}
-        type="color"
-        value={draft}
-        onInput={(event) => {
-          const next = event.currentTarget.value;
-          setDraft(next);
-          customDraftRef.current = { ...customDraftRef.current, [colorKey]: next };
-          applyUserProfile(
-            patchAppearance(profile, { customColors: customDraftRef.current }),
-          );
-        }}
-      />
-    </label>
-  );
-}
-
 export function AppearanceSettingsSection({
   profile,
   onProfileChange,
@@ -201,9 +139,7 @@ export function AppearanceSettingsSection({
   const customDraftRef = useRef({ ...custom });
   const showCustomColors = appearance.colorPreset === "custom";
 
-  useEffect(() => {
-    customDraftRef.current = { ...custom };
-  }, [custom]);
+  customDraftRef.current = { ...custom };
 
   return (
     <section className="settings-section appearance-settings">
