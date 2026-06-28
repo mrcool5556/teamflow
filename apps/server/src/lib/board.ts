@@ -1,4 +1,4 @@
-import { and, asc, eq } from "drizzle-orm";
+import { and, asc, eq, isNull } from "drizzle-orm";
 import {
   DEFAULT_STATUSES,
   generateEntityKey,
@@ -187,7 +187,7 @@ export async function countRowIssues(db: Db, rowId: string) {
   const issues = await db
     .select({ id: schema.issues.id })
     .from(schema.issues)
-    .where(eq(schema.issues.rowId, rowId));
+    .where(and(eq(schema.issues.rowId, rowId), isNull(schema.issues.deletedAt)));
   return issues.length;
 }
 
@@ -195,6 +195,6 @@ export async function countStatusIssues(db: Db, statusId: string) {
   const issues = await db
     .select({ id: schema.issues.id })
     .from(schema.issues)
-    .where(eq(schema.issues.statusId, statusId));
+    .where(and(eq(schema.issues.statusId, statusId), isNull(schema.issues.deletedAt)));
   return issues.length;
 }
