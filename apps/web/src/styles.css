@@ -1185,8 +1185,30 @@ select {
 }
 
 .board-preview-surface {
+  min-height: 0;
   pointer-events: none;
   user-select: none;
+}
+
+:root[data-appearance-color-drag] .board-scroll--preview {
+  pointer-events: none;
+}
+
+:root[data-appearance-color-drag] .board-preview-surface,
+:root[data-appearance-color-drag] .board-preview-surface * {
+  transition: none !important;
+  animation: none !important;
+}
+
+:root[data-appearance-color-drag] .board-preview-surface .issue-card,
+:root[data-appearance-color-drag] .board-preview-surface .column-label,
+:root[data-appearance-color-drag] .board-preview-surface .row-separator-bar,
+:root[data-appearance-color-drag] .board-preview-surface .board-cell,
+:root[data-appearance-color-drag] .board-preview-surface .panel {
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+  filter: none !important;
+  box-shadow: none !important;
 }
 
 .board-layout-preview .preview-label {
