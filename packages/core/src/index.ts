@@ -8,6 +8,7 @@ export * from "./priorities.js";
 export * from "./profile.js";
 export * from "./refs.js";
 export * from "./maintenance.js";
+export * from "./discordBotService.js";
 export * from "./permissions.js";
 export * from "./teamBundle.js";
 

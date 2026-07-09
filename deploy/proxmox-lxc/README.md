@@ -167,7 +167,9 @@ Interactive prompts save SMTP settings to `.env` and restart Teamflow. No local 
 | `update.sh` | pull → build → migrate → restart |
 | `teamflow.service` | systemd unit |
 | `backup.sh` | SQLite / Postgres backups |
-| `setup-maintenance-sudo.sh` | Passwordless sudo for in-app Updates |
+| `setup-maintenance-sudo.sh` | Passwordless sudo for in-app Updates and Discord bot service |
+| `discord-bot.sh` | Install/start/stop Discord bot systemd service (`teamflow-discord`) |
+| `teamflow-discord.service` | systemd unit for the Discord bot |
 | `.env.example` | Production env |
 
 Relay / remote access: [../relay/README.md](../relay/README.md)

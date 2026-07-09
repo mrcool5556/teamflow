@@ -28,6 +28,7 @@ import type {
   UpdateTeamDiscordSettingsInput,
   DiscordGuildConfigPublic,
   DiscordBotSecretsPublic,
+  DiscordBotServiceStatusPublic,
   MaintenanceJobPublic,
   MaintenanceStatusPublic,
   RunMaintenanceBackupInput,
@@ -365,6 +366,33 @@ export class TeamflowClient {
         method: "PATCH",
         body: JSON.stringify(input),
       },
+    );
+  }
+
+  getDiscordBotServiceStatus(teamId: string) {
+    return this.request<{ status: DiscordBotServiceStatusPublic }>(
+      `/teams/${teamId}/integrations/discord/service`,
+    );
+  }
+
+  enableDiscordBotService(teamId: string) {
+    return this.request<{ status: DiscordBotServiceStatusPublic }>(
+      `/teams/${teamId}/integrations/discord/service/enable`,
+      { method: "POST" },
+    );
+  }
+
+  restartDiscordBotService(teamId: string) {
+    return this.request<{ status: DiscordBotServiceStatusPublic }>(
+      `/teams/${teamId}/integrations/discord/service/restart`,
+      { method: "POST" },
+    );
+  }
+
+  stopDiscordBotService(teamId: string) {
+    return this.request<{ status: DiscordBotServiceStatusPublic }>(
+      `/teams/${teamId}/integrations/discord/service/stop`,
+      { method: "POST" },
     );
   }
 

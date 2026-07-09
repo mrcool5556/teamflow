@@ -1,0 +1,16 @@
+[Unit]
+Description=Teamflow Discord bot
+After=network.target teamflow.service
+Wants=teamflow.service
+
+[Service]
+Type=simple
+User=teamflow
+WorkingDirectory=/opt/teamflow/apps/discord-bot
+EnvironmentFile=/opt/teamflow/data/discord-bot.env
+ExecStart=/usr/bin/node /opt/teamflow/apps/discord-bot/dist/index.js
+Restart=on-failure
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target

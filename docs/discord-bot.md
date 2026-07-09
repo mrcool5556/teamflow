@@ -25,23 +25,26 @@ Talk to your Teamflow board from Discord: slash commands, ticket threads → iss
 
 ## 2. Save bot credentials (recommended)
 
-1. Generate a random string for `TEAMFLOW_BOT_CONFIG_KEY` and add it to **both** the Teamflow root `.env` and `apps/discord-bot/.env`
-2. Restart the Teamflow API
-3. In the web app: **Settings → Integrations → Bot credentials** (admin only)
+1. In the web app: **Settings → Integrations → Bot credentials** (admin only)
    - Discord client ID, bot token, Teamflow PAT, API URL, public web URL
    - Enable **Message Content Intent** if you use `/create` in threads
-4. Copy `apps/discord-bot/.env.example` to `.env` with at least:
+2. On a **Linux server install**, the config key and bot env file are created automatically when you save credentials.
+3. Click **Enable Discord bot** under **Discord bot on this server** — no manual `.env` editing required.
+4. Configure each team under **Settings → Integrations → Discord bot** (guild ID, allowed roles).
+
+### Local development
+
+Copy `apps/discord-bot/.env.example` to `.env` with at least:
 
 ```env
 TEAMFLOW_URL=http://localhost:3000
-TEAMFLOW_BOT_CONFIG_KEY=same-random-string-as-teamflow-.env
 ```
 
-5. Run `pnpm dev:discord` — the bot loads token/PAT from Settings via the API
+Run `pnpm dev:discord` — on Windows, credentials are loaded from Settings when a config key is set, or from `.env` directly.
 
 ### Legacy `.env` mode
 
-You can still put secrets directly in `apps/discord-bot/.env` (`DISCORD_BOT_TOKEN`, `DISCORD_CLIENT_ID`, `TEAMFLOW_TOKEN`, …) if `TEAMFLOW_BOT_CONFIG_KEY` is unset or the Settings fetch fails.
+You can still put secrets directly in `apps/discord-bot/.env` (`DISCORD_BOT_TOKEN`, `DISCORD_CLIENT_ID`, `TEAMFLOW_TOKEN`, …) if the Settings fetch fails.
 
 | Variable | Required | Purpose |
 |----------|----------|---------|

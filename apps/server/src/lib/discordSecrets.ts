@@ -12,8 +12,19 @@ import {
   encryptSecret,
 } from "./secretsCrypto.js";
 import { userHasTeamPermission } from "./permissions.js";
+import { defaultPublicUrl, syncDiscordBotEnv } from "./botConfigKey.js";
+import { findRepoRoot } from "@teamflow/db";
+import path from "node:path";
 
 const ROW_ID = "default";
+
+function getAppDir() {
+  const configured = process.env.TEAMFLOW_APP_DIR?.trim();
+  if (configured) {
+    return path.isAbsolute(configured) ? configured : path.resolve(findRepoRoot(), configured);
+  }
+  return findRepoRoot();
+}
 
 function defaultSecretsPublic(): DiscordBotSecretsPublic {
   return {
@@ -22,7 +33,7 @@ function defaultSecretsPublic(): DiscordBotSecretsPublic {
     hasBotToken: false,
     hasPat: false,
     teamflowUrl: "http://localhost:3000",
-    publicUrl: "http://localhost:5173",
+    publicUrl: defaultPublicUrl(),
     messageContentIntent: false,
     botConfigKeyConfigured: botConfigKeyConfigured(),
     updatedAt: null,
@@ -91,13 +102,14 @@ export async function updateDiscordBotSecrets(
     throw new Error("Client ID cannot be empty");
   }
 
+  const publicUrlDefault = defaultPublicUrl();
   const payload = {
     id: ROW_ID,
     botTokenEnc: nextBotTokenEnc,
     clientId: nextClientId,
     patEnc: nextPatEnc,
-    teamflowUrl: input.teamflowUrl ?? current?.teamflowUrl ?? "http://localhost:3000",
-    publicUrl: input.publicUrl ?? current?.publicUrl ?? "http://localhost:5173",
+    teamflowUrl: input.teamflowUrl ?? current?.teamflowUrl ?? publicUrlDefault,
+    publicUrl: input.publicUrl ?? current?.publicUrl ?? publicUrlDefault,
     messageContentIntent:
       input.messageContentIntent !== undefined
         ? input.messageContentIntent
@@ -125,7 +137,19 @@ export async function updateDiscordBotSecrets(
       },
     });
 
-  return getDiscordBotSecretsPublic(db);
+  const publicSecrets = await getDiscordBotSecretsPublic(db);
+  if (publicSecrets.configured && process.platform !== "win32") {
+    try {
+      await syncDiscordBotEnv(getAppDir(), publicSecrets.teamflowUrl);
+    } catch (err) {
+      console.warn(
+        "[teamflow] Could not sync Discord bot env:",
+        err instanceof Error ? err.message : err,
+      );
+    }
+  }
+
+  return publicSecrets;
 }
 
 export async function getDiscordBotRuntimeConfig(db: Db): Promise<DiscordBotRuntimeConfig | null> {

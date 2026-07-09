@@ -6,8 +6,10 @@ APP_USER="${APP_USER:-teamflow}"
 BASH_BIN="${BASH_BIN:-/usr/bin/bash}"
 BACKUP_REPO="$APP_DIR/deploy/proxmox-lxc/backup.sh"
 UPDATE_REPO="$APP_DIR/deploy/proxmox-lxc/update.sh"
+DISCORD_REPO="$APP_DIR/deploy/proxmox-lxc/discord-bot.sh"
 BACKUP_BIN="/usr/local/bin/teamflow-backup"
 UPDATE_BIN="/usr/local/bin/teamflow-update"
+DISCORD_BIN="/usr/local/bin/teamflow-discord"
 SUDOERS_FILE="/etc/sudoers.d/teamflow-maintenance"
 
 if [[ $EUID -ne 0 ]]; then
@@ -15,7 +17,7 @@ if [[ $EUID -ne 0 ]]; then
   exit 1
 fi
 
-if [[ ! -f "$BACKUP_REPO" ]] || [[ ! -f "$UPDATE_REPO" ]]; then
+if [[ ! -f "$BACKUP_REPO" ]] || [[ ! -f "$UPDATE_REPO" ]] || [[ ! -f "$DISCORD_REPO" ]]; then
   echo "Scripts not found under $APP_DIR/deploy/proxmox-lxc/"
   exit 1
 fi
@@ -33,17 +35,19 @@ fix_script() {
 
 fix_script "$BACKUP_REPO"
 fix_script "$UPDATE_REPO"
+fix_script "$DISCORD_REPO"
 
 install -m 755 "$BACKUP_REPO" "$BACKUP_BIN"
 install -m 755 "$UPDATE_REPO" "$UPDATE_BIN"
+install -m 755 "$DISCORD_REPO" "$DISCORD_BIN"
 ln -sf teamflow-update /usr/local/bin/update
 
 cat >"$SUDOERS_FILE" <<EOF
-# Teamflow in-app maintenance (Settings → Updates)
+# Teamflow in-app maintenance (Settings → Updates) and Discord bot service (Settings → Integrations)
 # Installed wrappers: sudo /usr/local/bin/teamflow-backup (no bash prefix)
 # Repo scripts: sudo /usr/bin/bash /opt/teamflow/deploy/.../backup.sh
 Defaults:$APP_USER env_keep += "APP_DIR BACKUP_DIR"
-$APP_USER ALL=(root) NOPASSWD: $BACKUP_BIN *, $UPDATE_BIN *, $BASH_BIN $BACKUP_REPO *, $BASH_BIN $UPDATE_REPO *
+$APP_USER ALL=(root) NOPASSWD: $BACKUP_BIN *, $UPDATE_BIN *, $DISCORD_BIN *, $BASH_BIN $BACKUP_REPO *, $BASH_BIN $UPDATE_REPO *, $BASH_BIN $DISCORD_REPO *
 EOF
 
 chmod 440 "$SUDOERS_FILE"
@@ -60,5 +64,6 @@ echo ""
 echo "Test:"
 echo "  sudo -u $APP_USER sudo -n $BACKUP_BIN --db-only"
 echo "  sudo -u $APP_USER sudo -n $UPDATE_BIN --help"
+echo "  sudo -u $APP_USER sudo -n $DISCORD_BIN status"
 echo ""
 echo "Restart Teamflow: systemctl restart teamflow"
