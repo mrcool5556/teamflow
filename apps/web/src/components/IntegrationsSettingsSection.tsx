@@ -1,4 +1,6 @@
+import { useState } from "react";
 import { DiscordBotSecretsSection } from "./DiscordBotSecretsSection";
+import { DiscordBotServiceSection } from "./DiscordBotServiceSection";
 import { DiscordBotSettingsSection } from "./DiscordBotSettingsSection";
 
 type IntegrationsSettingsSectionProps = {
@@ -16,6 +18,8 @@ export function IntegrationsSettingsSection({
   canManageSecrets,
   onMessage,
 }: IntegrationsSettingsSectionProps) {
+  const [serviceRefreshKey, setServiceRefreshKey] = useState(0);
+
   return (
     <div className="settings-panel">
       <header className="settings-panel-header">
@@ -31,8 +35,17 @@ export function IntegrationsSettingsSection({
           teamId={teamId}
           canManage={canManageSecrets}
           onMessage={onMessage}
+          onSaved={() => setServiceRefreshKey((value) => value + 1)}
         />
       ) : null}
+
+      <DiscordBotServiceSection
+        key={serviceRefreshKey}
+        teamId={teamId}
+        canManage={canManageSecrets}
+        onMessage={onMessage}
+        onSecretsRefresh={() => setServiceRefreshKey((value) => value + 1)}
+      />
 
       <DiscordBotSettingsSection
         teamId={teamId}

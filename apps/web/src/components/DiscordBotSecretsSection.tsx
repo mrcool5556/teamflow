@@ -6,12 +6,14 @@ type DiscordBotSecretsSectionProps = {
   teamId: string;
   canManage: boolean;
   onMessage: (message: string | null) => void;
+  onSaved?: () => void;
 };
 
 export function DiscordBotSecretsSection({
   teamId,
   canManage,
   onMessage,
+  onSaved,
 }: DiscordBotSecretsSectionProps) {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -74,9 +76,10 @@ export function DiscordBotSecretsSection({
       applySecrets(next);
       onMessage(
         next.configured
-          ? "Discord bot secrets saved. Restart the bot to pick them up."
+          ? "Discord bot credentials saved. Enable the bot service below when ready."
           : "Saved partial secrets — add bot token and PAT to finish setup.",
       );
+      onSaved?.();
     } catch (err) {
       onMessage(err instanceof Error ? err.message : "Failed to save Discord secrets");
     } finally {
@@ -111,15 +114,14 @@ export function DiscordBotSecretsSection({
           )}
 
           {!secrets.botConfigKeyConfigured ? (
-            <p className="settings-hint settings-hint--warn">
-              Add the same random key to <code>TEAMFLOW_BOT_CONFIG_KEY</code> in the Teamflow{" "}
-              <code>.env</code> and <code>apps/discord-bot/.env</code>, then restart both the API
-              and bot so the bot can fetch these secrets.
+            <p className="settings-hint">
+              The config key is created automatically when you save credentials on a Linux server.
+              Use <strong>Enable Discord bot</strong> below to install and start the service.
             </p>
           ) : (
             <p className="settings-hint">
-              Bot config key is set on the server. The bot reads secrets via{" "}
-              <code>TEAMFLOW_BOT_CONFIG_KEY</code>.
+              Bot config key is ready. Use <strong>Restart bot</strong> below after credential
+              changes.
             </p>
           )}
 

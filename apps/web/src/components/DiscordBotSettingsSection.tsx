@@ -24,15 +24,10 @@ function formatIdList(ids: string[]) {
   return ids.join("\n");
 }
 
-const ENV_TEMPLATE = `# apps/discord-bot/.env — minimal when using Settings → Bot credentials
+const ENV_TEMPLATE = `# Local dev only — production uses Settings → Enable Discord bot
 TEAMFLOW_URL=http://localhost:3000
-TEAMFLOW_BOT_CONFIG_KEY=use-the-same-random-string-as-teamflow-.env
 
-# Optional fallbacks (guild linking is usually done in Settings → Integrations)
-# TEAMFLOW_TEAM_ID=
-# DISCORD_REGISTER_GUILD_IDS=
-
-# Legacy: full .env without Settings (uncomment if not using bot-config key)
+# Legacy: full .env without Settings
 # DISCORD_BOT_TOKEN=
 # DISCORD_CLIENT_ID=
 # TEAMFLOW_TOKEN=pat_your_token_here
@@ -153,12 +148,11 @@ export function DiscordBotSettingsSection({
             <code>applications.commands</code>).
           </li>
           <li>
-            Save bot token, client ID, and PAT under <strong>Bot credentials</strong> above (or use{" "}
-            <code>apps/discord-bot/.env</code> as fallback).
+            Save bot token, client ID, and PAT under <strong>Bot credentials</strong> above.
           </li>
           <li>
-            Set the same <code>TEAMFLOW_BOT_CONFIG_KEY</code> in Teamflow <code>.env</code> and{" "}
-            <code>apps/discord-bot/.env</code>, then run <code>pnpm dev:discord</code>.
+            On a Linux server, click <strong>Enable Discord bot</strong> above. For local dev, run{" "}
+            <code>pnpm dev:discord</code>.
           </li>
           <li>Link this team below — the bot registers slash commands for saved server IDs.</li>
         </ol>
@@ -168,7 +162,7 @@ export function DiscordBotSettingsSection({
             className={`ghost copy-feedback-btn ${copiedKey === "env" ? "copied" : ""}`}
             onClick={() => void copyText(ENV_TEMPLATE, "env")}
           >
-            {copiedKey === "env" ? "Copied!" : "Copy .env template"}
+            {copiedKey === "env" ? "Copied!" : "Copy local dev .env template"}
           </button>
         </div>
       </details>

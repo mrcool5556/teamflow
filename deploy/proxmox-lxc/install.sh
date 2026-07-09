@@ -96,6 +96,7 @@ systemctl restart teamflow
 install -m 755 "$APP_DIR/deploy/proxmox-lxc/update.sh" /usr/local/bin/teamflow-update
 ln -sf teamflow-update /usr/local/bin/update
 install -m 755 "$APP_DIR/deploy/proxmox-lxc/backup.sh" /usr/local/bin/teamflow-backup
+install -m 755 "$APP_DIR/deploy/proxmox-lxc/discord-bot.sh" /usr/local/bin/teamflow-discord
 install -m 755 "$APP_DIR/deploy/proxmox-lxc/configure-smtp.sh" /usr/local/bin/teamflow-smtp
 bash "$APP_DIR/deploy/proxmox-lxc/setup-maintenance-sudo.sh" || true
 

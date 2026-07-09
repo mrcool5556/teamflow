@@ -145,6 +145,12 @@ import {
   getDiscordBotSecretsPublic,
   updateDiscordBotSecrets,
 } from "./lib/discordSecrets.js";
+import {
+  enableDiscordBotService,
+  getDiscordBotServiceStatus,
+  restartDiscordBotService,
+  stopDiscordBotService,
+} from "./lib/discordBotService.js";
 import { assertBotConfigKey } from "./lib/secretsCrypto.js";
 import {
   getMaintenanceJob,
@@ -1242,6 +1248,88 @@ app.patch("/teams/:teamId/integrations/discord/secrets", async (c) => {
     const message = err instanceof Error ? err.message : "Failed to update Discord secrets";
     const status = message === "Permission denied" ? 403 : 400;
     return c.json({ error: message }, status);
+  }
+});
+
+app.get("/teams/:teamId/integrations/discord/service", async (c) => {
+  const result = await requireAuth(c);
+  if ("error" in result) return result.error;
+
+  const teamId = c.req.param("teamId");
+  if (!(await userHasTeamAccess(db, result.auth.userId, teamId))) {
+    return c.json({ error: "Team access denied" }, 403);
+  }
+  if (!(await userHasTeamPermission(db, result.auth.userId, teamId, "integrations.discord.view"))) {
+    return c.json({ error: "Permission denied" }, 403);
+  }
+
+  const status = await getDiscordBotServiceStatus(db);
+  return c.json({ status });
+});
+
+app.post("/teams/:teamId/integrations/discord/service/enable", async (c) => {
+  const result = await requireAuth(c);
+  if ("error" in result) return result.error;
+  requireWrite(result.auth);
+
+  const teamId = c.req.param("teamId");
+  if (!(await userHasTeamAccess(db, result.auth.userId, teamId))) {
+    return c.json({ error: "Team access denied" }, 403);
+  }
+  if (!(await userHasTeamPermission(db, result.auth.userId, teamId, "integrations.discord.secrets"))) {
+    return c.json({ error: "Permission denied" }, 403);
+  }
+
+  try {
+    const status = await enableDiscordBotService(db);
+    return c.json({ status });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "Failed to enable Discord bot";
+    return c.json({ error: message }, 400);
+  }
+});
+
+app.post("/teams/:teamId/integrations/discord/service/restart", async (c) => {
+  const result = await requireAuth(c);
+  if ("error" in result) return result.error;
+  requireWrite(result.auth);
+
+  const teamId = c.req.param("teamId");
+  if (!(await userHasTeamAccess(db, result.auth.userId, teamId))) {
+    return c.json({ error: "Team access denied" }, 403);
+  }
+  if (!(await userHasTeamPermission(db, result.auth.userId, teamId, "integrations.discord.secrets"))) {
+    return c.json({ error: "Permission denied" }, 403);
+  }
+
+  try {
+    const status = await restartDiscordBotService(db);
+    return c.json({ status });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "Failed to restart Discord bot";
+    return c.json({ error: message }, 400);
+  }
+});
+
+app.post("/teams/:teamId/integrations/discord/service/stop", async (c) => {
+  const result = await requireAuth(c);
+  if ("error" in result) return result.error;
+  requireWrite(result.auth);
+
+  const teamId = c.req.param("teamId");
+  if (!(await userHasTeamAccess(db, result.auth.userId, teamId))) {
+    return c.json({ error: "Team access denied" }, 403);
+  }
+  if (!(await userHasTeamPermission(db, result.auth.userId, teamId, "integrations.discord.secrets"))) {
+    return c.json({ error: "Permission denied" }, 403);
+  }
+
+  try {
+    const status = await stopDiscordBotService(db);
+    return c.json({ status });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "Failed to stop Discord bot";
+    return c.json({ error: message }, 400);
   }
 });
 

@@ -138,6 +138,7 @@ trap - EXIT
 
 install -m 755 "$APP_DIR/deploy/proxmox-lxc/update.sh" /usr/local/bin/teamflow-update
 install -m 755 "$APP_DIR/deploy/proxmox-lxc/backup.sh" /usr/local/bin/teamflow-backup
+install -m 755 "$APP_DIR/deploy/proxmox-lxc/discord-bot.sh" /usr/local/bin/teamflow-discord
 ln -sf teamflow-update /usr/local/bin/update
 cp "$APP_DIR/deploy/proxmox-lxc/teamflow.service" /etc/systemd/system/teamflow.service
 systemctl daemon-reload
