@@ -8,16 +8,19 @@ Defaults (override in `.env`, then restart):
 
 | Type | Default | Env |
 |------|---------|-----|
-| Images | 25 MB | `ATTACHMENT_MAX_IMAGE_BYTES` |
-| ZIP archives | 150 MB | `ATTACHMENT_MAX_ZIP_BYTES` |
-| Other files | 25 MB | `ATTACHMENT_MAX_BYTES` |
+| Images | 4 GB | `ATTACHMENT_MAX_IMAGE_BYTES` |
+| ZIP archives | 4 GB | `ATTACHMENT_MAX_ZIP_BYTES` |
+| Videos | 4 GB | `ATTACHMENT_MAX_VIDEO_BYTES` |
+| Other files | 4 GB | `ATTACHMENT_MAX_BYTES` |
 | Storage directory | `data/uploads/` | `UPLOAD_DIR` (optional absolute path) |
 
 Example:
 
 ```bash
-ATTACHMENT_MAX_IMAGE_BYTES=26214400
-ATTACHMENT_MAX_ZIP_BYTES=157286400
+ATTACHMENT_MAX_IMAGE_BYTES=4294967296
+ATTACHMENT_MAX_VIDEO_BYTES=4294967296
+ATTACHMENT_MAX_ZIP_BYTES=4294967296
+ATTACHMENT_MAX_BYTES=4294967296
 ```
 
 ## API
@@ -60,9 +63,9 @@ curl -X POST "https://teamflow.example.com/issues/ISSUE_UUID/attachments" \
     }
   ],
   "limits": {
-    "imageBytes": 26214400,
-    "zipBytes": 157286400,
-    "defaultBytes": 26214400
+    "imageBytes": 4294967296,
+    "zipBytes": 4294967296,
+    "defaultBytes": 4294967296
   }
 }
 ```

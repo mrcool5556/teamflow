@@ -12,7 +12,8 @@ Files larger than **8 MB** (configurable) upload in **chunks** instead of one PO
 | Chunked threshold | 8 MB | `UPLOAD_CHUNK_THRESHOLD_BYTES` |
 | Max video | 4 GB | `ATTACHMENT_MAX_VIDEO_BYTES` |
 | Max ZIP | 4 GB | `ATTACHMENT_MAX_ZIP_BYTES` |
-| Max image | 25 MB | `ATTACHMENT_MAX_IMAGE_BYTES` |
+| Max image | 4 GB | `ATTACHMENT_MAX_IMAGE_BYTES` |
+| Max other files | 4 GB | `ATTACHMENT_MAX_BYTES` |
 
 ### How chunks work
 

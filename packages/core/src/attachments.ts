@@ -1,6 +1,6 @@
 const IMAGE_EXT = /\.(png|jpe?g|gif|webp|bmp|avif|svg)$/i;
 const VIDEO_EXT = /\.(mp4|webm|mov|m4v|mkv|avi|ogv)$/i;
-const ZIP_EXT = /\.zip$/i;
+const ZIP_EXT = /\.(zip|7z|rar|tar|tgz|gz)$/i;
 const ZIP_MIMES = new Set([
   "application/zip",
   "application/x-zip-compressed",
@@ -69,10 +69,10 @@ export function maxBytesForAttachmentFile(
 }
 
 export const DEFAULT_ATTACHMENT_LIMITS: AttachmentLimitsPublic = {
-  imageBytes: 25 * MB,
+  imageBytes: 4 * GB,
   videoBytes: 4 * GB,
   zipBytes: 4 * GB,
-  defaultBytes: 25 * MB,
+  defaultBytes: 4 * GB,
   chunkBytes: 32 * MB,
   chunkThresholdBytes: 8 * MB,
 };
