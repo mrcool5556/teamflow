@@ -39,6 +39,8 @@
   --board-column-width: 420px;
   --card-min-height: 72px;
   --board-row-max-height: min(58vh, 600px);
+  /* Side drawers (issue, row files, team files); 720px from 1200px wide, full screen below 768px. */
+  --drawer-width: 560px;
   --radius-xs: 4px;
   --radius-sm: 6px;
   --radius-md: 10px;
@@ -69,6 +71,18 @@
   --chrome-modal-shadow: 8px 8px 0 #000;
   --chrome-drag-shadow: 6px 6px 0 #000;
   font-family: "JetBrains Mono", monospace;
+}
+
+@media (min-width: 1200px) {
+  :root {
+    --drawer-width: 720px;
+  }
+}
+
+@media (max-width: 767px) {
+  :root {
+    --drawer-width: 100vw;
+  }
 }
 
 :root[data-chrome-style="minimal"] {

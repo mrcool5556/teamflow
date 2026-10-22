@@ -24,10 +24,6 @@
   clip-path: var(--clip-chamfer-md);
 }
 
-.team-files-drawer {
-  width: min(860px, 96vw);
-}
-
 .team-files-drawer > .team-files-drawer-header,
 .team-files-drawer > .team-files-tabs,
 .team-files-drawer > .team-files-drawer-toolbar {
@@ -306,6 +302,30 @@
   color: var(--text);
 }
 
+/* Below 768px every drawer is a full-screen sheet. */
+@media (max-width: 767px) {
+  .drawer {
+    width: 100%;
+    border-left: none;
+    border-radius: 0;
+  }
+
+  .issue-drawer > .issue-drawer-header,
+  .row-files-drawer > .row-files-drawer-header,
+  .team-files-drawer > .team-files-drawer-header {
+    padding: var(--space-3) var(--space-3) 0;
+  }
+
+  .issue-drawer > .issue-drawer-surface,
+  .row-files-drawer > .row-files-drawer-surface {
+    padding: 0 var(--space-3) var(--space-4);
+  }
+
+  .issue-drawer-action {
+    padding: 0.3rem 0.5rem;
+  }
+}
+
 .drawer-backdrop {
   position: fixed;
   inset: 0;
@@ -319,7 +339,7 @@
   border-radius: var(--radius-sm);
   position: relative;
   z-index: calc(var(--z-drawer) + 1);
-  width: min(560px, 100%);
+  width: min(var(--drawer-width), 100%);
   height: 100%;
   background: var(--surface);
   border-left: 3px solid var(--border);
