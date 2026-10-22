@@ -23,7 +23,40 @@ export function toUserPublic(user: typeof schema.users.$inferSelect): UserPublic
     email: user.email,
     name: user.name,
     createdAt: user.createdAt,
+    isInstanceAdmin: user.isInstanceAdmin === 1,
   };
+}
+
+/** Emails listed in TEAMFLOW_INSTANCE_ADMINS (comma-separated, case-insensitive). */
+export function instanceAdminEmailsFromEnv(): Set<string> {
+  const raw = process.env.TEAMFLOW_INSTANCE_ADMINS ?? "";
+  return new Set(
+    raw
+      .split(",")
+      .map((value) => value.trim().toLowerCase())
+      .filter(Boolean),
+  );
+}
+
+/**
+ * Persist the instance-admin flag for a user if their email is listed in
+ * TEAMFLOW_INSTANCE_ADMINS. Called at login and registration. Returns the current flag.
+ */
+export async function syncInstanceAdminFromEnv(db: Db, user: typeof schema.users.$inferSelect) {
+  if (user.isInstanceAdmin === 1) return true;
+  if (!instanceAdminEmailsFromEnv().has(user.email.toLowerCase())) return false;
+  await db.update(schema.users).set({ isInstanceAdmin: 1 }).where(eq(schema.users.id, user.id));
+  user.isInstanceAdmin = 1;
+  return true;
+}
+
+export async function userIsInstanceAdmin(db: Db, userId: string) {
+  const [row] = await db
+    .select({ isInstanceAdmin: schema.users.isInstanceAdmin })
+    .from(schema.users)
+    .where(eq(schema.users.id, userId))
+    .limit(1);
+  return row?.isInstanceAdmin === 1;
 }
 
 export async function hashPassword(password: string) {

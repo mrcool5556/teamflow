@@ -135,12 +135,14 @@ export function App() {
     effectiveTeamPermissions,
     "integrations.discord.manage",
   );
-  const canManageDiscordSecrets = hasTeamPermission(
-    effectiveTeamPermissions,
-    "integrations.discord.secrets",
-  );
-  const showMaintenance = hasTeamPermission(effectiveTeamPermissions, "server.maintenance.view");
-  const canRunMaintenance = hasTeamPermission(effectiveTeamPermissions, "server.maintenance.run");
+  // Server-wide panels need the instance-admin flag (GET /auth/me) on top of the team permission.
+  const isInstanceAdmin = user?.isInstanceAdmin === true;
+  const canManageDiscordSecrets =
+    isInstanceAdmin && hasTeamPermission(effectiveTeamPermissions, "integrations.discord.secrets");
+  const showMaintenance =
+    isInstanceAdmin && hasTeamPermission(effectiveTeamPermissions, "server.maintenance.view");
+  const canRunMaintenance =
+    isInstanceAdmin && hasTeamPermission(effectiveTeamPermissions, "server.maintenance.run");
   const currentTeam = teams.find((team) => team.id === teamId) ?? null;
 
   const persistProfile = useCallback(async (next: UserProfile) => {

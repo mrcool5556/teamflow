@@ -274,6 +274,8 @@ export type UserPublic = {
   email: string;
   name: string;
   createdAt: string;
+  /** Server-wide admin (maintenance, bot secrets). Separate from team roles. */
+  isInstanceAdmin?: boolean;
 };
 
 export type TeamPublic = {
