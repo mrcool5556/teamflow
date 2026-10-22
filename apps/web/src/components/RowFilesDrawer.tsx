@@ -2,6 +2,7 @@ import { useMemo, useState } from "react";
 import type { BoardRowPublic } from "@teamflow/core";
 import { client } from "../api";
 import { useAttachmentList } from "../hooks/useAttachmentList";
+import { useCanEditBoard } from "../lib/teamPermissions";
 import { describeAttachmentLimits, formatFileSize, formatTimestamp } from "../lib/format";
 import { Drawer } from "../ui/Dialog";
 import { DialogTitle } from "../ui/DialogTitle";
@@ -25,6 +26,7 @@ export function RowFilesDrawer({ row, onClose, onNavigateRef }: RowFilesDrawerPr
   );
   const { attachments } = files;
   const [fileSearch, setFileSearch] = useState("");
+  const canEdit = useCanEditBoard();
 
   function handleClose() {
     files.release();
@@ -122,7 +124,7 @@ export function RowFilesDrawer({ row, onClose, onNavigateRef }: RowFilesDrawerPr
                     <button
                       type="button"
                       className="ghost issue-attachment-delete"
-                      disabled={files.deletingId === attachment.id}
+                      disabled={!canEdit || files.deletingId === attachment.id}
                       onClick={() => void files.remove(attachment)}
                       aria-label={`Remove ${attachment.filename}`}
                       title="Remove file"
@@ -138,6 +140,7 @@ export function RowFilesDrawer({ row, onClose, onNavigateRef }: RowFilesDrawerPr
           <LinkFromFileRef
             teamId={row.teamId}
             label="Link file from ref (another row or issue)"
+            disabled={!canEdit}
             onLinkFileId={async (fileId) => {
               if (files.linkedFileIds.has(fileId)) return;
               const { attachment } = await client.linkRowAttachment(row.id, fileId);
@@ -147,9 +150,15 @@ export function RowFilesDrawer({ row, onClose, onNavigateRef }: RowFilesDrawerPr
 
           <div
             className={`issue-attachment-drop${files.dragOver ? " issue-attachment-drop--active" : ""}`}
-            {...files.dropZoneProps}
+            {...(canEdit ? files.dropZoneProps : null)}
           >
-            <input ref={bindFileInput} type="file" hidden onChange={files.onInputChange} />
+            <input
+              ref={bindFileInput}
+              type="file"
+              hidden
+              disabled={!canEdit}
+              onChange={files.onInputChange}
+            />
             <p>
               {files.uploading
                 ? `Uploading ${files.uploadName ?? "file"}…`
@@ -166,7 +175,7 @@ export function RowFilesDrawer({ row, onClose, onNavigateRef }: RowFilesDrawerPr
             <button
               type="button"
               className="secondary"
-              disabled={files.uploading}
+              disabled={!canEdit || files.uploading}
               onClick={files.chooseFile}
             >
               Choose file

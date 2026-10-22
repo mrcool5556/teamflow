@@ -1,4 +1,4 @@
-import { fireEvent, screen, waitFor } from "@testing-library/react";
+import { fireEvent, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it } from "vitest";
 import { installFakeApi, seedDb, signIn } from "./fakeApi";
@@ -71,5 +71,62 @@ describe("board permissions", () => {
     await user.click(screen.getByText("ENG issue 2"));
     await user.keyboard("{/Control}");
     expect(screen.getByRole("toolbar", { name: "Bulk issue actions" })).toBeInTheDocument();
+  });
+});
+
+describe("issue drawer permissions", () => {
+  async function openIssueAs(role: "owner" | "viewer") {
+    const db = seedDb(role);
+    const api = installFakeApi(db);
+    signIn(db);
+    db.comments.push({
+      id: "c1",
+      issueId: db.issues[0]!.id,
+      authorId: db.user.id,
+      authorName: db.user.name,
+      body: "First!",
+      createdAt: new Date().toISOString(),
+    });
+    renderApp(`/t/ENG/issue/${db.issues[0]!.identifier}`);
+    const drawer = await screen.findByRole("dialog", { name: /ENG-1/ });
+    await within(drawer).findByText("First!");
+    return { api, drawer };
+  }
+
+  it("renders every write control disabled for a viewer", async () => {
+    const { api, drawer } = await openIssueAs("viewer");
+    const d = within(drawer);
+    await waitFor(() => expect(d.getByRole("button", { name: "Mark done" })).toBeDisabled());
+
+    expect(d.getByLabelText("Issue title")).toHaveAttribute("readonly");
+    for (const select of drawer.querySelectorAll("select")) expect(select).toBeDisabled();
+    expect(drawer.querySelector("input[type='datetime-local']")).toBeDisabled();
+    for (const trigger of drawer.querySelectorAll(
+      ".color-picker-trigger, .assignee-picker-trigger, .issue-timer-trigger",
+    )) {
+      expect(trigger).toBeDisabled();
+    }
+    expect(d.queryByRole("button", { name: /description/i })).not.toBeInTheDocument();
+    expect(d.getByPlaceholderText(/Leave a comment/)).toBeDisabled();
+    expect(d.getByRole("button", { name: "Post comment" })).toBeDisabled();
+    expect(d.getByRole("button", { name: "Delete comment" })).toBeDisabled();
+    expect(d.getByRole("button", { name: "Choose file" })).toBeDisabled();
+    expect(d.getByRole("button", { name: "Delete" })).toBeDisabled();
+
+    // Reading still works: the drawer closes normally.
+    await userEvent.click(d.getByRole("button", { name: "Close" }));
+    expect(
+      api.calls.filter((call) => call.method !== "GET" && call.path !== "/auth/profile"),
+    ).toEqual([]);
+  });
+
+  it("keeps the drawer editable for an owner", async () => {
+    const { drawer } = await openIssueAs("owner");
+    const d = within(drawer);
+    await waitFor(() => expect(d.getByRole("button", { name: "Mark done" })).toBeEnabled());
+    expect(d.getByLabelText("Issue title")).not.toHaveAttribute("readonly");
+    expect(d.getByPlaceholderText(/Leave a comment/)).toBeEnabled();
+    expect(d.getByRole("button", { name: "Choose file" })).toBeEnabled();
+    expect(d.getByRole("button", { name: /description/i })).toBeInTheDocument();
   });
 });

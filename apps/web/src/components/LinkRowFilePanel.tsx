@@ -10,6 +10,8 @@ type LinkRowFilePanelProps = {
   row: BoardRowPublic | null;
   linkedFileIds: ReadonlySet<string>;
   onLinked: (attachment: IssueAttachmentPublic) => void;
+  /** Read-only: row files can be browsed but not linked. */
+  disabled?: boolean;
 };
 
 export function LinkRowFilePanel({
@@ -18,6 +20,7 @@ export function LinkRowFilePanel({
   row,
   linkedFileIds,
   onLinked,
+  disabled = false,
 }: LinkRowFilePanelProps) {
   const [browserOpen, setBrowserOpen] = useState(false);
   const [rowFiles, setRowFiles] = useState<IssueAttachmentPublic[]>([]);
@@ -119,7 +122,7 @@ export function LinkRowFilePanel({
       <LinkFromFileRef
         teamId={teamId}
         onLinkFileId={linkFileId}
-        disabled={Boolean(linkingFileId)}
+        disabled={disabled || Boolean(linkingFileId)}
       />
 
       {error ? <p className="issue-link-row-files-error">{error}</p> : null}
@@ -133,9 +136,13 @@ export function LinkRowFilePanel({
         linkedFileIds={linkedFileIds}
         linkingFileId={linkingFileId}
         onClose={() => setBrowserOpen(false)}
-        onLink={(file) => {
-          void linkFile(file).then(() => setBrowserOpen(false));
-        }}
+        onLink={
+          disabled
+            ? undefined
+            : (file) => {
+                void linkFile(file).then(() => setBrowserOpen(false));
+              }
+        }
       />
     </div>
   );
