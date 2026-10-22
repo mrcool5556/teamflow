@@ -687,7 +687,7 @@ export function KanbanBoard({
     const sourceStatusId = issue.statusId;
     if (!sourceRowId) return;
 
-    let targetRowId = dropTarget.rowId;
+    const targetRowId = dropTarget.rowId;
     let targetStatusId = dropTarget.statusId;
     const overIssueId = dropTarget.anchorIssueId;
     const insertAfter = dropTarget.insertAfter;
