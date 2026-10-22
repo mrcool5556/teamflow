@@ -53,6 +53,7 @@ export function LinkPasteOffer({
             }
             if (e.key === "Escape") {
               e.preventDefault();
+              e.stopPropagation();
               onKeep();
             }
           }}

@@ -66,6 +66,8 @@ export function TeamFileEditableName({
             void save();
           }
           if (event.key === "Escape") {
+            // Cancel the rename only; the drawer stays open.
+            event.stopPropagation();
             setDraft(displayName);
             setEditing(false);
           }

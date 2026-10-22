@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react";
-import { createPortal } from "react-dom";
+import { Dialog } from "../ui/Dialog";
+import { DialogTitle } from "../ui/DialogTitle";
 import type { IssueAttachmentPublic } from "@teamflow/core";
 import { FileRefCopyButton } from "./FileRefCopyButton";
 import { formatFileSize } from "../lib/format";
@@ -38,75 +39,76 @@ export function SharedFileBrowser({
     });
   }, [files, query]);
 
-  if (!open) return null;
-
-  return createPortal(
-    <div className="shared-file-browser-backdrop" onClick={onClose}>
-      <aside className="shared-file-browser" onClick={(e) => e.stopPropagation()}>
-        <header className="shared-file-browser-header">
-          <div>
-            <h3>{title}</h3>
-            {subtitle ? <p className="muted">{subtitle}</p> : null}
-          </div>
-          <button type="button" className="ghost" onClick={onClose}>
-            Close
-          </button>
-        </header>
-
-        <div className="shared-file-browser-search">
-          <input
-            type="search"
-            value={query}
-            placeholder="Search files…"
-            onChange={(e) => setQuery(e.target.value)}
-            autoFocus
-          />
+  return (
+    <Dialog
+      open={open}
+      onClose={onClose}
+      backdropClassName="shared-file-browser-backdrop"
+      className="shared-file-browser"
+      as="aside"
+    >
+      <header className="shared-file-browser-header">
+        <div>
+          <DialogTitle as="h3">{title}</DialogTitle>
+          {subtitle ? <p className="muted">{subtitle}</p> : null}
         </div>
+        <button type="button" className="ghost" onClick={onClose}>
+          Close
+        </button>
+      </header>
 
-        <div className="shared-file-browser-body">
-          {loading ? (
-            <p className="muted">Loading files…</p>
-          ) : files.length === 0 ? (
-            <p className="muted">No files here yet.</p>
-          ) : filtered.length === 0 ? (
-            <p className="muted">No files match your search.</p>
-          ) : (
-            <ul className="shared-file-browser-list">
-              {filtered.map((file) => {
-                const alreadyLinked = linkedFileIds?.has(file.fileId) ?? false;
-                return (
-                  <li key={file.fileId} className="shared-file-browser-item">
-                    <div className="shared-file-browser-meta">
-                      <span className="shared-file-browser-name">{file.filename}</span>
-                      <span className="shared-file-browser-sub muted">
-                        {file.fileRef} · {formatFileSize(file.sizeBytes)} · {file.uploaderName}
-                      </span>
-                    </div>
-                    <div className="shared-file-browser-actions">
-                      <FileRefCopyButton fileRef={file.fileRef} filename={file.filename} />
-                      {onLink ? (
-                        <button
-                          type="button"
-                          className="secondary compact"
-                          disabled={alreadyLinked || linkingFileId === file.fileId}
-                          onClick={() => onLink(file)}
-                        >
-                          {alreadyLinked
-                            ? "Linked"
-                            : linkingFileId === file.fileId
-                              ? "Linking…"
-                              : "Link"}
-                        </button>
-                      ) : null}
-                    </div>
-                  </li>
-                );
-              })}
-            </ul>
-          )}
-        </div>
-      </aside>
-    </div>,
-    document.body,
+      <div className="shared-file-browser-search">
+        <input
+          type="search"
+          value={query}
+          placeholder="Search files…"
+          onChange={(e) => setQuery(e.target.value)}
+          autoFocus
+        />
+      </div>
+
+      <div className="shared-file-browser-body">
+        {loading ? (
+          <p className="muted">Loading files…</p>
+        ) : files.length === 0 ? (
+          <p className="muted">No files here yet.</p>
+        ) : filtered.length === 0 ? (
+          <p className="muted">No files match your search.</p>
+        ) : (
+          <ul className="shared-file-browser-list">
+            {filtered.map((file) => {
+              const alreadyLinked = linkedFileIds?.has(file.fileId) ?? false;
+              return (
+                <li key={file.fileId} className="shared-file-browser-item">
+                  <div className="shared-file-browser-meta">
+                    <span className="shared-file-browser-name">{file.filename}</span>
+                    <span className="shared-file-browser-sub muted">
+                      {file.fileRef} · {formatFileSize(file.sizeBytes)} · {file.uploaderName}
+                    </span>
+                  </div>
+                  <div className="shared-file-browser-actions">
+                    <FileRefCopyButton fileRef={file.fileRef} filename={file.filename} />
+                    {onLink ? (
+                      <button
+                        type="button"
+                        className="secondary compact"
+                        disabled={alreadyLinked || linkingFileId === file.fileId}
+                        onClick={() => onLink(file)}
+                      >
+                        {alreadyLinked
+                          ? "Linked"
+                          : linkingFileId === file.fileId
+                            ? "Linking…"
+                            : "Link"}
+                      </button>
+                    ) : null}
+                  </div>
+                </li>
+              );
+            })}
+          </ul>
+        )}
+      </div>
+    </Dialog>
   );
 }

@@ -1,9 +1,9 @@
-import { useEffect, useRef, useState } from "react";
-import { createPortal } from "react-dom";
+import { useEffect, useState } from "react";
 import type { IssueAttachmentPublic } from "@teamflow/core";
 import { isImageAttachmentFile } from "@teamflow/core";
 import { client } from "../api";
-import { useLayer } from "../ui/layerStack";
+import { Dialog } from "../ui/Dialog";
+import { DialogTitle } from "../ui/DialogTitle";
 
 export function isImageAttachment(attachment: IssueAttachmentPublic) {
   return isImageAttachmentFile(attachment.filename, attachment.mimeType);
@@ -111,40 +111,27 @@ export function AttachmentLightbox({
   onClose,
   onDownload,
 }: AttachmentLightboxProps) {
-  const figureRef = useRef<HTMLElement>(null);
-  useLayer({ open: true, onEscape: onClose, modal: true, containerRef: figureRef });
-
-  return createPortal(
-    <div
-      className="attachment-lightbox-backdrop"
-      onClick={(event) => {
-        event.stopPropagation();
-        if (event.target === event.currentTarget) onClose();
-      }}
-      role="presentation"
+  return (
+    <Dialog
+      onClose={onClose}
+      backdropClassName="attachment-lightbox-backdrop"
+      className="attachment-lightbox"
+      as="figure"
     >
-      <figure
-        ref={figureRef}
-        className="attachment-lightbox"
-        role="dialog"
-        aria-modal="true"
-        aria-label={attachment.filename}
-        onClick={(event) => event.stopPropagation()}
-      >
-        <img src={imageUrl} alt={attachment.filename} />
-        <figcaption className="attachment-lightbox-caption">
-          <span className="attachment-lightbox-name">{attachment.filename}</span>
-          <span className="attachment-lightbox-actions">
-            <button type="button" className="ghost" onClick={onDownload}>
-              Download
-            </button>
-            <button type="button" className="ghost" onClick={onClose}>
-              Close
-            </button>
-          </span>
-        </figcaption>
-      </figure>
-    </div>,
-    document.body,
+      <img src={imageUrl} alt={attachment.filename} />
+      <figcaption className="attachment-lightbox-caption">
+        <DialogTitle as="span" className="attachment-lightbox-name">
+          {attachment.filename}
+        </DialogTitle>
+        <span className="attachment-lightbox-actions">
+          <button type="button" className="ghost" onClick={onDownload}>
+            Download
+          </button>
+          <button type="button" className="ghost" onClick={onClose}>
+            Close
+          </button>
+        </span>
+      </figcaption>
+    </Dialog>
   );
 }
