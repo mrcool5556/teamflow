@@ -52,7 +52,7 @@ export const ROADMAP_FOCUS: RoadmapItem[] = [
   {
     id: "deploy",
     title: "Self-hosted deploy (Windows / LXC / Docker)",
-    notes: "SELF-HOSTING.md, update command, SMTP wizard. Production at teamflow.toasterland.org.",
+    notes: "SELF-HOSTING.md, update command, SMTP wizard.",
     status: "done",
     priority: 2,
     tags: ["deploy", "ops"],
