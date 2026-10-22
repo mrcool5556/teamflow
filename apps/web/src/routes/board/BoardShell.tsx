@@ -41,13 +41,10 @@ import {
   scrollToIssueRef,
   scrollToRowRef,
 } from "../../lib/refLinks";
-import { hasTeamPermission } from "../../lib/teamPermissions";
+import { hasTeamPermission, TeamPermissionsContext } from "../../lib/teamPermissions";
 import { usePanScroll } from "../../lib/usePanScroll";
 import { updateBoard, useBoardQuery } from "../../queries/board";
-import {
-  completeIssue as completeIssueChange,
-  patchIssue,
-} from "../../queries/boardMutations";
+import { completeIssue as completeIssueChange, patchIssue } from "../../queries/boardMutations";
 import { queryKeys } from "../../queries/keys";
 import { useMembersQuery } from "../../queries/members";
 import { refreshTeams, useTeamPermissionsQuery } from "../../queries/teams";
@@ -77,7 +74,9 @@ export function BoardShell() {
   const { teams, teamsLoaded } = useTeams();
   const { error, report, clear: clearError } = useErrorSink();
 
-  const routeTeam = route.teamKey ? (teams.find((team) => team.key === route.teamKey) ?? null) : null;
+  const routeTeam = route.teamKey
+    ? (teams.find((team) => team.key === route.teamKey) ?? null)
+    : null;
   const teamId = routeTeam?.id ?? null;
   const teamKey = routeTeam?.key ?? null;
   // Board data is keyed by team: a slow response for the previous team cannot land here.
@@ -472,7 +471,7 @@ export function BoardShell() {
         </div>
       ) : (
         <div className="board-toolbar">
-          <button type="button" onClick={() => addRow()}>
+          <button type="button" disabled={!can("board.edit")} onClick={() => addRow()}>
             + Add row
           </button>
           <span className="board-toolbar-hint">
@@ -587,188 +586,192 @@ export function BoardShell() {
 
   return (
     <ShellContext.Provider value={shellValue}>
-    <div className="app-shell">
-      <header className="topbar">
-        <div>
-          <p className="eyebrow">TEAMFLOW</p>
-          <h1>{teams.find((t) => t.id === teamId)?.name ?? "Board"}</h1>
-        </div>
-        <div className="topbar-actions">
-          {!overlayOpen && refBackLabel ? (
-            <button
-              type="button"
-              className="secondary ref-back-btn"
-              title={`Back to ${refBackLabel}`}
-              onClick={goBackRef}
-            >
-              ← Back
-            </button>
-          ) : null}
-          {!overlayOpen && (
-            <GoToRefBar disabled={!teamId || loading} onGo={(ref) => void goToRef(ref)} />
-          )}
-          {teams.length > 0 && (
-            <label className="topbar-team-switch">
-              <span className="sr-only">Workspace</span>
-              <select
-                aria-label="Workspace"
-                value={teamId ?? ""}
-                disabled={!teamId || loading}
-                onChange={(e) => {
-                  switchTeam(e.target.value);
-                }}
+      <TeamPermissionsContext.Provider
+        value={permissionsQuery.isFetched ? effectiveTeamPermissions : undefined}
+      >
+        <div className="app-shell">
+          <header className="topbar">
+            <div>
+              <p className="eyebrow">TEAMFLOW</p>
+              <h1>{teams.find((t) => t.id === teamId)?.name ?? "Board"}</h1>
+            </div>
+            <div className="topbar-actions">
+              {!overlayOpen && refBackLabel ? (
+                <button
+                  type="button"
+                  className="secondary ref-back-btn"
+                  title={`Back to ${refBackLabel}`}
+                  onClick={goBackRef}
+                >
+                  ← Back
+                </button>
+              ) : null}
+              {!overlayOpen && (
+                <GoToRefBar disabled={!teamId || loading} onGo={(ref) => void goToRef(ref)} />
+              )}
+              {teams.length > 0 && (
+                <label className="topbar-team-switch">
+                  <span className="sr-only">Workspace</span>
+                  <select
+                    aria-label="Workspace"
+                    value={teamId ?? ""}
+                    disabled={!teamId || loading}
+                    onChange={(e) => {
+                      switchTeam(e.target.value);
+                    }}
+                  >
+                    {teams.map((team) => (
+                      <option key={team.id} value={team.id}>
+                        {team.key} — {team.name}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              )}
+              <button
+                type="button"
+                className={historyOpen ? "active" : undefined}
+                disabled={changeHistory.length === 0}
+                onClick={() => setHistoryOpen((open) => !open)}
               >
-                {teams.map((team) => (
-                  <option key={team.id} value={team.id}>
-                    {team.key} — {team.name}
-                  </option>
-                ))}
-              </select>
-            </label>
+                Recent{changeHistory.length > 0 ? ` (${changeHistory.length})` : ""}
+              </button>
+              {!overlayOpen && teamId ? (
+                <button type="button" onClick={() => setTeamFilesOpen(true)}>
+                  Files
+                </button>
+              ) : null}
+              <button
+                type="button"
+                className={roadmapOpen ? "active" : undefined}
+                onClick={() => navigate(roadmapOpen ? boardPath(teamKey) : planPath(teamKey))}
+              >
+                {roadmapOpen ? "Close plan" : "Plan"}
+              </button>
+              <button
+                type="button"
+                className={settingsOpen ? "active" : undefined}
+                onClick={() =>
+                  navigate(
+                    settingsOpen
+                      ? boardPath(teamKey)
+                      : settingsPath(teamKey, lastSettingsPanelRef.current),
+                  )
+                }
+              >
+                {settingsOpen ? "Close settings" : "Settings"}
+              </button>
+              <button type="button" className="ghost" onClick={() => setAboutOpen(true)}>
+                About
+              </button>
+              <button type="button" className="ghost" onClick={logout}>
+                Log out ({user?.name})
+              </button>
+            </div>
+          </header>
+
+          {(error ?? boardQuery.error?.message) && (
+            <div className="banner error">{error ?? boardQuery.error?.message}</div>
           )}
-          <button
-            type="button"
-            className={historyOpen ? "active" : undefined}
-            disabled={changeHistory.length === 0}
-            onClick={() => setHistoryOpen((open) => !open)}
-          >
-            Recent{changeHistory.length > 0 ? ` (${changeHistory.length})` : ""}
-          </button>
-          {!overlayOpen && teamId ? (
-            <button type="button" onClick={() => setTeamFilesOpen(true)}>
-              Files
-            </button>
-          ) : null}
-          <button
-            type="button"
-            className={roadmapOpen ? "active" : undefined}
-            onClick={() => navigate(roadmapOpen ? boardPath(teamKey) : planPath(teamKey))}
-          >
-            {roadmapOpen ? "Close plan" : "Plan"}
-          </button>
-          <button
-            type="button"
-            className={settingsOpen ? "active" : undefined}
-            onClick={() =>
-              navigate(
-                settingsOpen
-                  ? boardPath(teamKey)
-                  : settingsPath(teamKey, lastSettingsPanelRef.current),
-              )
+          {refNotice && <div className="banner ref-notice">{refNotice}</div>}
+          {loading && <div className="banner">Loading…</div>}
+
+          {settingsOpen ? (
+            <div className="app-workspace app-workspace--settings">
+              <Outlet />
+              {boardPanel}
+            </div>
+          ) : roadmapOpen ? (
+            <div className="app-workspace app-workspace--roadmap">
+              <Outlet />
+            </div>
+          ) : (
+            <>
+              {boardPanel}
+              <Outlet />
+            </>
+          )}
+
+          <QuickAddModal
+            open={quickAdd !== null}
+            title={
+              quickAdd?.kind === "row"
+                ? "Add row"
+                : quickAdd?.kind === "column"
+                  ? `Add column — ${rows.find((row) => row.id === quickAdd.rowId)?.name ?? "row"}`
+                  : "Add issue"
             }
-          >
-            {settingsOpen ? "Close settings" : "Settings"}
-          </button>
-          <button type="button" className="ghost" onClick={() => setAboutOpen(true)}>
-            About
-          </button>
-          <button type="button" className="ghost" onClick={logout}>
-            Log out ({user?.name})
-          </button>
+            label={
+              quickAdd?.kind === "issue"
+                ? "Issue title"
+                : quickAdd?.kind === "row"
+                  ? "Row name"
+                  : "Column name"
+            }
+            placeholder={quickAdd?.kind === "issue" ? "What needs to be done?" : "Name"}
+            value={quickAddValue}
+            onChange={setQuickAddValue}
+            onSubmit={submitQuickAdd}
+            onClose={closeQuickAdd}
+          />
+
+          {rowFilesRow && !overlayOpen && (
+            <RowFilesDrawer
+              row={rowFilesRow}
+              onClose={() => setRowFilesRow(null)}
+              onNavigateRef={(ref) => void goToRef(ref)}
+            />
+          )}
+
+          {teamFilesOpen && teamId && !overlayOpen && (
+            <TeamFilesDrawer
+              teamId={teamId}
+              open={teamFilesOpen}
+              onClose={() => setTeamFilesOpen(false)}
+              onNavigateRef={(ref) => {
+                setTeamFilesOpen(false);
+                void goToRef(ref);
+              }}
+            />
+          )}
+          {selectedIssue && !overlayOpen && (
+            <IssueDrawer
+              issue={selectedIssue}
+              members={members}
+              statuses={statuses}
+              rows={rows}
+              currentUserId={user?.id ?? null}
+              onClose={closeIssue}
+              onNavigateRef={(ref) => void goToRef(ref)}
+              onPatch={(patch) =>
+                mutateBoard(
+                  patchIssue(board, members, selectedIssue.id, patch, "Failed to update issue"),
+                )
+              }
+              onComplete={() => mutateBoard(completeIssueChange(selectedIssue.id))}
+              onDelete={deleteIssue}
+            />
+          )}
+          {pendingUndo && (
+            <UndoToast
+              label={pendingUndo.label}
+              historyCount={changeHistory.length}
+              historyOpen={historyOpen}
+              onUndo={undoDelete}
+              onToggleHistory={() => setHistoryOpen((open) => !open)}
+            />
+          )}
+          <ChangeHistoryPanel
+            entries={changeHistory}
+            pendingId={pendingUndo?.id ?? null}
+            open={historyOpen}
+            onClose={() => setHistoryOpen(false)}
+            onUndo={undoEntry}
+            onRestore={restoreEntry}
+          />
+          <AboutDialog open={aboutOpen} version={APP_VERSION} onClose={() => setAboutOpen(false)} />
         </div>
-      </header>
-
-      {(error ?? boardQuery.error?.message) && (
-        <div className="banner error">{error ?? boardQuery.error?.message}</div>
-      )}
-      {refNotice && <div className="banner ref-notice">{refNotice}</div>}
-      {loading && <div className="banner">Loading…</div>}
-
-      {settingsOpen ? (
-        <div className="app-workspace app-workspace--settings">
-          <Outlet />
-          {boardPanel}
-        </div>
-      ) : roadmapOpen ? (
-        <div className="app-workspace app-workspace--roadmap">
-          <Outlet />
-        </div>
-      ) : (
-        <>
-          {boardPanel}
-          <Outlet />
-        </>
-      )}
-
-      <QuickAddModal
-        open={quickAdd !== null}
-        title={
-          quickAdd?.kind === "row"
-            ? "Add row"
-            : quickAdd?.kind === "column"
-              ? `Add column — ${rows.find((row) => row.id === quickAdd.rowId)?.name ?? "row"}`
-              : "Add issue"
-        }
-        label={
-          quickAdd?.kind === "issue"
-            ? "Issue title"
-            : quickAdd?.kind === "row"
-              ? "Row name"
-              : "Column name"
-        }
-        placeholder={quickAdd?.kind === "issue" ? "What needs to be done?" : "Name"}
-        value={quickAddValue}
-        onChange={setQuickAddValue}
-        onSubmit={submitQuickAdd}
-        onClose={closeQuickAdd}
-      />
-
-      {rowFilesRow && !overlayOpen && (
-        <RowFilesDrawer
-          row={rowFilesRow}
-          onClose={() => setRowFilesRow(null)}
-          onNavigateRef={(ref) => void goToRef(ref)}
-        />
-      )}
-
-      {teamFilesOpen && teamId && !overlayOpen && (
-        <TeamFilesDrawer
-          teamId={teamId}
-          open={teamFilesOpen}
-          onClose={() => setTeamFilesOpen(false)}
-          onNavigateRef={(ref) => {
-            setTeamFilesOpen(false);
-            void goToRef(ref);
-          }}
-        />
-      )}
-      {selectedIssue && !overlayOpen && (
-        <IssueDrawer
-          issue={selectedIssue}
-          members={members}
-          statuses={statuses}
-          rows={rows}
-          currentUserId={user?.id ?? null}
-          onClose={closeIssue}
-          onNavigateRef={(ref) => void goToRef(ref)}
-          onPatch={(patch) =>
-            mutateBoard(
-              patchIssue(board, members, selectedIssue.id, patch, "Failed to update issue"),
-            )
-          }
-          onComplete={() => mutateBoard(completeIssueChange(selectedIssue.id))}
-          onDelete={deleteIssue}
-        />
-      )}
-      {pendingUndo && (
-        <UndoToast
-          label={pendingUndo.label}
-          historyCount={changeHistory.length}
-          historyOpen={historyOpen}
-          onUndo={undoDelete}
-          onToggleHistory={() => setHistoryOpen((open) => !open)}
-        />
-      )}
-      <ChangeHistoryPanel
-        entries={changeHistory}
-        pendingId={pendingUndo?.id ?? null}
-        open={historyOpen}
-        onClose={() => setHistoryOpen(false)}
-        onUndo={undoEntry}
-        onRestore={restoreEntry}
-      />
-      <AboutDialog open={aboutOpen} version={APP_VERSION} onClose={() => setAboutOpen(false)} />
-    </div>
+      </TeamPermissionsContext.Provider>
     </ShellContext.Provider>
   );
 }
