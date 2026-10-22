@@ -2881,6 +2881,9 @@ if (serveWeb) {
 const port = Number(process.env.PORT ?? 3000);
 const host = process.env.HOST ?? "0.0.0.0";
 
-console.log(`Teamflow API listening on http://${host}:${port}`);
+export { app };
 
-serve({ fetch: app.fetch, port, hostname: host });
+if (!process.env.VITEST) {
+  console.log(`Teamflow API listening on http://${host}:${port}`);
+  serve({ fetch: app.fetch, port, hostname: host });
+}
