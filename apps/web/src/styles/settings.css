@@ -859,6 +859,8 @@
 }
 
 .settings-range {
+  display: grid;
+  gap: var(--space-2);
   margin-bottom: 0.75rem;
 }
 
@@ -947,4 +949,31 @@
 
 .invite-login-hint {
   color: var(--accent);
+}
+
+.settings-segmented {
+  display: inline-flex;
+  width: fit-content;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+}
+
+.settings-segmented button {
+  padding: 0.3rem 0.85rem;
+  border: none;
+  border-radius: 0;
+  background: transparent;
+  color: var(--text-soft);
+  box-shadow: none;
+  font-size: var(--font-size-sm);
+}
+
+.settings-segmented button + button {
+  border-left: 1px solid var(--border-strong);
+}
+
+.settings-segmented button.active {
+  background: var(--accent);
+  color: #111;
 }

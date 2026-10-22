@@ -7,6 +7,8 @@ import {
   MAX_CARD_MIN_HEIGHT,
   MIN_BOARD_COLUMN_WIDTH,
   MIN_CARD_MIN_HEIGHT,
+  BOARD_COLUMN_WIDTH_MODES,
+  boardColumnWidthMode,
   clampBoardColumnWidth,
   clampCardMinHeight,
   mergeUserProfile,
@@ -31,6 +33,7 @@ export function AdvancedProfileSettingsSection({
   onExportProfile,
   onImportProfile,
 }: AdvancedProfileSettingsSectionProps) {
+  const columnWidthMode = boardColumnWidthMode(profile.board);
   return (
     <section className="settings-section">
       <h3>Advanced</h3>
@@ -43,28 +46,58 @@ export function AdvancedProfileSettingsSection({
               Column width and card height apply to every row on your board. Changes preview live on
               the right.
             </p>
-            <label className="settings-range">
-              Column width
-              <div className="settings-range-row">
-                <input
-                  type="range"
-                  min={MIN_BOARD_COLUMN_WIDTH}
-                  max={MAX_BOARD_COLUMN_WIDTH}
-                  step={BOARD_COLUMN_WIDTH_STEP}
-                  value={profile.board.columnWidth}
-                  onChange={(e) => {
-                    onProfileChange(
-                      mergeUserProfile(profile, {
-                        board: {
-                          columnWidth: clampBoardColumnWidth(Number(e.target.value)),
-                        },
-                      }),
-                    );
-                  }}
-                />
-                <span className="settings-range-value">{profile.board.columnWidth}px</span>
+            <div className="settings-range">
+              <span id="column-width-mode-label">Column width</span>
+              <div
+                className="settings-segmented"
+                role="radiogroup"
+                aria-labelledby="column-width-mode-label"
+              >
+                {BOARD_COLUMN_WIDTH_MODES.map((mode) => (
+                  <button
+                    key={mode}
+                    type="button"
+                    role="radio"
+                    aria-checked={columnWidthMode === mode}
+                    className={columnWidthMode === mode ? "active" : undefined}
+                    onClick={() =>
+                      onProfileChange(
+                        mergeUserProfile(profile, { board: { columnWidthMode: mode } }),
+                      )
+                    }
+                  >
+                    {mode === "auto" ? "Auto" : "Custom"}
+                  </button>
+                ))}
               </div>
-            </label>
+              {columnWidthMode === "auto" ? (
+                <p className="settings-hint">
+                  Fits four columns in the window (260–420px each); wider boards scroll sideways.
+                </p>
+              ) : (
+                <label className="settings-range-row">
+                  <span className="sr-only">Custom column width</span>
+                  <input
+                    type="range"
+                    min={MIN_BOARD_COLUMN_WIDTH}
+                    max={MAX_BOARD_COLUMN_WIDTH}
+                    step={BOARD_COLUMN_WIDTH_STEP}
+                    value={profile.board.columnWidth}
+                    onChange={(e) => {
+                      onProfileChange(
+                        mergeUserProfile(profile, {
+                          board: {
+                            columnWidth: clampBoardColumnWidth(Number(e.target.value)),
+                            columnWidthMode: "custom",
+                          },
+                        }),
+                      );
+                    }}
+                  />
+                  <span className="settings-range-value">{profile.board.columnWidth}px</span>
+                </label>
+              )}
+            </div>
             <label className="settings-range">
               Card min height
               <div className="settings-range-row">
@@ -95,6 +128,7 @@ export function AdvancedProfileSettingsSection({
                   mergeUserProfile(profile, {
                     board: {
                       columnWidth: DEFAULT_BOARD_COLUMN_WIDTH,
+                      columnWidthMode: "auto",
                       cardMinHeight: DEFAULT_CARD_MIN_HEIGHT,
                     },
                   }),

@@ -472,6 +472,8 @@ body.board-pan-active {
 }
 
 .board-row-scroll {
+  /* Size container: the "Auto" column width is a share of this width (cqw). */
+  container-type: inline-size;
   width: 100%;
   max-width: 100%;
   min-width: 0;

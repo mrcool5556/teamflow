@@ -1,4 +1,5 @@
 import {
+  boardColumnWidthMode,
   clampBoardColumnWidth,
   clampCardMinHeight,
   createDefaultUserProfile,
@@ -8,6 +9,12 @@ import {
   type ThemeMode,
   type UserProfile,
 } from "@teamflow/core";
+
+/**
+ * Four columns per row width (`cqw` of `.board-row-scroll`, 0.65rem gaps), never narrower than
+ * 260px or wider than the 420px default; past that the row scrolls sideways.
+ */
+const AUTO_BOARD_COLUMN_WIDTH = "clamp(260px, calc((100cqw - 3 * 0.65rem) / 4), 420px)";
 
 const LEGACY_COLUMN_WIDTH_KEY = "teamflow_board_column_width";
 
@@ -82,8 +89,9 @@ export function applyUserProfile(profile: UserProfile) {
 
   root.style.setProperty(
     "--board-column-width",
-
-    `${clampBoardColumnWidth(profile.board.columnWidth)}px`,
+    boardColumnWidthMode(profile.board) === "auto"
+      ? AUTO_BOARD_COLUMN_WIDTH
+      : `${clampBoardColumnWidth(profile.board.columnWidth)}px`,
   );
 
   root.style.setProperty(
@@ -118,6 +126,7 @@ export function mergeWithLegacyDefaults(profile: UserProfile): {
         ...profile.board,
 
         columnWidth: legacy.columnWidth,
+        columnWidthMode: "custom",
       },
     },
 
