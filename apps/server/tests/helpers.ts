@@ -9,6 +9,8 @@ export async function bootApp(env: Record<string, string> = {}): Promise<TestApp
   process.env.DATABASE_URL = ":memory:";
   process.env.JWT_SECRET ??= "test-secret-not-for-production";
   process.env.NODE_ENV ??= "test";
+  // Tests register many users per file; keep the auth rate limit out of the way unless a test opts in.
+  process.env.TEAMFLOW_AUTH_RATE_LIMIT ??= "1000";
   for (const [key, value] of Object.entries(env)) {
     process.env[key] = value;
   }

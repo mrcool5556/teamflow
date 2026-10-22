@@ -38,9 +38,13 @@ import { createDb, schema } from "@teamflow/db";
 import type { TokenScope } from "@teamflow/core";
 import { and, eq, sql } from "drizzle-orm";
 import { Hono } from "hono";
-import type { Context } from "hono";
+import type { Context, Next } from "hono";
 import type { AuthContext } from "./lib/auth.js";
+import { bodyLimit } from "hono/body-limit";
 import { cors } from "hono/cors";
+import { getConnInfo } from "@hono/node-server/conninfo";
+import { checkRateLimit, clientKey, resolveCorsOrigin } from "./lib/httpHardening.js";
+import { getBundleImportLimits } from "./lib/teamBundle.js";
 import {
   countRowIssues,
   countStatusIssues,
@@ -187,10 +191,72 @@ app.onError((err, c) => {
 app.use(
   "*",
   cors({
-    origin: (origin) => origin ?? "*",
+    // Allowlist: PUBLIC_URL + CORS_ORIGINS (+ localhost Vite ports outside production).
+    origin: (origin) => resolveCorsOrigin(origin),
     credentials: true,
   }),
 );
+
+app.use("*", async (c, next) => {
+  await next();
+  c.header("X-Content-Type-Options", "nosniff");
+});
+
+const JSON_BODY_LIMIT = 1024 * 1024;
+
+function uploadBodyLimit() {
+  const limits = getAttachmentLimits();
+  const largest = Math.max(
+    limits.imageBytes,
+    limits.videoBytes,
+    limits.zipBytes,
+    limits.defaultBytes,
+    getBundleImportLimits().maxBytes,
+  );
+  return largest + JSON_BODY_LIMIT; // multipart framing overhead
+}
+
+// Body size caps, enforced before any handler buffers the body: 1 MB for JSON, the configured
+// attachment/bundle maximum for multipart uploads, one chunk for chunked upload PUTs.
+app.use("*", async (c, next) => {
+  const method = c.req.method;
+  if (method === "GET" || method === "HEAD" || method === "OPTIONS") return next();
+  const contentType = c.req.header("content-type") ?? "";
+  let maxSize = JSON_BODY_LIMIT;
+  if (contentType.startsWith("multipart/form-data")) {
+    maxSize = uploadBodyLimit();
+  } else if (method === "PUT" && c.req.path.startsWith("/uploads/")) {
+    maxSize = getAttachmentLimits().chunkBytes + 1024;
+  }
+  return bodyLimit({
+    maxSize,
+    onError: (ctx) => ctx.json({ error: "Request body too large" }, 413),
+  })(c, next);
+});
+
+function remoteAddress(c: Context) {
+  try {
+    return getConnInfo(c).remote.address;
+  } catch {
+    return undefined;
+  }
+}
+
+// Basic per-IP rate limit on credential endpoints (TEAMFLOW_AUTH_RATE_LIMIT per minute, default 10).
+async function authRateLimit(c: Context, next: Next) {
+  if (c.req.method !== "POST") return next();
+  const key = `${c.req.path}:${clientKey(c.req.raw.headers, remoteAddress(c))}`;
+  const retryAfter = checkRateLimit(key);
+  if (retryAfter !== null) {
+    c.header("Retry-After", String(retryAfter));
+    return c.json({ error: "Too many attempts. Try again later." }, 429);
+  }
+  return next();
+}
+
+app.use("/auth/login", authRateLimit);
+app.use("/auth/register", authRateLimit);
+app.use("/auth/forgot-password", authRateLimit);
 
 app.get("/health", (c) => c.json({ ok: true }));
 
