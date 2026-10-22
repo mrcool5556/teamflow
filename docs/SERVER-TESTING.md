@@ -4,7 +4,7 @@ Use this when debugging production issues (502 after update, maintenance jobs, v
 
 ## SSH access
 
-See [CONNECTIONS.md](CONNECTIONS.md) for host, user, and key path.
+Host, user and key path for your own server are machine-specific; keep them in a local note outside git (this repo ignores `docs/CONNECTIONS.md` for that purpose).
 
 Recommended `~/.ssh/config` entry (Windows: `C:\Users\<you>\.ssh\config`):
 
