@@ -752,10 +752,9 @@ export function KanbanBoard({
           const target = event.target as HTMLElement;
           if (target.closest(".issue-card")) return;
           if (target.closest(".bulk-action-bar")) return;
-          // Ignore clicks inside portaled panels (assignee/timer) so selection
-          // doesn't clear while picking members/timer values.
-          if (target.closest(".assignee-picker-panel")) return;
-          if (target.closest(".issue-timer-panel")) return;
+          // Presses inside any popover, dialog or drawer (all portaled, all marked by the
+          // ui primitives) never clear the selection.
+          if (target.closest("[data-layer]")) return;
           clearIssueSelection();
         }}
       >

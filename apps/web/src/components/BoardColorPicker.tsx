@@ -1,8 +1,6 @@
 import { BOARD_COLOR_PRESETS } from "@teamflow/core";
 import { useCallback, useRef, useState } from "react";
-import { createPortal } from "react-dom";
-import { useFloatingPanelStyle } from "../hooks/useFloatingPanelStyle";
-import { useDismissOnClickOutside } from "../hooks/useDismissOnClickOutside";
+import { Popover } from "../ui/Popover";
 
 type BoardColorPickerProps = {
   color: string | null;
@@ -28,18 +26,12 @@ export function BoardColorPicker({
   disabled = false,
 }: BoardColorPickerProps) {
   const [open, setOpen] = useState(false);
-  const rootRef = useRef<HTMLDivElement>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
-  const panelRef = useRef<HTMLDivElement>(null);
   const useFloating = compact || floatingPanel;
-  const panelStyle = useFloatingPanelStyle(open && useFloating, triggerRef, "auto");
-  const panelPositioned = Boolean(panelStyle.position);
 
   const closePanel = useCallback(() => {
     setOpen(false);
   }, []);
-
-  useDismissOnClickOutside(open, [rootRef, panelRef], closePanel);
 
   function stopBubble(event: React.SyntheticEvent) {
     event.stopPropagation();
@@ -50,13 +42,16 @@ export function BoardColorPicker({
     closePanel();
   }
 
-  const panel = open ? (
-    <div
-      ref={panelRef}
-      className={`color-picker-panel ${useFloating ? "color-picker-panel--floating" : ""} ${panelPositioned ? "color-picker-panel--positioned" : ""}`.trim()}
-      style={useFloating ? panelStyle : undefined}
-      onPointerDown={stopBubble}
-      onClick={stopBubble}
+  const panel = (
+    <Popover
+      open={open}
+      onClose={closePanel}
+      anchorRef={triggerRef}
+      width={useFloating ? 280 : undefined}
+      maxWidth={320}
+      className={`color-picker-panel ${useFloating ? "color-picker-panel--floating" : ""}`.trim()}
+      positionedClassName="color-picker-panel--positioned"
+      label={title}
     >
       <strong>{title}</strong>
       {hint ? <p className="muted">{hint}</p> : null}
@@ -81,12 +76,11 @@ export function BoardColorPicker({
           None
         </button>
       </div>
-    </div>
-  ) : null;
+    </Popover>
+  );
 
   return (
     <div
-      ref={rootRef}
       className={`color-picker ${compact ? "color-picker--compact" : ""} ${open ? "open" : ""} ${className}`.trim()}
       onPointerDown={stopBubble}
       onClick={stopBubble}
@@ -110,7 +104,7 @@ export function BoardColorPicker({
         ) : null}
       </button>
 
-      {useFloating && panel ? createPortal(panel, document.body) : panel}
+      {panel}
     </div>
   );
 }

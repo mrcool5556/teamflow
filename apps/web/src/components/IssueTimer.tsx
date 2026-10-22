@@ -1,8 +1,6 @@
 import { useEffect, useRef, useState, type WheelEvent } from "react";
-import { createPortal } from "react-dom";
 import type { IssuePublic } from "@teamflow/core";
-import { useFloatingPanelStyle } from "../hooks/useFloatingPanelStyle";
-import { useDismissOnClickOutside } from "../hooks/useDismissOnClickOutside";
+import { Popover } from "../ui/Popover";
 import {
   EMPTY_TIMER_PARTS,
   type IssueTimerPatch,
@@ -88,11 +86,7 @@ export function IssueTimer({
   const [addInputs, setAddInputs] = useState<TimerInputValues>(
     timerInputsFromParts(EMPTY_TIMER_PARTS),
   );
-  const rootRef = useRef<HTMLDivElement>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
-  const panelRef = useRef<HTMLDivElement>(null);
-  const panelStyle = useFloatingPanelStyle(open && floatingPanel, triggerRef, "auto");
-  const panelPositioned = Boolean(panelStyle.position);
   const display = getTimerDisplay(issue, now);
   const isCountdown = issue.timerTargetSec != null;
   const isRunning = Boolean(issue.timerActiveAt);
@@ -107,8 +101,6 @@ export function IssueTimer({
     const id = window.setInterval(() => setNow(Date.now()), 1000);
     return () => window.clearInterval(id);
   }, [issue.timerActiveAt]);
-
-  useDismissOnClickOutside(open, [rootRef, panelRef], () => setOpen(false));
 
   useEffect(() => {
     if (!open || isCountdown) return;
@@ -205,13 +197,17 @@ export function IssueTimer({
 
   const chunkSeconds = timerSecondsFromParts(timerPartsFromInputs(normalizeTimerInputs(addInputs)));
 
-  const panel = open ? (
-    <div
-      ref={panelRef}
-      className={`issue-timer-panel issue-timer-panel--clock ${compact ? "issue-timer-panel--compact" : ""} ${floatingPanel ? "issue-timer-panel--floating" : ""} ${panelPositioned ? "issue-timer-panel--positioned" : ""}`}
-      style={floatingPanel ? panelStyle : undefined}
-      onPointerDown={(event) => event.stopPropagation()}
-      onClick={(event) => event.stopPropagation()}
+  const panel = (
+    <Popover
+      open={open}
+      onClose={() => setOpen(false)}
+      anchorRef={triggerRef}
+      placement="bottom-start"
+      width={floatingPanel ? 280 : undefined}
+      maxWidth={520}
+      className={`issue-timer-panel issue-timer-panel--clock ${compact ? "issue-timer-panel--compact" : ""} ${floatingPanel ? "issue-timer-panel--floating" : ""}`}
+      positionedClassName="issue-timer-panel--positioned"
+      label="Timer"
     >
       <p className="issue-timer-mode">
         {isCountdown
@@ -280,12 +276,11 @@ export function IssueTimer({
           Reset
         </button>
       </div>
-    </div>
-  ) : null;
+    </Popover>
+  );
 
   return (
     <div
-      ref={rootRef}
       className={`issue-timer ${compact ? "issue-timer--compact" : ""} ${open ? "open" : ""} ${display.running ? "running" : ""} ${display.finished ? "finished" : ""}`}
       onPointerDown={(e) => e.stopPropagation()}
       onClick={(e) => e.stopPropagation()}
@@ -311,11 +306,7 @@ export function IssueTimer({
         {!compact && <span className="assignee-picker-caret">{open ? "▴" : "▾"}</span>}
       </button>
 
-      {floatingPanel && panel && panelPositioned
-        ? createPortal(panel, document.body)
-        : !floatingPanel
-          ? panel
-          : null}
+      {panel}
     </div>
   );
 }

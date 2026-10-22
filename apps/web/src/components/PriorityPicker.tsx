@@ -1,8 +1,6 @@
 import { useCallback, useRef, useState } from "react";
-import { createPortal } from "react-dom";
 import { PRIORITIES, PRIORITY_LABELS, type Priority } from "@teamflow/core";
-import { useFloatingPanelStyle } from "../hooks/useFloatingPanelStyle";
-import { useDismissOnClickOutside } from "../hooks/useDismissOnClickOutside";
+import { Popover } from "../ui/Popover";
 
 type PriorityPickerProps = {
   priority: Priority;
@@ -22,17 +20,11 @@ export function PriorityPicker({
   disabled = false,
 }: PriorityPickerProps) {
   const [open, setOpen] = useState(false);
-  const rootRef = useRef<HTMLDivElement>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
-  const panelRef = useRef<HTMLDivElement>(null);
-  const panelStyle = useFloatingPanelStyle(open && floatingPanel, triggerRef, "auto", "right", 200);
-  const panelPositioned = Boolean(panelStyle.position);
 
   const closePanel = useCallback(() => {
     setOpen(false);
   }, []);
-
-  useDismissOnClickOutside(open, [rootRef, panelRef], closePanel);
 
   function stopBubble(event: React.SyntheticEvent) {
     event.stopPropagation();
@@ -47,13 +39,16 @@ export function PriorityPicker({
   const triggerTitle =
     priority === "none" ? "Set priority" : `${PRIORITY_LABELS[priority]} priority`;
 
-  const panel = open ? (
-    <div
-      ref={panelRef}
-      className={`priority-picker-panel ${floatingPanel ? "priority-picker-panel--floating" : ""} ${panelPositioned ? "priority-picker-panel--positioned" : ""}`.trim()}
-      style={floatingPanel ? panelStyle : undefined}
-      onPointerDown={stopBubble}
-      onClick={stopBubble}
+  const panel = (
+    <Popover
+      open={open}
+      onClose={closePanel}
+      anchorRef={triggerRef}
+      placement="bottom-end"
+      width={floatingPanel ? 200 : undefined}
+      className={`priority-picker-panel ${floatingPanel ? "priority-picker-panel--floating" : ""}`.trim()}
+      positionedClassName="priority-picker-panel--positioned"
+      label={title}
     >
       <strong>{title}</strong>
       <div className="priority-picker-list">
@@ -73,12 +68,11 @@ export function PriorityPicker({
           </button>
         ))}
       </div>
-    </div>
-  ) : null;
+    </Popover>
+  );
 
   return (
     <div
-      ref={rootRef}
       className={`priority-picker ${compact ? "priority-picker--compact" : ""} ${open ? "open" : ""}`.trim()}
       onPointerDown={stopBubble}
       onClick={stopBubble}
@@ -99,11 +93,7 @@ export function PriorityPicker({
         {triggerLabel}
       </button>
 
-      {floatingPanel && panel && panelPositioned
-        ? createPortal(panel, document.body)
-        : !floatingPanel
-          ? panel
-          : null}
+      {panel}
     </div>
   );
 }

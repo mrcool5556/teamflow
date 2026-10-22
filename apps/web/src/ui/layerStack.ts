@@ -81,6 +81,15 @@ export class LayerStack {
     return this.layers[this.layers.length - 1] === layer;
   }
 
+  /** True when `node` sits inside `layer` or any layer opened after it. */
+  containsAtOrAbove(layer: LayerRecord, node: Node) {
+    const index = this.layers.indexOf(layer);
+    if (index < 0) return false;
+    return this.layers
+      .slice(index)
+      .some((entry) => Boolean(entry.containerRef?.current?.contains(node)));
+  }
+
   get size() {
     return this.layers.length;
   }
@@ -164,7 +173,12 @@ export type UseLayerOptions = {
   restoreFocus?: boolean;
 };
 
-/** Register a layer while `open` is true. Returns a function telling whether it is topmost. */
+export type LayerHandle = {
+  isTop: () => boolean;
+  containsAtOrAbove: (node: Node) => boolean;
+};
+
+/** Register a layer while `open` is true. */
 export function useLayer({
   open,
   onEscape,
@@ -172,7 +186,7 @@ export function useLayer({
   containerRef,
   initialFocusRef,
   restoreFocus = modal,
-}: UseLayerOptions) {
+}: UseLayerOptions): LayerHandle {
   const stack = useLayerStack();
   const recordRef = useRef<LayerRecord | null>(null);
   stack.trackFocus();
@@ -214,5 +228,9 @@ export function useLayer({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, stack]);
 
-  return () => (recordRef.current ? stack.isTop(recordRef.current) : false);
+  return {
+    isTop: () => (recordRef.current ? stack.isTop(recordRef.current) : false),
+    containsAtOrAbove: (node) =>
+      recordRef.current ? stack.containsAtOrAbove(recordRef.current, node) : false,
+  };
 }
