@@ -19,7 +19,9 @@ $ServerJs = Join-Path $RepoRoot "apps\server\dist\index.js"
 
 & nssm install $ServiceName $NodePath $ServerJs
 & nssm set $ServiceName AppDirectory $RepoRoot
-& nssm set $ServiceName AppEnvironmentExtra "PORT=$Port" "DATABASE_URL=file:./data/teamflow.db"
+$EnvFile = Join-Path $RepoRoot ".env"
+# The server loads TEAMFLOW_ENV_FILE itself (JWT_SECRET etc.); the values below win over it.
+& nssm set $ServiceName AppEnvironmentExtra "TEAMFLOW_ENV_FILE=$EnvFile" "PORT=$Port" "DATABASE_URL=file:./data/teamflow.db" "SERVE_WEB=true"
 & nssm start $ServiceName
 
 Write-Host "Service '$ServiceName' installed and started." -ForegroundColor Green
