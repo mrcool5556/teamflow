@@ -1,4 +1,4 @@
-import { createContext, useContext, type MutableRefObject } from "react";
+import { createContext, useContext } from "react";
 import type { TeamMemberPublic, TeamPermissionsPublic, TeamPublic } from "@teamflow/core";
 
 /** What the signed-in user may open or change in the current team's settings. */
@@ -29,8 +29,6 @@ export type ShellContextValue = {
   onTeamLeft: (teamId: string) => void;
   onTeamDeleted: (teamId: string) => void;
   closeSettings: () => void;
-  /** Set while a pointer press starts inside settings, so the preview click does not close it. */
-  settingsPointerDownRef: MutableRefObject<boolean>;
 };
 
 export const ShellContext = createContext<ShellContextValue | null>(null);

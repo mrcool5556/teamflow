@@ -4,46 +4,40 @@ import { isSettingsPanel, settingsPath, useAppRoute } from "../../lib/appRoute";
 import { useShell } from "../board/shellContext";
 import { useLayer } from "../../ui/layerStack";
 
-/** The settings sidebar: header, panel navigation and the panel route. */
+/** Settings as a page: grouped navigation on the left, the panel in a readable column. */
 export function SettingsLayout() {
   const navigate = useNavigate();
   const { settingsPanel } = useAppRoute();
-  const { team, teamKey, access, closeSettings, settingsPointerDownRef } = useShell();
+  const { team, teamKey, access, closeSettings } = useShell();
   const panel = isSettingsPanel(settingsPanel) ? settingsPanel : "general";
 
   useLayer({ open: true, onEscape: closeSettings });
 
   return (
-    <aside
-      className="settings-sidebar panel settings"
-      onPointerDown={() => {
-        settingsPointerDownRef.current = true;
-      }}
-    >
-      <div className="settings-sidebar-header">
-        <h2>Settings</h2>
-        <button
-          type="button"
-          className="ghost settings-close-btn"
-          aria-label="Close settings"
-          onClick={closeSettings}
-        >
-          ×
+    <div className="settings-page">
+      <aside className="settings-sidebar">
+        <button type="button" className="ghost settings-back-btn" onClick={closeSettings}>
+          <span aria-hidden="true">←</span> Back to board
+          <kbd className="settings-back-kbd" aria-hidden="true">
+            Esc
+          </kbd>
         </button>
-      </div>
-      <div className="settings-shell">
+        <h2 className="settings-title">Settings</h2>
         <SettingsNav
           panel={panel}
           onPanelChange={(next) => navigate(settingsPath(teamKey, next))}
+          teamKey={team?.key ?? null}
           showTeam={Boolean(team)}
           showRoles={access.showRoles}
           showIntegrations={access.showIntegrations}
           showUpdates={access.showMaintenance}
         />
-        <div className="settings-main">
+      </aside>
+      <main className="settings-main">
+        <div className="settings-column">
           <Outlet />
         </div>
-      </div>
-    </aside>
+      </main>
+    </div>
   );
 }
