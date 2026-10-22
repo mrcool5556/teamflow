@@ -97,13 +97,13 @@ Board rows and columns (statuses).
 |--------|------|------|-------|------|------------|-------|
 | GET | `/teams/:teamId/statuses` | bearer |  | member |  |  |
 | GET | `/rows/:rowId/statuses` | bearer |  | member (via row) |  |  |
-| POST | `/rows/:rowId/statuses` | bearer | yes | member (via row) |  | body `createStatusSchema` |
-| PATCH | `/statuses/:statusId` | bearer | yes | member (via status) |  | body `updateStatusSchema` |
-| DELETE | `/statuses/:statusId` | bearer | yes | member (via status) |  |  |
+| POST | `/rows/:rowId/statuses` | bearer | yes | member (via row) | `board.edit` | body `createStatusSchema` |
+| PATCH | `/statuses/:statusId` | bearer | yes | member (via status) | `board.edit` | body `updateStatusSchema` |
+| DELETE | `/statuses/:statusId` | bearer | yes | member (via status) | `board.edit` |  |
 | GET | `/teams/:teamId/rows` | bearer |  | member |  |  |
-| POST | `/teams/:teamId/rows` | bearer | yes | member |  | body `createBoardRowSchema` |
-| PATCH | `/rows/:rowId` | bearer | yes | member (via row) |  | body `updateBoardRowSchema` |
-| DELETE | `/rows/:rowId` | bearer | yes | member (via row) |  |  |
+| POST | `/teams/:teamId/rows` | bearer | yes | member | `board.edit` | body `createBoardRowSchema` |
+| PATCH | `/rows/:rowId` | bearer | yes | member (via row) | `board.edit` | body `updateBoardRowSchema` |
+| DELETE | `/rows/:rowId` | bearer | yes | member (via row) | `board.edit` |  |
 
 ### Members
 
@@ -175,9 +175,9 @@ Team file library: list, rename, trash, restore.
 | Method | Path | Auth | Write | Team | Permission | Input |
 |--------|------|------|-------|------|------------|-------|
 | GET | `/teams/:teamId/files` | bearer |  | member |  | query `listTeamFilesQuerySchema` |
-| PATCH | `/teams/:teamId/files/:fileId` | bearer | yes | member |  | body `renameTeamFileSchema` |
-| DELETE | `/teams/:teamId/files/:fileId` | bearer | yes | member |  |  |
-| POST | `/teams/:teamId/files/:fileId/restore` | bearer | yes | member |  |  |
+| PATCH | `/teams/:teamId/files/:fileId` | bearer | yes | member | `board.edit` | body `renameTeamFileSchema` |
+| DELETE | `/teams/:teamId/files/:fileId` | bearer | yes | member | `board.edit` |  |
+| POST | `/teams/:teamId/files/:fileId/restore` | bearer | yes | member | `board.edit` |  |
 
 ### Projects
 
@@ -197,10 +197,10 @@ Issues: list, read, create, update, complete, trash, restore.
 | GET | `/issues` | bearer |  |  |  | query `listIssuesSchema` |
 | GET | `/issues/:id` | bearer |  | member (via issue) |  |  |
 | POST | `/issues` | bearer | yes |  |  | body `createIssueSchema` |
-| PATCH | `/issues/:id` | bearer | yes | member (via issue) |  | body `updateIssueSchema` |
-| POST | `/issues/:id/complete` | bearer | yes | member (via issue) |  |  |
-| DELETE | `/issues/:id` | bearer | yes | member (via issue) |  |  |
-| POST | `/issues/:id/restore` | bearer | yes | member (via issue) |  |  |
+| PATCH | `/issues/:id` | bearer | yes | member (via issue) | `board.edit` | body `updateIssueSchema` |
+| POST | `/issues/:id/complete` | bearer | yes | member (via issue) | `board.edit` |  |
+| DELETE | `/issues/:id` | bearer | yes | member (via issue) | `board.edit` |  |
+| POST | `/issues/:id/restore` | bearer | yes | member (via issue) | `board.edit` |  |
 
 ### Comments
 
@@ -208,8 +208,8 @@ Issue comments.
 
 | Method | Path | Auth | Write | Team | Permission | Input |
 |--------|------|------|-------|------|------------|-------|
-| POST | `/issues/:id/comments` | bearer | yes | member (via issue) |  | body `createCommentSchema` |
-| DELETE | `/issues/:issueId/comments/:commentId` | bearer | yes | member (via issue) |  |  |
+| POST | `/issues/:id/comments` | bearer | yes | member (via issue) | `board.edit` | body `createCommentSchema` |
+| DELETE | `/issues/:issueId/comments/:commentId` | bearer | yes | member (via issue) | `board.edit` |  |
 
 ### Attachments
 
@@ -218,17 +218,17 @@ Issue/row attachments, linking, moving, streaming and downloads.
 | Method | Path | Auth | Write | Team | Permission | Input |
 |--------|------|------|-------|------|------------|-------|
 | GET | `/issues/:issueId/attachments` | bearer |  | member (via issue) |  |  |
-| POST | `/issues/:issueId/attachments` | bearer | yes | member (via issue) |  | multipart field `file` |
+| POST | `/issues/:issueId/attachments` | bearer | yes | member (via issue) | `board.edit` | multipart field `file` |
 | GET | `/rows/:rowId/attachments` | bearer |  | member (via row) |  |  |
-| POST | `/rows/:rowId/attachments` | bearer | yes | member (via row) |  | multipart field `file` |
-| DELETE | `/rows/:rowId/attachments/:id` | bearer | yes | member (via row) |  |  |
-| POST | `/rows/:rowId/attachments/link` | bearer | yes | member (via row) |  | body `linkAttachmentSchema` |
+| POST | `/rows/:rowId/attachments` | bearer | yes | member (via row) | `board.edit` | multipart field `file` |
+| DELETE | `/rows/:rowId/attachments/:id` | bearer | yes | member (via row) | `board.edit` |  |
+| POST | `/rows/:rowId/attachments/link` | bearer | yes | member (via row) | `board.edit` | body `linkAttachmentSchema` |
 | POST | `/issues/:issueId/attachments/:id/move` | bearer | yes |  |  | body `moveAttachmentSchema` |
-| POST | `/issues/:issueId/attachments/link` | bearer | yes | member (via issue) |  | body `linkAttachmentSchema` |
+| POST | `/issues/:issueId/attachments/link` | bearer | yes | member (via issue) | `board.edit` | body `linkAttachmentSchema` |
 | POST | `/attachments/:id/stream-token` | bearer |  | member (via attachment) |  |  |
 | GET | `/attachments/:id/stream` | stream token |  |  |  | query `token` |
 | GET | `/attachments/:id/download` | bearer |  | member (via attachment) |  |  |
-| DELETE | `/issues/:issueId/attachments/:id` | bearer | yes | member (via issue) |  |  |
+| DELETE | `/issues/:issueId/attachments/:id` | bearer | yes | member (via issue) | `board.edit` |  |
 
 ### Chunked uploads
 
@@ -236,12 +236,12 @@ Chunked upload sessions for issue and row attachments.
 
 | Method | Path | Auth | Write | Team | Permission | Input |
 |--------|------|------|-------|------|------------|-------|
-| POST | `/issues/:issueId/uploads` | bearer | yes | member (via issue) |  | body `createUploadSessionSchema` |
+| POST | `/issues/:issueId/uploads` | bearer | yes | member (via issue) | `board.edit` | body `createUploadSessionSchema` |
 | GET | `/uploads/:sessionId` | bearer |  | member (via upload) |  |  |
-| PUT | `/uploads/:sessionId/chunks/:index` | bearer | yes | member (via upload) |  | raw bytes |
-| POST | `/uploads/:sessionId/complete` | bearer | yes | member (via upload) |  |  |
-| DELETE | `/uploads/:sessionId` | bearer | yes | member (via upload) |  |  |
-| POST | `/rows/:rowId/uploads` | bearer | yes | member (via row) |  | body `createUploadSessionSchema` |
+| PUT | `/uploads/:sessionId/chunks/:index` | bearer | yes | member (via upload) | `board.edit` | raw bytes |
+| POST | `/uploads/:sessionId/complete` | bearer | yes | member (via upload) | `board.edit` |  |
+| DELETE | `/uploads/:sessionId` | bearer | yes | member (via upload) | `board.edit` |  |
+| POST | `/rows/:rowId/uploads` | bearer | yes | member (via row) | `board.edit` | body `createUploadSessionSchema` |
 
 <!-- END GENERATED ROUTES -->
 

@@ -7,7 +7,7 @@ import { schema } from "@teamflow/db";
 import { eq } from "drizzle-orm";
 import { db } from "../db.js";
 import { requireAuth, requireWrite } from "../middleware/auth.js";
-import { assertTeamAccess, loadTeam } from "../middleware/team.js";
+import { assertTeamAccess, loadTeam, requirePermission } from "../middleware/team.js";
 import { userHasTeamAccess } from "../lib/issues.js";
 import {
   deleteIssueAttachment,
@@ -25,6 +25,8 @@ import {
 } from "../lib/attachments.js";
 import { createFileRangeResponse } from "../lib/fileStream.js";
 import { signStreamToken, streamTokenExpiresAt, verifyStreamToken } from "../lib/streamTokens.js";
+import { forbidden } from "../lib/errors.js";
+import { userHasTeamPermission } from "../lib/permissions.js";
 
 /** Issue/row attachments, linking, moving, streaming and downloads. */
 const routes = new Hono<AppEnv>();
@@ -49,6 +51,7 @@ routes.post(
   requireWrite,
   validateParams,
   loadTeam("issue"),
+  requirePermission("board.edit"),
   async (c) => {
     const auth = c.var.auth;
 
@@ -81,6 +84,7 @@ routes.post(
   requireWrite,
   validateParams,
   loadTeam("row"),
+  requirePermission("board.edit"),
   async (c) => {
     const auth = c.var.auth;
 
@@ -105,6 +109,7 @@ routes.delete(
   requireWrite,
   validateParams,
   loadTeam("row"),
+  requirePermission("board.edit"),
   async (c) => {
     const row = c.var.row;
     const rowId = row.id;
@@ -123,6 +128,7 @@ routes.post(
   requireWrite,
   validateParams,
   loadTeam("row"),
+  requirePermission("board.edit"),
   async (c) => {
     const row = c.var.row;
     const rowId = row.id;
@@ -168,6 +174,9 @@ routes.post(
       return c.json({ error: "Issues must be on the same team" }, 400);
     }
     await assertTeamAccess(auth, sourceIssue.teamId);
+    if (!(await userHasTeamPermission(db, auth.userId, sourceIssue.teamId, "board.edit"))) {
+      throw forbidden("Permission denied");
+    }
 
     const attachment = await moveIssueAttachment(db, linkId, issueId, body.targetIssueId);
     return c.json({ attachment });
@@ -180,6 +189,7 @@ routes.post(
   requireWrite,
   validateParams,
   loadTeam("issue"),
+  requirePermission("board.edit"),
   async (c) => {
     const issue = c.var.issue;
     const issueId = issue.id;
@@ -278,6 +288,7 @@ routes.delete(
   requireWrite,
   validateParams,
   loadTeam("issue"),
+  requirePermission("board.edit"),
   async (c) => {
     const issue = c.var.issue;
     const issueId = issue.id;

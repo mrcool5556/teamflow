@@ -5,7 +5,7 @@ import { validateParams } from "../middleware/params.js";
 import { createUploadSessionSchema } from "@teamflow/core";
 import { db } from "../db.js";
 import { requireAuth, requireWrite } from "../middleware/auth.js";
-import { loadTeam } from "../middleware/team.js";
+import { loadTeam, requirePermission } from "../middleware/team.js";
 import {
   abortUploadSession,
   completeUploadSession,
@@ -22,6 +22,7 @@ routes.post(
   requireWrite,
   validateParams,
   loadTeam("issue"),
+  requirePermission("board.edit"),
   async (c) => {
     const auth = c.var.auth;
 
@@ -50,6 +51,7 @@ routes.put(
   requireWrite,
   validateParams,
   loadTeam("upload"),
+  requirePermission("board.edit"),
   async (c) => {
     const auth = c.var.auth;
 
@@ -72,6 +74,7 @@ routes.post(
   requireWrite,
   validateParams,
   loadTeam("upload"),
+  requirePermission("board.edit"),
   async (c) => {
     const auth = c.var.auth;
 
@@ -89,6 +92,7 @@ routes.delete(
   requireWrite,
   validateParams,
   loadTeam("upload"),
+  requirePermission("board.edit"),
   async (c) => {
     const existing = c.var.uploadSession;
     const sessionId = existing.sessionId;
@@ -104,6 +108,7 @@ routes.post(
   requireWrite,
   validateParams,
   loadTeam("row"),
+  requirePermission("board.edit"),
   async (c) => {
     const auth = c.var.auth;
 

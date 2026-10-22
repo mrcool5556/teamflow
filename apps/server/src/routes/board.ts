@@ -12,7 +12,7 @@ import { schema } from "@teamflow/db";
 import { eq } from "drizzle-orm";
 import { db } from "../db.js";
 import { requireAuth, requireWrite } from "../middleware/auth.js";
-import { loadTeam } from "../middleware/team.js";
+import { loadTeam, requirePermission } from "../middleware/team.js";
 import {
   countRowIssues,
   countStatusIssues,
@@ -66,6 +66,7 @@ routes.post(
   requireWrite,
   validateParams,
   loadTeam("row"),
+  requirePermission("board.edit"),
   async (c) => {
     const row = c.var.row;
     const rowId = row.id;
@@ -103,6 +104,7 @@ routes.patch(
   requireWrite,
   validateParams,
   loadTeam("status"),
+  requirePermission("board.edit"),
   async (c) => {
     const existing = c.var.status;
     const statusId = existing.id;
@@ -157,6 +159,7 @@ routes.delete(
   requireWrite,
   validateParams,
   loadTeam("status"),
+  requirePermission("board.edit"),
   async (c) => {
     const existing = c.var.status;
     const statusId = existing.id;
@@ -195,6 +198,7 @@ routes.post(
   requireWrite,
   validateParams,
   loadTeam(),
+  requirePermission("board.edit"),
   async (c) => {
     const teamId = c.var.teamId;
 
@@ -225,6 +229,7 @@ routes.patch(
   requireWrite,
   validateParams,
   loadTeam("row"),
+  requirePermission("board.edit"),
   async (c) => {
     const existing = c.var.row;
     const rowId = existing.id;
@@ -300,6 +305,7 @@ routes.delete(
   requireWrite,
   validateParams,
   loadTeam("row"),
+  requirePermission("board.edit"),
   async (c) => {
     const existing = c.var.row;
     const rowId = existing.id;
