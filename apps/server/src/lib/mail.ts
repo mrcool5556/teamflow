@@ -1,38 +1,37 @@
 import nodemailer from "nodemailer";
+import { config } from "../config.js";
 
 export function isSmtpConfigured() {
-  return Boolean(process.env.SMTP_HOST?.trim());
+  return config.smtp !== null;
 }
 
 export function getPublicBaseUrl() {
-  return (process.env.PUBLIC_URL ?? "http://localhost:3000").replace(/\/$/, "");
+  return config.publicUrl;
 }
 
 function createTransport() {
-  const host = process.env.SMTP_HOST!.trim();
-  const port = Number(process.env.SMTP_PORT ?? 587);
-  const secure = process.env.SMTP_SECURE === "true" || port === 465;
-  const user = process.env.SMTP_USER?.trim();
-  const pass = process.env.SMTP_PASS ?? "";
-
-  if (!user || !pass) {
+  const smtp = config.smtp;
+  if (!smtp) {
+    throw new Error("SMTP_HOST is not set");
+  }
+  if (!smtp.user || !smtp.pass) {
     throw new Error("SMTP_USER and SMTP_PASS are required when SMTP_HOST is set");
   }
 
   return nodemailer.createTransport({
-    host,
-    port,
-    secure,
-    auth: { user, pass },
+    host: smtp.host,
+    port: smtp.port,
+    secure: smtp.secure,
+    auth: { user: smtp.user, pass: smtp.pass },
   });
 }
 
 export async function sendPasswordResetEmail(to: string, resetUrl: string) {
-  if (!isSmtpConfigured()) {
+  if (!config.smtp) {
     return false;
   }
 
-  const from = process.env.SMTP_FROM?.trim() ?? "teamflow@localhost";
+  const from = config.smtp.from;
   const transport = createTransport();
   await transport.sendMail({
     from,

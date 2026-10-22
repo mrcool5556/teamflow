@@ -1,8 +1,7 @@
 import { serve } from "@hono/node-server";
 import { serveStatic } from "@hono/node-server/serve-static";
 import fs from "node:fs";
-import path from "node:path";
-import { fileURLToPath } from "node:url";
+import { config } from "./config.js";
 import {
   createCommentSchema,
   createBoardRowSchema,
@@ -71,7 +70,6 @@ import {
   toUserPublic,
   verifyPassword,
   signSessionToken,
-  assertSecretsConfigured,
   syncInstanceAdminFromEnv,
   userIsInstanceAdmin,
 } from "./lib/auth.js";
@@ -171,10 +169,8 @@ import {
 import { exportTeamBundle, importTeamBundle, TeamBundleError } from "./lib/teamBundle.js";
 import { getTeamPermissionsForUser, userHasTeamPermission } from "./lib/permissions.js";
 
-// Refuse to start with an unset or placeholder JWT_SECRET (see lib/auth.ts resolveSecret).
-assertSecretsConfigured();
-
-const db = createDb();
+// config.ts validated every env var (and refused a placeholder JWT_SECRET) when it was imported.
+const db = createDb(config.databaseUrl);
 void purgeExpiredUploadSessions(db);
 void purgeExpiredDeletedFiles(db);
 const app = new Hono();
@@ -3094,11 +3090,8 @@ app.delete("/issues/:issueId/attachments/:id", async (c) => {
   return c.body(null, 204);
 });
 
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const webDist = process.env.WEB_DIST ?? path.resolve(__dirname, "..", "..", "web", "dist");
-const serveWeb =
-  process.env.SERVE_WEB === "true" ||
-  (process.env.NODE_ENV === "production" && fs.existsSync(webDist));
+const webDist = config.webDist;
+const serveWeb = config.serveWeb || (config.isProduction && fs.existsSync(webDist));
 
 const apiPathPrefixes = [
   "/health",
@@ -3128,8 +3121,7 @@ if (serveWeb) {
   });
 }
 
-const port = Number(process.env.PORT ?? 3000);
-const host = process.env.HOST ?? "0.0.0.0";
+const { port, host } = config;
 
 export { app };
 

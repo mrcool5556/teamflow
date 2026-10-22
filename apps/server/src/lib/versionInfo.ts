@@ -1,18 +1,13 @@
 import { execFile } from "node:child_process";
 import { readFileSync, existsSync } from "node:fs";
-import path from "node:path";
 import { promisify } from "node:util";
 import type { MaintenanceVersionPublic } from "@teamflow/core";
-import { findRepoRoot } from "@teamflow/db";
+import { config } from "../config.js";
 
 const execFileAsync = promisify(execFile);
 
 function getAppDir() {
-  const configured = process.env.TEAMFLOW_APP_DIR?.trim();
-  if (configured) {
-    return path.isAbsolute(configured) ? configured : path.resolve(findRepoRoot(), configured);
-  }
-  return findRepoRoot();
+  return config.appDir;
 }
 
 async function runGit(appDir: string, args: string[], timeoutMs = 12_000) {

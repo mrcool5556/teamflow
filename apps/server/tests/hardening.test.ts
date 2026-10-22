@@ -5,6 +5,7 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { api, bootApp, json, registerUser, type RegisteredUser, type TestApp } from "./helpers";
 import { createFileRangeResponse } from "../src/lib/fileStream.js";
 import { resetRateLimits } from "../src/lib/httpHardening.js";
+import { reloadConfig } from "../src/config.js";
 
 let app: TestApp;
 let user: RegisteredUser;
@@ -50,6 +51,7 @@ describe("response hardening", () => {
 
   it("rate limits login per client", async () => {
     process.env.TEAMFLOW_AUTH_RATE_LIMIT = "3";
+    reloadConfig();
     resetRateLimits();
     try {
       const attempt = (ip: string) =>
@@ -67,6 +69,7 @@ describe("response hardening", () => {
       expect((await api(app, "GET", "/auth/me", { token: user.token })).status).toBe(200);
     } finally {
       process.env.TEAMFLOW_AUTH_RATE_LIMIT = "1000";
+      reloadConfig();
       resetRateLimits();
     }
   });
@@ -88,6 +91,7 @@ describe("response hardening", () => {
     process.env.ATTACHMENT_MAX_VIDEO_BYTES = "1024";
     process.env.ATTACHMENT_MAX_ZIP_BYTES = "1024";
     process.env.TEAMFLOW_BUNDLE_MAX_BYTES = "1024";
+    reloadConfig();
     try {
       const { issue } = await json<{ issue: { id: string } }>(
         await api(app, "POST", "/issues", {
@@ -112,6 +116,7 @@ describe("response hardening", () => {
       ]) {
         delete process.env[key];
       }
+      reloadConfig();
     }
   });
 });

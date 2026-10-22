@@ -9,17 +9,12 @@ import { schema } from "@teamflow/db";
 import { botConfigKeyConfigured, decryptSecret, encryptSecret } from "./secretsCrypto.js";
 import { userHasTeamPermission } from "./permissions.js";
 import { defaultPublicUrl, syncDiscordBotEnv } from "./botConfigKey.js";
-import { findRepoRoot } from "@teamflow/db";
-import path from "node:path";
+import { config } from "../config.js";
 
 const ROW_ID = "default";
 
 function getAppDir() {
-  const configured = process.env.TEAMFLOW_APP_DIR?.trim();
-  if (configured) {
-    return path.isAbsolute(configured) ? configured : path.resolve(findRepoRoot(), configured);
-  }
-  return findRepoRoot();
+  return config.appDir;
 }
 
 function defaultSecretsPublic(): DiscordBotSecretsPublic {

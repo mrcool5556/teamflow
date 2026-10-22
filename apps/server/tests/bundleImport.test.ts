@@ -6,6 +6,7 @@ import { ZipArchive } from "archiver";
 import yauzl from "yauzl";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { api, bootApp, json, registerUser, type RegisteredUser, type TestApp } from "./helpers";
+import { reloadConfig } from "../src/config.js";
 
 let app: TestApp;
 let owner: RegisteredUser;
@@ -129,23 +130,27 @@ describe("team bundle import", () => {
 
   it("caps the number of entries via TEAMFLOW_BUNDLE_MAX_ENTRIES", async () => {
     process.env.TEAMFLOW_BUNDLE_MAX_ENTRIES = "2";
+    reloadConfig();
     try {
       const target = await registerUser(app);
       const res = await importBundle(target, exportZip);
       expect(res.status).toBe(413);
     } finally {
       delete process.env.TEAMFLOW_BUNDLE_MAX_ENTRIES;
+      reloadConfig();
     }
   });
 
   it("caps total uncompressed bytes via TEAMFLOW_BUNDLE_MAX_BYTES", async () => {
     process.env.TEAMFLOW_BUNDLE_MAX_BYTES = "10";
+    reloadConfig();
     try {
       const target = await registerUser(app);
       const res = await importBundle(target, exportZip);
       expect(res.status).toBe(413);
     } finally {
       delete process.env.TEAMFLOW_BUNDLE_MAX_BYTES;
+      reloadConfig();
     }
   });
 });

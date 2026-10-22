@@ -6,7 +6,7 @@ import {
   scryptSync,
   timingSafeEqual,
 } from "node:crypto";
-import { resolveSecret } from "./auth.js";
+import { config } from "../config.js";
 
 const ALGO = "aes-256-gcm";
 const IV_BYTES = 12;
@@ -17,16 +17,16 @@ const KDF_PARAMS = { N: 16384, r: 8, p: 1, maxmem: 64 * 1024 * 1024 };
 let warnedFallback = false;
 const keyCache = new Map<string, Buffer>();
 
+/** Both values were validated at boot (config.ts refuses placeholders outside development). */
 function getRawKeyMaterial() {
-  const explicit = process.env.TEAMFLOW_SECRETS_KEY?.trim();
-  if (explicit) return resolveSecret("TEAMFLOW_SECRETS_KEY", explicit);
+  if (config.secretsKey) return config.secretsKey;
   if (!warnedFallback) {
     warnedFallback = true;
     console.warn(
       "[teamflow] TEAMFLOW_SECRETS_KEY not set; using JWT_SECRET for integration secret encryption.",
     );
   }
-  return resolveSecret("JWT_SECRET", process.env.JWT_SECRET);
+  return config.jwtSecret;
 }
 
 /** v2 key: scrypt-derived (current). */
@@ -82,11 +82,11 @@ export function decryptSecret(blob: string) {
 }
 
 export function botConfigKeyConfigured() {
-  return Boolean(process.env.TEAMFLOW_BOT_CONFIG_KEY?.trim());
+  return Boolean(config.botConfigKey);
 }
 
 export function assertBotConfigKey(provided: string | undefined) {
-  const expected = process.env.TEAMFLOW_BOT_CONFIG_KEY?.trim();
+  const expected = config.botConfigKey ?? undefined;
   if (!expected) {
     throw new Error("Bot config endpoint is disabled");
   }

@@ -1,4 +1,5 @@
 import { open } from "node:fs/promises";
+import { config } from "../config.js";
 
 /* ---------- CORS allowlist ---------- */
 
@@ -20,15 +21,12 @@ function originOf(value: string | undefined) {
  * the Vite dev ports on localhost are allowed too. Anything else gets no CORS headers, which
  * for a browser means same-origin only.
  */
-export function getAllowedOrigins(env: NodeJS.ProcessEnv = process.env): Set<string> {
+export function getAllowedOrigins(): Set<string> {
   const allowed = new Set<string>();
-  const publicOrigin = originOf(env.PUBLIC_URL);
+  const publicOrigin = originOf(config.publicUrl);
   if (publicOrigin) allowed.add(publicOrigin);
-  for (const raw of (env.CORS_ORIGINS ?? "").split(",")) {
-    const origin = originOf(raw.trim());
-    if (origin) allowed.add(origin);
-  }
-  if (env.NODE_ENV !== "production") {
+  for (const origin of config.corsOrigins) allowed.add(origin);
+  if (!config.isProduction) {
     for (const origin of DEV_ORIGINS) allowed.add(origin);
   }
   return allowed;
@@ -43,20 +41,14 @@ export function resolveCorsOrigin(requestOrigin: string | undefined): string | n
 
 type Bucket = { count: number; resetAt: number };
 const buckets = new Map<string, Bucket>();
-const DEFAULT_LIMIT = 10;
 const DEFAULT_WINDOW_MS = 60_000;
-
-function limitFromEnv() {
-  const raw = Number(process.env.TEAMFLOW_AUTH_RATE_LIMIT);
-  return Number.isFinite(raw) && raw > 0 ? Math.floor(raw) : DEFAULT_LIMIT;
-}
 
 /**
  * Fixed-window counter per key (normally the client IP). Returns `null` when allowed, or the
  * number of seconds until the window resets when the limit is exceeded.
  */
 export function checkRateLimit(key: string, now = Date.now()): number | null {
-  const limit = limitFromEnv();
+  const limit = config.authRateLimit;
   const bucket = buckets.get(key);
   if (!bucket || bucket.resetAt <= now) {
     buckets.set(key, { count: 1, resetAt: now + DEFAULT_WINDOW_MS });
@@ -85,7 +77,7 @@ export function clientKey(
   headers: { get(name: string): string | null | undefined },
   remoteAddress: string | undefined,
 ) {
-  if (process.env.TEAMFLOW_TRUST_PROXY === "1") {
+  if (config.trustProxy) {
     const forwarded = headers.get("x-forwarded-for");
     const first = forwarded?.split(",")[0]?.trim();
     if (first) return first;

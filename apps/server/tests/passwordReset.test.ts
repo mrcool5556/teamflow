@@ -8,6 +8,7 @@ import {
   type RegisteredUser,
   type TestApp,
 } from "./helpers";
+import { reloadConfig } from "../src/config.js";
 
 let app: TestApp;
 let user: RegisteredUser;
@@ -70,12 +71,14 @@ describe("password reset", () => {
 
   it("does not log the reset link outside development", async () => {
     process.env.NODE_ENV = "production";
+    reloadConfig();
     try {
       const { token, status } = await requestReset(user.email);
       expect(status).toBe(200);
       expect(token).toBeUndefined();
     } finally {
       process.env.NODE_ENV = "development";
+      reloadConfig();
     }
   });
 });

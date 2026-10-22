@@ -4,6 +4,7 @@ import type { Db } from "@teamflow/db";
 import { schema } from "@teamflow/db";
 import { getPublicBaseUrl, isSmtpConfigured, sendPasswordResetEmail } from "./mail.js";
 import { hashPassword } from "./auth.js";
+import { config } from "../config.js";
 
 const RESET_TTL_MS = 60 * 60 * 1000;
 
@@ -64,7 +65,7 @@ export async function requestPasswordReset(db: Db, email: string) {
 
   if (!emailed) {
     // The link is a credential; only print it in local development.
-    if (process.env.NODE_ENV === "development") {
+    if (config.isDevelopment) {
       console.log(`[teamflow] Password reset for ${user.email} (SMTP not configured): ${resetUrl}`);
     } else {
       console.warn(

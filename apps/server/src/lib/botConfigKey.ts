@@ -1,5 +1,6 @@
 import { randomBytes } from "node:crypto";
 import path from "node:path";
+import { config } from "../config.js";
 import { getEnvFileValue, setEnvFileValue } from "./envFile.js";
 
 export function generateBotConfigKey() {
@@ -8,7 +9,7 @@ export function generateBotConfigKey() {
 
 export async function ensureBotConfigKey(appDir: string) {
   const rootEnvPath = path.join(appDir, ".env");
-  let key = process.env.TEAMFLOW_BOT_CONFIG_KEY?.trim();
+  let key = config.botConfigKey ?? "";
   let created = false;
 
   if (!key) {
@@ -21,6 +22,8 @@ export async function ensureBotConfigKey(appDir: string) {
     created = true;
   }
 
+  // Keep the running process and its environment in step with the key written to .env.
+  config.botConfigKey = key;
   process.env.TEAMFLOW_BOT_CONFIG_KEY = key;
   return { key, created };
 }
@@ -33,5 +36,5 @@ export async function syncDiscordBotEnv(appDir: string, teamflowUrl: string) {
 }
 
 export function defaultPublicUrl() {
-  return (process.env.PUBLIC_URL ?? "http://localhost:3000").replace(/\/$/, "");
+  return config.publicUrl;
 }
