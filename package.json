@@ -16,7 +16,9 @@
     "lint:fix": "eslint . --fix",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
-    "test": "vitest run"
+    "test": "vitest run",
+    "docs:api": "node scripts/gen-api-docs.mjs",
+    "docs:api:check": "node scripts/gen-api-docs.mjs --check"
   },
   "engines": {
     "node": "20.x"

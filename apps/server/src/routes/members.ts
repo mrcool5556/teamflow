@@ -49,6 +49,7 @@ routes.patch(
   requireWrite,
   validateParams,
   loadTeam(),
+  requirePermission("team.members.manage"),
   async (c) => {
     const auth = c.var.auth;
 

@@ -58,6 +58,7 @@ routes.patch(
   requireWrite,
   validateParams,
   loadTeam(),
+  requirePermission("integrations.discord.manage"),
   async (c) => {
     const auth = c.var.auth;
 
@@ -90,6 +91,7 @@ routes.patch(
   validateParams,
   loadTeam(),
   requireInstanceAdmin,
+  requirePermission("integrations.discord.secrets"),
   async (c) => {
     const auth = c.var.auth;
 
