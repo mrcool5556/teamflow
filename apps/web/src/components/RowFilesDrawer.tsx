@@ -1,45 +1,16 @@
-import {
-  useCallback,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-  type ChangeEvent,
-  type DragEvent,
-} from "react";
-import type { BoardRowPublic, IssueAttachmentPublic } from "@teamflow/core";
-import {
-  DEFAULT_ATTACHMENT_LIMITS,
-  isImageAttachmentFile,
-  maxBytesForAttachmentFile,
-} from "@teamflow/core";
-import type { AttachmentLimitsPublic } from "@teamflow/core";
-import { useQueryClient } from "@tanstack/react-query";
-import { useConfirm } from "../ui/confirmContext";
-import { useErrorSink } from "../lib/errorSink";
+import { useMemo, useState } from "react";
+import type { BoardRowPublic } from "@teamflow/core";
 import { client } from "../api";
-import { queryKeys } from "../queries/keys";
-import { useRowAttachmentsQuery } from "../queries/attachments";
+import { useAttachmentList } from "../hooks/useAttachmentList";
+import { describeAttachmentLimits, formatFileSize, formatTimestamp } from "../lib/format";
 import { Drawer } from "../ui/Dialog";
 import { DialogTitle } from "../ui/DialogTitle";
+import { AttachmentImageThumbnail, isImageAttachment } from "./AttachmentImagePreview";
+import { AttachmentLightboxes } from "./AttachmentLightboxes";
+import { AttachmentVideoThumbnail, isVideoAttachment } from "./AttachmentVideoPlayer";
 import { FileRefCopyButton } from "./FileRefCopyButton";
 import { LinkFromFileRef } from "./LinkFromFileRef";
 import { RefCopyButton } from "./RefCopyButton";
-import {
-  AttachmentImageThumbnail,
-  AttachmentLightbox,
-  createAttachmentBlobCache,
-  isImageAttachment,
-} from "./AttachmentImagePreview";
-import {
-  AttachmentVideoLightbox,
-  AttachmentVideoThumbnail,
-  isVideoAttachment,
-} from "./AttachmentVideoPlayer";
-import { describeAttachmentLimits, formatFileSize, formatTimestamp } from "../lib/format";
-import { downloadAttachmentFile } from "../lib/download";
-
-const NO_ATTACHMENTS: IssueAttachmentPublic[] = [];
 
 type RowFilesDrawerProps = {
   row: BoardRowPublic;
@@ -48,51 +19,17 @@ type RowFilesDrawerProps = {
 };
 
 export function RowFilesDrawer({ row, onClose, onNavigateRef }: RowFilesDrawerProps) {
-  const queryClient = useQueryClient();
-  const confirm = useConfirm();
-  const { report, show } = useErrorSink();
-  const attachmentsQuery = useRowAttachmentsQuery(row.id);
-  const attachments = attachmentsQuery.data?.attachments ?? NO_ATTACHMENTS;
-  const attachmentsLoading = attachmentsQuery.isPending;
-  const attachmentLimits = attachmentsQuery.data?.limits ?? DEFAULT_ATTACHMENT_LIMITS;
-  const [uploadingAttachment, setUploadingAttachment] = useState(false);
-  const [attachmentUploadProgress, setAttachmentUploadProgress] = useState<number | null>(null);
-  const [attachmentUploadName, setAttachmentUploadName] = useState<string | null>(null);
-  const [deletingAttachmentId, setDeletingAttachmentId] = useState<string | null>(null);
-  const [attachmentDragOver, setAttachmentDragOver] = useState(false);
-  const [attachmentLightbox, setAttachmentLightbox] = useState<{
-    attachment: IssueAttachmentPublic;
-    imageUrl: string;
-  } | null>(null);
-  const [attachmentVideo, setAttachmentVideo] = useState<IssueAttachmentPublic | null>(null);
-  const [fileSearch, setFileSearch] = useState("");
-  const attachmentBlobCache = useMemo(() => createAttachmentBlobCache(), []);
-  const attachmentInputRef = useRef<HTMLInputElement>(null);
-
-  const handleClose = useCallback(() => {
-    setAttachmentLightbox(null);
-    setAttachmentVideo(null);
-    attachmentBlobCache.revokeAll();
-    onClose();
-  }, [attachmentBlobCache, onClose]);
-
-  function setAttachments(update: (prev: IssueAttachmentPublic[]) => IssueAttachmentPublic[]) {
-    queryClient.setQueryData<{
-      attachments: IssueAttachmentPublic[];
-      limits: AttachmentLimitsPublic;
-    }>(queryKeys.rowAttachments(row.id), (data) =>
-      data ? { ...data, attachments: update(data.attachments) } : data,
-    );
-  }
-
-  useEffect(() => {
-    return () => attachmentBlobCache.revokeAll();
-  }, [attachmentBlobCache]);
-
-  const linkedFileIds = useMemo(
-    () => new Set(attachments.map((attachment) => attachment.fileId)),
-    [attachments],
+  const { bindFileInput, ...files } = useAttachmentList(
+    { kind: "row", id: row.id },
+    { sizeDigits: 2 },
   );
+  const { attachments } = files;
+  const [fileSearch, setFileSearch] = useState("");
+
+  function handleClose() {
+    files.release();
+    onClose();
+  }
 
   const filteredAttachments = useMemo(() => {
     const q = fileSearch.trim().toLowerCase();
@@ -104,92 +41,12 @@ export function RowFilesDrawer({ row, onClose, onNavigateRef }: RowFilesDrawerPr
     });
   }, [attachments, fileSearch]);
 
-  async function openImagePreview(attachment: IssueAttachmentPublic) {
-    try {
-      const imageUrl = await attachmentBlobCache.get(attachment.id);
-      setAttachmentLightbox({ attachment, imageUrl });
-    } catch {
-      show("Could not load image preview.");
-    }
-  }
-
-  async function uploadAttachmentFile(file: File) {
-    if (uploadingAttachment) return;
-    const maxBytes = maxBytesForAttachmentFile(
-      file.name,
-      file.type || "application/octet-stream",
-      attachmentLimits,
-    );
-    if (file.size > maxBytes) {
-      show(
-        `File is too large (${formatFileSize(file.size, 2)}). Max for this type is ${formatFileSize(maxBytes, 2)}.`,
-      );
-      return;
-    }
-    setUploadingAttachment(true);
-    setAttachmentUploadProgress(0);
-    setAttachmentUploadName(file.name);
-    try {
-      const { attachment } = await client.uploadRowFile(row.id, file, {
-        limits: attachmentLimits,
-        onProgress: (percent) => setAttachmentUploadProgress(percent),
-      });
-      setAttachments((prev) => [...prev, attachment]);
-      if (isImageAttachmentFile(file.name, file.type || "")) {
-        attachmentBlobCache.set(attachment.id, URL.createObjectURL(file));
-      }
-    } catch (error) {
-      report(error, "Upload failed");
-    } finally {
-      setUploadingAttachment(false);
-      setAttachmentUploadProgress(null);
-      setAttachmentUploadName(null);
-    }
-  }
-
-  function handleAttachmentInputChange(event: ChangeEvent<HTMLInputElement>) {
-    const file = event.target.files?.[0];
-    event.target.value = "";
-    if (file) void uploadAttachmentFile(file);
-  }
-
-  function handleAttachmentDrop(event: DragEvent<HTMLDivElement>) {
-    event.preventDefault();
-    setAttachmentDragOver(false);
-    const file = event.dataTransfer.files?.[0];
-    if (file) void uploadAttachmentFile(file);
-  }
-
-  async function downloadAttachment(attachment: IssueAttachmentPublic) {
-    try {
-      await downloadAttachmentFile(attachment.id, attachment.filename);
-    } catch (error) {
-      report(error, "Download failed");
-    }
-  }
-
-  async function deleteAttachment(attachment: IssueAttachmentPublic) {
-    const ok = await confirm({
-      title: `Remove ${attachment.filename}?`,
-      confirmLabel: "Remove",
-      danger: true,
-    });
-    if (!ok) return;
-    setDeletingAttachmentId(attachment.id);
-    try {
-      await client.deleteRowAttachment(row.id, attachment.id);
-      setAttachments((prev) => prev.filter((item) => item.id !== attachment.id));
-    } finally {
-      setDeletingAttachmentId(null);
-    }
-  }
-
   return (
-    <Drawer onClose={handleClose} className="issue-drawer">
-      <header className="issue-drawer-header">
-        <div className="issue-drawer-header-ids">
-          <div className="issue-drawer-id-row">
-            <p className="eyebrow issue-drawer-id">{row.key}</p>
+    <Drawer onClose={handleClose} className="row-files-drawer">
+      <header className="row-files-drawer-header">
+        <div className="row-files-drawer-header-ids">
+          <div className="row-files-drawer-id-row">
+            <p className="eyebrow row-files-drawer-id">{row.key}</p>
             <RefCopyButton
               value={row.key}
               display="icon"
@@ -198,21 +55,16 @@ export function RowFilesDrawer({ row, onClose, onNavigateRef }: RowFilesDrawerPr
               onGo={onNavigateRef ? () => onNavigateRef(row.key) : undefined}
             />
           </div>
-          <DialogTitle className="issue-drawer-title" style={{ margin: 0 }}>
-            {row.name} — shared files
-          </DialogTitle>
+          <DialogTitle className="row-files-drawer-title">{row.name} — shared files</DialogTitle>
         </div>
         <button type="button" className="ghost" onClick={handleClose}>
           Close
         </button>
       </header>
 
-      <div className="issue-drawer-surface">
-        <section className="issue-drawer-section">
-          <p className="muted" style={{ marginTop: 0 }}>
-            Tools, docs, and assets for everyone working in this row.
-          </p>
-          <p className="muted" style={{ marginTop: 0 }}>
+      <div className="row-files-drawer-surface">
+        <section className="row-files-drawer-section">
+          <p className="muted row-files-drawer-intro">
             Tools, docs, and assets for everyone working in this row.
           </p>
 
@@ -227,7 +79,7 @@ export function RowFilesDrawer({ row, onClose, onNavigateRef }: RowFilesDrawerPr
             </div>
           ) : null}
 
-          {attachmentsLoading ? (
+          {files.loading ? (
             <p className="muted">Loading files…</p>
           ) : attachments.length === 0 ? (
             <p className="muted">No files yet.</p>
@@ -240,30 +92,20 @@ export function RowFilesDrawer({ row, onClose, onNavigateRef }: RowFilesDrawerPr
                   {isVideoAttachment(attachment) ? (
                     <AttachmentVideoThumbnail
                       attachment={attachment}
-                      onOpen={() => setAttachmentVideo(attachment)}
+                      onOpen={() => files.openVideo(attachment)}
                     />
                   ) : isImageAttachment(attachment) ? (
                     <AttachmentImageThumbnail
                       attachment={attachment}
-                      blobCache={attachmentBlobCache}
-                      onOpen={(imageUrl) => setAttachmentLightbox({ attachment, imageUrl })}
+                      blobCache={files.blobCache}
+                      onOpen={(imageUrl) => files.openImageUrl(attachment, imageUrl)}
                     />
                   ) : null}
                   <div className="issue-attachment-main">
                     <button
                       type="button"
                       className="ghost issue-attachment-name"
-                      onClick={() => {
-                        if (isVideoAttachment(attachment)) {
-                          setAttachmentVideo(attachment);
-                          return;
-                        }
-                        if (isImageAttachment(attachment)) {
-                          void openImagePreview(attachment);
-                          return;
-                        }
-                        void downloadAttachment(attachment);
-                      }}
+                      onClick={() => files.open(attachment)}
                     >
                       {attachment.filename}
                     </button>
@@ -280,12 +122,12 @@ export function RowFilesDrawer({ row, onClose, onNavigateRef }: RowFilesDrawerPr
                     <button
                       type="button"
                       className="ghost issue-attachment-delete"
-                      disabled={deletingAttachmentId === attachment.id}
-                      onClick={() => void deleteAttachment(attachment)}
+                      disabled={files.deletingId === attachment.id}
+                      onClick={() => void files.remove(attachment)}
                       aria-label={`Remove ${attachment.filename}`}
                       title="Remove file"
                     >
-                      {deletingAttachmentId === attachment.id ? "…" : "Remove"}
+                      {files.deletingId === attachment.id ? "…" : "Remove"}
                     </button>
                   </div>
                 </li>
@@ -297,73 +139,46 @@ export function RowFilesDrawer({ row, onClose, onNavigateRef }: RowFilesDrawerPr
             teamId={row.teamId}
             label="Link file from ref (another row or issue)"
             onLinkFileId={async (fileId) => {
-              if (linkedFileIds.has(fileId)) return;
+              if (files.linkedFileIds.has(fileId)) return;
               const { attachment } = await client.linkRowAttachment(row.id, fileId);
-              setAttachments((prev) => {
-                if (prev.some((item) => item.fileId === attachment.fileId)) return prev;
-                return [...prev, attachment];
-              });
+              files.addLinked(attachment);
             }}
           />
 
           <div
-            className={`issue-attachment-drop${attachmentDragOver ? " issue-attachment-drop--active" : ""}`}
-            onDragOver={(event) => {
-              event.preventDefault();
-              setAttachmentDragOver(true);
-            }}
-            onDragLeave={() => setAttachmentDragOver(false)}
-            onDrop={handleAttachmentDrop}
+            className={`issue-attachment-drop${files.dragOver ? " issue-attachment-drop--active" : ""}`}
+            {...files.dropZoneProps}
           >
-            <input
-              ref={attachmentInputRef}
-              type="file"
-              hidden
-              onChange={handleAttachmentInputChange}
-            />
+            <input ref={bindFileInput} type="file" hidden onChange={files.onInputChange} />
             <p>
-              {uploadingAttachment
-                ? `Uploading ${attachmentUploadName ?? "file"}…`
+              {files.uploading
+                ? `Uploading ${files.uploadName ?? "file"}…`
                 : "Drop a file here or choose one"}
             </p>
-            {uploadingAttachment ? (
+            {files.uploading ? (
               <div className="issue-attachment-progress" aria-hidden>
                 <div
                   className="issue-attachment-progress-bar"
-                  style={{ width: `${attachmentUploadProgress ?? 0}%` }}
+                  style={{ width: `${files.uploadProgress ?? 0}%` }}
                 />
               </div>
             ) : null}
             <button
               type="button"
               className="secondary"
-              disabled={uploadingAttachment}
-              onClick={() => attachmentInputRef.current?.click()}
+              disabled={files.uploading}
+              onClick={files.chooseFile}
             >
               Choose file
             </button>
             <p className="muted issue-attachment-limits">
-              {describeAttachmentLimits(attachmentLimits, 2)}
+              {describeAttachmentLimits(files.limits, 2)}
             </p>
           </div>
         </section>
       </div>
 
-      {attachmentLightbox ? (
-        <AttachmentLightbox
-          attachment={attachmentLightbox.attachment}
-          imageUrl={attachmentLightbox.imageUrl}
-          onClose={() => setAttachmentLightbox(null)}
-          onDownload={() => void downloadAttachment(attachmentLightbox.attachment)}
-        />
-      ) : null}
-      {attachmentVideo ? (
-        <AttachmentVideoLightbox
-          attachment={attachmentVideo}
-          onClose={() => setAttachmentVideo(null)}
-          onDownload={() => void downloadAttachment(attachmentVideo)}
-        />
-      ) : null}
+      <AttachmentLightboxes list={files} />
     </Drawer>
   );
 }

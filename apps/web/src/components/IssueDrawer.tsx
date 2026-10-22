@@ -1,37 +1,21 @@
-import {
-  useCallback,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-  type ChangeEvent,
-  type DragEvent,
-} from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type {
   BoardRowPublic,
   CommentPublic,
-  IssueAttachmentPublic,
   IssuePublic,
   IssueStatusPublic,
   Priority,
   TeamMemberPublic,
   UpdateIssueInput,
 } from "@teamflow/core";
-import {
-  PRIORITIES,
-  DEFAULT_ATTACHMENT_LIMITS,
-  PRIORITY_LABELS,
-  maxBytesForAttachmentFile,
-  isImageAttachmentFile,
-} from "@teamflow/core";
-import type { AttachmentLimitsPublic } from "@teamflow/core";
+import { PRIORITIES, PRIORITY_LABELS } from "@teamflow/core";
 import { useQueryClient } from "@tanstack/react-query";
 import { useConfirm } from "../ui/confirmContext";
-import { useErrorSink } from "../lib/errorSink";
 import { client } from "../api";
 import { queryKeys } from "../queries/keys";
 import { useIssueQuery } from "../queries/issue";
-import { useIssueAttachmentsQuery } from "../queries/attachments";
+import { useAttachmentList } from "../hooks/useAttachmentList";
+import { AttachmentLightboxes } from "./AttachmentLightboxes";
 import { IssueTimer } from "./IssueTimer";
 import { DescriptionEditor } from "./DescriptionEditor";
 import { MultiAssigneePicker } from "./MultiAssigneePicker";
@@ -43,23 +27,12 @@ import { LinkPasteOffer } from "./LinkPasteOffer";
 import { initials } from "../lib/timer";
 import { useLinkPasteOffer } from "../hooks/useLinkPasteOffer";
 import { Drawer } from "../ui/Dialog";
-import {
-  AttachmentImageThumbnail,
-  AttachmentLightbox,
-  createAttachmentBlobCache,
-  isImageAttachment,
-} from "./AttachmentImagePreview";
-import {
-  AttachmentVideoLightbox,
-  AttachmentVideoThumbnail,
-  isVideoAttachment,
-} from "./AttachmentVideoPlayer";
+import { AttachmentImageThumbnail, isImageAttachment } from "./AttachmentImagePreview";
+import { AttachmentVideoThumbnail, isVideoAttachment } from "./AttachmentVideoPlayer";
 import { LinkRowFilePanel } from "./LinkRowFilePanel";
 import { describeAttachmentLimits, formatFileSize, formatTimestamp } from "../lib/format";
-import { downloadAttachmentFile } from "../lib/download";
 
 const NO_COMMENTS: CommentPublic[] = [];
-const NO_ATTACHMENTS: IssueAttachmentPublic[] = [];
 
 function toDateInputValue(iso: string | null) {
   if (!iso) return "";
@@ -106,29 +79,13 @@ export function IssueDrawer({
   const [description, setDescription] = useState(issue.description ?? "");
   const queryClient = useQueryClient();
   const confirm = useConfirm();
-  const { report, show } = useErrorSink();
   const issueQuery = useIssueQuery(issue.id);
   const comments = issueQuery.data?.comments ?? NO_COMMENTS;
   const commentsLoading = issueQuery.isPending;
-  const attachmentsQuery = useIssueAttachmentsQuery(issue.id);
-  const attachments = attachmentsQuery.data?.attachments ?? NO_ATTACHMENTS;
-  const attachmentsLoading = attachmentsQuery.isPending;
-  const attachmentLimits = attachmentsQuery.data?.limits ?? DEFAULT_ATTACHMENT_LIMITS;
+  const { bindFileInput, ...files } = useAttachmentList({ kind: "issue", id: issue.id });
   const [commentDraft, setCommentDraft] = useState("");
   const [commentSubmitting, setCommentSubmitting] = useState(false);
   const [deletingCommentId, setDeletingCommentId] = useState<string | null>(null);
-  const [uploadingAttachment, setUploadingAttachment] = useState(false);
-  const [attachmentUploadProgress, setAttachmentUploadProgress] = useState<number | null>(null);
-  const [attachmentUploadName, setAttachmentUploadName] = useState<string | null>(null);
-  const [deletingAttachmentId, setDeletingAttachmentId] = useState<string | null>(null);
-  const [attachmentDragOver, setAttachmentDragOver] = useState(false);
-  const [attachmentLightbox, setAttachmentLightbox] = useState<{
-    attachment: IssueAttachmentPublic;
-    imageUrl: string;
-  } | null>(null);
-  const [attachmentVideo, setAttachmentVideo] = useState<IssueAttachmentPublic | null>(null);
-  const attachmentBlobCache = useMemo(() => createAttachmentBlobCache(), []);
-  const attachmentInputRef = useRef<HTMLInputElement>(null);
   const commentTextareaRef = useRef<HTMLTextAreaElement>(null);
   const {
     linkOffer: commentLinkOffer,
@@ -155,11 +112,6 @@ export function IssueDrawer({
     [issue.rowId, rows],
   );
 
-  const linkedFileIds = useMemo(
-    () => new Set(attachments.map((attachment) => attachment.fileId)),
-    [attachments],
-  );
-
   const patchIssue = useCallback(
     async (patch: UpdateIssueInput) => {
       setSaving(true);
@@ -177,28 +129,12 @@ export function IssueDrawer({
     setDescription(issue.description ?? "");
   }, [issue.id, issue.title, issue.description]);
 
-  function setAttachments(update: (prev: IssueAttachmentPublic[]) => IssueAttachmentPublic[]) {
-    queryClient.setQueryData<{
-      attachments: IssueAttachmentPublic[];
-      limits: AttachmentLimitsPublic;
-    }>(queryKeys.issueAttachments(issue.id), (data) =>
-      data ? { ...data, attachments: update(data.attachments) } : data,
-    );
-  }
-
   function setComments(update: (prev: CommentPublic[]) => CommentPublic[]) {
     queryClient.setQueryData<{ issue: IssuePublic; comments: CommentPublic[] }>(
       queryKeys.issue(issue.id),
       (data) => (data ? { ...data, comments: update(data.comments) } : data),
     );
   }
-
-  useEffect(() => {
-    attachmentBlobCache.revokeAll();
-    setAttachmentLightbox(null);
-    setAttachmentVideo(null);
-    return () => attachmentBlobCache.revokeAll();
-  }, [issue.id, attachmentBlobCache]);
 
   useEffect(
     () => () => {
@@ -236,86 +172,6 @@ export function IssueDrawer({
     }, 500);
   }
 
-  async function openImagePreview(attachment: IssueAttachmentPublic) {
-    try {
-      const imageUrl = await attachmentBlobCache.get(attachment.id);
-      setAttachmentLightbox({ attachment, imageUrl });
-    } catch {
-      show("Could not load image preview.");
-    }
-  }
-
-  async function uploadAttachmentFile(file: File) {
-    if (uploadingAttachment) return;
-    const maxBytes = maxBytesForAttachmentFile(
-      file.name,
-      file.type || "application/octet-stream",
-      attachmentLimits,
-    );
-    if (file.size > maxBytes) {
-      show(
-        `File is too large (${formatFileSize(file.size)}). Max for this type is ${formatFileSize(maxBytes)}.`,
-      );
-      return;
-    }
-    setUploadingAttachment(true);
-    setAttachmentUploadProgress(0);
-    setAttachmentUploadName(file.name);
-    try {
-      const { attachment } = await client.uploadFile(issue.id, file, {
-        limits: attachmentLimits,
-        onProgress: (percent) => setAttachmentUploadProgress(percent),
-      });
-      setAttachments((prev) => [...prev, attachment]);
-      if (isImageAttachmentFile(file.name, file.type || "")) {
-        attachmentBlobCache.set(attachment.id, URL.createObjectURL(file));
-      }
-    } catch (error) {
-      report(error, "Upload failed");
-    } finally {
-      setUploadingAttachment(false);
-      setAttachmentUploadProgress(null);
-      setAttachmentUploadName(null);
-    }
-  }
-
-  function handleAttachmentInputChange(event: ChangeEvent<HTMLInputElement>) {
-    const file = event.target.files?.[0];
-    event.target.value = "";
-    if (file) void uploadAttachmentFile(file);
-  }
-
-  function handleAttachmentDrop(event: DragEvent) {
-    event.preventDefault();
-    setAttachmentDragOver(false);
-    const file = event.dataTransfer.files[0];
-    if (file) void uploadAttachmentFile(file);
-  }
-
-  async function downloadAttachment(attachment: IssueAttachmentPublic) {
-    try {
-      await downloadAttachmentFile(attachment.id, attachment.filename);
-    } catch (error) {
-      report(error, "Download failed");
-    }
-  }
-
-  async function deleteAttachment(attachment: IssueAttachmentPublic) {
-    const ok = await confirm({
-      title: `Remove ${attachment.filename}?`,
-      confirmLabel: "Remove",
-      danger: true,
-    });
-    if (!ok) return;
-    setDeletingAttachmentId(attachment.id);
-    try {
-      await client.deleteAttachment(issue.id, attachment.id);
-      setAttachments((prev) => prev.filter((item) => item.id !== attachment.id));
-    } finally {
-      setDeletingAttachmentId(null);
-    }
-  }
-
   async function submitComment() {
     const body = commentDraft.trim();
     if (!body || commentSubmitting) return;
@@ -350,9 +206,7 @@ export function IssueDrawer({
   }
 
   function handleDrawerClose() {
-    setAttachmentLightbox(null);
-    setAttachmentVideo(null);
-    attachmentBlobCache.revokeAll();
+    files.release();
     onClose();
   }
 
@@ -544,41 +398,31 @@ export function IssueDrawer({
 
         <section className="issue-drawer-section">
           <h3>Attachments</h3>
-          {attachmentsLoading ? (
+          {files.loading ? (
             <p className="muted">Loading attachments…</p>
-          ) : attachments.length === 0 ? (
+          ) : files.attachments.length === 0 ? (
             <p className="muted">No files attached yet.</p>
           ) : (
             <ul className="issue-attachment-list">
-              {attachments.map((attachment) => (
+              {files.attachments.map((attachment) => (
                 <li key={attachment.id} className="issue-attachment">
                   {isVideoAttachment(attachment) ? (
                     <AttachmentVideoThumbnail
                       attachment={attachment}
-                      onOpen={() => setAttachmentVideo(attachment)}
+                      onOpen={() => files.openVideo(attachment)}
                     />
                   ) : isImageAttachment(attachment) ? (
                     <AttachmentImageThumbnail
                       attachment={attachment}
-                      blobCache={attachmentBlobCache}
-                      onOpen={(imageUrl) => setAttachmentLightbox({ attachment, imageUrl })}
+                      blobCache={files.blobCache}
+                      onOpen={(imageUrl) => files.openImageUrl(attachment, imageUrl)}
                     />
                   ) : null}
                   <div className="issue-attachment-main">
                     <button
                       type="button"
                       className="ghost issue-attachment-name"
-                      onClick={() => {
-                        if (isVideoAttachment(attachment)) {
-                          setAttachmentVideo(attachment);
-                          return;
-                        }
-                        if (isImageAttachment(attachment)) {
-                          void openImagePreview(attachment);
-                          return;
-                        }
-                        void downloadAttachment(attachment);
-                      }}
+                      onClick={() => files.open(attachment)}
                     >
                       {attachment.filename}
                     </button>
@@ -595,12 +439,12 @@ export function IssueDrawer({
                     <button
                       type="button"
                       className="ghost issue-attachment-delete"
-                      disabled={deletingAttachmentId === attachment.id}
-                      onClick={() => void deleteAttachment(attachment)}
+                      disabled={files.deletingId === attachment.id}
+                      onClick={() => void files.remove(attachment)}
                       aria-label={`Remove ${attachment.filename}`}
                       title="Remove attachment"
                     >
-                      {deletingAttachmentId === attachment.id ? "…" : "Remove"}
+                      {files.deletingId === attachment.id ? "…" : "Remove"}
                     </button>
                   </div>
                 </li>
@@ -612,54 +456,42 @@ export function IssueDrawer({
             teamId={issue.teamId}
             issueId={issue.id}
             row={issueRow}
-            linkedFileIds={linkedFileIds}
-            onLinked={(attachment) => {
-              setAttachments((prev) => {
-                if (prev.some((item) => item.fileId === attachment.fileId)) return prev;
-                return [...prev, attachment];
-              });
-            }}
+            linkedFileIds={files.linkedFileIds}
+            onLinked={files.addLinked}
           />
 
           <div
-            className={`issue-attachment-drop${attachmentDragOver ? " issue-attachment-drop--active" : ""}`}
-            onDragOver={(event) => {
-              event.preventDefault();
-              setAttachmentDragOver(true);
-            }}
-            onDragLeave={() => setAttachmentDragOver(false)}
-            onDrop={handleAttachmentDrop}
+            className={`issue-attachment-drop${files.dragOver ? " issue-attachment-drop--active" : ""}`}
+            {...files.dropZoneProps}
           >
             <input
-              ref={attachmentInputRef}
+              ref={bindFileInput}
               type="file"
               className="issue-attachment-input"
-              onChange={handleAttachmentInputChange}
+              onChange={files.onInputChange}
             />
             <p>
-              {uploadingAttachment
-                ? `Uploading ${attachmentUploadName ?? "file"}…`
-                : `Drop a file here or choose one (${describeAttachmentLimits(attachmentLimits)}).`}
+              {files.uploading
+                ? `Uploading ${files.uploadName ?? "file"}…`
+                : `Drop a file here or choose one (${describeAttachmentLimits(files.limits)}).`}
             </p>
-            {uploadingAttachment ? (
+            {files.uploading ? (
               <div
                 className="issue-attachment-progress"
                 role="progressbar"
                 aria-valuemin={0}
                 aria-valuemax={100}
-                aria-valuenow={attachmentUploadProgress ?? 0}
+                aria-valuenow={files.uploadProgress ?? 0}
                 aria-label="Upload progress"
               >
                 <div
                   className={`issue-attachment-progress-bar${
-                    attachmentUploadProgress == null
+                    files.uploadProgress == null
                       ? " issue-attachment-progress-bar--indeterminate"
                       : ""
                   }`}
                   style={
-                    attachmentUploadProgress != null
-                      ? { width: `${attachmentUploadProgress}%` }
-                      : undefined
+                    files.uploadProgress != null ? { width: `${files.uploadProgress}%` } : undefined
                   }
                 />
               </div>
@@ -667,8 +499,8 @@ export function IssueDrawer({
             <button
               type="button"
               className="ghost"
-              disabled={uploadingAttachment}
-              onClick={() => attachmentInputRef.current?.click()}
+              disabled={files.uploading}
+              onClick={files.chooseFile}
             >
               Choose file
             </button>
@@ -770,21 +602,7 @@ export function IssueDrawer({
           </button>
         </div>
       </div>
-      {attachmentLightbox ? (
-        <AttachmentLightbox
-          attachment={attachmentLightbox.attachment}
-          imageUrl={attachmentLightbox.imageUrl}
-          onClose={() => setAttachmentLightbox(null)}
-          onDownload={() => void downloadAttachment(attachmentLightbox.attachment)}
-        />
-      ) : null}
-      {attachmentVideo ? (
-        <AttachmentVideoLightbox
-          attachment={attachmentVideo}
-          onClose={() => setAttachmentVideo(null)}
-          onDownload={() => void downloadAttachment(attachmentVideo)}
-        />
-      ) : null}
+      <AttachmentLightboxes list={files} />
     </Drawer>
   );
 }
