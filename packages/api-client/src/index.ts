@@ -1,3 +1,6 @@
+// Uploads use XMLHttpRequest; apps without the DOM lib type-check this file from source.
+/// <reference lib="dom" />
+
 import type {
   ApiError,
   ApiTokenCreated,
