@@ -6,7 +6,18 @@ import { createDefaultUserProfile } from "@teamflow/core";
 import { applyUserProfile } from "./profile";
 import { createQueryClient } from "./queries/keys";
 import { createAppRouter } from "./router";
-import "./styles.css";
+// Order matters: later files win ties in the cascade.
+import "./styles/tokens.css";
+import "./styles/base.css";
+import "./styles/topbar.css";
+import "./styles/board.css";
+import "./styles/card.css";
+import "./styles/drawer.css";
+import "./styles/dialog.css";
+import "./styles/popover.css";
+import "./styles/settings.css";
+import "./styles/plan.css";
+import "./styles/auth.css";
 
 applyUserProfile(createDefaultUserProfile());
 
