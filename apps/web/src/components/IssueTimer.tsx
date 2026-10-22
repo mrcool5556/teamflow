@@ -25,6 +25,7 @@ type IssueTimerProps = {
   onUpdate: (patch: IssueTimerPatch) => void;
   compact?: boolean;
   floatingPanel?: boolean;
+  disabled?: boolean;
 };
 
 function TimerDigitRow({
@@ -79,6 +80,7 @@ export function IssueTimer({
   onUpdate,
   compact = false,
   floatingPanel = false,
+  disabled = false,
 }: IssueTimerProps) {
   const [open, setOpen] = useState(false);
   const [now, setNow] = useState(Date.now());
@@ -292,6 +294,7 @@ export function IssueTimer({
         ref={triggerRef}
         type="button"
         className={`issue-timer-trigger ${compact ? "compact" : ""}`}
+        disabled={disabled}
         onPointerDown={(e) => e.stopPropagation()}
         onClick={(e) => {
           e.stopPropagation();

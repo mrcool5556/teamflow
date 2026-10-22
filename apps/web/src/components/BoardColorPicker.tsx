@@ -13,6 +13,7 @@ type BoardColorPickerProps = {
   compact?: boolean;
   floatingPanel?: boolean;
   className?: string;
+  disabled?: boolean;
 };
 
 export function BoardColorPicker({
@@ -24,6 +25,7 @@ export function BoardColorPicker({
   compact = false,
   floatingPanel = false,
   className = "",
+  disabled = false,
 }: BoardColorPickerProps) {
   const [open, setOpen] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
@@ -93,6 +95,7 @@ export function BoardColorPicker({
         ref={triggerRef}
         type="button"
         className="color-picker-trigger"
+        disabled={disabled}
         onClick={() => setOpen((value) => !value)}
         title={title}
         aria-label={title}

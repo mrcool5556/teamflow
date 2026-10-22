@@ -52,10 +52,12 @@ import { PriorityPicker } from "./components/PriorityPicker";
 import { issueMatchesBoardSearch, buildRefShareUrl } from "./lib/refLinks";
 import { copyTextToClipboard } from "./lib/clipboard";
 import { useInlineRename } from "./hooks/useInlineRename";
+import { useCanEditBoard } from "./lib/teamPermissions";
 import type { IssueTimerPatch } from "./lib/timer";
 import type { Priority } from "@teamflow/core";
 
 export const issueDndId = (issueId: string) => `issue:${issueId}`;
+const NO_SENSORS: ReturnType<typeof useSensors> = [];
 export const rowDndId = (rowId: string) => `row:${rowId}`;
 export const columnDndId = (rowId: string, statusId: string) => `column:${rowId}:${statusId}`;
 export const cellDndId = (rowId: string, statusId: string) => `cell:${rowId}:${statusId}`;
@@ -333,6 +335,8 @@ export function KanbanBoard({
   onBulkDelete,
   onOpenRowFiles,
 }: KanbanBoardProps) {
+  // Viewers (no board.edit) can open and read everything but not drag, rename or delete.
+  const canEdit = useCanEditBoard();
   const [activeId, setActiveId] = useState<string | null>(null);
   const [issueInsertHint, setIssueInsertHint] = useState<IssueInsertHint | null>(null);
   const [rowSearchQueries, setRowSearchQueries] = useState<Record<string, string>>({});
@@ -394,7 +398,7 @@ export function KanbanBoard({
 
     if (contextMenu.kind === "issue") {
       const issue = contextMenu.issue;
-      return [
+      const issueEntries: ContextMenuEntry[] = [
         {
           kind: "item",
           id: "open",
@@ -429,6 +433,10 @@ export function KanbanBoard({
           onSelect: () => onDeleteIssue(issue),
         },
       ];
+      const readOnlyIds = new Set(["priority", "delete"]);
+      return canEdit
+        ? issueEntries
+        : issueEntries.filter((entry) => ("id" in entry ? !readOnlyIds.has(entry.id) : false));
     }
 
     const { row, canRemoveRow, headersVisible } = contextMenu;
@@ -443,13 +451,15 @@ export function KanbanBoard({
       });
     }
 
-    entries.push(
-      {
+    if (canEdit) {
+      entries.push({
         kind: "item",
         id: "add-column",
         label: "Add column",
         onSelect: () => onAddColumn(row.id),
-      },
+      });
+    }
+    entries.push(
       {
         kind: "item",
         id: "toggle-headers",
@@ -464,7 +474,7 @@ export function KanbanBoard({
       },
     );
 
-    if (canRemoveRow) {
+    if (canRemoveRow && canEdit) {
       entries.push({ kind: "separator" });
       entries.push({
         kind: "item",
@@ -477,6 +487,7 @@ export function KanbanBoard({
 
     return entries;
   }, [
+    canEdit,
     contextMenu,
     onAddColumn,
     onDeleteIssue,
@@ -738,7 +749,7 @@ export function KanbanBoard({
 
   return (
     <DndContext
-      sensors={sensors}
+      sensors={canEdit ? sensors : NO_SENSORS}
       collisionDetection={issueCollisionDetection}
       onDragStart={handleDragStart}
       onDragOver={handleDragOver}
@@ -862,6 +873,7 @@ export function KanbanBoard({
       </DragOverlay>
 
       {!previewMode &&
+      canEdit &&
       onBulkMove &&
       onBulkAssign &&
       onBulkPriority &&
@@ -980,6 +992,8 @@ function RowSeparatorBar({
   ) => void;
   previewMode?: boolean;
 }) {
+  const canEdit = useCanEditBoard();
+  const locked = previewMode || !canEdit;
   return (
     <div
       className="row-separator-bar"
@@ -995,7 +1009,7 @@ function RowSeparatorBar({
             className="row-drag-handle"
             aria-label={`Drag row ${row.name}`}
             title="Hold to drag row"
-            disabled={previewMode}
+            disabled={locked}
             {...listeners}
           >
             ⋮⋮
@@ -1025,7 +1039,7 @@ function RowSeparatorBar({
               label="Row owners"
               compact
               floatingPanel
-              disabled={previewMode}
+              disabled={locked}
               onChange={(assigneeIds) => onAssignRow(row, assigneeIds)}
             />
           </div>
@@ -1037,22 +1051,24 @@ function RowSeparatorBar({
           <button
             type="button"
             className="row-bar-action"
-            disabled={previewMode}
+            disabled={locked}
             onClick={() => onAddColumn(row.id)}
           >
             + Column
           </button>
           <RowEditMenu>
-            <RowEditMenuSection title="Row color">
-              <RowColorPicker
-                color={row.color}
-                onSelect={(color) => onUpdateRowColor(row, color)}
-              />
-            </RowEditMenuSection>
+            {canEdit ? (
+              <RowEditMenuSection title="Row color">
+                <RowColorPicker
+                  color={row.color}
+                  onSelect={(color) => onUpdateRowColor(row, color)}
+                />
+              </RowEditMenuSection>
+            ) : null}
             <RowEditMenuItem onClick={onToggleHeaders}>
               {headersVisible ? "Hide column headers" : "Show column headers"}
             </RowEditMenuItem>
-            {canRemoveRow ? (
+            {canRemoveRow && canEdit ? (
               <RowEditMenuItem danger onClick={() => onRemoveRow(row)}>
                 Remove row
               </RowEditMenuItem>
@@ -1176,6 +1192,7 @@ function SortableBoardRow({
     transition,
     isDragging,
   } = useSortable({ id: rowDndId(row.id) });
+  const canEdit = useCanEditBoard();
 
   const style = {
     transform: CSS.Transform.toString(transform),
@@ -1276,7 +1293,7 @@ function SortableBoardRow({
             {visibleStatuses.map((status) => {
               const cellIssues = filterCellIssues(status.id);
               const issueIds = cellIssues.map((issue) => issueDndId(issue.id));
-              const columnSortable = headersVisible && !previewMode;
+              const columnSortable = headersVisible && !previewMode && canEdit;
               const columnHint =
                 issueInsertHint?.rowId === row.id && issueInsertHint?.statusId === status.id
                   ? issueInsertHint
@@ -1316,11 +1333,15 @@ function SortableBoardRow({
                           className={`column-label column-label-row${isDragging ? " column-label--dragging" : ""}`}
                           onSave={(name) => onRenameStatus(status, name)}
                           onRemove={
-                            cellIssues.length === 0 ? () => onRemoveColumn(status) : undefined
+                            cellIssues.length === 0 && canEdit
+                              ? () => onRemoveColumn(status)
+                              : undefined
                           }
                           onGoToRef={onGoToRef}
                           color={status.color}
-                          onColorChange={(color) => onUpdateStatusColor(status, color)}
+                          onColorChange={
+                            canEdit ? (color) => onUpdateStatusColor(status, color) : undefined
+                          }
                           dragHandleRef={columnSortable ? setActivatorNodeRef : undefined}
                           dragHandleListeners={columnSortable ? listeners : undefined}
                         />
@@ -1335,6 +1356,7 @@ function SortableBoardRow({
                           <button
                             type="button"
                             className="ghost add-card-btn"
+                            disabled={!canEdit}
                             onPointerDown={(e) => e.stopPropagation()}
                             onClick={(e) => {
                               e.stopPropagation();
@@ -1522,6 +1544,7 @@ function SortableIssueCard({
   onGoToRef?: (ref: string) => void;
   onContextMenu?: (event: React.MouseEvent) => void;
 }) {
+  const canEdit = useCanEditBoard();
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: issueDndId(issue.id),
     ...(layoutAnimationDisabled ? { animateLayoutChanges: () => false } : {}),
@@ -1577,12 +1600,14 @@ function SortableIssueCard({
             compact
             panelPlacement="top"
             floatingPanel
+            disabled={!canEdit}
             onChange={(assigneeIds) => onAssignIssue(issue, assigneeIds)}
           />
           <IssueTimer
             issue={issue}
             compact
             floatingPanel
+            disabled={!canEdit}
             onUpdate={(patch) => onUpdateIssueTimer(issue, patch)}
           />
         </div>
@@ -1593,27 +1618,31 @@ function SortableIssueCard({
             compact
             title={`Card color: ${issue.identifier}`}
             className="color-picker--card"
+            disabled={!canEdit}
           />
           <PriorityPicker
             priority={issue.priority}
             onSelect={(priority) => onUpdateIssuePriority(issue, priority)}
             compact
             floatingPanel
+            disabled={!canEdit}
             title={`Priority: ${issue.identifier}`}
           />
-          <button
-            type="button"
-            className="ghost issue-delete-btn"
-            aria-label={`Delete ${issue.identifier}`}
-            title="Delete card"
-            onPointerDown={(e) => e.stopPropagation()}
-            onClick={(e) => {
-              e.stopPropagation();
-              onDelete();
-            }}
-          >
-            ×
-          </button>
+          {canEdit ? (
+            <button
+              type="button"
+              className="ghost issue-delete-btn"
+              aria-label={`Delete ${issue.identifier}`}
+              title="Delete card"
+              onPointerDown={(e) => e.stopPropagation()}
+              onClick={(e) => {
+                e.stopPropagation();
+                onDelete();
+              }}
+            >
+              ×
+            </button>
+          ) : null}
         </div>
       </div>
       <h3 className="issue-card-title">{issue.title}</h3>
@@ -1665,6 +1694,7 @@ function ColumnHeader({
   previewMode?: boolean;
 }) {
   const rename = useInlineRename(label, onSave);
+  const canEdit = useCanEditBoard();
 
   const columnStyle = color ? ({ "--column-accent": color } as CSSProperties) : undefined;
 
@@ -1712,6 +1742,7 @@ function ColumnHeader({
             <button
               type="button"
               className="column-label-name"
+              disabled={!canEdit}
               onClick={rename.start}
               title="Click to rename"
             >
@@ -1725,7 +1756,7 @@ function ColumnHeader({
               compact
               panelPlacement="top"
               floatingPanel
-              disabled={previewMode}
+              disabled={previewMode || !canEdit}
               onChange={onAssignColumn}
             />
           ) : null}
@@ -1787,6 +1818,7 @@ function EditableLabel({
   onSave: (name: string) => void;
 }) {
   const rename = useInlineRename(label, onSave);
+  const canEdit = useCanEditBoard();
 
   if (rename.editing) {
     return <input className="row-separator-rename-input" {...rename.inputProps} />;
@@ -1796,6 +1828,7 @@ function EditableLabel({
     <button
       type="button"
       className={className}
+      disabled={!canEdit}
       onClick={rename.start}
       title="Click to rename"
     >
