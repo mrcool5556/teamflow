@@ -902,6 +902,34 @@ app.get("/teams/:teamId/rows", async (c) => {
   return c.json({ rows: await Promise.all(rows.map((row) => mapBoardRow(db, row))) });
 });
 
+/** Resolve an id against its table and confirm it belongs to `teamId`. Null when it does not. */
+async function rowBelongsToTeam(rowId: string, teamId: string) {
+  const [row] = await db
+    .select()
+    .from(schema.boardRows)
+    .where(eq(schema.boardRows.id, rowId))
+    .limit(1);
+  return row && row.teamId === teamId ? row : null;
+}
+
+async function projectBelongsToTeam(projectId: string, teamId: string) {
+  const [project] = await db
+    .select()
+    .from(schema.projects)
+    .where(eq(schema.projects.id, projectId))
+    .limit(1);
+  return project && project.teamId === teamId ? project : null;
+}
+
+async function statusBelongsToTeam(statusId: string, teamId: string) {
+  const [status] = await db
+    .select()
+    .from(schema.issueStatuses)
+    .where(eq(schema.issueStatuses.id, statusId))
+    .limit(1);
+  return status && status.teamId === teamId ? status : null;
+}
+
 app.get("/teams/:teamId/members", async (c) => {
   const result = await requireAuth(c);
   if ("error" in result) return result.error;
@@ -909,6 +937,9 @@ app.get("/teams/:teamId/members", async (c) => {
   const teamId = c.req.param("teamId");
   if (!(await canAccessTeam(result.auth, teamId))) {
     return c.json({ error: "Team access denied" }, 403);
+  }
+  if (!(await userHasTeamPermission(db, result.auth.userId, teamId, "team.members.view"))) {
+    return c.json({ error: "Permission denied" }, 403);
   }
 
   const members = await db
@@ -2015,6 +2046,20 @@ app.post("/issues", async (c) => {
     .set({ issueCounter: nextNumber })
     .where(eq(schema.teams.id, team.id));
 
+  // Every referenced entity must belong to the issue's team (no cross-team references).
+  if (body.data.rowId && !(await rowBelongsToTeam(body.data.rowId, body.data.teamId))) {
+    return c.json({ error: "Row does not belong to this team" }, 400);
+  }
+  if (body.data.projectId && !(await projectBelongsToTeam(body.data.projectId, body.data.teamId))) {
+    return c.json({ error: "Project does not belong to this team" }, 400);
+  }
+  if (body.data.assigneeId) {
+    const valid = await filterValidTeamMemberIds(db, body.data.teamId, [body.data.assigneeId]);
+    if (valid.length === 0) {
+      return c.json({ error: "Assignee is not a member of this team" }, 400);
+    }
+  }
+
   let statusId = body.data.statusId;
   const rowId = body.data.rowId ?? (await getDefaultRowId(db, body.data.teamId));
 
@@ -2028,11 +2073,7 @@ app.post("/issues", async (c) => {
       statuses.find((s) => s.type === "todo")?.id ??
       statuses[0]?.id;
   } else {
-    const [status] = await db
-      .select()
-      .from(schema.issueStatuses)
-      .where(eq(schema.issueStatuses.id, statusId))
-      .limit(1);
+    const status = await statusBelongsToTeam(statusId, body.data.teamId);
     if (!status || status.rowId !== rowId) {
       return c.json({ error: "Status does not belong to this row" }, 400);
     }
@@ -2109,6 +2150,14 @@ app.patch("/issues/:id", async (c) => {
     return c.json({ error: "Team access denied" }, 403);
   }
 
+  // Referenced entities must belong to the issue's team (no cross-team references).
+  if (body.data.rowId && !(await rowBelongsToTeam(body.data.rowId, existing.teamId))) {
+    return c.json({ error: "Row does not belong to this team" }, 400);
+  }
+  if (body.data.projectId && !(await projectBelongsToTeam(body.data.projectId, existing.teamId))) {
+    return c.json({ error: "Project does not belong to this team" }, 400);
+  }
+
   const updates: Partial<typeof schema.issues.$inferInsert> = {
     updatedAt: new Date().toISOString(),
   };
@@ -2132,11 +2181,7 @@ app.patch("/issues/:id", async (c) => {
 
   const nextRowId = body.data.rowId ?? existing.rowId;
   if (body.data.statusId !== undefined) {
-    const [status] = await db
-      .select()
-      .from(schema.issueStatuses)
-      .where(eq(schema.issueStatuses.id, body.data.statusId))
-      .limit(1);
+    const status = await statusBelongsToTeam(body.data.statusId, existing.teamId);
     if (!status) return c.json({ error: "Status not found" }, 404);
     if (nextRowId && status.rowId !== nextRowId) {
       return c.json({ error: "Status does not belong to this row" }, 400);
