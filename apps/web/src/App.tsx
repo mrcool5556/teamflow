@@ -1669,9 +1669,9 @@ function LoginScreen({
   const [mode, setMode] = useState<"login" | "register" | "forgot" | "reset">(
     initialResetToken ? "reset" : "login",
   );
-  const [name, setName] = useState("Demo User");
-  const [email, setEmail] = useState("demo@teamflow.local");
-  const [password, setPassword] = useState("changeme123");
+  const [name, setName] = useState("");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [resetToken, setResetToken] = useState(initialResetToken ?? "");
   const [inviteOnly, setInviteOnly] = useState(false);
@@ -1930,7 +1930,9 @@ function LoginScreen({
         )}
 
         {mode === "login" ? (
-          <p className="hint">Demo: demo@teamflow.local / changeme123 (after seed)</p>
+          <p className="hint">
+            New install? Register the first account; it becomes the instance admin.
+          </p>
         ) : null}
 
         <button type="button" className="ghost about-login-link" onClick={onOpenAbout}>

@@ -2,7 +2,15 @@ import { DEFAULT_STATUSES, generateEntityKey } from "@teamflow/core";
 import bcrypt from "bcryptjs";
 import { createDb, schema } from "./index.js";
 
+/**
+ * Demo data (demo@teamflow.local) is opt-in: set TEAMFLOW_SEED_DEMO=1. Production installs run
+ * the migrations only and the first registered account becomes the instance admin.
+ */
 async function seed() {
+  if (process.env.TEAMFLOW_SEED_DEMO !== "1") {
+    return;
+  }
+
   const db = createDb();
 
   const existing = await db.select().from(schema.workspaces).limit(1);
@@ -24,6 +32,7 @@ async function seed() {
     email: "demo@teamflow.local",
     name: "Demo User",
     passwordHash: await bcrypt.hash("changeme123", 10),
+    isInstanceAdmin: 1,
   });
 
   const teamId = crypto.randomUUID();
@@ -186,9 +195,7 @@ async function seed() {
     });
   }
 
-  console.log("Seed complete.");
-  console.log("Demo login: demo@teamflow.local / changeme123");
-  console.log(`Team key: ENG`);
+  console.log("Seed complete (demo data, TEAMFLOW_SEED_DEMO=1).");
 }
 
 seed().catch((err) => {
