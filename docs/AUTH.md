@@ -8,8 +8,26 @@ Teamflow uses email + password accounts. Sessions are JWTs stored in the browser
 |--------|------|-------|
 | POST | `/auth/register` | `{ email, name, password }` — optional `inviteToken` |
 | POST | `/auth/login` | `{ email, password }` → `{ user, token }` |
-| GET | `/auth/me` | Current user (Bearer token) |
+| GET | `/auth/me` | Current user (Bearer token); `user.isInstanceAdmin` marks server-wide admins |
 | GET | `/auth/config` | `{ inviteOnly, passwordResetEmail }` |
+
+Login, register and forgot-password are rate limited per client IP (`TEAMFLOW_AUTH_RATE_LIMIT` per minute, default 10, HTTP 429 with `Retry-After`). Behind a reverse proxy set `TEAMFLOW_TRUST_PROXY=1` so `X-Forwarded-For` is used as the client address.
+
+### Instance admin
+
+Team roles are per team. Server-wide actions (Settings → Updates, Discord bot secrets, Discord bot service start/stop) additionally require the **instance admin** flag on the account (`users.is_instance_admin`):
+
+- On a fresh install the **first registered account** gets it.
+- On upgrade, the oldest existing account is promoted once when the column is added.
+- `TEAMFLOW_INSTANCE_ADMINS=alice@example.com,bob@example.com` grants it to those emails at their next login.
+
+Without the flag those routes return `403 { "error": "Instance admin required" }` even for team Owners, and the web app hides the panels.
+
+### Role and member safety rules
+
+- A role can only grant permissions the acting user already holds.
+- An invite cannot carry a role ranked above the inviter's.
+- Only an Owner can promote someone to Owner, demote an Owner, or remove an Owner.
 
 ### Invite-only registration
 
@@ -34,8 +52,10 @@ Flow:
 2. Server creates a one-hour reset token.
 3. If **SMTP is configured**, an email is sent with a link like  
    `https://your-domain/?reset=<token>`.
-4. If SMTP is **not** configured, the reset URL is logged on the server (`journalctl -u teamflow`).
-5. User sets a new password; the token is consumed.
+4. If SMTP is **not** configured, the link is only printed to the server log when `NODE_ENV=development`; in production nothing usable is logged, so configure SMTP.
+5. User sets a new password; the token is consumed and **every existing session for that user is signed out** (the JWT carries `users.token_version`, which the reset bumps).
+
+The response to forgot-password is identical whether or not the email exists.
 
 ### SMTP (production)
 
@@ -73,8 +93,20 @@ Used by:
 
 Scopes: `read`, `write`.
 
+| Method | Path | Notes |
+|--------|------|-------|
+| POST | `/auth/tokens` | Requires write scope. A PAT may only mint tokens for its own team and with scopes it already has. |
+| GET | `/auth/tokens` | List the caller's tokens (prefix only, never the secret). |
+| DELETE | `/auth/tokens/:id` | Revoke a token. |
+
+A PAT created with a `teamId` is enforced on **every** route that resolves a team (teams, rows, statuses, issues, files, uploads, members, projects), not only `/issues`.
+
 ## Security notes
 
-- Set a strong `JWT_SECRET` in production (not the example default).
+- `JWT_SECRET` is required. The server refuses to start if it is unset, shorter than 16 characters or one of the shipped placeholders, unless `NODE_ENV=development` or `TEAMFLOW_ALLOW_DEV_SECRET=1`. The same rule applies to `TEAMFLOW_SECRETS_KEY`; integration secrets at rest use a scrypt-derived key (older `v1` values still decrypt).
+- CORS is an allowlist: `PUBLIC_URL` plus `CORS_ORIGINS` (comma-separated); outside production `localhost:5173-5179` is allowed for the Vite dev server. Every response carries `X-Content-Type-Options: nosniff`.
+- Attachments render inline only when the file's own bytes are an image, video or PDF; everything else downloads as `application/octet-stream`.
+- Request bodies are capped: 1 MB for JSON, the configured attachment / bundle maximum for multipart uploads.
+- No demo account is seeded unless `TEAMFLOW_SEED_DEMO=1`.
 - `.env` should be mode `600` and owned by the `teamflow` user on Linux.
 - Password reset responses never reveal whether an email exists in the database.
