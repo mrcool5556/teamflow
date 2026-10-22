@@ -6,6 +6,7 @@ import { runMaintenanceBackupSchema, runMaintenanceUpdateSchema } from "@teamflo
 import { requireAuth, requireInstanceAdmin, requireWrite } from "../middleware/auth.js";
 import { loadTeam, requirePermission } from "../middleware/team.js";
 import {
+  checkMaintenanceHost,
   dismissMaintenanceJob,
   getMaintenanceJob,
   getMaintenanceStatus,
@@ -25,6 +26,21 @@ routes.get(
   requireInstanceAdmin,
   async (c) => {
     const status = await getMaintenanceStatus();
+    return c.json({ status });
+  },
+);
+
+/** Run the sudo probe and origin comparison now, cache them for GET, return the fresh status. */
+routes.post(
+  "/teams/:teamId/server/maintenance/check",
+  requireAuth,
+  requireWrite,
+  validateParams,
+  loadTeam(),
+  requirePermission("server.maintenance.view"),
+  requireInstanceAdmin,
+  async (c) => {
+    const status = await checkMaintenanceHost();
     return c.json({ status });
   },
 );

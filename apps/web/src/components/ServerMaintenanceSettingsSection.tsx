@@ -188,10 +188,13 @@ export function ServerMaintenanceSettingsSection({
   const [updateBranch, setUpdateBranch] = useState("");
 
   const loadStatus = useCallback(
-    async (options?: { silent?: boolean }) => {
+    async (options?: { silent?: boolean; check?: boolean }) => {
       if (!options?.silent) setRefreshing(true);
       try {
-        const { status: next } = await client.getServerMaintenanceStatus(teamId);
+        // "Refresh status" re-runs the host check (sudo + origin); everything else just reads.
+        const { status: next } = options?.check
+          ? await client.checkServerMaintenance(teamId)
+          : await client.getServerMaintenanceStatus(teamId);
         setStatus(next);
         setServerUnreachable(false);
         return next;
@@ -275,7 +278,7 @@ export function ServerMaintenanceSettingsSection({
             status={status}
             serverUnreachable={serverUnreachable}
             refreshing={refreshing}
-            onRefresh={() => void loadStatus()}
+            onRefresh={() => void loadStatus({ check: true })}
           />
 
           <section className="settings-section">

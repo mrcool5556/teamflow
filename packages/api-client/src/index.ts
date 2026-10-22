@@ -394,6 +394,14 @@ export class TeamflowClient {
     return this.request<{ status: MaintenanceStatusPublic }>(`/teams/${teamId}/server/maintenance`);
   }
 
+  /** Probe sudo and compare with origin now (the GET status only reads the cached result). */
+  checkServerMaintenance(teamId: string) {
+    return this.request<{ status: MaintenanceStatusPublic }>(
+      `/teams/${teamId}/server/maintenance/check`,
+      { method: "POST" },
+    );
+  }
+
   getServerMaintenanceJob(teamId: string) {
     return this.request<{ job: MaintenanceJobPublic | null }>(
       `/teams/${teamId}/server/maintenance/job`,
