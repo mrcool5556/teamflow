@@ -1,5 +1,7 @@
 import { Hono } from "hono";
 import type { AppEnv } from "../types.js";
+import { parseBody } from "../lib/validation.js";
+import { validateParams } from "../middleware/params.js";
 import { updateTeamMemberRoleSchema } from "@teamflow/core";
 import { schema } from "@teamflow/db";
 import { eq } from "drizzle-orm";
@@ -15,6 +17,7 @@ const routes = new Hono<AppEnv>();
 routes.get(
   "/teams/:teamId/members",
   requireAuth,
+  validateParams,
   loadTeam(),
   requirePermission("team.members.view"),
   async (c) => {
@@ -44,18 +47,16 @@ routes.patch(
   "/teams/:teamId/members/:memberId",
   requireAuth,
   requireWrite,
+  validateParams,
   loadTeam(),
   async (c) => {
     const auth = c.var.auth;
 
     const teamId = c.var.teamId;
     const memberId = c.req.param("memberId");
-    const body = updateTeamMemberRoleSchema.safeParse(await c.req.json().catch(() => ({})));
-    if (!body.success) {
-      return c.json({ error: body.error.issues[0]?.message ?? "Invalid input" }, 400);
-    }
+    const body = await parseBody(c, updateTeamMemberRoleSchema);
 
-    const role = await updateTeamMemberRole(db, teamId, memberId, body.data.roleId, auth.userId);
+    const role = await updateTeamMemberRole(db, teamId, memberId, body.roleId, auth.userId);
     return c.json({ role });
   },
 );
@@ -64,6 +65,7 @@ routes.delete(
   "/teams/:teamId/members/:memberId",
   requireAuth,
   requireWrite,
+  validateParams,
   loadTeam(),
   async (c) => {
     const auth = c.var.auth;

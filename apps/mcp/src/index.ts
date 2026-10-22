@@ -407,7 +407,7 @@ server.tool(
 
       rowId,
 
-      priority: input.priority ?? "none",
+      priority: input.priority,
 
       assigneeId,
     });

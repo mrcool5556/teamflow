@@ -283,7 +283,7 @@ export class TeamflowClient {
     return this.request<{ invites: TeamInvitePublic[] }>(`/teams/${teamId}/invites`);
   }
 
-  createTeamInvite(teamId: string, input: Partial<CreateTeamInviteInput> = {}) {
+  createTeamInvite(teamId: string, input: CreateTeamInviteInput = {}) {
     return this.request<{ invite: TeamInvitePublic }>(`/teams/${teamId}/invites`, {
       method: "POST",
       body: JSON.stringify(input),

@@ -1,5 +1,7 @@
 import { Hono } from "hono";
 import type { AppEnv } from "../types.js";
+import { parseBody } from "../lib/validation.js";
+import { validateParams } from "../middleware/params.js";
 import { runMaintenanceBackupSchema, runMaintenanceUpdateSchema } from "@teamflow/core";
 import { requireAuth, requireInstanceAdmin, requireWrite } from "../middleware/auth.js";
 import { loadTeam, requirePermission } from "../middleware/team.js";
@@ -17,6 +19,7 @@ const routes = new Hono<AppEnv>();
 routes.get(
   "/teams/:teamId/server/maintenance",
   requireAuth,
+  validateParams,
   loadTeam(),
   requirePermission("server.maintenance.view"),
   requireInstanceAdmin,
@@ -29,6 +32,7 @@ routes.get(
 routes.get(
   "/teams/:teamId/server/maintenance/job",
   requireAuth,
+  validateParams,
   loadTeam(),
   requirePermission("server.maintenance.view"),
   requireInstanceAdmin,
@@ -42,16 +46,14 @@ routes.post(
   "/teams/:teamId/server/maintenance/backup",
   requireAuth,
   requireWrite,
+  validateParams,
   loadTeam(),
   requirePermission("server.maintenance.run"),
   requireInstanceAdmin,
   async (c) => {
-    const body = runMaintenanceBackupSchema.safeParse(await c.req.json().catch(() => ({})));
-    if (!body.success) {
-      return c.json({ error: body.error.issues[0]?.message ?? "Invalid input" }, 400);
-    }
+    const body = await parseBody(c, runMaintenanceBackupSchema);
 
-    const job = await runMaintenanceBackup(body.data);
+    const job = await runMaintenanceBackup(body);
     return c.json({ job }, 202);
   },
 );
@@ -60,16 +62,14 @@ routes.post(
   "/teams/:teamId/server/maintenance/update",
   requireAuth,
   requireWrite,
+  validateParams,
   loadTeam(),
   requirePermission("server.maintenance.run"),
   requireInstanceAdmin,
   async (c) => {
-    const body = runMaintenanceUpdateSchema.safeParse(await c.req.json().catch(() => ({})));
-    if (!body.success) {
-      return c.json({ error: body.error.issues[0]?.message ?? "Invalid input" }, 400);
-    }
+    const body = await parseBody(c, runMaintenanceUpdateSchema);
 
-    const job = await runMaintenanceUpdate(body.data);
+    const job = await runMaintenanceUpdate(body);
     return c.json({ job }, 202);
   },
 );
@@ -78,6 +78,7 @@ routes.post(
   "/teams/:teamId/server/maintenance/job/dismiss",
   requireAuth,
   requireWrite,
+  validateParams,
   loadTeam(),
   requirePermission("server.maintenance.run"),
   requireInstanceAdmin,

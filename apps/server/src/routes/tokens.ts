@@ -1,5 +1,7 @@
 import { Hono } from "hono";
 import type { AppEnv } from "../types.js";
+import { parseBody } from "../lib/validation.js";
+import { validateParams } from "../middleware/params.js";
 import { createTokenSchema } from "@teamflow/core";
 import type { TokenScope } from "@teamflow/core";
 import { schema } from "@teamflow/db";
@@ -35,7 +37,7 @@ routes.get("/auth/tokens", requireAuth, async (c) => {
   return c.json({ tokens: rows.map(toApiTokenPublic) });
 });
 
-routes.delete("/auth/tokens/:id", requireAuth, requireWrite, async (c) => {
+routes.delete("/auth/tokens/:id", requireAuth, requireWrite, validateParams, async (c) => {
   const auth = c.var.auth;
 
   const id = c.req.param("id");
@@ -53,23 +55,20 @@ routes.delete("/auth/tokens/:id", requireAuth, requireWrite, async (c) => {
 routes.post("/auth/tokens", requireAuth, requireWrite, async (c) => {
   const auth = c.var.auth;
 
-  const body = createTokenSchema.safeParse(await c.req.json());
-  if (!body.success) {
-    return c.json({ error: body.error.issues[0]?.message ?? "Invalid input" }, 400);
-  }
+  const body = await parseBody(c, createTokenSchema);
 
   // A PAT can only mint tokens no broader than itself: same team scope, no new scopes.
   if (auth.authType === "pat") {
-    if (auth.patTeamId && body.data.teamId !== auth.patTeamId) {
+    if (auth.patTeamId && body.teamId !== auth.patTeamId) {
       return c.json({ error: "Token restricted to a different team" }, 403);
     }
-    if (body.data.scopes.some((scope) => !auth.scopes.includes(scope))) {
+    if (body.scopes.some((scope) => !auth.scopes.includes(scope))) {
       return c.json({ error: "Token cannot grant scopes it does not have" }, 403);
     }
   }
 
-  if (body.data.teamId) {
-    await assertTeamAccess(auth, body.data.teamId);
+  if (body.teamId) {
+    await assertTeamAccess(auth, body.teamId);
   }
 
   const { raw, prefix, hash } = generatePat();
@@ -78,20 +77,20 @@ routes.post("/auth/tokens", requireAuth, requireWrite, async (c) => {
   await db.insert(schema.apiTokens).values({
     id,
     userId: auth.userId,
-    name: body.data.name,
+    name: body.name,
     tokenHash: hash,
     prefix,
-    scopes: JSON.stringify(body.data.scopes),
-    teamId: body.data.teamId,
+    scopes: JSON.stringify(body.scopes),
+    teamId: body.teamId,
   });
 
   return c.json(
     {
       id,
-      name: body.data.name,
+      name: body.name,
       prefix,
-      scopes: body.data.scopes,
-      teamId: body.data.teamId ?? null,
+      scopes: body.scopes,
+      teamId: body.teamId ?? null,
       token: raw,
       createdAt: new Date().toISOString(),
     },

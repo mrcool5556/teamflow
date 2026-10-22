@@ -243,6 +243,38 @@ export const updateBoardRowSchema = z.object({
   color: boardColorSchema.optional(),
 });
 
+/** Path parameter holding an entity id (every id is a UUID). */
+export const idParamSchema = z.string().uuid("Invalid id");
+
+export const createUploadSessionSchema = z.object({
+  filename: z.string().trim().min(1).max(1024),
+  mimeType: z
+    .string()
+    .max(255)
+    .optional()
+    .transform((value) => value || "application/octet-stream"),
+  totalBytes: z
+    .number()
+    .positive()
+    .transform((value) => Math.floor(value)),
+});
+
+export const moveAttachmentSchema = z.object({
+  targetIssueId: z.string().uuid(),
+});
+
+export const linkAttachmentSchema = z.object({
+  fileId: z.string().uuid(),
+});
+
+export const listProjectsQuerySchema = z.object({
+  teamId: z.string().uuid().optional(),
+});
+
+export const listTeamFilesQuerySchema = z.object({
+  trash: z.string().optional(),
+});
+
 export const createLabelSchema = z.object({
   teamId: z.string().uuid(),
   name: z.string().min(1).max(60),
@@ -256,18 +288,22 @@ export type RegisterInput = z.infer<typeof registerSchema>;
 export type LoginInput = z.infer<typeof loginSchema>;
 export type ForgotPasswordInput = z.infer<typeof forgotPasswordSchema>;
 export type ResetPasswordInput = z.infer<typeof resetPasswordSchema>;
-export type CreateIssueInput = z.infer<typeof createIssueSchema>;
+/** Input types use z.input so defaulted fields (priority, scopes, maxUses) stay optional for callers. */
+export type CreateIssueInput = z.input<typeof createIssueSchema>;
 export type UpdateIssueInput = z.infer<typeof updateIssueSchema>;
 export type UpdateBoardRowInput = z.infer<typeof updateBoardRowSchema>;
 export type ListIssuesInput = z.infer<typeof listIssuesSchema>;
 export type CreateTeamInput = z.infer<typeof createTeamSchema>;
-export type CreateTeamInviteInput = z.infer<typeof createTeamInviteSchema>;
+export type CreateTeamInviteInput = z.input<typeof createTeamInviteSchema>;
 export type CreateTeamRoleInput = z.infer<typeof createTeamRoleSchema>;
 export type UpdateTeamRoleInput = z.infer<typeof updateTeamRoleSchema>;
 export type UpdateTeamMemberRoleInput = z.infer<typeof updateTeamMemberRoleSchema>;
 export type CreateProjectInput = z.infer<typeof createProjectSchema>;
 export type CreateCommentInput = z.infer<typeof createCommentSchema>;
-export type CreateTokenInput = z.infer<typeof createTokenSchema>;
+export type CreateTokenInput = z.input<typeof createTokenSchema>;
+export type CreateUploadSessionInput = z.input<typeof createUploadSessionSchema>;
+export type MoveAttachmentInput = z.input<typeof moveAttachmentSchema>;
+export type LinkAttachmentInput = z.input<typeof linkAttachmentSchema>;
 
 export type UserPublic = {
   id: string;

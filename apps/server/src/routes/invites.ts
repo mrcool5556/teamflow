@@ -1,5 +1,7 @@
 import { Hono } from "hono";
 import type { AppEnv } from "../types.js";
+import { parseBody } from "../lib/validation.js";
+import { validateParams } from "../middleware/params.js";
 import { createTeamInviteSchema } from "@teamflow/core";
 import { db } from "../db.js";
 import { optionalAuth, requireAuth, requireWrite } from "../middleware/auth.js";
@@ -18,6 +20,7 @@ const routes = new Hono<AppEnv>();
 routes.get(
   "/teams/:teamId/invites",
   requireAuth,
+  validateParams,
   loadTeam(),
   requirePermission("team.invites.manage"),
   async (c) => {
@@ -32,6 +35,7 @@ routes.post(
   "/teams/:teamId/invites",
   requireAuth,
   requireWrite,
+  validateParams,
   loadTeam(),
   requirePermission("team.invites.manage"),
   async (c) => {
@@ -39,18 +43,15 @@ routes.post(
 
     const teamId = c.var.teamId;
 
-    const body = createTeamInviteSchema.safeParse(await c.req.json().catch(() => ({})));
-    if (!body.success) {
-      return c.json({ error: body.error.issues[0]?.message ?? "Invalid input" }, 400);
-    }
+    const body = await parseBody(c, createTeamInviteSchema);
 
     const invite = await createTeamInvite(db, {
       teamId,
       createdByUserId: auth.userId,
-      roleId: body.data.roleId,
-      role: body.data.role,
-      expiresInDays: body.data.expiresInDays,
-      maxUses: body.data.maxUses,
+      roleId: body.roleId,
+      role: body.role,
+      expiresInDays: body.expiresInDays,
+      maxUses: body.maxUses,
     });
     return c.json({ invite }, 201);
   },
@@ -60,6 +61,7 @@ routes.delete(
   "/teams/:teamId/invites/:inviteId",
   requireAuth,
   requireWrite,
+  validateParams,
   loadTeam(),
   requirePermission("team.invites.manage"),
   async (c) => {
@@ -73,7 +75,7 @@ routes.delete(
   },
 );
 
-routes.get("/invites/:token", optionalAuth, async (c) => {
+routes.get("/invites/:token", optionalAuth, validateParams, async (c) => {
   const token = c.req.param("token");
   const preview = await getInvitePreview(db, token, c.var.auth?.userId);
   if (!preview) return c.json({ error: "Invite not found" }, 404);
@@ -81,7 +83,7 @@ routes.get("/invites/:token", optionalAuth, async (c) => {
   return c.json({ preview });
 });
 
-routes.post("/invites/:token/accept", requireAuth, requireWrite, async (c) => {
+routes.post("/invites/:token/accept", requireAuth, requireWrite, validateParams, async (c) => {
   const auth = c.var.auth;
 
   const token = c.req.param("token");
