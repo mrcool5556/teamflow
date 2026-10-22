@@ -5,7 +5,7 @@ import {
   type BoardRowPublic,
   type IssueStatusPublic,
 } from "@teamflow/core";
-import type { Db } from "@teamflow/db";
+import type { Db, DbExecutor } from "@teamflow/db";
 import { schema } from "@teamflow/db";
 import { loadBoardRowAssignees } from "./assignees.js";
 
@@ -54,108 +54,94 @@ export async function mapBoardRow(
   };
 }
 
-export async function uniqueRowKey(db: Db, teamId: string) {
+/*
+ * The helpers below are synchronous (.get / .all / .run) so they can run inside
+ * db.transaction(), which better-sqlite3 requires to be synchronous. They accept the database or
+ * a transaction handle; awaiting them from async code is harmless.
+ */
+
+export function uniqueRowKey(db: DbExecutor, teamId: string) {
   for (let attempt = 0; attempt < 12; attempt++) {
     const key = generateEntityKey("row");
-    const [existing] = await db
+    const existing = db
       .select({ id: schema.boardRows.id })
       .from(schema.boardRows)
       .where(and(eq(schema.boardRows.teamId, teamId), eq(schema.boardRows.key, key)))
-      .limit(1);
+      .get();
     if (!existing) return key;
   }
   throw new Error("Failed to generate unique row key");
 }
 
-export async function uniqueColumnKey(db: Db, teamId: string) {
+export function uniqueColumnKey(db: DbExecutor, teamId: string) {
   for (let attempt = 0; attempt < 12; attempt++) {
     const key = generateEntityKey("col");
-    const [existing] = await db
+    const existing = db
       .select({ id: schema.issueStatuses.id })
       .from(schema.issueStatuses)
       .where(and(eq(schema.issueStatuses.teamId, teamId), eq(schema.issueStatuses.key, key)))
-      .limit(1);
+      .get();
     if (!existing) return key;
   }
   throw new Error("Failed to generate unique column key");
 }
 
-export async function seedDefaultStatusesForRow(db: Db, teamId: string, rowId: string) {
-  const existing = await db
-    .select()
+export function seedDefaultStatusesForRow(db: DbExecutor, teamId: string, rowId: string) {
+  const existing = db
+    .select({ id: schema.issueStatuses.id })
     .from(schema.issueStatuses)
     .where(eq(schema.issueStatuses.rowId, rowId))
-    .limit(1);
+    .get();
 
-  if (existing.length > 0) return;
+  if (existing) return;
 
   for (const status of DEFAULT_STATUSES) {
-    await db.insert(schema.issueStatuses).values({
-      teamId,
-      rowId,
-      key: await uniqueColumnKey(db, teamId),
-      name: status.name,
-      type: status.type,
-      position: status.position,
-    });
+    db.insert(schema.issueStatuses)
+      .values({
+        teamId,
+        rowId,
+        key: uniqueColumnKey(db, teamId),
+        name: status.name,
+        type: status.type,
+        position: status.position,
+      })
+      .run();
   }
 }
 
-export async function getDefaultRowId(db: Db, teamId: string) {
-  const [row] = await db
-    .select()
-    .from(schema.boardRows)
-    .where(eq(schema.boardRows.teamId, teamId))
-    .orderBy(asc(schema.boardRows.position))
-    .limit(1);
-
-  if (row) return row.id;
-
-  const id = crypto.randomUUID();
-  await db.insert(schema.boardRows).values({
-    id,
-    teamId,
-    key: await uniqueRowKey(db, teamId),
-    name: "Row 1",
-    position: 0,
-  });
-  await seedDefaultStatusesForRow(db, teamId, id);
-  return id;
-}
-
-export async function createDefaultBoardRow(db: Db, teamId: string, name = "Row 1") {
-  const id = crypto.randomUUID();
-  await db.insert(schema.boardRows).values({
-    id,
-    teamId,
-    key: await uniqueRowKey(db, teamId),
-    name,
-    position: 0,
-  });
-  await seedDefaultStatusesForRow(db, teamId, id);
-  return id;
-}
-
-export async function createBoardRowWithKey(
-  db: Db,
+export function createBoardRowWithKey(
+  db: DbExecutor,
   teamId: string,
   name: string,
   position: number,
 ) {
   const id = crypto.randomUUID();
-  await db.insert(schema.boardRows).values({
-    id,
-    teamId,
-    key: await uniqueRowKey(db, teamId),
-    name,
-    position,
-  });
-  await seedDefaultStatusesForRow(db, teamId, id);
+  db.insert(schema.boardRows)
+    .values({ id, teamId, key: uniqueRowKey(db, teamId), name, position })
+    .run();
+  seedDefaultStatusesForRow(db, teamId, id);
   return id;
 }
 
-export async function createStatusWithKey(
-  db: Db,
+export function createDefaultBoardRow(db: DbExecutor, teamId: string, name = "Row 1") {
+  return createBoardRowWithKey(db, teamId, name, 0);
+}
+
+/** The first row on the team board, creating "Row 1" (with default columns) when there is none. */
+export function getDefaultRowId(db: DbExecutor, teamId: string) {
+  const row = db
+    .select({ id: schema.boardRows.id })
+    .from(schema.boardRows)
+    .where(eq(schema.boardRows.teamId, teamId))
+    .orderBy(asc(schema.boardRows.position))
+    .get();
+
+  if (row) return row.id;
+  return createDefaultBoardRow(db, teamId);
+}
+
+export function createStatusWithKey(
+  db: DbExecutor,
   input: {
     teamId: string;
     rowId: string;
@@ -165,16 +151,35 @@ export async function createStatusWithKey(
   },
 ) {
   const id = crypto.randomUUID();
-  await db.insert(schema.issueStatuses).values({
-    id,
-    teamId: input.teamId,
-    rowId: input.rowId,
-    key: await uniqueColumnKey(db, input.teamId),
-    name: input.name,
-    type: input.type,
-    position: input.position,
-  });
+  db.insert(schema.issueStatuses)
+    .values({
+      id,
+      teamId: input.teamId,
+      rowId: input.rowId,
+      key: uniqueColumnKey(db, input.teamId),
+      name: input.name,
+      type: input.type,
+      position: input.position,
+    })
+    .run();
   return id;
+}
+
+/** Rewrite positions 0..n-1 in the given order (call inside a transaction). */
+export function writeRowPositions(db: DbExecutor, rowIds: string[]) {
+  rowIds.forEach((id, index) => {
+    db.update(schema.boardRows).set({ position: index }).where(eq(schema.boardRows.id, id)).run();
+  });
+}
+
+/** Rewrite column positions 0..n-1 in the given order (call inside a transaction). */
+export function writeStatusPositions(db: DbExecutor, statusIds: string[]) {
+  statusIds.forEach((id, index) => {
+    db.update(schema.issueStatuses)
+      .set({ position: index })
+      .where(eq(schema.issueStatuses.id, id))
+      .run();
+  });
 }
 
 export async function countRowIssues(db: Db, rowId: string) {
@@ -194,27 +199,28 @@ export async function countStatusIssues(db: Db, statusId: string) {
 }
 
 /** Hard-delete trashed issues still pointing at a column (blocks FK on column removal). */
-export async function purgeTrashedIssuesForStatus(db: Db, statusId: string) {
-  await db
-    .delete(schema.issues)
-    .where(and(eq(schema.issues.statusId, statusId), isNotNull(schema.issues.deletedAt)));
+export function purgeTrashedIssuesForStatus(db: DbExecutor, statusId: string) {
+  db.delete(schema.issues)
+    .where(and(eq(schema.issues.statusId, statusId), isNotNull(schema.issues.deletedAt)))
+    .run();
 }
 
 /** Hard-delete trashed issues still pointing at a row or its columns (blocks FK on row removal). */
-export async function purgeTrashedIssuesForRow(db: Db, rowId: string) {
-  const statuses = await db
+export function purgeTrashedIssuesForRow(db: DbExecutor, rowId: string) {
+  const statusIds = db
     .select({ id: schema.issueStatuses.id })
     .from(schema.issueStatuses)
-    .where(eq(schema.issueStatuses.rowId, rowId));
-  const statusIds = statuses.map((status) => status.id);
+    .where(eq(schema.issueStatuses.rowId, rowId))
+    .all()
+    .map((status) => status.id);
 
   if (statusIds.length > 0) {
-    await db
-      .delete(schema.issues)
-      .where(and(inArray(schema.issues.statusId, statusIds), isNotNull(schema.issues.deletedAt)));
+    db.delete(schema.issues)
+      .where(and(inArray(schema.issues.statusId, statusIds), isNotNull(schema.issues.deletedAt)))
+      .run();
   }
 
-  await db
-    .delete(schema.issues)
-    .where(and(eq(schema.issues.rowId, rowId), isNotNull(schema.issues.deletedAt)));
+  db.delete(schema.issues)
+    .where(and(eq(schema.issues.rowId, rowId), isNotNull(schema.issues.deletedAt)))
+    .run();
 }

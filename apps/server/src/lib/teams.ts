@@ -1,34 +1,63 @@
 import { eq, sql } from "drizzle-orm";
-import type { Db } from "@teamflow/db";
+import type { Db, DbExecutor } from "@teamflow/db";
 import { schema } from "@teamflow/db";
 import { userHasTeamPermission } from "./permissions.js";
-import { getTeamRoleBySlug, seedDefaultTeamRoles } from "./roles.js";
+import { findTeamRoleBySlug, seedDefaultTeamRoles } from "./roles.js";
+import { createDefaultBoardRow } from "./board.js";
 import { forbidden, internalError, notFound } from "./errors.js";
 
 export function personalWorkspaceSlug(userId: string) {
   return `ws-${userId.slice(0, 8)}`;
 }
 
-export async function getOrCreatePersonalWorkspace(db: Db, userId: string, userName = "User") {
+export function getOrCreatePersonalWorkspace(db: DbExecutor, userId: string, userName = "User") {
   const slug = personalWorkspaceSlug(userId);
-  const [existing] = await db
-    .select()
+  const existing = db
+    .select({ id: schema.workspaces.id })
     .from(schema.workspaces)
     .where(eq(schema.workspaces.slug, slug))
-    .limit(1);
+    .get();
 
   if (existing) {
     return existing.id;
   }
 
   const workspaceId = crypto.randomUUID();
-  await db.insert(schema.workspaces).values({
-    id: workspaceId,
-    name: `${userName}'s Workspace`,
-    slug,
-  });
+  db.insert(schema.workspaces)
+    .values({ id: workspaceId, name: `${userName}'s Workspace`, slug })
+    .run();
 
   return workspaceId;
+}
+
+/**
+ * Create a team with its system roles, the given member as `role`, and a default board row.
+ * Synchronous: callers run it inside db.transaction so a failure leaves nothing behind.
+ */
+export function createTeamWithOwner(
+  db: DbExecutor,
+  input: { userId: string; userName: string; name: string; key: string; role: "owner" | "admin" },
+) {
+  const workspaceId = getOrCreatePersonalWorkspace(db, input.userId, input.userName);
+
+  const teamId = crypto.randomUUID();
+  db.insert(schema.teams)
+    .values({ id: teamId, workspaceId, name: input.name, key: input.key })
+    .run();
+
+  seedDefaultTeamRoles(db, teamId);
+  const role = findTeamRoleBySlug(db, teamId, input.role);
+  if (!role) {
+    throw internalError("Failed to seed team roles");
+  }
+
+  db.insert(schema.teamMembers)
+    .values({ teamId, userId: input.userId, roleId: role.id, role: role.slug })
+    .run();
+
+  createDefaultBoardRow(db, teamId);
+
+  return db.select().from(schema.teams).where(eq(schema.teams.id, teamId)).get()!;
 }
 
 export async function countUserTeams(db: Db, userId: string) {
@@ -53,41 +82,4 @@ export async function deleteTeam(db: Db, teamId: string, actorUserId: string) {
   await db.delete(schema.teams).where(eq(schema.teams.id, teamId));
 
   return team;
-}
-
-export async function createTeamForUser(
-  db: Db,
-  input: {
-    userId: string;
-    userName: string;
-    name: string;
-    key: string;
-  },
-) {
-  const workspaceId = await getOrCreatePersonalWorkspace(db, input.userId, input.userName);
-
-  const teamId = crypto.randomUUID();
-  await db.insert(schema.teams).values({
-    id: teamId,
-    workspaceId,
-    name: input.name,
-    key: input.key,
-  });
-
-  await seedDefaultTeamRoles(db, teamId);
-  const adminRole = await getTeamRoleBySlug(db, teamId, "admin");
-  if (!adminRole) {
-    throw internalError("Failed to seed team roles");
-  }
-
-  await db.insert(schema.teamMembers).values({
-    teamId,
-    userId: input.userId,
-    roleId: adminRole.id,
-    role: adminRole.slug,
-  });
-
-  const [team] = await db.select().from(schema.teams).where(eq(schema.teams.id, teamId)).limit(1);
-
-  return team!;
 }

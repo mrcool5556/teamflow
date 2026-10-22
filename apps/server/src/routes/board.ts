@@ -23,8 +23,11 @@ import {
   mapIssueStatus,
   purgeTrashedIssuesForRow,
   purgeTrashedIssuesForStatus,
+  writeRowPositions,
+  writeStatusPositions,
 } from "../lib/board.js";
 import { filterValidTeamMemberIds, setBoardRowAssignees } from "../lib/assignees.js";
+import { notFound } from "../lib/errors.js";
 
 /** Board rows and columns (statuses). */
 const routes = new Hono<AppEnv>();
@@ -69,18 +72,19 @@ routes.post(
 
     const body = await parseBody(c, createStatusSchema);
 
-    const existing = await db
-      .select()
-      .from(schema.issueStatuses)
-      .where(eq(schema.issueStatuses.rowId, rowId));
-    const position = existing.length;
-
-    const id = await createStatusWithKey(db, {
-      teamId: row.teamId,
-      rowId,
-      name: body.name,
-      type: body.type,
-      position,
+    const id = db.transaction((tx) => {
+      const position = tx
+        .select({ id: schema.issueStatuses.id })
+        .from(schema.issueStatuses)
+        .where(eq(schema.issueStatuses.rowId, rowId))
+        .all().length;
+      return createStatusWithKey(tx, {
+        teamId: row.teamId,
+        rowId,
+        name: body.name,
+        type: body.type,
+        position,
+      });
     });
 
     const [status] = await db
@@ -115,43 +119,37 @@ routes.patch(
 
     const body = await parseBody(c, updateStatusSchema);
 
-    if (body.name !== undefined) {
-      await db
-        .update(schema.issueStatuses)
-        .set({ name: body.name })
-        .where(eq(schema.issueStatuses.id, statusId));
-    }
-
-    if (body.color !== undefined) {
-      await db
-        .update(schema.issueStatuses)
-        .set({ color: body.color })
-        .where(eq(schema.issueStatuses.id, statusId));
-    }
-
-    if (body.position !== undefined) {
-      const rowStatuses = await db
-        .select()
-        .from(schema.issueStatuses)
-        .where(eq(schema.issueStatuses.rowId, existing.rowId));
-      rowStatuses.sort((a, b) => a.position - b.position);
-
-      const fromIndex = rowStatuses.findIndex((status) => status.id === statusId);
-      if (fromIndex === -1) {
-        return c.json({ error: "Status not found" }, 404);
+    db.transaction((tx) => {
+      const changes: { name?: string; color?: string | null } = {};
+      if (body.name !== undefined) changes.name = body.name;
+      if (body.color !== undefined) changes.color = body.color;
+      if (Object.keys(changes).length > 0) {
+        tx.update(schema.issueStatuses)
+          .set(changes)
+          .where(eq(schema.issueStatuses.id, statusId))
+          .run();
       }
 
-      const targetIndex = Math.min(body.position, rowStatuses.length - 1);
-      const [moved] = rowStatuses.splice(fromIndex, 1);
-      rowStatuses.splice(targetIndex, 0, moved!);
+      if (body.position !== undefined) {
+        const rowStatuses = tx
+          .select({ id: schema.issueStatuses.id, position: schema.issueStatuses.position })
+          .from(schema.issueStatuses)
+          .where(eq(schema.issueStatuses.rowId, existing.rowId))
+          .all()
+          .sort((a, b) => a.position - b.position);
 
-      for (let index = 0; index < rowStatuses.length; index += 1) {
-        await db
-          .update(schema.issueStatuses)
-          .set({ position: index })
-          .where(eq(schema.issueStatuses.id, rowStatuses[index]!.id));
+        const fromIndex = rowStatuses.findIndex((status) => status.id === statusId);
+        if (fromIndex === -1) throw notFound("Status not found");
+
+        const targetIndex = Math.min(body.position, rowStatuses.length - 1);
+        const [moved] = rowStatuses.splice(fromIndex, 1);
+        rowStatuses.splice(targetIndex, 0, moved!);
+        writeStatusPositions(
+          tx,
+          rowStatuses.map((status) => status.id),
+        );
       }
-    }
+    });
 
     const [status] = await db
       .select()
@@ -178,9 +176,10 @@ routes.delete(
       return c.json({ error: "Column has issues — move or delete them first" }, 409);
     }
 
-    await purgeTrashedIssuesForStatus(db, statusId);
-
-    await db.delete(schema.issueStatuses).where(eq(schema.issueStatuses.id, statusId));
+    db.transaction((tx) => {
+      purgeTrashedIssuesForStatus(tx, statusId);
+      tx.delete(schema.issueStatuses).where(eq(schema.issueStatuses.id, statusId)).run();
+    });
 
     return c.body(null, 204);
   },
@@ -211,13 +210,14 @@ routes.post(
 
     const body = await parseBody(c, createBoardRowSchema);
 
-    const existing = await db
-      .select()
-      .from(schema.boardRows)
-      .where(eq(schema.boardRows.teamId, teamId));
-    const position = existing.length;
-
-    const id = await createBoardRowWithKey(db, teamId, body.name, position);
+    const id = db.transaction((tx) => {
+      const position = tx
+        .select({ id: schema.boardRows.id })
+        .from(schema.boardRows)
+        .where(eq(schema.boardRows.teamId, teamId))
+        .all().length;
+      return createBoardRowWithKey(tx, teamId, body.name, position);
+    });
 
     const [row] = await db
       .select()
@@ -251,54 +251,48 @@ routes.patch(
       return c.json({ error: "No updates provided" }, 400);
     }
 
-    if (body.name !== undefined) {
-      await db
-        .update(schema.boardRows)
-        .set({ name: body.name })
-        .where(eq(schema.boardRows.id, rowId));
-    }
-
-    if (body.assigneeIds !== undefined) {
-      const validIds = await filterValidTeamMemberIds(db, existing.teamId, body.assigneeIds);
-      await setBoardRowAssignees(db, rowId, validIds);
-    } else if (body.assigneeId !== undefined) {
-      const validIds =
-        body.assigneeId === null
-          ? []
-          : await filterValidTeamMemberIds(db, existing.teamId, [body.assigneeId]);
-      await setBoardRowAssignees(db, rowId, validIds);
-    }
-
-    if (body.color !== undefined) {
-      await db
-        .update(schema.boardRows)
-        .set({ color: body.color })
-        .where(eq(schema.boardRows.id, rowId));
-    }
-
-    if (body.position !== undefined) {
-      const teamRows = await db
-        .select()
-        .from(schema.boardRows)
-        .where(eq(schema.boardRows.teamId, existing.teamId));
-      teamRows.sort((a, b) => a.position - b.position);
-
-      const fromIndex = teamRows.findIndex((row) => row.id === rowId);
-      if (fromIndex === -1) {
-        return c.json({ error: "Row not found" }, 404);
+    db.transaction((tx) => {
+      const changes: { name?: string; color?: string | null } = {};
+      if (body.name !== undefined) changes.name = body.name;
+      if (body.color !== undefined) changes.color = body.color;
+      if (Object.keys(changes).length > 0) {
+        tx.update(schema.boardRows).set(changes).where(eq(schema.boardRows.id, rowId)).run();
       }
 
-      const targetIndex = Math.min(body.position, teamRows.length - 1);
-      const [moved] = teamRows.splice(fromIndex, 1);
-      teamRows.splice(targetIndex, 0, moved);
-
-      for (let index = 0; index < teamRows.length; index += 1) {
-        await db
-          .update(schema.boardRows)
-          .set({ position: index })
-          .where(eq(schema.boardRows.id, teamRows[index]!.id));
+      if (body.assigneeIds !== undefined) {
+        setBoardRowAssignees(
+          tx,
+          rowId,
+          filterValidTeamMemberIds(tx, existing.teamId, body.assigneeIds),
+        );
+      } else if (body.assigneeId !== undefined) {
+        const validIds =
+          body.assigneeId === null
+            ? []
+            : filterValidTeamMemberIds(tx, existing.teamId, [body.assigneeId]);
+        setBoardRowAssignees(tx, rowId, validIds);
       }
-    }
+
+      if (body.position !== undefined) {
+        const teamRows = tx
+          .select({ id: schema.boardRows.id, position: schema.boardRows.position })
+          .from(schema.boardRows)
+          .where(eq(schema.boardRows.teamId, existing.teamId))
+          .all()
+          .sort((a, b) => a.position - b.position);
+
+        const fromIndex = teamRows.findIndex((row) => row.id === rowId);
+        if (fromIndex === -1) throw notFound("Row not found");
+
+        const targetIndex = Math.min(body.position, teamRows.length - 1);
+        const [moved] = teamRows.splice(fromIndex, 1);
+        teamRows.splice(targetIndex, 0, moved!);
+        writeRowPositions(
+          tx,
+          teamRows.map((row) => row.id),
+        );
+      }
+    });
 
     const [row] = await db
       .select()
@@ -334,20 +328,16 @@ routes.delete(
       return c.json({ error: "Row has issues — move or delete them first" }, 409);
     }
 
-    await purgeTrashedIssuesForRow(db, rowId);
-
-    await db.delete(schema.boardRows).where(eq(schema.boardRows.id, rowId));
-
     const remaining = teamRows
       .filter((row) => row.id !== rowId)
-      .sort((a, b) => a.position - b.position);
+      .sort((a, b) => a.position - b.position)
+      .map((row) => row.id);
 
-    for (let index = 0; index < remaining.length; index += 1) {
-      await db
-        .update(schema.boardRows)
-        .set({ position: index })
-        .where(eq(schema.boardRows.id, remaining[index]!.id));
-    }
+    db.transaction((tx) => {
+      purgeTrashedIssuesForRow(tx, rowId);
+      tx.delete(schema.boardRows).where(eq(schema.boardRows.id, rowId)).run();
+      writeRowPositions(tx, remaining);
+    });
 
     return c.body(null, 204);
   },

@@ -6,7 +6,7 @@ import path from "node:path";
 import { PassThrough } from "node:stream";
 import { ZipArchive } from "archiver";
 import yauzl from "yauzl";
-import { and, asc, eq, inArray, isNull } from "drizzle-orm";
+import { and, asc, eq, inArray, isNull, sql } from "drizzle-orm";
 import {
   generateEntityKey,
   rewriteBundleRefs,
@@ -20,7 +20,7 @@ import {
   type TeamBundleManifest,
   type TeamBundleRefMap,
 } from "@teamflow/core";
-import type { Db } from "@teamflow/db";
+import type { Db, DbExecutor } from "@teamflow/db";
 import { schema } from "@teamflow/db";
 import { filterValidTeamMemberIds, setBoardRowAssignees, setIssueAssignees } from "./assignees.js";
 import { getUploadDir } from "./attachments.js";
@@ -35,14 +35,14 @@ export class TeamBundleError extends ApiError {
   }
 }
 
-async function uniqueFileKey(db: Db) {
+function uniqueFileKey(db: DbExecutor) {
   for (let attempt = 0; attempt < 12; attempt += 1) {
     const key = generateEntityKey("file");
-    const [existing] = await db
+    const existing = db
       .select({ id: schema.storedFiles.id })
       .from(schema.storedFiles)
       .where(eq(schema.storedFiles.key, key))
-      .limit(1);
+      .get();
     if (!existing) return key;
   }
   throw new TeamBundleError("Could not allocate file reference", 500);
@@ -571,19 +571,16 @@ export async function exportTeamBundle(
   };
 }
 
-async function recordEntityMap(
-  db: Db,
+function recordEntityMap(
+  db: DbExecutor,
   importId: string,
   entityType: string,
   sourceId: string,
   targetId: string,
 ) {
-  await db.insert(schema.teamBundleImportEntityMap).values({
-    importId,
-    entityType,
-    sourceId,
-    targetId,
-  });
+  db.insert(schema.teamBundleImportEntityMap)
+    .values({ importId, entityType, sourceId, targetId })
+    .run();
 }
 
 export async function importTeamBundle(
@@ -672,60 +669,133 @@ async function importTeamBundleExtracted(
     };
   }
 
-  if (existingImport && options.force) {
-    await db
-      .delete(schema.teamBundleImports)
-      .where(eq(schema.teamBundleImports.id, existingImport.id));
+  const memberEmails = await loadTeamMemberEmails(db, teamId);
+
+  // Copy attachment payloads into the upload dir before touching the database; the transaction
+  // below only records them. If it rolls back, the copies are deleted again.
+  const uploadDir = getUploadDir();
+  const plannedFiles: {
+    file: TeamBundleFiles["files"][number];
+    fileId: string;
+    relativePath: string;
+    finalPath: string;
+    size: number;
+  }[] = [];
+  try {
+    for (const file of filesData.files) {
+      const zipEntry = extracted.files.get(file.zipPath);
+      if (!zipEntry) continue;
+
+      const fileId = randomUUID();
+      const relativeDir = path.join("import", teamId);
+      const relativePath = path.join(relativeDir, `${fileId}_${file.filename}`);
+      const finalDir = resolveInside(uploadDir, relativeDir);
+      const finalPath = resolveInside(uploadDir, relativePath);
+      await fs.mkdir(finalDir, { recursive: true });
+      await fs.copyFile(zipEntry.path, finalPath);
+      plannedFiles.push({ file, fileId, relativePath, finalPath, size: zipEntry.size });
+    }
+
+    return db.transaction((tx) =>
+      writeImport(tx, {
+        teamId,
+        teamKey: team.key,
+        userId,
+        manifest,
+        board,
+        issuesData,
+        memberEmails,
+        plannedFiles,
+        replaceImportId: existingImport && options.force ? existingImport.id : null,
+      }),
+    );
+  } catch (err) {
+    await Promise.all(plannedFiles.map((planned) => fs.rm(planned.finalPath, { force: true })));
+    throw err;
+  }
+}
+
+/**
+ * Every database write of a bundle import, in one synchronous transaction: a failure part way
+ * through leaves the team exactly as it was.
+ */
+function writeImport(
+  tx: DbExecutor,
+  input: {
+    teamId: string;
+    teamKey: string;
+    userId: string;
+    manifest: TeamBundleManifest;
+    board: TeamBundleBoard;
+    issuesData: TeamBundleIssues;
+    memberEmails: Map<string, string>;
+    plannedFiles: {
+      file: TeamBundleFiles["files"][number];
+      fileId: string;
+      relativePath: string;
+      size: number;
+    }[];
+    replaceImportId: string | null;
+  },
+): TeamBundleImportResult {
+  const { teamId, userId, manifest, board, issuesData, memberEmails } = input;
+
+  if (input.replaceImportId) {
+    tx.delete(schema.teamBundleImports)
+      .where(eq(schema.teamBundleImports.id, input.replaceImportId))
+      .run();
   }
 
   const importId = randomUUID();
-  await db.insert(schema.teamBundleImports).values({
-    id: importId,
-    teamId,
-    exportId: manifest.exportId,
-    sourceTeamKey: manifest.source.teamKey,
-  });
+  tx.insert(schema.teamBundleImports)
+    .values({
+      id: importId,
+      teamId,
+      exportId: manifest.exportId,
+      sourceTeamKey: manifest.source.teamKey,
+    })
+    .run();
 
-  const memberEmails = await loadTeamMemberEmails(db, teamId);
   const rewriteMap: Record<string, string> = {};
 
-  const existingRows = await db
+  const existingRows = tx
     .select({ position: schema.boardRows.position })
     .from(schema.boardRows)
-    .where(eq(schema.boardRows.teamId, teamId));
+    .where(eq(schema.boardRows.teamId, teamId))
+    .all();
   let nextRowPosition =
     existingRows.length === 0 ? 0 : Math.max(...existingRows.map((row) => row.position)) + 1;
 
   const rowIdBySourceId = new Map<string, string>();
-  const rowKeyBySourceKey = new Map<string, string>();
   let rowsCreated = 0;
 
   for (const row of board.rows.sort((a, b) => a.position - b.position)) {
     const rowId = randomUUID();
-    const rowKey = await uniqueRowKey(db, teamId);
+    const rowKey = uniqueRowKey(tx, teamId);
     rowIdBySourceId.set(row.sourceId, rowId);
-    rowKeyBySourceKey.set(row.key, rowKey);
     rewriteMap[row.key] = rowKey;
 
-    await db.insert(schema.boardRows).values({
-      id: rowId,
-      teamId,
-      key: rowKey,
-      name: row.name,
-      position: nextRowPosition++,
-      color: row.color,
-    });
+    tx.insert(schema.boardRows)
+      .values({
+        id: rowId,
+        teamId,
+        key: rowKey,
+        name: row.name,
+        position: nextRowPosition++,
+        color: row.color,
+      })
+      .run();
 
-    const assigneeIds = await filterValidTeamMemberIds(
-      db,
+    const assigneeIds = filterValidTeamMemberIds(
+      tx,
       teamId,
       resolveAssigneeIds(row.assigneeEmails, memberEmails),
     );
     if (assigneeIds.length > 0) {
-      await setBoardRowAssignees(db, rowId, assigneeIds);
+      setBoardRowAssignees(tx, rowId, assigneeIds);
     }
 
-    await recordEntityMap(db, importId, "row", row.sourceId, rowId);
+    recordEntityMap(tx, importId, "row", row.sourceId, rowId);
     rowsCreated += 1;
   }
 
@@ -739,22 +809,24 @@ async function importTeamBundleExtracted(
     if (!rowId) continue;
 
     const statusId = randomUUID();
-    const statusKey = await uniqueColumnKey(db, teamId);
+    const statusKey = uniqueColumnKey(tx, teamId);
     statusIdBySourceId.set(status.sourceId, statusId);
     rewriteMap[status.key] = statusKey;
 
-    await db.insert(schema.issueStatuses).values({
-      id: statusId,
-      teamId,
-      rowId,
-      key: statusKey,
-      name: status.name,
-      type: status.type,
-      position: status.position,
-      color: status.color,
-    });
+    tx.insert(schema.issueStatuses)
+      .values({
+        id: statusId,
+        teamId,
+        rowId,
+        key: statusKey,
+        name: status.name,
+        type: status.type,
+        position: status.position,
+        color: status.color,
+      })
+      .run();
 
-    await recordEntityMap(db, importId, "status", status.sourceId, statusId);
+    recordEntityMap(tx, importId, "status", status.sourceId, statusId);
     statusesCreated += 1;
   }
 
@@ -769,59 +841,57 @@ async function importTeamBundleExtracted(
 
     if (!rowId || !statusId) continue;
 
-    const [currentTeam] = await db
-      .select()
-      .from(schema.teams)
-      .where(eq(schema.teams.id, teamId))
-      .limit(1);
-    if (!currentTeam) break;
-
-    const nextNumber = currentTeam.issueCounter + 1;
-    await db
+    const counter = tx
       .update(schema.teams)
-      .set({ issueCounter: nextNumber })
-      .where(eq(schema.teams.id, teamId));
+      .set({ issueCounter: sql`${schema.teams.issueCounter} + 1` })
+      .where(eq(schema.teams.id, teamId))
+      .returning({ issueCounter: schema.teams.issueCounter })
+      .get();
+    if (!counter) break;
+    const nextNumber = counter.issueCounter;
 
     const issueId = randomUUID();
-    const newIdentifier = `${team.key}-${nextNumber}`;
+    const newIdentifier = `${input.teamKey}-${nextNumber}`;
     issueIdBySourceId.set(issue.sourceId, issueId);
     rewriteMap[issue.identifier] = newIdentifier;
     rewriteMap[`${manifest.source.teamKey}-${issue.number}`] = newIdentifier;
     rewriteMap[`${manifest.source.teamKey.toUpperCase()}-${issue.number}`] = newIdentifier;
 
-    const assigneeIds = await filterValidTeamMemberIds(
-      db,
+    const assigneeIds = filterValidTeamMemberIds(
+      tx,
       teamId,
       resolveAssigneeIds(issue.assigneeEmails, memberEmails),
     );
 
     const now = new Date().toISOString();
-    await db.insert(schema.issues).values({
-      id: issueId,
-      teamId,
-      rowId,
-      number: nextNumber,
-      title: issue.title,
-      description: rewriteBundleRefs(issue.description, rewriteMap),
-      statusId,
-      priority: issue.priority,
-      assigneeId: assigneeIds[0] ?? null,
-      creatorId: userId,
-      boardSort: issue.boardSort,
-      timerActiveAt: null,
-      timerElapsedSec: issue.timerElapsedSec,
-      timerTargetSec: issue.timerTargetSec,
-      completedAt: issue.completedAt,
-      color: issue.color,
-      createdAt: issue.createdAt,
-      updatedAt: issue.updatedAt ?? now,
-    });
+    tx.insert(schema.issues)
+      .values({
+        id: issueId,
+        teamId,
+        rowId,
+        number: nextNumber,
+        title: issue.title,
+        description: rewriteBundleRefs(issue.description, rewriteMap),
+        statusId,
+        priority: issue.priority,
+        assigneeId: assigneeIds[0] ?? null,
+        creatorId: userId,
+        boardSort: issue.boardSort,
+        timerActiveAt: null,
+        timerElapsedSec: issue.timerElapsedSec,
+        timerTargetSec: issue.timerTargetSec,
+        completedAt: issue.completedAt,
+        color: issue.color,
+        createdAt: issue.createdAt,
+        updatedAt: issue.updatedAt ?? now,
+      })
+      .run();
 
     if (assigneeIds.length > 0) {
-      await setIssueAssignees(db, issueId, assigneeIds);
+      setIssueAssignees(tx, issueId, assigneeIds);
     }
 
-    await recordEntityMap(db, importId, "issue", issue.sourceId, issueId);
+    recordEntityMap(tx, importId, "issue", issue.sourceId, issueId);
     issuesCreated += 1;
   }
 
@@ -834,82 +904,64 @@ async function importTeamBundleExtracted(
     const authorId = memberEmails.get(comment.authorEmail.toLowerCase()) ?? userId;
     const commentId = randomUUID();
     commentIdBySourceId.set(comment.sourceId, commentId);
-    await db.insert(schema.comments).values({
-      id: commentId,
-      issueId,
-      authorId,
-      body: rewriteBundleRefs(comment.body, rewriteMap) ?? "",
-      createdAt: comment.createdAt,
-    });
-    await recordEntityMap(db, importId, "comment", comment.sourceId, commentId);
+    tx.insert(schema.comments)
+      .values({
+        id: commentId,
+        issueId,
+        authorId,
+        body: rewriteBundleRefs(comment.body, rewriteMap) ?? "",
+        createdAt: comment.createdAt,
+      })
+      .run();
+    recordEntityMap(tx, importId, "comment", comment.sourceId, commentId);
     commentsCreated += 1;
   }
 
   const fileIdBySourceId = new Map<string, string>();
   let filesCreated = 0;
-  const uploadDir = getUploadDir();
 
-  {
-    for (const file of filesData.files) {
-      const zipEntry = extracted.files.get(file.zipPath);
-      if (!zipEntry) continue;
+  for (const planned of input.plannedFiles) {
+    const fileKey = uniqueFileKey(tx);
+    rewriteMap[planned.file.fileRef] = fileKey;
 
-      const fileId = randomUUID();
-      const fileKey = await uniqueFileKey(db);
-      rewriteMap[file.fileRef] = fileKey;
-
-      const relativeDir = path.join("import", teamId);
-      const storageName = `${fileId}_${file.filename}`;
-      const relativePath = path.join(relativeDir, storageName);
-      const finalDir = resolveInside(uploadDir, relativeDir);
-      const finalPath = resolveInside(uploadDir, relativePath);
-      await fs.mkdir(finalDir, { recursive: true });
-      await fs.copyFile(zipEntry.path, finalPath);
-
-      const now = new Date().toISOString();
-      await db.insert(schema.storedFiles).values({
-        id: fileId,
+    tx.insert(schema.storedFiles)
+      .values({
+        id: planned.fileId,
         uploaderId: userId,
-        filename: file.filename,
-        mimeType: file.mimeType,
-        sizeBytes: zipEntry.size,
-        storagePath: relativePath,
+        filename: planned.file.filename,
+        mimeType: planned.file.mimeType,
+        sizeBytes: planned.size,
+        storagePath: planned.relativePath,
         key: fileKey,
-        createdAt: now,
-      });
+        createdAt: new Date().toISOString(),
+      })
+      .run();
 
-      fileIdBySourceId.set(file.sourceId, fileId);
-      await recordEntityMap(db, importId, "file", file.sourceId, fileId);
-      filesCreated += 1;
+    fileIdBySourceId.set(planned.file.sourceId, planned.fileId);
+    recordEntityMap(tx, importId, "file", planned.file.sourceId, planned.fileId);
+    filesCreated += 1;
+  }
+
+  for (const link of issuesData.fileLinks) {
+    const fileId = fileIdBySourceId.get(link.fileSourceId);
+    if (!fileId) continue;
+
+    if (link.issueSourceId) {
+      const issueId = issueIdBySourceId.get(link.issueSourceId);
+      if (!issueId) continue;
+      tx.insert(schema.issueFileLinks)
+        .values({ id: randomUUID(), issueId, fileId, createdAt: new Date().toISOString() })
+        .run();
+      continue;
     }
 
-    for (const link of issuesData.fileLinks) {
-      const fileId = fileIdBySourceId.get(link.fileSourceId);
-      if (!fileId) continue;
-
-      if (link.issueSourceId) {
-        const issueId = issueIdBySourceId.get(link.issueSourceId);
-        if (!issueId) continue;
-        await db.insert(schema.issueFileLinks).values({
-          id: randomUUID(),
-          issueId,
-          fileId,
-          createdAt: new Date().toISOString(),
-        });
-        continue;
-      }
-
-      if (link.rowKey) {
-        const rowSource = board.rows.find((row) => row.key === link.rowKey);
-        const rowId = rowSource ? rowIdBySourceId.get(rowSource.sourceId) : null;
-        if (!rowId) continue;
-        await db.insert(schema.rowFileLinks).values({
-          id: randomUUID(),
-          rowId,
-          fileId,
-          createdAt: new Date().toISOString(),
-        });
-      }
+    if (link.rowKey) {
+      const rowSource = board.rows.find((row) => row.key === link.rowKey);
+      const rowId = rowSource ? rowIdBySourceId.get(rowSource.sourceId) : null;
+      if (!rowId) continue;
+      tx.insert(schema.rowFileLinks)
+        .values({ id: randomUUID(), rowId, fileId, createdAt: new Date().toISOString() })
+        .run();
     }
   }
 
@@ -918,10 +970,10 @@ async function importTeamBundleExtracted(
     if (!issueId) continue;
     const rewritten = rewriteBundleRefs(issue.description, rewriteMap);
     if (rewritten !== issue.description) {
-      await db
-        .update(schema.issues)
+      tx.update(schema.issues)
         .set({ description: rewritten })
-        .where(eq(schema.issues.id, issueId));
+        .where(eq(schema.issues.id, issueId))
+        .run();
     }
   }
 
@@ -930,10 +982,10 @@ async function importTeamBundleExtracted(
     if (!commentId) continue;
     const rewritten = rewriteBundleRefs(comment.body, rewriteMap);
     if (rewritten !== comment.body) {
-      await db
-        .update(schema.comments)
+      tx.update(schema.comments)
         .set({ body: rewritten ?? "" })
-        .where(eq(schema.comments.id, commentId));
+        .where(eq(schema.comments.id, commentId))
+        .run();
     }
   }
 

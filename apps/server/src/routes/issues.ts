@@ -5,7 +5,7 @@ import { validateParams } from "../middleware/params.js";
 import { rowBelongsToTeam, projectBelongsToTeam, statusBelongsToTeam } from "../lib/ownership.js";
 import { createIssueSchema, listIssuesSchema, updateIssueSchema } from "@teamflow/core";
 import { schema } from "@teamflow/db";
-import { and, eq } from "drizzle-orm";
+import { and, eq, sql } from "drizzle-orm";
 import { db } from "../db.js";
 import { requireAuth, requireWrite } from "../middleware/auth.js";
 import { assertTeamAccess, loadTeam } from "../middleware/team.js";
@@ -85,12 +85,6 @@ routes.post("/issues", requireAuth, requireWrite, async (c) => {
 
   if (!team) return c.json({ error: "Team not found" }, 404);
 
-  const nextNumber = team.issueCounter + 1;
-  await db
-    .update(schema.teams)
-    .set({ issueCounter: nextNumber })
-    .where(eq(schema.teams.id, team.id));
-
   // Every referenced entity must belong to the issue's team (no cross-team references).
   if (body.rowId && !(await rowBelongsToTeam(body.rowId, body.teamId))) {
     return c.json({ error: "Row does not belong to this team" }, 400);
@@ -130,48 +124,57 @@ routes.post("/issues", requireAuth, requireWrite, async (c) => {
 
   const issueId = crypto.randomUUID();
   const now = new Date().toISOString();
+  const cellStatusId = statusId;
 
-  const cellIssues = await db
-    .select()
-    .from(schema.issues)
-    .where(
-      and(
-        eq(schema.issues.teamId, body.teamId),
-        eq(schema.issues.statusId, statusId),
-        eq(schema.issues.rowId, rowId),
-      ),
-    );
-  const boardSort = cellIssues.length;
+  // Number allocation, insert and activity are one transaction; UNIQUE(team_id, number) backs it.
+  const issue = db.transaction((tx) => {
+    const counter = tx
+      .update(schema.teams)
+      .set({ issueCounter: sql`${schema.teams.issueCounter} + 1` })
+      .where(eq(schema.teams.id, team.id))
+      .returning({ issueCounter: schema.teams.issueCounter })
+      .get();
 
-  await db.insert(schema.issues).values({
-    id: issueId,
-    teamId: body.teamId,
-    projectId: body.projectId,
-    rowId,
-    number: nextNumber,
-    title: body.title,
-    description: body.description,
-    statusId,
-    priority: body.priority,
-    assigneeId: body.assigneeId,
-    creatorId: auth.userId,
-    dueDate: body.dueDate,
-    boardSort,
-    updatedAt: now,
-  });
+    const boardSort = tx
+      .select({ id: schema.issues.id })
+      .from(schema.issues)
+      .where(
+        and(
+          eq(schema.issues.teamId, body.teamId),
+          eq(schema.issues.statusId, cellStatusId),
+          eq(schema.issues.rowId, rowId),
+        ),
+      )
+      .all().length;
 
-  const [issue] = await db
-    .select()
-    .from(schema.issues)
-    .where(eq(schema.issues.id, issueId))
-    .limit(1);
+    tx.insert(schema.issues)
+      .values({
+        id: issueId,
+        teamId: body.teamId,
+        projectId: body.projectId,
+        rowId,
+        number: counter!.issueCounter,
+        title: body.title,
+        description: body.description,
+        statusId: cellStatusId,
+        priority: body.priority,
+        assigneeId: body.assigneeId,
+        creatorId: auth.userId,
+        dueDate: body.dueDate,
+        boardSort,
+        updatedAt: now,
+      })
+      .run();
 
-  await logActivity(db, {
-    issueId,
-    userId: auth.userId,
-    action: "issue.created",
-    metadata: { title: body.title },
-    source: auth.source,
+    logActivity(tx, {
+      issueId,
+      userId: auth.userId,
+      action: "issue.created",
+      metadata: { title: body.title },
+      source: auth.source,
+    });
+
+    return tx.select().from(schema.issues).where(eq(schema.issues.id, issueId)).get();
   });
 
   return c.json({ issue: await mapIssue(db, issue!, team.key) }, 201);

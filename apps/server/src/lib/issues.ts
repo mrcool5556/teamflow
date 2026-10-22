@@ -1,5 +1,5 @@
 import { and, eq } from "drizzle-orm";
-import type { Db } from "@teamflow/db";
+import type { Db, DbExecutor } from "@teamflow/db";
 import { schema } from "@teamflow/db";
 import type { IssuePublic, ListIssuesInput } from "@teamflow/core";
 import { loadIssueAssignees } from "./assignees.js";
@@ -111,12 +111,12 @@ export async function listIssuesForUser(db: Db, userId: string, filters: ListIss
   return Promise.all(rows.map((issue) => mapIssue(db, issue, teamKeys.get(issue.teamId) ?? "ISS")));
 }
 
-export async function userHasTeamAccess(db: Db, userId: string, teamId: string) {
-  const [member] = await db
-    .select()
+export function userHasTeamAccess(db: DbExecutor, userId: string, teamId: string) {
+  const member = db
+    .select({ id: schema.teamMembers.id })
     .from(schema.teamMembers)
     .where(and(eq(schema.teamMembers.userId, userId), eq(schema.teamMembers.teamId, teamId)))
-    .limit(1);
+    .get();
   return Boolean(member);
 }
 

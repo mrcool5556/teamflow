@@ -9,7 +9,7 @@ import {
   TEAM_PERMISSIONS,
   isTeamPermission,
 } from "@teamflow/core";
-import type { Db } from "@teamflow/db";
+import type { Db, DbExecutor } from "@teamflow/db";
 import { schema } from "@teamflow/db";
 import {
   getTeamMemberRoleSlug,
@@ -106,31 +106,40 @@ export async function mapTeamRolePublic(
   };
 }
 
-export async function seedDefaultTeamRoles(db: Db, teamId: string) {
-  const existing = await db
+/** Create the system roles for a new team (no-op when it has roles). Synchronous for transactions. */
+export function seedDefaultTeamRoles(db: DbExecutor, teamId: string) {
+  const existing = db
     .select({ id: schema.teamRoles.id })
     .from(schema.teamRoles)
     .where(eq(schema.teamRoles.teamId, teamId))
-    .limit(1);
-
-  if (existing.length > 0) {
-    return listTeamRoles(db, teamId);
-  }
+    .get();
+  if (existing) return;
 
   const now = new Date().toISOString();
   for (const template of DEFAULT_SYSTEM_ROLE_TEMPLATES) {
-    await db.insert(schema.teamRoles).values({
-      teamId,
-      name: template.name,
-      slug: template.slug,
-      permissions: serializeRolePermissions([...template.permissions]),
-      isSystem: 1,
-      position: template.position,
-      updatedAt: now,
-    });
+    db.insert(schema.teamRoles)
+      .values({
+        teamId,
+        name: template.name,
+        slug: template.slug,
+        permissions: serializeRolePermissions([...template.permissions]),
+        isSystem: 1,
+        position: template.position,
+        updatedAt: now,
+      })
+      .run();
   }
+}
 
-  return listTeamRoles(db, teamId);
+/** Id and slug of a team's role by slug, or null. Synchronous for transactions. */
+export function findTeamRoleBySlug(db: DbExecutor, teamId: string, slug: string) {
+  return (
+    db
+      .select({ id: schema.teamRoles.id, slug: schema.teamRoles.slug })
+      .from(schema.teamRoles)
+      .where(and(eq(schema.teamRoles.teamId, teamId), eq(schema.teamRoles.slug, slug)))
+      .get() ?? null
+  );
 }
 
 export async function listTeamRoles(db: Db, teamId: string) {
