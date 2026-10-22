@@ -673,6 +673,24 @@
   pointer-events: none;
 }
 
+/* An open drawer takes the right edge: centre the dock in the space left of it. */
+body:has(.drawer) .bottom-dock {
+  left: calc((100vw - var(--drawer-width)) / 2);
+  max-width: calc(100vw - var(--drawer-width) - 2rem);
+}
+
+/* Below 768px the drawer fills the screen; the bulk bar waits until it closes. */
+@media (max-width: 767px) {
+  body:has(.drawer) .bottom-dock {
+    left: 50%;
+    max-width: calc(100vw - 2rem);
+  }
+
+  body:has(.drawer) .bottom-dock-bar {
+    display: none;
+  }
+}
+
 .bottom-dock-bar:empty,
 .toast-region:empty {
   display: none;
@@ -844,14 +862,6 @@
   border-radius: var(--radius-sm);
   padding: 0.55rem;
   background: color-mix(in srgb, var(--panel) 80%, var(--bg));
-}
-
-.bulk-action-side-title {
-  font-size: 0.68rem;
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
-  color: var(--muted);
-  margin-bottom: 0.05rem;
 }
 
 .bulk-action-field {
