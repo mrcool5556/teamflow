@@ -1,11 +1,13 @@
 import { useRef, useState } from "react";
 import { client } from "../api";
+import { errorMessage } from "../lib/errorSink";
+import type { PanelMessage } from "../lib/panelStatus";
 
 type TeamDataTransferSectionProps = {
   teamId: string;
   teamName: string;
   teamKey: string;
-  onMessage: (message: string | null) => void;
+  onMessage: PanelMessage;
   onImported?: () => void;
 };
 
@@ -49,9 +51,9 @@ export function TeamDataTransferSection({
       setStatusMessage(message);
       onMessage(message);
     } catch (err) {
-      const message = err instanceof Error ? err.message : "Export failed";
+      const message = errorMessage(err, "Export failed");
       setStatusMessage(message);
-      onMessage(message);
+      onMessage(message, "error");
     } finally {
       setExporting(false);
     }
@@ -74,9 +76,9 @@ export function TeamDataTransferSection({
       onMessage(message);
       onImported?.();
     } catch (err) {
-      const message = err instanceof Error ? err.message : "Import failed";
+      const message = errorMessage(err, "Import failed");
       setStatusMessage(message);
-      onMessage(message);
+      onMessage(message, "error");
     } finally {
       setImporting(false);
       if (fileInputRef.current) fileInputRef.current.value = "";

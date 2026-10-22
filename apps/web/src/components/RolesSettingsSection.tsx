@@ -5,13 +5,15 @@ import { TEAM_PERMISSION_GROUPS, TEAM_PERMISSION_LABELS } from "@teamflow/core";
 import { client } from "../api";
 import { queryKeys } from "../queries/keys";
 import { useTeamRolesQuery } from "../queries/roles";
+import { errorMessage } from "../lib/errorSink";
+import type { PanelMessage } from "../lib/panelStatus";
 
 const NO_ROLES: TeamRolePublic[] = [];
 
 type RolesSettingsSectionProps = {
   teamId: string;
   canManage: boolean;
-  onMessage: (message: string | null) => void;
+  onMessage: PanelMessage;
   onRolesChange?: () => void;
 };
 
@@ -40,7 +42,7 @@ export function RolesSettingsSection({
 
   useEffect(() => {
     if (rolesQuery.error) {
-      onMessage(rolesQuery.error instanceof Error ? rolesQuery.error.message : "Failed to load roles");
+      onMessage(errorMessage(rolesQuery.error, "Failed to load roles"), "error");
     }
   }, [rolesQuery.error, onMessage]);
 
@@ -78,7 +80,7 @@ export function RolesSettingsSection({
       onMessage(`Saved ${role.name}.`);
       onRolesChange?.();
     } catch (err) {
-      onMessage(err instanceof Error ? err.message : "Failed to save role");
+      onMessage(errorMessage(err, "Failed to save role"), "error");
     } finally {
       setSaving(false);
     }
@@ -99,7 +101,7 @@ export function RolesSettingsSection({
       onMessage(`Created ${role.name}.`);
       onRolesChange?.();
     } catch (err) {
-      onMessage(err instanceof Error ? err.message : "Failed to create role");
+      onMessage(errorMessage(err, "Failed to create role"), "error");
     } finally {
       setCreating(false);
     }
@@ -124,18 +126,12 @@ export function RolesSettingsSection({
       onMessage(`Deleted ${role.name}.`);
       onRolesChange?.();
     } catch (err) {
-      onMessage(err instanceof Error ? err.message : "Failed to delete role");
+      onMessage(errorMessage(err, "Failed to delete role"), "error");
     }
   }
 
   return (
-    <div className="settings-panel">
-      <header className="settings-panel-header">
-        <h2>Roles & permissions</h2>
-        <p className="settings-copy settings-lead">
-          Each team member has one role. Roles define what they can do in Settings and integrations.
-        </p>
-      </header>
+    <>
 
       {loading ? <p className="settings-hint">Loading roles…</p> : null}
 
@@ -241,6 +237,6 @@ export function RolesSettingsSection({
           ) : null}
         </div>
       ) : null}
-    </div>
+    </>
   );
 }

@@ -5,11 +5,13 @@ import { MAINTENANCE_UPDATE_STEPS, inferUpdatePhase, updatePhaseIndex } from "@t
 import { client } from "../api";
 import { queryKeys } from "../queries/keys";
 import { useMaintenanceStatusQuery } from "../queries/maintenance";
+import { errorMessage } from "../lib/errorSink";
+import type { PanelMessage } from "../lib/panelStatus";
 
 type ServerMaintenanceSettingsSectionProps = {
   teamId: string;
   canRun: boolean;
-  onMessage: (message: string | null) => void;
+  onMessage: PanelMessage;
 };
 
 function formatBytes(bytes: number) {
@@ -201,11 +203,7 @@ export function ServerMaintenanceSettingsSection({
 
   useEffect(() => {
     if (statusQuery.error && !serverUnreachable) {
-      onMessage(
-        statusQuery.error instanceof Error
-          ? statusQuery.error.message
-          : "Failed to load maintenance status",
-      );
+      onMessage(errorMessage(statusQuery.error, "Failed to load maintenance status"), "error");
     }
   }, [statusQuery.error, serverUnreachable, onMessage]);
 
@@ -221,7 +219,7 @@ export function ServerMaintenanceSettingsSection({
         const { status: next } = await client.checkServerMaintenance(teamId);
         setStatus(() => next);
       } catch (err) {
-        onMessage(err instanceof Error ? err.message : "Failed to load maintenance status");
+        onMessage(errorMessage(err, "Failed to load maintenance status"), "error");
       } finally {
         setRefreshing(false);
       }
@@ -244,7 +242,7 @@ export function ServerMaintenanceSettingsSection({
       onMessage(`${label} started.`);
       void loadStatus();
     } catch (err) {
-      onMessage(err instanceof Error ? err.message : `Failed to start ${label.toLowerCase()}`);
+      onMessage(errorMessage(err, `Failed to start ${label.toLowerCase()}`), "error");
     } finally {
       setRunningAction(null);
     }
@@ -255,14 +253,7 @@ export function ServerMaintenanceSettingsSection({
     !canRun || !status?.enabled || !status.sudoReady || jobRunning || Boolean(runningAction);
 
   return (
-    <div className="settings-panel">
-      <header className="settings-panel-header">
-        <h2>Updates & backups</h2>
-        <p className="settings-copy settings-lead">
-          Run the same maintenance commands as <code>sudo teamflow-backup</code> and{" "}
-          <code>sudo update</code> from the UI — no SSH required.
-        </p>
-      </header>
+    <>
 
       {loading ? <p className="settings-hint">Loading server status…</p> : null}
 
@@ -442,6 +433,6 @@ export function ServerMaintenanceSettingsSection({
           </section>
         </>
       ) : null}
-    </div>
+    </>
   );
 }
