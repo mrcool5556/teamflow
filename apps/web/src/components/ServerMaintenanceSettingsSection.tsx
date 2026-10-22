@@ -7,19 +7,13 @@ import { queryKeys } from "../queries/keys";
 import { useMaintenanceStatusQuery } from "../queries/maintenance";
 import { errorMessage } from "../lib/errorSink";
 import type { PanelMessage } from "../lib/panelStatus";
+import { formatFileSize } from "../lib/format";
 
 type ServerMaintenanceSettingsSectionProps = {
   teamId: string;
   canRun: boolean;
   onMessage: PanelMessage;
 };
-
-function formatBytes(bytes: number) {
-  if (bytes < 1024) return `${bytes} B`;
-  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
-  if (bytes < 1024 * 1024 * 1024) return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
-  return `${(bytes / (1024 * 1024 * 1024)).toFixed(2)} GB`;
-}
 
 function formatWhen(iso: string) {
   const date = new Date(iso);
@@ -420,7 +414,7 @@ export function ServerMaintenanceSettingsSection({
                         <code>{backup.name}</code>
                       </td>
                       <td>{backup.kind === "uploads" ? "Uploads" : "Database"}</td>
-                      <td>{formatBytes(backup.sizeBytes)}</td>
+                      <td>{formatFileSize(backup.sizeBytes, 2)}</td>
                       <td>{formatWhen(backup.createdAt)}</td>
                     </tr>
                   ))}

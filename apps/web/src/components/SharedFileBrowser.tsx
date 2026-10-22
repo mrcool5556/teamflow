@@ -2,13 +2,7 @@ import { useMemo, useState } from "react";
 import { createPortal } from "react-dom";
 import type { IssueAttachmentPublic } from "@teamflow/core";
 import { FileRefCopyButton } from "./FileRefCopyButton";
-
-function formatFileSize(bytes: number) {
-  if (bytes < 1024) return `${bytes} B`;
-  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
-  if (bytes < 1024 * 1024 * 1024) return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
-  return `${(bytes / (1024 * 1024 * 1024)).toFixed(1)} GB`;
-}
+import { formatFileSize } from "../lib/format";
 
 type SharedFileBrowserProps = {
   open: boolean;

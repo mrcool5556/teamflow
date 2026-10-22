@@ -173,35 +173,3 @@ export function MultiAssigneePicker({
   );
 }
 
-type ToolbarUsersReadonlyProps = {
-  members: TeamMemberPublic[];
-  userIds: string[];
-  label?: string;
-  title?: string;
-};
-
-export function ToolbarUsersReadonly({
-  members,
-  userIds,
-  label = "Users",
-  title,
-}: ToolbarUsersReadonlyProps) {
-  const selected = members.filter((member) => userIds.includes(member.userId));
-
-  return (
-    <div className="toolbar-users toolbar-users--readonly" title={title}>
-      <span className="toolbar-users-label">{label}</span>
-      <span className="assignee-avatar-stack" aria-hidden>
-        {selected.length === 0 ? (
-          <span className="assignee-avatar">—</span>
-        ) : (
-          selected.slice(0, 3).map((member) => (
-            <span key={member.userId} className="assignee-avatar filled stacked">
-              {initials(member.name)}
-            </span>
-          ))
-        )}
-      </span>
-    </div>
-  );
-}

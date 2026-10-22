@@ -124,7 +124,6 @@ export const EMPTY_TIMER_PARTS: TimerParts = {
   s: 0,
 };
 
-export const TIMER_MINUTE_SEC = 60;
 export const TIMER_DAY_SEC = 86_400;
 export const TIMER_WEEK_SEC = 7 * TIMER_DAY_SEC;
 export const TIMER_MONTH_SEC = 30 * TIMER_DAY_SEC;
@@ -147,50 +146,6 @@ export function stepTimerInputs(
   const seconds = timerSecondsFromParts(timerPartsFromInputs(inputs));
   const next = Math.max(0, seconds + delta * TIMER_FIELD_STEP_SEC[field]);
   return timerInputsFromParts(timerPartsFromSeconds(next));
-}
-
-export const TIMER_COUNTDOWN_UNITS = [
-  { id: "minutes", label: "m" },
-  { id: "days", label: "d" },
-  { id: "weeks", label: "w" },
-  { id: "months", label: "mo" },
-] as const;
-
-export type TimerCountdownUnit = (typeof TIMER_COUNTDOWN_UNITS)[number]["id"];
-
-export const TIMER_DURATION_UNITS = ["days", "weeks", "months"] as const;
-export type TimerDurationUnit = (typeof TIMER_DURATION_UNITS)[number];
-
-export function timerCountdownToSeconds(amount: number, unit: TimerCountdownUnit) {
-  const value = Math.max(1, Math.floor(amount));
-  switch (unit) {
-    case "minutes":
-      return value * TIMER_MINUTE_SEC;
-    case "days":
-      return value * TIMER_DAY_SEC;
-    case "weeks":
-      return value * TIMER_WEEK_SEC;
-    case "months":
-      return value * TIMER_MONTH_SEC;
-  }
-}
-
-export function timerDurationToSeconds(amount: number, unit: TimerDurationUnit) {
-  const value = Math.max(1, Math.floor(amount));
-  switch (unit) {
-    case "days":
-      return value * TIMER_DAY_SEC;
-    case "weeks":
-      return value * TIMER_WEEK_SEC;
-    case "months":
-      return value * TIMER_MONTH_SEC;
-  }
-}
-
-export function formatTimerDurationLabel(amount: number, unit: TimerDurationUnit) {
-  const value = Math.max(1, Math.floor(amount));
-  const short = unit === "days" ? "d" : unit === "weeks" ? "w" : "mo";
-  return `${value}${short}`;
 }
 
 export function initials(name: string) {

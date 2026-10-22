@@ -33,24 +33,8 @@ import {
   AttachmentVideoThumbnail,
   isVideoAttachment,
 } from "./AttachmentVideoPlayer";
-
-function formatFileSize(bytes: number) {
-  if (bytes < 1024) return `${bytes} B`;
-  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
-  if (bytes < 1024 * 1024 * 1024) return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
-  return `${(bytes / (1024 * 1024 * 1024)).toFixed(2)} GB`;
-}
-
-function formatTimestamp(value: string) {
-  return new Date(value).toLocaleString(undefined, {
-    dateStyle: "medium",
-    timeStyle: "short",
-  });
-}
-
-function describeAttachmentLimits(limits: AttachmentLimitsPublic) {
-  return `Images ${formatFileSize(limits.imageBytes)}, videos ${formatFileSize(limits.videoBytes)}, ZIPs ${formatFileSize(limits.zipBytes)}`;
-}
+import { describeAttachmentLimits, formatFileSize, formatTimestamp } from "../lib/format";
+import { downloadAttachmentFile } from "../lib/download";
 
 const NO_ATTACHMENTS: IssueAttachmentPublic[] = [];
 
@@ -133,7 +117,7 @@ export function RowFilesDrawer({ row, onClose, onNavigateRef }: RowFilesDrawerPr
     );
     if (file.size > maxBytes) {
       window.alert(
-        `File is too large (${formatFileSize(file.size)}). Max for this type is ${formatFileSize(maxBytes)}.`,
+        `File is too large (${formatFileSize(file.size, 2)}). Max for this type is ${formatFileSize(maxBytes, 2)}.`,
       );
       return;
     }
@@ -174,13 +158,7 @@ export function RowFilesDrawer({ row, onClose, onNavigateRef }: RowFilesDrawerPr
 
   async function downloadAttachment(attachment: IssueAttachmentPublic) {
     try {
-      const blob = await client.downloadAttachment(attachment.id);
-      const url = URL.createObjectURL(blob);
-      const link = document.createElement("a");
-      link.href = url;
-      link.download = attachment.filename;
-      link.click();
-      URL.revokeObjectURL(url);
+      await downloadAttachmentFile(attachment.id, attachment.filename);
     } catch (error) {
       const message = error instanceof Error ? error.message : "Download failed";
       window.alert(message);
@@ -287,7 +265,7 @@ export function RowFilesDrawer({ row, onClose, onNavigateRef }: RowFilesDrawerPr
                         {attachment.filename}
                       </button>
                       <span className="issue-attachment-meta muted">
-                        {attachment.fileRef} · {formatFileSize(attachment.sizeBytes)} ·{" "}
+                        {attachment.fileRef} · {formatFileSize(attachment.sizeBytes, 2)} ·{" "}
                         {attachment.uploaderName} · {formatTimestamp(attachment.createdAt)}
                       </span>
                     </div>
@@ -362,7 +340,7 @@ export function RowFilesDrawer({ row, onClose, onNavigateRef }: RowFilesDrawerPr
                 Choose file
               </button>
               <p className="muted issue-attachment-limits">
-                {describeAttachmentLimits(attachmentLimits)}
+                {describeAttachmentLimits(attachmentLimits, 2)}
               </p>
             </div>
           </section>

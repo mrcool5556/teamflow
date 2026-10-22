@@ -65,10 +65,3 @@ export function cancelScheduledCustomColorPreview() {
   pendingPreview = null;
 }
 
-export function flushCustomColorPreview(
-  appearance: UserProfile["appearance"],
-  customColors: CustomColors,
-) {
-  cancelScheduledCustomColorPreview();
-  applyCustomColorPreview(appearance, customColors);
-}

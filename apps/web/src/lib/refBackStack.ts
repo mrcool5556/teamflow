@@ -28,10 +28,6 @@ function writeStack(stack: RefBackEntry[]) {
   sessionStorage.setItem(STACK_KEY, JSON.stringify(stack.slice(-MAX_ENTRIES)));
 }
 
-export function getRefBackStack(): RefBackEntry[] {
-  return readStack();
-}
-
 export function pushRefBack(entry: RefBackEntry) {
   const ref = entry.ref.trim();
   if (!ref) return;

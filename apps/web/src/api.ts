@@ -1,11 +1,5 @@
 import { TeamflowClient } from "@teamflow/api-client";
-import type {
-  IssuePublic,
-  IssueStatusPublic,
-  ProjectPublic,
-  TeamPublic,
-  UserPublic,
-} from "@teamflow/core";
+import type { UserPublic } from "@teamflow/core";
 
 const API_BASE = import.meta.env.VITE_API_URL ?? (import.meta.env.DEV ? "/api" : "");
 
@@ -44,15 +38,5 @@ export function initClientFromStorage() {
   const token = getStoredToken();
   if (token) client.setToken(token);
 }
-
-export type AppState = {
-  user: UserPublic | null;
-  teams: TeamPublic[];
-  projects: ProjectPublic[];
-  statuses: IssueStatusPublic[];
-  issues: IssuePublic[];
-  selectedTeamId: string | null;
-  selectedIssueId: string | null;
-};
 
 initClientFromStorage();
