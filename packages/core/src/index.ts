@@ -478,6 +478,16 @@ export const renameTeamFileSchema = z.object({
 
 export type RenameTeamFileInput = z.input<typeof renameTeamFileSchema>;
 
+export type ApiTokenPublic = {
+  id: string;
+  name: string;
+  prefix: string;
+  scopes: TokenScope[];
+  teamId: string | null;
+  lastUsedAt: string | null;
+  createdAt: string;
+};
+
 export type ApiTokenCreated = {
   id: string;
   name: string;
