@@ -369,7 +369,7 @@ app.post("/auth/register", async (c) => {
   const [user] = await db.select().from(schema.users).where(eq(schema.users.id, userId)).limit(1);
   await syncInstanceAdminFromEnv(db, user!);
 
-  const token = await signSessionToken(userId);
+  const token = await signSessionToken(userId, user!.tokenVersion);
   return c.json({ user: toUserPublic(user!), token }, 201);
 });
 
@@ -390,7 +390,7 @@ app.post("/auth/login", async (c) => {
   }
 
   await syncInstanceAdminFromEnv(db, user);
-  const token = await signSessionToken(user.id);
+  const token = await signSessionToken(user.id, user.tokenVersion);
   return c.json({ user: toUserPublic(user), token });
 });
 
