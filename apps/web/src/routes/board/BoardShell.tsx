@@ -633,6 +633,9 @@ export function BoardShell() {
                 onLogout={logout}
               />
             </nav>
+            {loading ? (
+              <span className="topbar-progress" role="progressbar" aria-label="Loading board" />
+            ) : null}
           </header>
 
           {shownError ? (
@@ -646,8 +649,12 @@ export function BoardShell() {
               {shownError}
             </Toast>
           ) : null}
-          {refNotice && <div className="banner ref-notice">{refNotice}</div>}
-          {loading && <div className="banner">Loading…</div>}
+          {refNotice ? (
+            <Toast onDismiss={() => setRefNotice(null)}>
+              <span aria-hidden="true">↪ </span>
+              {refNotice}
+            </Toast>
+          ) : null}
 
           {settingsOpen ? (
             <div className="app-workspace app-workspace--settings">

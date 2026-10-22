@@ -64,4 +64,19 @@ describe("board layout", () => {
     expect(drawer.className).not.toContain("issue-drawer");
     expect(drawer.querySelector("[class*='issue-drawer']")).toBeNull();
   });
+
+  it("shows a row jump as a toast, not a banner above the board", async () => {
+    const user = userEvent.setup();
+    const db = seedDb();
+    installFakeApi(db);
+    signIn(db);
+    renderApp("/t/ENG");
+    const row = db.rows.find((r) => r.teamId === db.teams[0]!.id)!;
+    const search = await screen.findByRole("textbox", { name: "Issue or board reference" });
+    await waitFor(() => expect(search).toBeEnabled());
+    await user.type(search, `${row.key}{Enter}`);
+    const region = screen.getByRole("region", { name: "Notifications" });
+    expect(await within(region).findByRole("status")).toHaveTextContent(`Row: ${row.name}`);
+    expect(document.querySelector(".banner")).toBeNull();
+  });
 });

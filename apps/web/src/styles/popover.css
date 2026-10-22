@@ -703,6 +703,10 @@
   color: var(--text);
 }
 
+.toast--info {
+  border-left-color: var(--accent);
+}
+
 .toast--error {
   border-color: var(--danger);
 }
