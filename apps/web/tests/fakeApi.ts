@@ -1,6 +1,7 @@
 import type {
   BoardRowPublic,
   CommentPublic,
+  IssueAttachmentPublic,
   IssuePublic,
   IssueStatusPublic,
   TeamMemberPublic,
@@ -11,6 +12,16 @@ import type {
 } from "@teamflow/core";
 import { createDefaultUserProfile, permissionsForSystemSlug } from "@teamflow/core";
 import { vi } from "vitest";
+
+/** Small limits so tests can hit the "too large" path with a tiny file. */
+export const FAKE_ATTACHMENT_LIMITS = {
+  imageBytes: 1024,
+  videoBytes: 1024,
+  zipBytes: 1024,
+  defaultBytes: 1024,
+  chunkBytes: 512,
+  chunkThresholdBytes: 512,
+};
 
 /** In-memory stand-in for the Teamflow HTTP API, installed as global fetch. */
 export type FakeDb = {
@@ -24,6 +35,7 @@ export type FakeDb = {
   members: TeamMemberPublic[];
   permissions: Record<string, TeamPermissionsPublic>;
   comments: CommentPublic[];
+  attachments: IssueAttachmentPublic[];
 };
 
 export type FakeCall = { method: string; path: string; body: unknown };
@@ -179,6 +191,7 @@ export function seedDb(roleSlug: "owner" | "member" | "viewer" = "owner"): FakeD
     members,
     permissions,
     comments: [],
+    attachments: [],
   };
 }
 
@@ -312,17 +325,17 @@ export function installFakeApi(db: FakeDb, options: FakeApiOptions = {}) {
     [
       "GET",
       /^\/issues\/([^/]+)\/attachments$/,
-      () => ({
-        attachments: [],
-        limits: { imageBytes: 1, videoBytes: 1, zipBytes: 1, otherBytes: 1 },
+      ({ params }) => ({
+        attachments: db.attachments.filter((a) => a.issueId === params[0]),
+        limits: FAKE_ATTACHMENT_LIMITS,
       }),
     ],
     [
       "GET",
       /^\/rows\/([^/]+)\/attachments$/,
-      () => ({
-        attachments: [],
-        limits: { imageBytes: 1, videoBytes: 1, zipBytes: 1, otherBytes: 1 },
+      ({ params }) => ({
+        attachments: db.attachments.filter((a) => a.rowId === params[0]),
+        limits: FAKE_ATTACHMENT_LIMITS,
       }),
     ],
     [
@@ -352,6 +365,14 @@ export function installFakeApi(db: FakeDb, options: FakeApiOptions = {}) {
         if (index < 0) return notFound();
         db.statuses[index] = { ...db.statuses[index]!, ...(body as Partial<IssueStatusPublic>) };
         return { status: db.statuses[index] };
+      },
+    ],
+    [
+      "DELETE",
+      /^\/(?:issues|rows)\/([^/]+)\/attachments\/([^/]+)$/,
+      ({ params }) => {
+        db.attachments = db.attachments.filter((a) => a.id !== params[1]);
+        return undefined;
       },
     ],
     [
