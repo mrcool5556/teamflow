@@ -22,7 +22,8 @@ function measure(scroller: HTMLElement): Overflow {
 
 /**
  * Horizontal scroller for one board row. When columns run past either edge it fades that edge
- * and offers a button that scrolls one column ("3 more →", "←").
+ * and adds a slim button in a gutter beside the scroller (never over cards) that scrolls one
+ * column ("3 more →", "← 2").
  */
 export function RowScroller({ children }: { children: ReactNode }) {
   const scrollerRef = useRef<HTMLDivElement | null>(null);
@@ -67,9 +68,6 @@ export function RowScroller({ children }: { children: ReactNode }) {
     <div
       className={`board-row-scroll-frame${overflow.before ? " has-before" : ""}${overflow.after ? " has-after" : ""}`}
     >
-      <div ref={scrollerRef} className="board-row-scroll">
-        {children}
-      </div>
       {overflow.before > 0 ? (
         <button
           type="button"
@@ -77,9 +75,13 @@ export function RowScroller({ children }: { children: ReactNode }) {
           aria-label={`Scroll left (${overflow.before} more)`}
           onClick={() => scrollByColumn(-1)}
         >
-          ←
+          <span aria-hidden="true">←</span>
+          <span className="board-row-scroll-btn-label">{overflow.before} more</span>
         </button>
       ) : null}
+      <div ref={scrollerRef} className="board-row-scroll">
+        {children}
+      </div>
       {overflow.after > 0 ? (
         <button
           type="button"
@@ -87,7 +89,8 @@ export function RowScroller({ children }: { children: ReactNode }) {
           aria-label={`Scroll right (${overflow.after} more ${overflow.after === 1 ? "column" : "columns"})`}
           onClick={() => scrollByColumn(1)}
         >
-          {overflow.after} more →
+          <span aria-hidden="true">→</span>
+          <span className="board-row-scroll-btn-label">{overflow.after} more</span>
         </button>
       ) : null}
     </div>
