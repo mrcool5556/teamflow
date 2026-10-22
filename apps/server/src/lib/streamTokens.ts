@@ -1,12 +1,9 @@
 import { SignJWT, jwtVerify } from "jose";
+import { getJwtSecret } from "./auth.js";
 
 const JWT_ISSUER = "teamflow";
 const STREAM_AUDIENCE = "teamflow-stream";
 const STREAM_TTL_SEC = 60 * 60;
-
-function getJwtSecret() {
-  return new TextEncoder().encode(process.env.JWT_SECRET ?? "dev-secret");
-}
 
 export async function signStreamToken(linkId: string, userId: string) {
   return new SignJWT({ sub: userId, linkId, type: "stream" })
