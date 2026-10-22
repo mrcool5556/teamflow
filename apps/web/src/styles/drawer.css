@@ -630,8 +630,7 @@
   color: var(--muted);
 }
 
-.issue-drawer-field select,
-.issue-drawer-field input[type="datetime-local"] {
+.issue-drawer-field select {
   width: 100%;
   background: var(--surface);
   color: var(--text);

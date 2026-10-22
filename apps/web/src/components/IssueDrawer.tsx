@@ -31,24 +31,10 @@ import { Drawer } from "../ui/Dialog";
 import { AttachmentImageThumbnail, isImageAttachment } from "./AttachmentImagePreview";
 import { AttachmentVideoThumbnail, isVideoAttachment } from "./AttachmentVideoPlayer";
 import { LinkRowFilePanel } from "./LinkRowFilePanel";
+import { DueDatePicker } from "./DueDatePicker";
 import { describeAttachmentLimits, formatFileSize, formatTimestamp } from "../lib/format";
 
 const NO_COMMENTS: CommentPublic[] = [];
-
-function toDateInputValue(iso: string | null) {
-  if (!iso) return "";
-  const date = new Date(iso);
-  if (Number.isNaN(date.getTime())) return "";
-  const pad = (n: number) => String(n).padStart(2, "0");
-  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
-}
-
-function fromDateInputValue(value: string) {
-  if (!value.trim()) return null;
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return null;
-  return date.toISOString();
-}
 
 type IssueDrawerProps = {
   issue: IssuePublic;
@@ -351,17 +337,16 @@ export function IssueDrawer({
               </label>
             )}
 
-            <label className="issue-drawer-field">
+            <div className="issue-drawer-field">
               <span className="issue-drawer-label">Due</span>
-              <input
-                type="datetime-local"
+              <DueDatePicker
+                value={issue.dueDate}
                 disabled={!canEdit}
-                value={toDateInputValue(issue.dueDate)}
-                onChange={(e) => {
-                  void patchIssue({ dueDate: fromDateInputValue(e.target.value) });
+                onChange={(dueDate) => {
+                  void patchIssue({ dueDate });
                 }}
               />
-            </label>
+            </div>
           </div>
         </section>
 
