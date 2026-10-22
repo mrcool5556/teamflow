@@ -117,14 +117,23 @@ export async function getUploadSession(db: Db, sessionId: string) {
   };
 }
 
-export async function saveUploadChunk(db: Db, sessionId: string, chunkIndex: number, data: Buffer) {
+export async function saveUploadChunk(
+  db: Db,
+  sessionId: string,
+  chunkIndex: number,
+  data: Buffer,
+  uploaderId: string,
+) {
   const [session] = await db
     .select()
     .from(schema.uploadSessions)
     .where(eq(schema.uploadSessions.id, sessionId))
     .limit(1);
 
-  if (!session) throw new AttachmentError("Upload session not found", 404);
+  // Only the user who opened the session may write to it (same rule as complete).
+  if (!session || session.uploaderId !== uploaderId) {
+    throw new AttachmentError("Upload session not found", 404);
+  }
   if (session.status !== "pending") {
     throw new AttachmentError("Upload session is not active", 400);
   }

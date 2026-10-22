@@ -426,7 +426,22 @@ export async function runMaintenanceBackup(input: RunMaintenanceBackupInput) {
   return job;
 }
 
+/** Branch names reach `git checkout "$BRANCH"`; allow only plain ref characters, no options. */
+const BRANCH_PATTERN = /^[A-Za-z0-9._/-]{1,120}$/;
+
+export function isValidBranchName(value: string) {
+  return BRANCH_PATTERN.test(value) && !value.startsWith("-") && !value.includes("..");
+}
+
+export function assertValidBranchName(value: string | undefined) {
+  if (value !== undefined && !isValidBranchName(value)) {
+    throw new Error("Invalid branch name");
+  }
+}
+
 export async function runMaintenanceUpdate(input: RunMaintenanceUpdateInput) {
+  assertValidBranchName(input.branch);
+
   const reason = disabledReason();
   if (reason) throw new Error(reason);
 
