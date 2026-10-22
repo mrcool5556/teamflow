@@ -72,7 +72,8 @@ export function BoardShell() {
   const route = useAppRoute();
   const navState = location.state as NavState;
   const queryClient = useQueryClient();
-  const { user, sessionLoading, profile, profileRef, updateProfile, logout } = useSession();
+  const { user, sessionReady, sessionLoading, profile, profileRef, updateProfile, logout } =
+    useSession();
   const { teams, teamsLoaded } = useTeams();
   const { error, report, clear: clearError } = useErrorSink();
   const [dismissedBoardError, setDismissedBoardError] = useState<string | null>(null);
@@ -136,6 +137,8 @@ export function BoardShell() {
       : null);
   // Server-wide panels need the instance-admin flag (GET /auth/me) on top of the team permission.
   const isInstanceAdmin = user?.isInstanceAdmin === true;
+  // The Plan page is the internal dev backlog, so only instance admins see it.
+  const canSeePlan = isInstanceAdmin;
   const can = (permission: Parameters<typeof hasTeamPermission>[1]) =>
     hasTeamPermission(effectiveTeamPermissions, permission);
   const access = {
@@ -407,7 +410,7 @@ export function BoardShell() {
   }
 
   const settingsOpen = route.settingsOpen;
-  const roadmapOpen = route.planOpen;
+  const roadmapOpen = route.planOpen && canSeePlan;
   if (settingsOpen && isSettingsPanel(route.settingsPanel)) {
     lastSettingsPanelRef.current = route.settingsPanel;
   }
@@ -504,6 +507,12 @@ export function BoardShell() {
     return <Navigate to="/login" replace state={{ from }} />;
   }
 
+  // Non-admins go to the board. Wait for GET /auth/me first so a stale cached user does not
+  // bounce an admin off the plan, and render nothing meanwhile so the plan never flashes.
+  if (route.planOpen && !canSeePlan) {
+    return sessionReady ? <Navigate to={boardPath(route.teamKey)} replace /> : null;
+  }
+
   if (teamsLoaded) {
     if (route.isIndex && teams.length > 0) {
       return <Navigate to={boardPath(defaultTeamKey())} replace state={navState} />;
@@ -585,18 +594,20 @@ export function BoardShell() {
                   <span className="topbar-btn-label">Files</span>
                 </button>
               ) : null}
-              <button
-                type="button"
-                className={`ghost topbar-btn${roadmapOpen ? " active" : ""}`}
-                aria-pressed={roadmapOpen}
-                title={roadmapOpen ? "Back to the board" : "Plan & backlog"}
-                onClick={() => navigate(roadmapOpen ? boardPath(teamKey) : planPath(teamKey))}
-              >
-                <span className="topbar-btn-icon" aria-hidden="true">
-                  ◫
-                </span>
-                <span className="topbar-btn-label">Plan</span>
-              </button>
+              {canSeePlan ? (
+                <button
+                  type="button"
+                  className={`ghost topbar-btn${roadmapOpen ? " active" : ""}`}
+                  aria-pressed={roadmapOpen}
+                  title={roadmapOpen ? "Back to the board" : "Plan & backlog"}
+                  onClick={() => navigate(roadmapOpen ? boardPath(teamKey) : planPath(teamKey))}
+                >
+                  <span className="topbar-btn-icon" aria-hidden="true">
+                    ◫
+                  </span>
+                  <span className="topbar-btn-label">Plan</span>
+                </button>
+              ) : null}
               <span className="topbar-divider" aria-hidden="true" />
               <UserMenu
                 name={user?.name ?? ""}
@@ -619,12 +630,17 @@ export function BoardShell() {
                         },
                       ]
                     : []),
-                  {
-                    key: "plan",
-                    icon: "◫",
-                    label: roadmapOpen ? "Back to board" : "Plan",
-                    onSelect: () => navigate(roadmapOpen ? boardPath(teamKey) : planPath(teamKey)),
-                  },
+                  ...(canSeePlan
+                    ? [
+                        {
+                          key: "plan",
+                          icon: "◫",
+                          label: roadmapOpen ? "Back to board" : "Plan",
+                          onSelect: () =>
+                            navigate(roadmapOpen ? boardPath(teamKey) : planPath(teamKey)),
+                        },
+                      ]
+                    : []),
                 ]}
                 onSettings={() => navigate(settingsPath(teamKey, lastSettingsPanelRef.current))}
                 onAbout={() => setAboutOpen(true)}
