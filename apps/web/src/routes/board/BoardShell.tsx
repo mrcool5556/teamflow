@@ -20,6 +20,7 @@ import { QuickAddModal } from "../../components/QuickAddModal";
 import { RowFilesDrawer } from "../../components/RowFilesDrawer";
 import { TeamFilesDrawer } from "../../components/TeamFilesDrawer";
 import { UndoToast } from "../../components/UndoToast";
+import { UserMenu } from "../../components/UserMenu";
 import type { SettingsPanel } from "../../components/SettingsNav";
 import { useChangeHistory } from "../../hooks/useChangeHistory";
 import {
@@ -595,24 +596,11 @@ export function BoardShell() {
       >
         <div className="app-shell">
           <header className="topbar">
-            <div>
-              <p className="eyebrow">TEAMFLOW</p>
-              <h1>{teams.find((t) => t.id === teamId)?.name ?? "Board"}</h1>
-            </div>
-            <div className="topbar-actions">
-              {!overlayOpen && refBackLabel ? (
-                <button
-                  type="button"
-                  className="secondary ref-back-btn"
-                  title={`Back to ${refBackLabel}`}
-                  onClick={goBackRef}
-                >
-                  ← Back
-                </button>
-              ) : null}
-              {!overlayOpen && (
-                <GoToRefBar disabled={!teamId || loading} onGo={(ref) => void goToRef(ref)} />
-              )}
+            <div className="topbar-start">
+              <span className="topbar-brand" aria-hidden="true">
+                TEAMFLOW
+              </span>
+              <h1 className="sr-only">{teams.find((t) => t.id === teamId)?.name ?? "Board"}</h1>
               {teams.length > 0 && (
                 <label className="topbar-team-switch">
                   <span className="sr-only">Workspace</span>
@@ -632,46 +620,71 @@ export function BoardShell() {
                   </select>
                 </label>
               )}
+              {!overlayOpen && refBackLabel ? (
+                <button
+                  type="button"
+                  className="ghost ref-back-btn"
+                  title={`Back to ${refBackLabel}`}
+                  onClick={goBackRef}
+                >
+                  ← Back
+                </button>
+              ) : null}
+              {!overlayOpen && (
+                <GoToRefBar disabled={!teamId || loading} onGo={(ref) => void goToRef(ref)} />
+              )}
+            </div>
+            <nav className="topbar-actions" aria-label="Board tools">
               <button
                 type="button"
-                className={historyOpen ? "active" : undefined}
+                className={`ghost topbar-btn${historyOpen ? " active" : ""}`}
+                aria-pressed={historyOpen}
                 disabled={changeHistory.length === 0}
+                title="Recent changes"
                 onClick={() => setHistoryOpen((open) => !open)}
               >
-                Recent{changeHistory.length > 0 ? ` (${changeHistory.length})` : ""}
+                <span className="topbar-btn-icon" aria-hidden="true">
+                  ⟲
+                </span>
+                <span className="topbar-btn-label">Recent</span>
+                {changeHistory.length > 0 ? (
+                  <span className="topbar-btn-badge">{changeHistory.length}</span>
+                ) : null}
               </button>
               {!overlayOpen && teamId ? (
-                <button type="button" onClick={() => setTeamFilesOpen(true)}>
-                  Files
+                <button
+                  type="button"
+                  className="ghost topbar-btn"
+                  title="Team files"
+                  onClick={() => setTeamFilesOpen(true)}
+                >
+                  <span className="topbar-btn-icon" aria-hidden="true">
+                    ▤
+                  </span>
+                  <span className="topbar-btn-label">Files</span>
                 </button>
               ) : null}
               <button
                 type="button"
-                className={roadmapOpen ? "active" : undefined}
+                className={`ghost topbar-btn${roadmapOpen ? " active" : ""}`}
+                aria-pressed={roadmapOpen}
+                title={roadmapOpen ? "Back to the board" : "Plan & backlog"}
                 onClick={() => navigate(roadmapOpen ? boardPath(teamKey) : planPath(teamKey))}
               >
-                {roadmapOpen ? "Close plan" : "Plan"}
+                <span className="topbar-btn-icon" aria-hidden="true">
+                  ◫
+                </span>
+                <span className="topbar-btn-label">Plan</span>
               </button>
-              <button
-                type="button"
-                className={settingsOpen ? "active" : undefined}
-                onClick={() =>
-                  navigate(
-                    settingsOpen
-                      ? boardPath(teamKey)
-                      : settingsPath(teamKey, lastSettingsPanelRef.current),
-                  )
-                }
-              >
-                {settingsOpen ? "Close settings" : "Settings"}
-              </button>
-              <button type="button" className="ghost" onClick={() => setAboutOpen(true)}>
-                About
-              </button>
-              <button type="button" className="ghost" onClick={logout}>
-                Log out ({user?.name})
-              </button>
-            </div>
+              <span className="topbar-divider" aria-hidden="true" />
+              <UserMenu
+                name={user?.name ?? ""}
+                email={user?.email}
+                onSettings={() => navigate(settingsPath(teamKey, lastSettingsPanelRef.current))}
+                onAbout={() => setAboutOpen(true)}
+                onLogout={logout}
+              />
+            </nav>
           </header>
 
           {shownError ? (
