@@ -46,13 +46,7 @@ export function useLinkPasteOffer(
   function shortenFromOffer(label: string) {
     if (!linkOffer) return;
 
-    const result = applyShortLabel(
-      text,
-      linkOffer.start,
-      linkOffer.end,
-      linkOffer.url,
-      label,
-    );
+    const result = applyShortLabel(text, linkOffer.start, linkOffer.end, linkOffer.url, label);
     setText(result.value);
     setLinkOffer(null);
 

@@ -65,10 +65,7 @@ async function loadTeamMemberEmails(db: Db, teamId: string) {
   return byEmail;
 }
 
-function resolveAssigneeIds(
-  emails: string[],
-  memberEmails: Map<string, string>,
-): string[] {
+function resolveAssigneeIds(emails: string[], memberEmails: Map<string, string>): string[] {
   const ids: string[] = [];
   for (const email of emails) {
     const userId = memberEmails.get(email.toLowerCase());
@@ -77,9 +74,7 @@ function resolveAssigneeIds(
   return [...new Set(ids)];
 }
 
-function zipToBuffer(
-  append: (archive: ZipArchive) => void | Promise<void>,
-): Promise<Buffer> {
+function zipToBuffer(append: (archive: ZipArchive) => void | Promise<void>): Promise<Buffer> {
   return new Promise((resolve, reject) => {
     const chunks: Buffer[] = [];
     const passthrough = new PassThrough();
@@ -170,11 +165,7 @@ export async function exportTeamBundle(
   teamId: string,
   includeFiles: boolean,
 ): Promise<{ filename: string; buffer: Buffer }> {
-  const [team] = await db
-    .select()
-    .from(schema.teams)
-    .where(eq(schema.teams.id, teamId))
-    .limit(1);
+  const [team] = await db.select().from(schema.teams).where(eq(schema.teams.id, teamId)).limit(1);
   if (!team) throw new TeamBundleError("Team not found", 404);
 
   const rows = await db
@@ -476,11 +467,7 @@ export async function importTeamBundle(
     ? readJsonEntry<TeamBundleFiles>(entries, "files.json")
     : { files: [] };
 
-  const [team] = await db
-    .select()
-    .from(schema.teams)
-    .where(eq(schema.teams.id, teamId))
-    .limit(1);
+  const [team] = await db.select().from(schema.teams).where(eq(schema.teams.id, teamId)).limit(1);
   if (!team) throw new TeamBundleError("Team not found", 404);
 
   const [existingImport] = await db

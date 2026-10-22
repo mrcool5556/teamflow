@@ -224,7 +224,7 @@ export async function getMaintenanceVersionInfo(options?: {
           latestCommit: resolvedOrigin,
           latestCommitShort: shortSha(resolvedOrigin),
           updateAvailable: comparison.updateAvailable,
-          commitsBehind: comparison.updateAvailable ? commitsBehind : commitsBehind ?? 0,
+          commitsBehind: comparison.updateAvailable ? commitsBehind : (commitsBehind ?? 0),
           gitError: null,
         };
       }
@@ -243,7 +243,7 @@ export async function getMaintenanceVersionInfo(options?: {
       latestCommit,
       latestCommitShort: shortSha(latestCommit),
       updateAvailable,
-      commitsBehind: updateAvailable ? commitsBehind : commitsBehind ?? 0,
+      commitsBehind: updateAvailable ? commitsBehind : (commitsBehind ?? 0),
       gitError,
     };
   } catch (err) {

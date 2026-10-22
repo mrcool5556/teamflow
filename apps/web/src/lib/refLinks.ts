@@ -78,10 +78,10 @@ function scrollIntoBoardView(
 }
 
 export function scrollToIssueRef(issueId: string, delayMs = 50) {
-  scrollIntoBoardView(
-    document.querySelector(`[data-issue-id="${CSS.escape(issueId)}"]`),
-    { delayMs, inline: "center" },
-  );
+  scrollIntoBoardView(document.querySelector(`[data-issue-id="${CSS.escape(issueId)}"]`), {
+    delayMs,
+    inline: "center",
+  });
 }
 
 export function scrollToColumnRef(columnKey: string, delayMs = 80) {
@@ -98,9 +98,8 @@ export function scrollToColumnRef(columnKey: string, delayMs = 80) {
 
 export function scrollToRowRef(rowId: string, delayMs = 0) {
   scrollIntoBoardView(
-    document.querySelector(
-      `[data-row-id="${CSS.escape(rowId)}"] .row-separator-wrap`,
-    ) ?? document.querySelector(`[data-row-id="${CSS.escape(rowId)}"]`),
+    document.querySelector(`[data-row-id="${CSS.escape(rowId)}"] .row-separator-wrap`) ??
+      document.querySelector(`[data-row-id="${CSS.escape(rowId)}"]`),
     { delayMs },
   );
 }

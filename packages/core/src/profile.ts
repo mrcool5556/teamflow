@@ -53,9 +53,7 @@ export function resolveUiColors(appearance: {
   return UI_COLOR_PRESET_PALETTES[appearance.colorPreset];
 }
 
-const hexColorSchema = z
-  .string()
-  .regex(/^#[0-9A-Fa-f]{6}$/, "Expected #RRGGBB hex color");
+const hexColorSchema = z.string().regex(/^#[0-9A-Fa-f]{6}$/, "Expected #RRGGBB hex color");
 
 export const userProfileCustomColorsSchema = z
   .object({
@@ -165,10 +163,7 @@ export function createDefaultUserProfile(): UserProfile {
   });
 }
 
-export function mergeUserProfile(
-  current: UserProfile,
-  patch: UserProfilePatch,
-): UserProfile {
+export function mergeUserProfile(current: UserProfile, patch: UserProfilePatch): UserProfile {
   return userProfileSchema.parse({
     version: USER_PROFILE_VERSION,
     appearance: {
@@ -223,15 +218,13 @@ export function parseUserProfile(input: unknown): UserProfile {
           ...(raw.board as object),
           rowHeadersVisible: {
             ...defaults.board.rowHeadersVisible,
-            ...((raw.board as { rowHeadersVisible?: Record<string, boolean> })
-              .rowHeadersVisible ?? {}),
+            ...((raw.board as { rowHeadersVisible?: Record<string, boolean> }).rowHeadersVisible ??
+              {}),
           },
         }
       : defaults.board;
   const ui =
-    typeof raw.ui === "object" && raw.ui
-      ? { ...defaults.ui, ...(raw.ui as object) }
-      : defaults.ui;
+    typeof raw.ui === "object" && raw.ui ? { ...defaults.ui, ...(raw.ui as object) } : defaults.ui;
 
   return userProfileSchema.parse({
     version: USER_PROFILE_VERSION,

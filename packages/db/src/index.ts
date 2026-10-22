@@ -24,9 +24,7 @@ export function resolveDatabasePath(databaseUrl?: string) {
     process.env.DATABASE_URL ??
     `file:${path.join(findRepoRoot(), "data", "teamflow.db")}`;
   const filePath = url.replace(/^file:/, "");
-  return path.isAbsolute(filePath)
-    ? filePath
-    : path.resolve(findRepoRoot(), filePath);
+  return path.isAbsolute(filePath) ? filePath : path.resolve(findRepoRoot(), filePath);
 }
 
 export function createDb(databaseUrl?: string) {

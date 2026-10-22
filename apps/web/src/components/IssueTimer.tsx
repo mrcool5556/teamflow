@@ -77,7 +77,12 @@ function TimerDigitRow({
   );
 }
 
-export function IssueTimer({ issue, onUpdate, compact = false, floatingPanel = false }: IssueTimerProps) {
+export function IssueTimer({
+  issue,
+  onUpdate,
+  compact = false,
+  floatingPanel = false,
+}: IssueTimerProps) {
   const [open, setOpen] = useState(false);
   const [now, setNow] = useState(Date.now());
   const [totalSeconds, setTotalSeconds] = useState(0);
@@ -93,9 +98,7 @@ export function IssueTimer({ issue, onUpdate, compact = false, floatingPanel = f
   const isCountdown = issue.timerTargetSec != null;
   const isRunning = Boolean(issue.timerActiveAt);
   const hasTimer =
-    issue.timerActiveAt != null ||
-    issue.timerElapsedSec > 0 ||
-    issue.timerTargetSec != null;
+    issue.timerActiveAt != null || issue.timerElapsedSec > 0 || issue.timerTargetSec != null;
 
   const largeClockSeconds = isCountdown ? display.seconds : totalSeconds;
   const largeClockValues = timerInputsFromParts(timerPartsFromSeconds(largeClockSeconds));
@@ -305,9 +308,7 @@ export function IssueTimer({ issue, onUpdate, compact = false, floatingPanel = f
             {hasTimer ? formatTimer(display.seconds) : "Timer"}
           </span>
         )}
-        {!compact && (
-          <span className="assignee-picker-caret">{open ? "▴" : "▾"}</span>
-        )}
+        {!compact && <span className="assignee-picker-caret">{open ? "▴" : "▾"}</span>}
       </button>
 
       {floatingPanel && panel && panelPositioned

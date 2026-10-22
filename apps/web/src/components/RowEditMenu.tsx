@@ -76,13 +76,7 @@ export function RowEditMenuItem({
   );
 }
 
-export function RowEditMenuSection({
-  title,
-  children,
-}: {
-  title: string;
-  children: ReactNode;
-}) {
+export function RowEditMenuSection({ title, children }: { title: string; children: ReactNode }) {
   return (
     <div
       className="row-edit-menu-section"

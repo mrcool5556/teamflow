@@ -117,12 +117,7 @@ export async function getUploadSession(db: Db, sessionId: string) {
   };
 }
 
-export async function saveUploadChunk(
-  db: Db,
-  sessionId: string,
-  chunkIndex: number,
-  data: Buffer,
-) {
+export async function saveUploadChunk(db: Db, sessionId: string, chunkIndex: number, data: Buffer) {
   const [session] = await db
     .select()
     .from(schema.uploadSessions)
@@ -170,11 +165,7 @@ export async function saveUploadChunk(
   return getUploadSession(db, sessionId);
 }
 
-export async function completeUploadSession(
-  db: Db,
-  sessionId: string,
-  uploaderId: string,
-) {
+export async function completeUploadSession(db: Db, sessionId: string, uploaderId: string) {
   const session = await getUploadSession(db, sessionId);
   if (!session) throw new AttachmentError("Upload session not found", 404);
   if (session.receivedChunks.length !== session.totalChunks) {

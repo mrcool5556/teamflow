@@ -147,7 +147,9 @@ export function DiscordBotServiceSection({
 
       {showActions ? (
         <div className="row settings-actions maintenance-actions">
-          {status.state === "not_installed" || status.state === "stopped" || status.state === "failed" ? (
+          {status.state === "not_installed" ||
+          status.state === "stopped" ||
+          status.state === "failed" ? (
             <button
               type="button"
               disabled={busy}
@@ -177,7 +179,12 @@ export function DiscordBotServiceSection({
               </button>
             </>
           ) : null}
-          <button type="button" className="button-secondary" disabled={busy} onClick={() => void loadStatus()}>
+          <button
+            type="button"
+            className="button-secondary"
+            disabled={busy}
+            onClick={() => void loadStatus()}
+          >
             Refresh status
           </button>
         </div>

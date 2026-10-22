@@ -13,7 +13,10 @@ function suggestTeamKey(name: string) {
 }
 
 function normalizeTeamKey(value: string) {
-  return value.toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 8);
+  return value
+    .toUpperCase()
+    .replace(/[^A-Z0-9]/g, "")
+    .slice(0, 8);
 }
 
 export function CreateTeamSection({ onMessage, onTeamCreated }: CreateTeamSectionProps) {
@@ -66,8 +69,8 @@ export function CreateTeamSection({ onMessage, onTeamCreated }: CreateTeamSectio
     <section className="settings-section">
       <h3>Create team</h3>
       <p className="settings-copy">
-        Add another board to your account. Your main board stays as-is — use the workspace
-        dropdown in the header to switch between teams.
+        Add another board to your account. Your main board stays as-is — use the workspace dropdown
+        in the header to switch between teams.
       </p>
       <label>
         Team name

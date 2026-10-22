@@ -322,8 +322,16 @@
 
 :root[data-chrome-style="glass"] body {
   background:
-    radial-gradient(ellipse 80% 55% at 8% -8%, color-mix(in srgb, var(--accent) 18%, transparent), transparent 58%),
-    radial-gradient(ellipse 70% 50% at 100% 0%, color-mix(in srgb, var(--primary) 14%, transparent), transparent 52%),
+    radial-gradient(
+      ellipse 80% 55% at 8% -8%,
+      color-mix(in srgb, var(--accent) 18%, transparent),
+      transparent 58%
+    ),
+    radial-gradient(
+      ellipse 70% 50% at 100% 0%,
+      color-mix(in srgb, var(--primary) 14%, transparent),
+      transparent 52%
+    ),
     var(--bg);
 }
 
@@ -404,7 +412,8 @@
   color: var(--accent-text);
 }
 
-:root[data-chrome-style="neon"] button:not(.ghost):not(.danger):not(.ref-copy-btn):not(.priority-picker-trigger) {
+:root[data-chrome-style="neon"]
+  button:not(.ghost):not(.danger):not(.ref-copy-btn):not(.priority-picker-trigger) {
   text-shadow: 0 0 8px color-mix(in srgb, var(--accent) 42%, transparent);
 }
 
@@ -961,7 +970,11 @@ select {
 
 .maintenance-status-card {
   border: 2px solid var(--border);
-  background: linear-gradient(135deg, var(--bg) 0%, color-mix(in srgb, var(--accent) 6%, var(--bg)) 100%);
+  background: linear-gradient(
+    135deg,
+    var(--bg) 0%,
+    color-mix(in srgb, var(--accent) 6%, var(--bg)) 100%
+  );
   padding: 1rem 1.1rem;
   margin-bottom: 1.25rem;
   display: flex;
@@ -1481,10 +1494,7 @@ body.board-pan-active {
   align-items: start;
   width: max-content;
   min-width: 100%;
-  grid-template-columns: repeat(
-    var(--column-count, 1),
-    var(--board-column-width)
-  );
+  grid-template-columns: repeat(var(--column-count, 1), var(--board-column-width));
 }
 
 .board-grid {
@@ -2688,7 +2698,9 @@ body.board-pan-active {
   display: flex;
   flex-direction: column;
   gap: 0.35rem;
-  transition: border-color 0.12s ease, box-shadow 0.12s ease;
+  transition:
+    border-color 0.12s ease,
+    box-shadow 0.12s ease;
 }
 
 .issue-card:hover {
@@ -3192,7 +3204,9 @@ body.board-pan-active {
 
 .issue-card--highlighted {
   outline: 3px solid var(--accent);
-  box-shadow: 0 0 0 2px var(--bg), 0 0 18px color-mix(in srgb, var(--accent) 45%, transparent);
+  box-shadow:
+    0 0 0 2px var(--bg),
+    0 0 18px color-mix(in srgb, var(--accent) 45%, transparent);
   animation: ref-target-settle 0.48s cubic-bezier(0.22, 1, 0.36, 1);
 }
 
@@ -3897,7 +3911,9 @@ body.board-pan-active {
   width: 100%;
   text-align: left;
   cursor: text;
-  transition: border-color 0.15s ease, background 0.15s ease;
+  transition:
+    border-color 0.15s ease,
+    background 0.15s ease;
 }
 
 .description-view-trigger:hover {

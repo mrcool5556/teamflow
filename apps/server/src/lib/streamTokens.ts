@@ -5,9 +5,7 @@ const STREAM_AUDIENCE = "teamflow-stream";
 const STREAM_TTL_SEC = 60 * 60;
 
 function getJwtSecret() {
-  return new TextEncoder().encode(
-    process.env.JWT_SECRET ?? "dev-secret",
-  );
+  return new TextEncoder().encode(process.env.JWT_SECRET ?? "dev-secret");
 }
 
 export async function signStreamToken(linkId: string, userId: string) {

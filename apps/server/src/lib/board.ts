@@ -73,20 +73,14 @@ export async function uniqueColumnKey(db: Db, teamId: string) {
     const [existing] = await db
       .select({ id: schema.issueStatuses.id })
       .from(schema.issueStatuses)
-      .where(
-        and(eq(schema.issueStatuses.teamId, teamId), eq(schema.issueStatuses.key, key)),
-      )
+      .where(and(eq(schema.issueStatuses.teamId, teamId), eq(schema.issueStatuses.key, key)))
       .limit(1);
     if (!existing) return key;
   }
   throw new Error("Failed to generate unique column key");
 }
 
-export async function seedDefaultStatusesForRow(
-  db: Db,
-  teamId: string,
-  rowId: string,
-) {
+export async function seedDefaultStatusesForRow(db: Db, teamId: string, rowId: string) {
   const existing = await db
     .select()
     .from(schema.issueStatuses)

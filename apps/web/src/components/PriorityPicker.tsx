@@ -43,12 +43,9 @@ export function PriorityPicker({
     closePanel();
   }
 
-  const triggerLabel =
-    priority === "none" ? "—" : priority;
+  const triggerLabel = priority === "none" ? "—" : priority;
   const triggerTitle =
-    priority === "none"
-      ? "Set priority"
-      : `${PRIORITY_LABELS[priority]} priority`;
+    priority === "none" ? "Set priority" : `${PRIORITY_LABELS[priority]} priority`;
 
   const panel = open ? (
     <div

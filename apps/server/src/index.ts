@@ -159,15 +159,8 @@ import {
   runMaintenanceBackup,
   runMaintenanceUpdate,
 } from "./lib/maintenance.js";
-import {
-  exportTeamBundle,
-  importTeamBundle,
-  TeamBundleError,
-} from "./lib/teamBundle.js";
-import {
-  getTeamPermissionsForUser,
-  userHasTeamPermission,
-} from "./lib/permissions.js";
+import { exportTeamBundle, importTeamBundle, TeamBundleError } from "./lib/teamBundle.js";
+import { getTeamPermissionsForUser, userHasTeamPermission } from "./lib/permissions.js";
 
 const db = createDb();
 void purgeExpiredUploadSessions(db);
@@ -223,10 +216,7 @@ app.post("/auth/register", async (c) => {
     try {
       await assertInviteAcceptable(db, body.data.inviteToken);
     } catch (err) {
-      return c.json(
-        { error: err instanceof Error ? err.message : "Invalid invite" },
-        400,
-      );
+      return c.json({ error: err instanceof Error ? err.message : "Invalid invite" }, 400);
     }
   }
 
@@ -279,18 +269,11 @@ app.post("/auth/register", async (c) => {
     try {
       await acceptTeamInvite(db, body.data.inviteToken, userId);
     } catch (err) {
-      return c.json(
-        { error: err instanceof Error ? err.message : "Failed to accept invite" },
-        400,
-      );
+      return c.json({ error: err instanceof Error ? err.message : "Failed to accept invite" }, 400);
     }
   }
 
-  const [user] = await db
-    .select()
-    .from(schema.users)
-    .where(eq(schema.users.id, userId))
-    .limit(1);
+  const [user] = await db.select().from(schema.users).where(eq(schema.users.id, userId)).limit(1);
 
   const token = await signSessionToken(userId);
   return c.json({ user: toUserPublic(user!), token }, 201);
@@ -336,10 +319,7 @@ app.post("/auth/reset-password", async (c) => {
     await resetPasswordWithToken(db, body.data.token, body.data.password);
     return c.json({ ok: true });
   } catch (err) {
-    return c.json(
-      { error: err instanceof Error ? err.message : "Reset failed" },
-      400,
-    );
+    return c.json({ error: err instanceof Error ? err.message : "Reset failed" }, 400);
   }
 });
 
@@ -406,9 +386,7 @@ app.get("/auth/profile/export", async (c) => {
   if (!user) return c.json({ error: "User not found" }, 404);
 
   const profile = await getUserProfile(db, result.auth.userId);
-  return c.json(
-    buildProfileExport(profile, { name: user.name, email: user.email }),
-  );
+  return c.json(buildProfileExport(profile, { name: user.name, email: user.email }));
 });
 
 app.post("/auth/profile/import", async (c) => {
@@ -437,11 +415,7 @@ app.post("/auth/tokens", async (c) => {
   }
 
   if (body.data.teamId) {
-    const hasAccess = await userHasTeamAccess(
-      db,
-      result.auth.userId,
-      body.data.teamId,
-    );
+    const hasAccess = await userHasTeamAccess(db, result.auth.userId, body.data.teamId);
     if (!hasAccess) {
       return c.json({ error: "Team access denied" }, 403);
     }
@@ -487,10 +461,7 @@ app.get("/teams", async (c) => {
       createdAt: schema.teams.createdAt,
     })
     .from(schema.teams)
-    .innerJoin(
-      schema.teamMembers,
-      eq(schema.teamMembers.teamId, schema.teams.id),
-    )
+    .innerJoin(schema.teamMembers, eq(schema.teamMembers.teamId, schema.teams.id))
     .where(eq(schema.teamMembers.userId, result.auth.userId));
 
   return c.json({ teams: rows });
@@ -822,9 +793,7 @@ app.delete("/statuses/:statusId", async (c) => {
 
   await purgeTrashedIssuesForStatus(db, statusId);
 
-  await db
-    .delete(schema.issueStatuses)
-    .where(eq(schema.issueStatuses.id, statusId));
+  await db.delete(schema.issueStatuses).where(eq(schema.issueStatuses.id, statusId));
 
   return c.body(null, 204);
 });
@@ -838,17 +807,11 @@ app.get("/teams/:teamId/rows", async (c) => {
     return c.json({ error: "Team access denied" }, 403);
   }
 
-  let rows = await db
-    .select()
-    .from(schema.boardRows)
-    .where(eq(schema.boardRows.teamId, teamId));
+  let rows = await db.select().from(schema.boardRows).where(eq(schema.boardRows.teamId, teamId));
 
   if (rows.length === 0) {
     await createDefaultBoardRow(db, teamId);
-    rows = await db
-      .select()
-      .from(schema.boardRows)
-      .where(eq(schema.boardRows.teamId, teamId));
+    rows = await db.select().from(schema.boardRows).where(eq(schema.boardRows.teamId, teamId));
   }
 
   rows.sort((a, b) => a.position - b.position);
@@ -1105,8 +1068,7 @@ app.patch("/teams/:teamId/roles/:roleId", async (c) => {
     return c.json({ role });
   } catch (err) {
     const message = err instanceof Error ? err.message : "Failed to update role";
-    const status =
-      message === "Permission denied" || message === "Role not found" ? 403 : 400;
+    const status = message === "Permission denied" || message === "Role not found" ? 403 : 400;
     return c.json({ error: message }, status);
   }
 });
@@ -1186,12 +1148,7 @@ app.patch("/teams/:teamId/discord-settings", async (c) => {
   }
 
   try {
-    const settings = await updateTeamDiscordSettings(
-      db,
-      teamId,
-      result.auth.userId,
-      body.data,
-    );
+    const settings = await updateTeamDiscordSettings(db, teamId, result.auth.userId, body.data);
     return c.json({ settings });
   } catch (err) {
     const message = err instanceof Error ? err.message : "Failed to update Discord settings";
@@ -1213,7 +1170,9 @@ app.get("/teams/:teamId/integrations/discord/secrets", async (c) => {
   if (!(await userHasTeamAccess(db, result.auth.userId, teamId))) {
     return c.json({ error: "Team access denied" }, 403);
   }
-  if (!(await userHasTeamPermission(db, result.auth.userId, teamId, "integrations.discord.secrets"))) {
+  if (
+    !(await userHasTeamPermission(db, result.auth.userId, teamId, "integrations.discord.secrets"))
+  ) {
     return c.json({ error: "Permission denied" }, 403);
   }
 
@@ -1237,12 +1196,7 @@ app.patch("/teams/:teamId/integrations/discord/secrets", async (c) => {
   }
 
   try {
-    const secrets = await updateDiscordBotSecrets(
-      db,
-      teamId,
-      result.auth.userId,
-      body.data,
-    );
+    const secrets = await updateDiscordBotSecrets(db, teamId, result.auth.userId, body.data);
     return c.json({ secrets });
   } catch (err) {
     const message = err instanceof Error ? err.message : "Failed to update Discord secrets";
@@ -1276,7 +1230,9 @@ app.post("/teams/:teamId/integrations/discord/service/enable", async (c) => {
   if (!(await userHasTeamAccess(db, result.auth.userId, teamId))) {
     return c.json({ error: "Team access denied" }, 403);
   }
-  if (!(await userHasTeamPermission(db, result.auth.userId, teamId, "integrations.discord.secrets"))) {
+  if (
+    !(await userHasTeamPermission(db, result.auth.userId, teamId, "integrations.discord.secrets"))
+  ) {
     return c.json({ error: "Permission denied" }, 403);
   }
 
@@ -1298,7 +1254,9 @@ app.post("/teams/:teamId/integrations/discord/service/restart", async (c) => {
   if (!(await userHasTeamAccess(db, result.auth.userId, teamId))) {
     return c.json({ error: "Team access denied" }, 403);
   }
-  if (!(await userHasTeamPermission(db, result.auth.userId, teamId, "integrations.discord.secrets"))) {
+  if (
+    !(await userHasTeamPermission(db, result.auth.userId, teamId, "integrations.discord.secrets"))
+  ) {
     return c.json({ error: "Permission denied" }, 403);
   }
 
@@ -1320,7 +1278,9 @@ app.post("/teams/:teamId/integrations/discord/service/stop", async (c) => {
   if (!(await userHasTeamAccess(db, result.auth.userId, teamId))) {
     return c.json({ error: "Team access denied" }, 403);
   }
-  if (!(await userHasTeamPermission(db, result.auth.userId, teamId, "integrations.discord.secrets"))) {
+  if (
+    !(await userHasTeamPermission(db, result.auth.userId, teamId, "integrations.discord.secrets"))
+  ) {
     return c.json({ error: "Permission denied" }, 403);
   }
 
@@ -1482,10 +1442,7 @@ app.post("/invites/:token/accept", async (c) => {
     const outcome = await acceptTeamInvite(db, token, result.auth.userId);
     return c.json(outcome);
   } catch (err) {
-    return c.json(
-      { error: err instanceof Error ? err.message : "Failed to accept invite" },
-      400,
-    );
+    return c.json({ error: err instanceof Error ? err.message : "Failed to accept invite" }, 400);
   }
 });
 
@@ -1670,11 +1627,7 @@ app.patch("/rows/:rowId", async (c) => {
   }
 
   if (body.data.assigneeIds !== undefined) {
-    const validIds = await filterValidTeamMemberIds(
-      db,
-      existing.teamId,
-      body.data.assigneeIds,
-    );
+    const validIds = await filterValidTeamMemberIds(db, existing.teamId, body.data.assigneeIds);
     await setBoardRowAssignees(db, rowId, validIds);
   } else if (body.data.assigneeId !== undefined) {
     const validIds =
@@ -1857,11 +1810,7 @@ app.get("/issues/:id", async (c) => {
   if ("error" in result) return result.error;
 
   const id = c.req.param("id");
-  const [issue] = await db
-    .select()
-    .from(schema.issues)
-    .where(eq(schema.issues.id, id))
-    .limit(1);
+  const [issue] = await db.select().from(schema.issues).where(eq(schema.issues.id, id)).limit(1);
 
   if (!issue) return c.json({ error: "Issue not found" }, 404);
   if (!(await userHasTeamAccess(db, result.auth.userId, issue.teamId))) {
@@ -2014,11 +1963,7 @@ app.patch("/issues/:id", async (c) => {
     return c.json({ error: body.error.issues[0]?.message ?? "Invalid input" }, 400);
   }
 
-  const [existing] = await db
-    .select()
-    .from(schema.issues)
-    .where(eq(schema.issues.id, id))
-    .limit(1);
+  const [existing] = await db.select().from(schema.issues).where(eq(schema.issues.id, id)).limit(1);
 
   if (!existing) return c.json({ error: "Issue not found" }, 404);
   if (!(await userHasTeamAccess(db, result.auth.userId, existing.teamId))) {
@@ -2034,11 +1979,7 @@ app.patch("/issues/:id", async (c) => {
   if (body.data.projectId !== undefined) updates.projectId = body.data.projectId;
   if (body.data.priority !== undefined) updates.priority = body.data.priority;
   if (body.data.assigneeIds !== undefined) {
-    const validIds = await filterValidTeamMemberIds(
-      db,
-      existing.teamId,
-      body.data.assigneeIds,
-    );
+    const validIds = await filterValidTeamMemberIds(db, existing.teamId, body.data.assigneeIds);
     await setIssueAssignees(db, id, validIds);
   } else if (body.data.assigneeId !== undefined) {
     const validIds =
@@ -2116,11 +2057,7 @@ app.patch("/issues/:id", async (c) => {
 
   await db.update(schema.issues).set(updates).where(eq(schema.issues.id, id));
 
-  const [issue] = await db
-    .select()
-    .from(schema.issues)
-    .where(eq(schema.issues.id, id))
-    .limit(1);
+  const [issue] = await db.select().from(schema.issues).where(eq(schema.issues.id, id)).limit(1);
 
   const teamKey = await getTeamKey(db, issue!.teamId);
 
@@ -2141,19 +2078,14 @@ app.post("/issues/:id/complete", async (c) => {
   requireWrite(result.auth);
 
   const id = c.req.param("id");
-  const [existing] = await db
-    .select()
-    .from(schema.issues)
-    .where(eq(schema.issues.id, id))
-    .limit(1);
+  const [existing] = await db.select().from(schema.issues).where(eq(schema.issues.id, id)).limit(1);
 
   if (!existing) return c.json({ error: "Issue not found" }, 404);
   if (!(await userHasTeamAccess(db, result.auth.userId, existing.teamId))) {
     return c.json({ error: "Team access denied" }, 403);
   }
 
-  const issueRowId =
-    existing.rowId ?? (await getDefaultRowId(db, existing.teamId));
+  const issueRowId = existing.rowId ?? (await getDefaultRowId(db, existing.teamId));
   const doneStatusId = await getDoneStatusId(db, issueRowId);
   if (!doneStatusId) {
     return c.json({ error: "Done status not configured" }, 400);
@@ -2169,11 +2101,7 @@ app.post("/issues/:id/complete", async (c) => {
     })
     .where(eq(schema.issues.id, id));
 
-  const [issue] = await db
-    .select()
-    .from(schema.issues)
-    .where(eq(schema.issues.id, id))
-    .limit(1);
+  const [issue] = await db.select().from(schema.issues).where(eq(schema.issues.id, id)).limit(1);
 
   const teamKey = await getTeamKey(db, issue!.teamId);
 
@@ -2193,11 +2121,7 @@ app.delete("/issues/:id", async (c) => {
   requireWrite(result.auth);
 
   const id = c.req.param("id");
-  const [existing] = await db
-    .select()
-    .from(schema.issues)
-    .where(eq(schema.issues.id, id))
-    .limit(1);
+  const [existing] = await db.select().from(schema.issues).where(eq(schema.issues.id, id)).limit(1);
 
   if (!existing) return c.json({ error: "Issue not found" }, 404);
   if (existing.deletedAt) return c.body(null, 204);
@@ -2227,11 +2151,7 @@ app.post("/issues/:id/restore", async (c) => {
   requireWrite(result.auth);
 
   const id = c.req.param("id");
-  const [existing] = await db
-    .select()
-    .from(schema.issues)
-    .where(eq(schema.issues.id, id))
-    .limit(1);
+  const [existing] = await db.select().from(schema.issues).where(eq(schema.issues.id, id)).limit(1);
 
   if (!existing) return c.json({ error: "Issue not found" }, 404);
   if (!existing.deletedAt) {
@@ -2247,11 +2167,7 @@ app.post("/issues/:id/restore", async (c) => {
     .set({ deletedAt: null, updatedAt: now })
     .where(eq(schema.issues.id, id));
 
-  const [issue] = await db
-    .select()
-    .from(schema.issues)
-    .where(eq(schema.issues.id, id))
-    .limit(1);
+  const [issue] = await db.select().from(schema.issues).where(eq(schema.issues.id, id)).limit(1);
 
   const teamKey = await getTeamKey(db, issue!.teamId);
 
@@ -2453,12 +2369,7 @@ app.post("/issues/:issueId/attachments", async (c) => {
   }
 
   try {
-    const attachment = await saveIssueAttachment(
-      db,
-      issueId,
-      result.auth.userId,
-      file,
-    );
+    const attachment = await saveIssueAttachment(db, issueId, result.auth.userId, file);
     return c.json({ attachment }, 201);
   } catch (error) {
     if (error instanceof AttachmentError) {
@@ -2491,16 +2402,11 @@ app.post("/issues/:issueId/uploads", async (c) => {
   }
 
   try {
-    const session = await createUploadSession(
-      db,
-      { issueId },
-      result.auth.userId,
-      {
-        filename: body.filename,
-        mimeType: body.mimeType,
-        totalBytes: body.totalBytes,
-      },
-    );
+    const session = await createUploadSession(db, { issueId }, result.auth.userId, {
+      filename: body.filename,
+      mimeType: body.mimeType,
+      totalBytes: body.totalBytes,
+    });
     return c.json({ session }, 201);
   } catch (error) {
     if (error instanceof AttachmentError) {
@@ -2569,11 +2475,7 @@ app.post("/uploads/:sessionId/complete", async (c) => {
   }
 
   try {
-    const attachment = await completeUploadSession(
-      db,
-      sessionId,
-      result.auth.userId,
-    );
+    const attachment = await completeUploadSession(db, sessionId, result.auth.userId);
     return c.json({ attachment }, 201);
   } catch (error) {
     if (error instanceof AttachmentError) {
@@ -2645,12 +2547,7 @@ app.post("/rows/:rowId/attachments", async (c) => {
   }
 
   try {
-    const attachment = await saveRowAttachment(
-      db,
-      rowId,
-      result.auth.userId,
-      file,
-    );
+    const attachment = await saveRowAttachment(db, rowId, result.auth.userId, file);
     return c.json({ attachment }, 201);
   } catch (error) {
     if (error instanceof AttachmentError) {
@@ -2683,16 +2580,11 @@ app.post("/rows/:rowId/uploads", async (c) => {
   }
 
   try {
-    const session = await createUploadSession(
-      db,
-      { rowId },
-      result.auth.userId,
-      {
-        filename: body.filename,
-        mimeType: body.mimeType,
-        totalBytes: body.totalBytes,
-      },
-    );
+    const session = await createUploadSession(db, { rowId }, result.auth.userId, {
+      filename: body.filename,
+      mimeType: body.mimeType,
+      totalBytes: body.totalBytes,
+    });
     return c.json({ session }, 201);
   } catch (error) {
     if (error instanceof AttachmentError) {
@@ -2799,12 +2691,7 @@ app.post("/issues/:issueId/attachments/:id/move", async (c) => {
   }
 
   try {
-    const attachment = await moveIssueAttachment(
-      db,
-      linkId,
-      issueId,
-      body.targetIssueId,
-    );
+    const attachment = await moveIssueAttachment(db, linkId, issueId, body.targetIssueId);
     return c.json({ attachment });
   } catch (error) {
     if (error instanceof AttachmentError) {
@@ -2958,9 +2845,7 @@ app.delete("/issues/:issueId/attachments/:id", async (c) => {
 });
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const webDist =
-  process.env.WEB_DIST ??
-  path.resolve(__dirname, "..", "..", "web", "dist");
+const webDist = process.env.WEB_DIST ?? path.resolve(__dirname, "..", "..", "web", "dist");
 const serveWeb =
   process.env.SERVE_WEB === "true" ||
   (process.env.NODE_ENV === "production" && fs.existsSync(webDist));
@@ -2979,9 +2864,7 @@ const apiPathPrefixes = [
 ];
 
 function isApiPath(pathname: string) {
-  return apiPathPrefixes.some(
-    (prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`),
-  );
+  return apiPathPrefixes.some((prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`));
 }
 
 if (serveWeb) {

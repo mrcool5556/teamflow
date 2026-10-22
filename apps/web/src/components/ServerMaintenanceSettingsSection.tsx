@@ -1,10 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import type { MaintenanceJobPublic, MaintenanceStatusPublic } from "@teamflow/core";
-import {
-  MAINTENANCE_UPDATE_STEPS,
-  inferUpdatePhase,
-  updatePhaseIndex,
-} from "@teamflow/core";
+import { MAINTENANCE_UPDATE_STEPS, inferUpdatePhase, updatePhaseIndex } from "@teamflow/core";
 import { client } from "../api";
 
 type ServerMaintenanceSettingsSectionProps = {
@@ -229,10 +225,7 @@ export function ServerMaintenanceSettingsSection({
     return () => window.clearInterval(timer);
   }, [loadStatus, serverUnreachable, status?.job?.status]);
 
-  async function runAction(
-    label: string,
-    action: () => Promise<{ job: MaintenanceJobPublic }>,
-  ) {
+  async function runAction(label: string, action: () => Promise<{ job: MaintenanceJobPublic }>) {
     if (!canRun) return;
     const confirmed = window.confirm(
       `${label} will run on the server host. The app may restart during an update. Continue?`,
@@ -311,8 +304,8 @@ export function ServerMaintenanceSettingsSection({
             <section className="settings-section">
               <h3>Actions</h3>
               <p className="settings-copy">
-                Database-only backups are fast and run before updates by default. Full backups include
-                uploaded files.
+                Database-only backups are fast and run before updates by default. Full backups
+                include uploaded files.
                 {status.version.updateAvailable ? (
                   <>
                     {" "}

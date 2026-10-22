@@ -1,10 +1,5 @@
 import { relations, sql } from "drizzle-orm";
-import {
-  integer,
-  sqliteTable,
-  text,
-  uniqueIndex,
-} from "drizzle-orm/sqlite-core";
+import { integer, sqliteTable, text, uniqueIndex } from "drizzle-orm/sqlite-core";
 
 export const workspaces = sqliteTable("workspaces", {
   id: text("id")
@@ -441,9 +436,7 @@ export const uploadChunks = sqliteTable(
       .notNull()
       .default(sql`(datetime('now'))`),
   },
-  (table) => [
-    uniqueIndex("upload_chunks_session_index").on(table.sessionId, table.chunkIndex),
-  ],
+  (table) => [uniqueIndex("upload_chunks_session_index").on(table.sessionId, table.chunkIndex)],
 );
 
 export const apiTokens = sqliteTable("api_tokens", {

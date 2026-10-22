@@ -1,18 +1,11 @@
 import { parseRefFromShareUrl } from "@teamflow/core";
-import {
-  SlashCommandBuilder,
-  type ChatInputCommandInteraction,
-} from "discord.js";
+import { SlashCommandBuilder, type ChatInputCommandInteraction } from "discord.js";
 import type { BotConfig } from "./config.js";
 import { buildShareUrl, formatIssueEmbed } from "./links.js";
 import { getGuildRuntimeConfig } from "./guildConfig.js";
 import { memberCanUseCommands, commandAccessDeniedMessage } from "./permissions.js";
 import { buildThreadContext, mergeDescription } from "./threadContext.js";
-import {
-  createTeamflowClient,
-  getDefaultRowId,
-  teamflowErrorMessage,
-} from "./teamflow.js";
+import { createTeamflowClient, getDefaultRowId, teamflowErrorMessage } from "./teamflow.js";
 
 function normalizeRefInput(raw: string) {
   return parseRefFromShareUrl(raw) ?? raw.trim();
@@ -77,17 +70,9 @@ export async function handleSlashCommand(
 
     const runtime = await getGuildRuntimeConfig(client, config, guildId);
     if (
-      !memberCanUseCommands(
-        interaction,
-        runtime.allowedRoleIds,
-        runtime.allowDiscordAdministrators,
-      )
+      !memberCanUseCommands(interaction, runtime.allowedRoleIds, runtime.allowDiscordAdministrators)
     ) {
-      await respond(
-        interaction,
-        commandAccessDeniedMessage(runtime.allowedRoleIds),
-        true,
-      );
+      await respond(interaction, commandAccessDeniedMessage(runtime.allowedRoleIds), true);
       return;
     }
 
@@ -101,10 +86,7 @@ export async function handleSlashCommand(
         return;
       }
       const shareUrl = buildShareUrl(config.publicUrl, result.issue.identifier);
-      await respond(
-        interaction,
-        [formatIssueEmbed(result.issue), shareUrl].join("\n\n"),
-      );
+      await respond(interaction, [formatIssueEmbed(result.issue), shareUrl].join("\n\n"));
       return;
     }
 
@@ -117,9 +99,7 @@ export async function handleSlashCommand(
       }
       const identifier =
         result.issue?.identifier ??
-        (result.resolved.type === "issue"
-          ? result.resolved.identifier
-          : result.resolved.ref);
+        (result.resolved.type === "issue" ? result.resolved.identifier : result.resolved.ref);
       const shareUrl = buildShareUrl(config.publicUrl, identifier);
       await respond(interaction, `**${identifier}**\n${shareUrl}`);
       return;
@@ -138,8 +118,7 @@ export async function handleSlashCommand(
         );
         return;
       }
-      const userDescription =
-        interaction.options.getString("description")?.trim() || undefined;
+      const userDescription = interaction.options.getString("description")?.trim() || undefined;
       const threadContext = await buildThreadContext(interaction);
       const description = mergeDescription(userDescription, threadContext);
       const rowId = await getDefaultRowId(client, teamId);
@@ -151,19 +130,12 @@ export async function handleSlashCommand(
         priority: "none",
       });
       const shareUrl = buildShareUrl(config.publicUrl, issue.identifier);
-      await respond(
-        interaction,
-        `Created **${issue.identifier}** — ${issue.title}\n${shareUrl}`,
-      );
+      await respond(interaction, `Created **${issue.identifier}** — ${issue.title}\n${shareUrl}`);
       return;
     }
 
     await respond(interaction, "Unknown command.", true);
   } catch (err) {
-    await respond(
-      interaction,
-      `Teamflow error: ${teamflowErrorMessage(err)}`,
-      true,
-    );
+    await respond(interaction, `Teamflow error: ${teamflowErrorMessage(err)}`, true);
   }
 }

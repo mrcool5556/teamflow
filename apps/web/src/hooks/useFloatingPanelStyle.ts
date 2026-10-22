@@ -22,15 +22,11 @@ export function useFloatingPanelStyle(
       const width = panelWidth;
       const preferTop =
         placement === "top" ||
-        (placement === "auto" &&
-          rect.bottom + PANEL_ESTIMATE_HEIGHT > window.innerHeight - 12);
+        (placement === "auto" && rect.bottom + PANEL_ESTIMATE_HEIGHT > window.innerHeight - 12);
 
       const left =
         align === "right"
-          ? Math.min(
-              Math.max(12, rect.right - width),
-              window.innerWidth - width - 12,
-            )
+          ? Math.min(Math.max(12, rect.right - width), window.innerWidth - width - 12)
           : Math.max(12, Math.min(rect.left, window.innerWidth - width - 12));
 
       setStyle({

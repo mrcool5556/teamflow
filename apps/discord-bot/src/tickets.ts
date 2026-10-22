@@ -3,11 +3,7 @@ import type { BotConfig } from "./config.js";
 import { buildShareUrl } from "./links.js";
 import { getGuildRuntimeConfig } from "./guildConfig.js";
 import { messageBody } from "./messageText.js";
-import {
-  createTeamflowClient,
-  getDefaultRowId,
-  teamflowErrorMessage,
-} from "./teamflow.js";
+import { createTeamflowClient, getDefaultRowId, teamflowErrorMessage } from "./teamflow.js";
 
 export function registerTicketHandlers(client: Client, config: BotConfig) {
   client.on("threadCreate", (thread) => {
@@ -58,9 +54,7 @@ async function handleTicketThread(thread: ThreadChannel, config: BotConfig) {
   } catch (err) {
     console.error("[teamflow-discord] ticket thread failed:", err);
     try {
-      await thread.send(
-        `Could not create Teamflow issue: ${teamflowErrorMessage(err)}`,
-      );
+      await thread.send(`Could not create Teamflow issue: ${teamflowErrorMessage(err)}`);
     } catch {
       // ignore reply failures
     }

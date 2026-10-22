@@ -60,11 +60,7 @@ export function LinkPasteOffer({
         <button type="button" className="ghost" onClick={onKeep}>
           Keep URL
         </button>
-        <button
-          type="button"
-          disabled={!label.trim()}
-          onClick={() => onShorten(label.trim())}
-        >
+        <button type="button" disabled={!label.trim()} onClick={() => onShorten(label.trim())}>
           Shorten
         </button>
       </div>

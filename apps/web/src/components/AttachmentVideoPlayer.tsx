@@ -40,10 +40,7 @@ type AttachmentVideoThumbnailProps = {
   onOpen: () => void;
 };
 
-export function AttachmentVideoThumbnail({
-  attachment,
-  onOpen,
-}: AttachmentVideoThumbnailProps) {
+export function AttachmentVideoThumbnail({ attachment, onOpen }: AttachmentVideoThumbnailProps) {
   return (
     <button
       type="button"

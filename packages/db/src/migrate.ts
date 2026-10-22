@@ -15,10 +15,7 @@ function runMigrations() {
 
   const migrationsDir = path.join(__dirname, "..", "drizzle");
   if (!fs.existsSync(migrationsDir)) {
-    const initSql = fs.readFileSync(
-      path.join(__dirname, "init.sql"),
-      "utf8",
-    );
+    const initSql = fs.readFileSync(path.join(__dirname, "init.sql"), "utf8");
     sqlite.exec(initSql);
     console.log("Applied init.sql");
     applySchemaPatches(sqlite);

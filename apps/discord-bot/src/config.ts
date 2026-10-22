@@ -49,11 +49,7 @@ function parseIdList(raw: string | undefined) {
   );
 }
 
-function loadEnvOptionalFields(
-  teamflowUrl: string,
-  publicUrl: string,
-  requireTeamMapping = true,
-) {
+function loadEnvOptionalFields(teamflowUrl: string, publicUrl: string, requireTeamMapping = true) {
   const defaultTeamId = process.env.TEAMFLOW_TEAM_ID?.trim() || null;
   const guildTeams = parseJsonRecord(process.env.DISCORD_GUILD_TEAMS);
 
@@ -70,8 +66,7 @@ function loadEnvOptionalFields(
     guildTeams,
     ticketChannelIds: parseIdList(process.env.DISCORD_TICKET_CHANNEL_IDS),
     registerGuildIds: [...parseIdList(process.env.DISCORD_REGISTER_GUILD_IDS)],
-    messageContentIntent:
-      process.env.DISCORD_MESSAGE_CONTENT_INTENT === "true",
+    messageContentIntent: process.env.DISCORD_MESSAGE_CONTENT_INTENT === "true",
     allowedRoleIds: [...parseIdList(process.env.DISCORD_ALLOWED_ROLE_IDS)],
     allowDiscordAdministrators: process.env.DISCORD_ALLOW_ADMINISTRATORS === "true",
   };
@@ -116,10 +111,7 @@ function loadConfigFromEnv(): BotConfig {
   }
 
   const teamflowUrl = (process.env.TEAMFLOW_URL ?? "http://localhost:3000").replace(/\/$/, "");
-  const publicUrl = (process.env.TEAMFLOW_PUBLIC_URL ?? "http://localhost:5173").replace(
-    /\/$/,
-    "",
-  );
+  const publicUrl = (process.env.TEAMFLOW_PUBLIC_URL ?? "http://localhost:5173").replace(/\/$/, "");
   const optional = loadEnvOptionalFields(teamflowUrl, publicUrl);
 
   return {
@@ -142,9 +134,7 @@ async function loadConfigFromSettings(teamflowUrl: string, configKey: string) {
     );
   }
   if (response.status === 404) {
-    throw new Error(
-      "Discord bot secrets are not saved in Settings → Integrations yet",
-    );
+    throw new Error("Discord bot secrets are not saved in Settings → Integrations yet");
   }
   if (!response.ok) {
     const payload = (await response.json().catch(() => ({}))) as { error?: string };

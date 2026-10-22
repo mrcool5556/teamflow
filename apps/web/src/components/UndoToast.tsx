@@ -17,10 +17,7 @@ export function UndoToast({
 }: UndoToastProps) {
   return (
     <div className="undo-toast" role="status" aria-live="polite">
-      <div
-        className="undo-toast-progress"
-        style={{ animationDuration: `${UNDO_DELAY_MS}ms` }}
-      />
+      <div className="undo-toast-progress" style={{ animationDuration: `${UNDO_DELAY_MS}ms` }} />
       <span className="undo-toast-label">{label}</span>
       <button
         type="button"

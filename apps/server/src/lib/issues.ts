@@ -63,11 +63,7 @@ export async function mapIssue(
   };
 }
 
-export async function listIssuesForUser(
-  db: Db,
-  userId: string,
-  filters: ListIssuesInput,
-) {
+export async function listIssuesForUser(db: Db, userId: string, filters: ListIssuesInput) {
   const memberships = await db
     .select({ teamId: schema.teamMembers.teamId })
     .from(schema.teamMembers)
@@ -108,39 +104,24 @@ export async function listIssuesForUser(
 
   const teamKeys = new Map<string, string>();
   for (const teamId of new Set(rows.map((r) => r.teamId))) {
-    const [team] = await db
-      .select()
-      .from(schema.teams)
-      .where(eq(schema.teams.id, teamId))
-      .limit(1);
+    const [team] = await db.select().from(schema.teams).where(eq(schema.teams.id, teamId)).limit(1);
     if (team) teamKeys.set(teamId, team.key);
   }
 
-  return Promise.all(
-    rows.map((issue) => mapIssue(db, issue, teamKeys.get(issue.teamId) ?? "ISS")),
-  );
+  return Promise.all(rows.map((issue) => mapIssue(db, issue, teamKeys.get(issue.teamId) ?? "ISS")));
 }
 
 export async function userHasTeamAccess(db: Db, userId: string, teamId: string) {
   const [member] = await db
     .select()
     .from(schema.teamMembers)
-    .where(
-      and(
-        eq(schema.teamMembers.userId, userId),
-        eq(schema.teamMembers.teamId, teamId),
-      ),
-    )
+    .where(and(eq(schema.teamMembers.userId, userId), eq(schema.teamMembers.teamId, teamId)))
     .limit(1);
   return Boolean(member);
 }
 
 export async function getTeamKey(db: Db, teamId: string) {
-  const [team] = await db
-    .select()
-    .from(schema.teams)
-    .where(eq(schema.teams.id, teamId))
-    .limit(1);
+  const [team] = await db.select().from(schema.teams).where(eq(schema.teams.id, teamId)).limit(1);
   return team?.key ?? "ISS";
 }
 
@@ -150,8 +131,5 @@ export async function getDoneStatusId(db: Db, rowId: string) {
     .from(schema.issueStatuses)
     .where(eq(schema.issueStatuses.rowId, rowId));
 
-  return (
-    statuses.find((s) => s.type === "done")?.id ??
-    statuses.find((s) => s.name === "Done")?.id
-  );
+  return statuses.find((s) => s.type === "done")?.id ?? statuses.find((s) => s.name === "Done")?.id;
 }

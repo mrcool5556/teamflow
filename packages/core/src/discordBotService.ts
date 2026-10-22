@@ -1,9 +1,4 @@
-export type DiscordBotServiceState =
-  | "not_installed"
-  | "stopped"
-  | "running"
-  | "failed"
-  | "unknown";
+export type DiscordBotServiceState = "not_installed" | "stopped" | "running" | "failed" | "unknown";
 
 export type DiscordBotServiceStatusPublic = {
   /** Linux host with scripts + sudo for systemctl management */

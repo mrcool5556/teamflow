@@ -69,7 +69,12 @@ export function LinkFromFileRef({
             }
           }}
         />
-        <button type="button" className="secondary compact" disabled={disabled || busy} onClick={() => void submit()}>
+        <button
+          type="button"
+          className="secondary compact"
+          disabled={disabled || busy}
+          onClick={() => void submit()}
+        >
           {busy ? "Linking…" : "Link"}
         </button>
       </div>

@@ -24,9 +24,7 @@ export function formatIssueEmbed(issue: {
   }
   if (issue.description?.trim()) {
     const preview =
-      issue.description.length > 400
-        ? `${issue.description.slice(0, 397)}…`
-        : issue.description;
+      issue.description.length > 400 ? `${issue.description.slice(0, 397)}…` : issue.description;
     lines.push("", preview);
   }
   return lines.join("\n");

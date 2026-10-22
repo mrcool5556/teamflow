@@ -8,8 +8,18 @@ const PREVIEW_COLUMNS = [
 
 const PREVIEW_CARDS = [
   { id: "preview-1", identifier: "PREV-1", title: "Sample card — column width", status: "backlog" },
-  { id: "preview-2", identifier: "PREV-2", title: "Another card in progress", status: "in_progress" },
-  { id: "preview-3", identifier: "PREV-3", title: "Taller cards use min height", status: "in_progress" },
+  {
+    id: "preview-2",
+    identifier: "PREV-2",
+    title: "Another card in progress",
+    status: "in_progress",
+  },
+  {
+    id: "preview-3",
+    identifier: "PREV-3",
+    title: "Taller cards use min height",
+    status: "in_progress",
+  },
 ] as const;
 
 export function BoardLayoutPreview() {

@@ -23,16 +23,11 @@ export function getPasswordResetAuthConfig() {
 }
 
 export async function requestPasswordReset(db: Db, email: string) {
-  const [user] = await db
-    .select()
-    .from(schema.users)
-    .where(eq(schema.users.email, email))
-    .limit(1);
+  const [user] = await db.select().from(schema.users).where(eq(schema.users.email, email)).limit(1);
 
   if (!user) {
     return {
-      message:
-        "If an account exists for that email, password reset instructions have been sent.",
+      message: "If an account exists for that email, password reset instructions have been sent.",
     };
   }
 
@@ -60,9 +55,7 @@ export async function requestPasswordReset(db: Db, email: string) {
   const emailed = await sendPasswordResetEmail(user.email, resetUrl);
 
   if (!emailed) {
-    console.log(
-      `[teamflow] Password reset for ${user.email} (SMTP not configured): ${resetUrl}`,
-    );
+    console.log(`[teamflow] Password reset for ${user.email} (SMTP not configured): ${resetUrl}`);
   }
 
   return {
@@ -94,10 +87,7 @@ export async function resetPasswordWithToken(db: Db, token: string, password: st
 
   const passwordHash = await hashPassword(password);
 
-  await db
-    .update(schema.users)
-    .set({ passwordHash })
-    .where(eq(schema.users.id, row.userId));
+  await db.update(schema.users).set({ passwordHash }).where(eq(schema.users.id, row.userId));
 
   await db
     .update(schema.passwordResetTokens)

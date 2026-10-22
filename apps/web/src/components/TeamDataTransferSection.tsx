@@ -88,8 +88,11 @@ export function TeamDataTransferSection({
       <h3>Export &amp; import</h3>
       <p className="settings-copy">
         Download a portable <strong>teamflow-bundle/1</strong> zip of{" "}
-        <strong>{teamKey} — {teamName}</strong>, or merge a bundle into this team. Assignees match
-        by email; refs in descriptions are rewritten on import.
+        <strong>
+          {teamKey} — {teamName}
+        </strong>
+        , or merge a bundle into this team. Assignees match by email; refs in descriptions are
+        rewritten on import.
       </p>
 
       <div className="settings-subsection">

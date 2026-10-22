@@ -1,4 +1,12 @@
-import { useCallback, useEffect, useMemo, useRef, useState, type ChangeEvent, type DragEvent } from "react";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type ChangeEvent,
+  type DragEvent,
+} from "react";
 import type { BoardRowPublic, IssueAttachmentPublic } from "@teamflow/core";
 import {
   DEFAULT_ATTACHMENT_LIMITS,
@@ -51,15 +59,12 @@ export function RowFilesDrawer({ row, onClose, onNavigateRef }: RowFilesDrawerPr
   const [attachments, setAttachments] = useState<IssueAttachmentPublic[]>([]);
   const [attachmentsLoading, setAttachmentsLoading] = useState(true);
   const [uploadingAttachment, setUploadingAttachment] = useState(false);
-  const [attachmentUploadProgress, setAttachmentUploadProgress] = useState<number | null>(
-    null,
-  );
+  const [attachmentUploadProgress, setAttachmentUploadProgress] = useState<number | null>(null);
   const [attachmentUploadName, setAttachmentUploadName] = useState<string | null>(null);
   const [deletingAttachmentId, setDeletingAttachmentId] = useState<string | null>(null);
   const [attachmentDragOver, setAttachmentDragOver] = useState(false);
-  const [attachmentLimits, setAttachmentLimits] = useState<AttachmentLimitsPublic>(
-    DEFAULT_ATTACHMENT_LIMITS,
-  );
+  const [attachmentLimits, setAttachmentLimits] =
+    useState<AttachmentLimitsPublic>(DEFAULT_ATTACHMENT_LIMITS);
   const [attachmentLightbox, setAttachmentLightbox] = useState<{
     attachment: IssueAttachmentPublic;
     imageUrl: string;
@@ -115,7 +120,8 @@ export function RowFilesDrawer({ row, onClose, onNavigateRef }: RowFilesDrawerPr
     const q = fileSearch.trim().toLowerCase();
     if (!q) return attachments;
     return attachments.filter((attachment) => {
-      const hay = `${attachment.filename} ${attachment.fileRef} ${attachment.uploaderName}`.toLowerCase();
+      const hay =
+        `${attachment.filename} ${attachment.fileRef} ${attachment.uploaderName}`.toLowerCase();
       return hay.includes(q);
     });
   }, [attachments, fileSearch]);
@@ -270,9 +276,7 @@ export function RowFilesDrawer({ row, onClose, onNavigateRef }: RowFilesDrawerPr
                       <AttachmentImageThumbnail
                         attachment={attachment}
                         blobCache={attachmentBlobCache}
-                        onOpen={(imageUrl) =>
-                          setAttachmentLightbox({ attachment, imageUrl })
-                        }
+                        onOpen={(imageUrl) => setAttachmentLightbox({ attachment, imageUrl })}
                       />
                     ) : null}
                     <div className="issue-attachment-main">
@@ -299,17 +303,20 @@ export function RowFilesDrawer({ row, onClose, onNavigateRef }: RowFilesDrawerPr
                       </span>
                     </div>
                     <div className="issue-attachment-actions">
-                      <FileRefCopyButton fileRef={attachment.fileRef} filename={attachment.filename} />
+                      <FileRefCopyButton
+                        fileRef={attachment.fileRef}
+                        filename={attachment.filename}
+                      />
                       <button
-                      type="button"
-                      className="ghost issue-attachment-delete"
-                      disabled={deletingAttachmentId === attachment.id}
-                      onClick={() => void deleteAttachment(attachment)}
-                      aria-label={`Remove ${attachment.filename}`}
-                      title="Remove file"
-                    >
-                      {deletingAttachmentId === attachment.id ? "…" : "Remove"}
-                    </button>
+                        type="button"
+                        className="ghost issue-attachment-delete"
+                        disabled={deletingAttachmentId === attachment.id}
+                        onClick={() => void deleteAttachment(attachment)}
+                        aria-label={`Remove ${attachment.filename}`}
+                        title="Remove file"
+                      >
+                        {deletingAttachmentId === attachment.id ? "…" : "Remove"}
+                      </button>
                     </div>
                   </li>
                 ))}

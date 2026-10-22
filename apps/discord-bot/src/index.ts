@@ -6,13 +6,7 @@ import { fileURLToPath } from "node:url";
 
 loadEnv({ path: join(dirname(fileURLToPath(import.meta.url)), "..", ".env") });
 
-import {
-  Client,
-  Events,
-  GatewayIntentBits,
-  REST,
-  Routes,
-} from "discord.js";
+import { Client, Events, GatewayIntentBits, REST, Routes } from "discord.js";
 import { handleSlashCommand, slashCommands } from "./commands.js";
 import { loadConfig, type BotConfig } from "./config.js";
 import { registerTicketHandlers } from "./tickets.js";

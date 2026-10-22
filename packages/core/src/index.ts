@@ -69,7 +69,10 @@ export const createTeamInviteSchema = z.object({
   roleId: z.string().uuid().optional(),
   role: z.enum(TEAM_ROLES).optional(),
   expiresInDays: z.number().int().min(1).max(365).optional(),
-  maxUses: z.union([z.literal(1), z.null()]).optional().default(1),
+  maxUses: z
+    .union([z.literal(1), z.null()])
+    .optional()
+    .default(1),
 });
 
 export const createTeamRoleSchema = z.object({
@@ -95,9 +98,7 @@ export const updateTeamDiscordSettingsSchema = z.object({
   allowDiscordAdministrators: z.boolean().optional(),
 });
 
-export type UpdateTeamDiscordSettingsInput = z.infer<
-  typeof updateTeamDiscordSettingsSchema
->;
+export type UpdateTeamDiscordSettingsInput = z.infer<typeof updateTeamDiscordSettingsSchema>;
 
 export type TeamDiscordSettingsPublic = {
   teamId: string;
@@ -226,10 +227,7 @@ export const updateStatusSchema = z
     color: boardColorSchema.optional(),
   })
   .refine(
-    (data) =>
-      data.name !== undefined ||
-      data.position !== undefined ||
-      data.color !== undefined,
+    (data) => data.name !== undefined || data.position !== undefined || data.color !== undefined,
     { message: "No updates provided" },
   );
 
