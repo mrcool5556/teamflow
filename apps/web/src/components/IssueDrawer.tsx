@@ -11,6 +11,7 @@ import type {
 import { PRIORITIES, PRIORITY_LABELS } from "@teamflow/core";
 import { useQueryClient } from "@tanstack/react-query";
 import { useConfirm } from "../ui/confirmContext";
+import { useCanEditBoard } from "../lib/teamPermissions";
 import { client } from "../api";
 import { queryKeys } from "../queries/keys";
 import { useIssueQuery } from "../queries/issue";
@@ -79,6 +80,8 @@ export function IssueDrawer({
   const [description, setDescription] = useState(issue.description ?? "");
   const queryClient = useQueryClient();
   const confirm = useConfirm();
+  // Without board.edit the drawer is for reading: every control that writes is disabled.
+  const canEdit = useCanEditBoard();
   const issueQuery = useIssueQuery(issue.id);
   const comments = issueQuery.data?.comments ?? NO_COMMENTS;
   const commentsLoading = issueQuery.isPending;
@@ -243,6 +246,7 @@ export function IssueDrawer({
           <input
             className="issue-drawer-title"
             value={title}
+            readOnly={!canEdit}
             onChange={(e) => {
               setTitle(e.target.value);
               queueTitleSave(e.target.value);
@@ -281,6 +285,7 @@ export function IssueDrawer({
               <span className="issue-drawer-label">Status</span>
               <select
                 value={issue.statusId}
+                disabled={!canEdit}
                 onChange={(e) => {
                   void patchIssue({ statusId: e.target.value });
                 }}
@@ -297,6 +302,7 @@ export function IssueDrawer({
               <span className="issue-drawer-label">Priority</span>
               <select
                 value={issue.priority}
+                disabled={!canEdit}
                 onChange={(e) => {
                   void patchIssue({ priority: e.target.value as Priority });
                 }}
@@ -318,6 +324,7 @@ export function IssueDrawer({
                 }}
                 title="Card color"
                 hint="Left accent on the board card."
+                disabled={!canEdit}
               />
             </div>
 
@@ -326,6 +333,7 @@ export function IssueDrawer({
                 <span className="issue-drawer-label">Row</span>
                 <select
                   value={issue.rowId ?? ""}
+                  disabled={!canEdit}
                   onChange={(e) => {
                     const rowId = e.target.value || null;
                     void patchIssue({ rowId });
@@ -344,6 +352,7 @@ export function IssueDrawer({
               <span className="issue-drawer-label">Due</span>
               <input
                 type="datetime-local"
+                disabled={!canEdit}
                 value={toDateInputValue(issue.dueDate)}
                 onChange={(e) => {
                   void patchIssue({ dueDate: fromDateInputValue(e.target.value) });
@@ -355,6 +364,7 @@ export function IssueDrawer({
               <span className="issue-drawer-label">Assignees</span>
               <MultiAssigneePicker
                 members={members}
+                disabled={!canEdit}
                 assigneeIds={
                   issue.assignees?.map((assignee) => assignee.userId) ??
                   (issue.assigneeId ? [issue.assigneeId] : [])
@@ -369,6 +379,7 @@ export function IssueDrawer({
               <span className="issue-drawer-label">Timer</span>
               <IssueTimer
                 issue={issue}
+                disabled={!canEdit}
                 onUpdate={(patch) => {
                   void patchIssue(patch);
                 }}
@@ -381,6 +392,7 @@ export function IssueDrawer({
           <DescriptionEditor
             key={issue.id}
             value={description}
+            readOnly={!canEdit}
             onChange={(nextDescription) => {
               setDescription(nextDescription);
               queueDescriptionSave(nextDescription);
@@ -439,7 +451,7 @@ export function IssueDrawer({
                     <button
                       type="button"
                       className="ghost issue-attachment-delete"
-                      disabled={files.deletingId === attachment.id}
+                      disabled={!canEdit || files.deletingId === attachment.id}
                       onClick={() => void files.remove(attachment)}
                       aria-label={`Remove ${attachment.filename}`}
                       title="Remove attachment"
@@ -458,16 +470,18 @@ export function IssueDrawer({
             row={issueRow}
             linkedFileIds={files.linkedFileIds}
             onLinked={files.addLinked}
+            disabled={!canEdit}
           />
 
           <div
             className={`issue-attachment-drop${files.dragOver ? " issue-attachment-drop--active" : ""}`}
-            {...files.dropZoneProps}
+            {...(canEdit ? files.dropZoneProps : null)}
           >
             <input
               ref={bindFileInput}
               type="file"
               className="issue-attachment-input"
+              disabled={!canEdit}
               onChange={files.onInputChange}
             />
             <p>
@@ -499,7 +513,7 @@ export function IssueDrawer({
             <button
               type="button"
               className="ghost"
-              disabled={files.uploading}
+              disabled={!canEdit || files.uploading}
               onClick={files.chooseFile}
             >
               Choose file
@@ -529,7 +543,7 @@ export function IssueDrawer({
                       <button
                         type="button"
                         className="ghost issue-comment-delete"
-                        disabled={deletingCommentId === comment.id}
+                        disabled={!canEdit || deletingCommentId === comment.id}
                         onClick={() => void deleteComment(comment)}
                         aria-label="Delete comment"
                         title="Delete comment"
@@ -550,6 +564,7 @@ export function IssueDrawer({
             <textarea
               ref={commentTextareaRef}
               value={commentDraft}
+              disabled={!canEdit}
               onChange={(e) => {
                 setCommentDraft(e.target.value);
                 clearCommentLinkOfferOnEdit();
@@ -574,7 +589,7 @@ export function IssueDrawer({
                 <button
                   type="button"
                   className="ghost"
-                  disabled={!/https?:\/\//.test(commentDraft)}
+                  disabled={!canEdit || !/https?:\/\//.test(commentDraft)}
                   onClick={openCommentShortenOffer}
                   title="Choose a short display label for a URL"
                 >
@@ -584,7 +599,7 @@ export function IssueDrawer({
               </div>
               <button
                 type="button"
-                disabled={!commentDraft.trim() || commentSubmitting}
+                disabled={!canEdit || !commentDraft.trim() || commentSubmitting}
                 onClick={() => void submitComment()}
               >
                 {commentSubmitting ? "Posting…" : "Post comment"}
@@ -594,10 +609,15 @@ export function IssueDrawer({
         </section>
 
         <div className="row drawer-actions issue-drawer-actions">
-          <button type="button" onClick={() => void markDone()}>
+          <button type="button" disabled={!canEdit} onClick={() => void markDone()}>
             Mark done
           </button>
-          <button type="button" className="danger" onClick={() => onDelete(issue)}>
+          <button
+            type="button"
+            className="danger"
+            disabled={!canEdit}
+            onClick={() => onDelete(issue)}
+          >
             Delete
           </button>
         </div>

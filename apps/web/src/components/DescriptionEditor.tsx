@@ -12,6 +12,8 @@ type DescriptionEditorProps = {
   onChange: (value: string) => void;
   onBlur?: () => void;
   onNavigateRef?: (ref: string) => void;
+  /** Show the description without the click-to-edit affordance. */
+  readOnly?: boolean;
 };
 
 function renderSegment(
@@ -93,6 +95,7 @@ export function DescriptionEditor({
   onChange,
   onBlur,
   onNavigateRef,
+  readOnly = false,
 }: DescriptionEditorProps) {
   const [editing, setEditing] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -132,7 +135,17 @@ export function DescriptionEditor({
     <div className="description-editor">
       <h3 className="description-editor-heading">Description</h3>
 
-      {editing ? (
+      {readOnly ? (
+        <div className="issue-drawer-description-view">
+          {isEmpty ? (
+            <p className="muted description-empty">No description.</p>
+          ) : (
+            <div className="description-rendered">
+              {segments.map((segment, index) => renderSegment(segment, index, onNavigateRef))}
+            </div>
+          )}
+        </div>
+      ) : editing ? (
         <>
           <div
             className="description-toolbar"
