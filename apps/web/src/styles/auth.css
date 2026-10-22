@@ -1,0 +1,35 @@
+:root[data-chrome-style="glass"] .login-card {
+  background: color-mix(in srgb, var(--surface) 76%, transparent);
+  backdrop-filter: blur(14px) saturate(145%);
+  -webkit-backdrop-filter: blur(14px) saturate(145%);
+}
+
+.login-shell {
+  min-height: 100vh;
+  display: grid;
+  place-items: center;
+  padding: 2rem;
+}
+
+.login-card {
+  width: min(480px, 100%);
+  background: var(--surface);
+  border: var(--chrome-frame-border-width) solid var(--border);
+  padding: 1.5rem;
+  box-shadow: var(--chrome-modal-shadow);
+}
+
+.login-card label {
+  display: grid;
+  gap: 0.35rem;
+  margin-bottom: 0.85rem;
+}
+
+.login-forgot-link {
+  display: block;
+  margin: -0.35rem 0 0.85rem;
+  padding: 0;
+  text-align: right;
+  font-size: 0.82rem;
+  text-decoration: underline;
+}

@@ -1,0 +1,467 @@
+:root[data-chrome-style="glass"] body {
+  background:
+    radial-gradient(
+      ellipse 80% 55% at 8% -8%,
+      color-mix(in srgb, var(--accent) 18%, transparent),
+      transparent 58%
+    ),
+    radial-gradient(
+      ellipse 70% 50% at 100% 0%,
+      color-mix(in srgb, var(--primary) 14%, transparent),
+      transparent 52%
+    ),
+    var(--bg);
+}
+
+:root[data-chrome-style="terminal"] button:not(.ghost):not(.danger) {
+  text-shadow: 0 0 10px color-mix(in srgb, var(--accent) 40%, transparent);
+}
+
+:root[data-chrome-style="terminal"] .eyebrow {
+  text-shadow: 0 0 8px color-mix(in srgb, var(--accent) 35%, transparent);
+}
+
+:root[data-chrome-style="paper"] h1,
+:root[data-chrome-style="paper"] h2,
+:root[data-chrome-style="paper"] h3 {
+  font-family: Georgia, "Times New Roman", serif;
+  letter-spacing: 0.01em;
+}
+
+:root[data-chrome-style="neon"] .eyebrow {
+  color: var(--accent-text);
+  text-shadow: 0 0 10px color-mix(in srgb, var(--accent) 42%, transparent);
+}
+
+:root[data-chrome-style="neon"] .ref-copy-btn.ref-copy-btn--issue {
+  color: var(--accent-text);
+  border-color: color-mix(in srgb, var(--accent) 38%, var(--border));
+  background: color-mix(in srgb, var(--panel) 84%, var(--accent) 16%);
+  box-shadow:
+    var(--issue-id-shadow),
+    0 0 10px color-mix(in srgb, var(--accent) 20%, transparent);
+}
+
+:root[data-chrome-style="neon"]
+  button:not(.ghost):not(.danger):not(.ref-copy-btn):not(.priority-picker-trigger) {
+  text-shadow: 0 0 8px color-mix(in srgb, var(--accent) 42%, transparent);
+}
+
+:root[data-chrome-style="terminal"][data-theme="dark"] .muted {
+  text-shadow: none;
+}
+
+:root[data-chrome-style="terminal"][data-theme="dark"] button:not(.ghost):not(.danger) {
+  text-shadow: 0 0 8px color-mix(in srgb, var(--accent) 45%, transparent);
+}
+
+:root[data-chrome-style="terminal"][data-theme="dark"] .eyebrow {
+  text-shadow: 0 0 7px color-mix(in srgb, var(--accent) 55%, transparent);
+}
+
+:root[data-chrome-style="terminal"][data-theme="light"] button:not(.ghost):not(.danger),
+:root[data-chrome-style="terminal"][data-theme="light"] .eyebrow {
+  text-shadow: none;
+}
+
+:root[data-chrome-style="neon"][data-theme="dark"] .eyebrow {
+  color: var(--accent-text);
+  text-shadow: 0 0 8px color-mix(in srgb, var(--accent) 50%, transparent);
+}
+
+:root[data-chrome-style="neon"][data-theme="dark"] .ref-copy-btn.ref-copy-btn--issue {
+  box-shadow:
+    var(--issue-id-shadow),
+    0 0 12px color-mix(in srgb, var(--accent) 28%, transparent);
+}
+
+:root[data-chrome-style="neon"][data-theme="light"] .eyebrow {
+  color: var(--accent-text);
+  text-shadow: 0 0 8px color-mix(in srgb, var(--accent) 32%, transparent);
+}
+
+:root[data-chrome-style="neon"][data-theme="light"] .ref-copy-btn.ref-copy-btn--issue {
+  box-shadow:
+    2px 2px 0 #000,
+    0 0 12px color-mix(in srgb, var(--accent) 22%, transparent);
+}
+
+:root[data-shape="octagon"] .banner {
+  border-radius: var(--radius-xs);
+  clip-path: var(--clip-chamfer-md);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+}
+
+h1,
+h2,
+h3 {
+  font-family: "Space Grotesk", sans-serif;
+  margin: 0;
+}
+
+button,
+input,
+select {
+  font: inherit;
+}
+
+button {
+  background: var(--primary);
+  color: var(--chrome-btn-text);
+  border: var(--chrome-btn-border-width) solid var(--chrome-btn-border-color);
+  padding: 0.55rem 0.9rem;
+  cursor: pointer;
+  box-shadow: var(--chrome-btn-shadow);
+  border-radius: var(--radius-sm);
+}
+
+button.ghost {
+  background: transparent;
+  color: var(--text);
+  border-color: var(--border);
+  box-shadow: none;
+}
+
+button.danger {
+  background: transparent;
+  color: var(--danger);
+  border-color: var(--danger);
+  box-shadow: none;
+}
+
+button.danger:hover {
+  background: color-mix(in srgb, var(--danger) 12%, transparent);
+}
+
+input,
+select {
+  width: 100%;
+  background: var(--surface);
+  color: var(--text);
+  border: var(--chrome-input-border-width) solid var(--border);
+  padding: 0.55rem 0.75rem;
+  border-radius: var(--radius-sm);
+}
+
+.eyebrow {
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  font-size: var(--font-size-xs);
+  color: var(--accent-text);
+}
+
+.muted {
+  color: var(--muted);
+}
+
+.banner {
+  border-radius: var(--radius-sm);
+  margin: var(--space-3) var(--space-5) 0;
+  padding: var(--space-3) var(--space-4);
+  border: var(--chrome-frame-border-width) solid var(--border);
+  background: var(--panel);
+  box-shadow: var(--chrome-surface-shadow);
+}
+
+.banner.error {
+  border-color: var(--danger);
+  color: var(--danger-text);
+}
+
+.preview-chip {
+  margin-left: auto;
+  font-size: 0.68rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--muted);
+  border: 1px solid var(--border);
+  padding: 0.15rem 0.45rem;
+}
+
+.preview-muted {
+  opacity: 0.45;
+}
+
+.row-separator-title .ref-actions {
+  flex-shrink: 0;
+}
+
+.toolbar-users {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  flex-shrink: 0;
+  padding: 0.2rem 0.45rem;
+  border: 2px solid var(--border);
+  background: var(--surface);
+}
+
+.toolbar-users-label {
+  font-size: 0.68rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+.board-row.has-row-color .row-separator-title .ref-action-btn {
+  background: color-mix(in srgb, var(--row-accent) 12%, var(--panel));
+  border-color: color-mix(in srgb, var(--row-accent) 35%, var(--border));
+}
+
+.team-files-item-actions .file-ref-copy-btn.team-files-action-btn {
+  width: 100%;
+  justify-content: center;
+  font-size: 0.74rem;
+  padding: 0.28rem 0.45rem;
+  min-height: 2rem;
+}
+
+.team-files-item-actions .file-ref-copy-btn {
+  width: 100%;
+  justify-content: center;
+}
+
+.column-label-actions .ref-copy-btn {
+  font-size: 0.72rem;
+  padding: 0.2rem 0.45rem;
+}
+
+.ref-copy-btn.ref-copy-btn--issue .ref-copy-label {
+  text-shadow: var(--issue-id-text-shadow);
+}
+
+.ref-copy-btn.ref-copy-btn--issue {
+  display: inline-block;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  line-height: 1.2;
+  background: color-mix(in srgb, var(--panel) 94%, var(--surface));
+  border-radius: var(--radius-xs);
+  box-shadow: var(--issue-id-shadow);
+  font-size: 0.78rem;
+  color: var(--accent-text);
+  border-color: color-mix(in srgb, var(--accent) 55%, var(--border-strong));
+  max-width: none;
+}
+
+:root[data-theme="light"] .ref-copy-btn.ref-copy-btn--issue {
+  box-shadow: 2px 2px 0 #000;
+}
+
+.add-card-btn {
+  flex-shrink: 0;
+  width: calc(100% - 1.1rem);
+  text-align: center;
+  margin: 0 0.55rem 0.55rem;
+  font-size: 0.74rem;
+  padding: 0.45rem;
+  color: var(--muted);
+  border-style: dashed;
+  border-width: 2px;
+}
+
+.add-card-btn:hover {
+  color: var(--text);
+  border-color: var(--border-strong);
+}
+
+.panel label {
+  display: grid;
+  gap: 0.35rem;
+  margin-bottom: 0.85rem;
+}
+
+.tabs {
+  display: flex;
+  gap: 0.5rem;
+  margin: 1rem 0;
+}
+
+.tabs button.active {
+  outline: 2px solid var(--accent);
+}
+
+.hint {
+  margin-top: 1rem;
+  color: var(--muted);
+  font-size: 0.85rem;
+}
+
+.ref-copy-btn {
+  font-family: "JetBrains Mono", monospace;
+  font-size: 0.68rem;
+  padding: 0.15rem 0.45rem;
+  background: var(--panel);
+  color: var(--text-soft);
+  border: 1px solid var(--border-strong);
+  box-shadow: 1px 1px 0 #000;
+  line-height: 1.2;
+}
+
+.ref-copy-btn.compact {
+  padding: 0.12rem 0.35rem;
+}
+
+.ref-copy-btn:hover {
+  border-color: var(--accent);
+  color: var(--text);
+}
+
+.ref-copy-btn.copied {
+  border-color: var(--done);
+  color: var(--done);
+}
+
+.ref-copy-label {
+  display: inline-block;
+  max-width: 9rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  vertical-align: bottom;
+}
+
+.column-label .ref-copy-btn,
+.column-label .ref-actions,
+.row-separator-bar .ref-copy-btn,
+.row-separator-bar .ref-actions {
+  flex-shrink: 0;
+}
+
+.ref-copy-btn--issue .ref-copy-label {
+  max-width: none;
+  color: inherit;
+}
+
+.ref-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.2rem;
+  flex-shrink: 0;
+}
+
+.ref-action-btn {
+  font-family: "JetBrains Mono", monospace;
+  font-size: 0.72rem;
+  line-height: 1;
+  padding: 0.18rem 0.38rem;
+  background: var(--panel);
+  color: var(--text-soft);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+}
+
+.ref-action-btn:hover {
+  border-color: var(--accent);
+  color: var(--text);
+}
+
+.ref-action-btn.copied {
+  border-color: var(--done);
+  color: var(--done);
+}
+
+.rich-text-link {
+  color: var(--accent);
+  font-weight: 600;
+  text-decoration: underline;
+  text-underline-offset: 0.14em;
+  word-break: break-all;
+  cursor: pointer;
+}
+
+.rich-text-link:hover {
+  color: var(--text);
+}
+
+.link-from-file-ref {
+  display: grid;
+  gap: 0.35rem;
+}
+
+.link-from-file-ref-label {
+  font-size: 0.72rem;
+  color: var(--text-soft);
+}
+
+.link-from-file-ref-row {
+  display: flex;
+  gap: 0.35rem;
+}
+
+.link-from-file-ref-row input {
+  flex: 1;
+  min-width: 0;
+  font-size: 0.78rem;
+  padding: 0.35rem 0.45rem;
+}
+
+.link-from-file-ref-error {
+  margin: 0;
+  font-size: 0.72rem;
+  color: var(--danger);
+}
+
+.file-ref-copy-btn {
+  font-size: 0.66rem;
+  padding: 0.15rem 0.35rem;
+  background: var(--bg);
+  color: var(--text-soft);
+  border: 1px solid var(--border);
+  box-shadow: none;
+}
+
+.file-ref-copy-btn.compact {
+  white-space: nowrap;
+}
+
+.file-ref-copy-btn:hover {
+  color: var(--text);
+  border-color: var(--accent);
+}
+
+.file-ref-copy-btn.copied {
+  color: var(--done);
+  border-color: var(--done);
+}
+
+button.secondary.compact {
+  padding: 0.2rem 0.45rem;
+  font-size: 0.68rem;
+  flex-shrink: 0;
+}
+
+.row {
+  display: flex;
+  gap: 0.75rem;
+  align-items: center;
+}
+
+.copy-feedback-btn.copied {
+  border-color: var(--done);
+  color: var(--done);
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
