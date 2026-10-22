@@ -2701,7 +2701,7 @@ app.put("/uploads/:sessionId/chunks/:index", async (c) => {
 
   const buffer = Buffer.from(await c.req.arrayBuffer());
   try {
-    const session = await saveUploadChunk(db, sessionId, chunkIndex, buffer);
+    const session = await saveUploadChunk(db, sessionId, chunkIndex, buffer, result.auth.userId);
     return c.json({ session });
   } catch (error) {
     if (error instanceof AttachmentError) {
