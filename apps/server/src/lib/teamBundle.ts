@@ -1,4 +1,5 @@
 import { randomUUID } from "node:crypto";
+import { createWriteStream } from "node:fs";
 import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
@@ -92,48 +93,180 @@ function zipToBuffer(append: (archive: ZipArchive) => void | Promise<void>): Pro
   });
 }
 
+const DEFAULT_BUNDLE_MAX_ENTRIES = 5000;
+const DEFAULT_BUNDLE_MAX_BYTES = 2 * 1024 * 1024 * 1024; // 2 GiB uncompressed
+const JSON_ENTRY_MAX_BYTES = 64 * 1024 * 1024;
+const MAX_NAME_LENGTH = 255;
+
+function parseEnvInt(key: string, fallback: number) {
+  const raw = process.env[key];
+  if (!raw) return fallback;
+  const parsed = Number(raw);
+  return Number.isFinite(parsed) && parsed > 0 ? Math.floor(parsed) : fallback;
+}
+
+export function getBundleImportLimits() {
+  return {
+    maxEntries: parseEnvInt("TEAMFLOW_BUNDLE_MAX_ENTRIES", DEFAULT_BUNDLE_MAX_ENTRIES),
+    maxBytes: parseEnvInt("TEAMFLOW_BUNDLE_MAX_BYTES", DEFAULT_BUNDLE_MAX_BYTES),
+  };
+}
+
+/**
+ * Names taken from files.json are used to build paths on disk. Accept a single path segment
+ * only: no separators, no "." / "..", no NUL, not absolute, bounded length.
+ */
+export function assertSafeBundleName(value: unknown, label: string): string {
+  if (typeof value !== "string" || value.length === 0 || value.length > MAX_NAME_LENGTH) {
+    throw new TeamBundleError(`Invalid ${label} in files.json`);
+  }
+  if (
+    value === "." ||
+    value === ".." ||
+    /[\\/\0]/.test(value) ||
+    path.isAbsolute(value) ||
+    path.basename(value) !== value
+  ) {
+    throw new TeamBundleError(`Invalid ${label} in files.json: path characters are not allowed`);
+  }
+  return value;
+}
+
+const MIME_PATTERN = /^[A-Za-z0-9!#$&^_.+-]{1,64}\/[A-Za-z0-9!#$&^_.+-]{1,64}$/;
+
+export function assertSafeMimeType(value: unknown): string {
+  if (typeof value !== "string" || !MIME_PATTERN.test(value)) {
+    throw new TeamBundleError("Invalid mimeType in files.json");
+  }
+  return value.toLowerCase();
+}
+
+/** Resolve `relative` under `rootDir` and refuse anything that escapes it. */
+export function resolveInside(rootDir: string, ...segments: string[]) {
+  const root = path.resolve(rootDir);
+  const target = path.resolve(root, ...segments);
+  if (target !== root && !target.startsWith(root + path.sep)) {
+    throw new TeamBundleError("Bundle entry resolves outside the upload directory");
+  }
+  return target;
+}
+
+type ExtractedZip = {
+  /** Small JSON documents kept in memory (manifest, board, issues, ref-map, files). */
+  json: Map<string, Buffer>;
+  /** Attachment payloads streamed to disk under tempRoot. */
+  files: Map<string, { path: string; size: number }>;
+};
+
 function openZipBuffer(buffer: Buffer): Promise<yauzl.ZipFile> {
   return new Promise((resolve, reject) => {
     yauzl.fromBuffer(buffer, { lazyEntries: true }, (err, zipfile) => {
-      if (err || !zipfile) reject(err ?? new TeamBundleError("Invalid bundle zip"));
+      if (err || !zipfile) reject(new TeamBundleError("Invalid bundle zip"));
       else resolve(zipfile);
     });
   });
 }
 
-async function readZipEntries(buffer: Buffer) {
+/**
+ * Walk the zip once. JSON entries are buffered; everything else is streamed straight to a
+ * temp file so a large bundle never has all attachments in memory at once. Entry count and
+ * total uncompressed bytes are capped (TEAMFLOW_BUNDLE_MAX_ENTRIES / TEAMFLOW_BUNDLE_MAX_BYTES).
+ */
+async function extractZipEntries(buffer: Buffer, tempRoot: string): Promise<ExtractedZip> {
+  const limits = getBundleImportLimits();
+  if (buffer.length > limits.maxBytes) {
+    throw new TeamBundleError("Bundle exceeds the maximum allowed size", 413);
+  }
+
   const zipfile = await openZipBuffer(buffer);
-  const entries = new Map<string, Buffer>();
+  if (zipfile.entryCount > limits.maxEntries) {
+    zipfile.close();
+    throw new TeamBundleError(`Bundle has too many entries (max ${limits.maxEntries})`, 413);
+  }
+
+  const json = new Map<string, Buffer>();
+  const files = new Map<string, { path: string; size: number }>();
+  let totalBytes = 0;
+  let fileIndex = 0;
 
   await new Promise<void>((resolve, reject) => {
+    const fail = (err: unknown) => {
+      zipfile.close();
+      reject(err instanceof TeamBundleError ? err : new TeamBundleError("Invalid bundle zip"));
+    };
+
     zipfile.on("entry", (entry) => {
-      if (/\/$/.test(entry.fileName)) {
+      const name = entry.fileName.replace(/\\/g, "/");
+      if (name.endsWith("/")) {
         zipfile.readEntry();
+        return;
+      }
+
+      totalBytes += entry.uncompressedSize;
+      if (totalBytes > limits.maxBytes) {
+        fail(new TeamBundleError("Bundle exceeds the maximum uncompressed size", 413));
+        return;
+      }
+
+      const isJson = !name.includes("/") && name.endsWith(".json");
+      if (isJson && entry.uncompressedSize > JSON_ENTRY_MAX_BYTES) {
+        fail(new TeamBundleError(`${name} is too large`, 413));
         return;
       }
 
       zipfile.openReadStream(entry, (err, stream) => {
         if (err || !stream) {
-          reject(err ?? new TeamBundleError("Failed to read bundle entry"));
+          fail(new TeamBundleError("Failed to read bundle entry"));
+          return;
+        }
+        stream.on("error", fail);
+
+        if (isJson) {
+          const chunks: Buffer[] = [];
+          let seen = 0;
+          stream.on("data", (chunk: Buffer) => {
+            seen += chunk.length;
+            if (seen > JSON_ENTRY_MAX_BYTES) {
+              stream.destroy();
+              fail(new TeamBundleError(`${name} is too large`, 413));
+              return;
+            }
+            chunks.push(chunk);
+          });
+          stream.on("end", () => {
+            json.set(name, Buffer.concat(chunks));
+            zipfile.readEntry();
+          });
           return;
         }
 
-        const chunks: Buffer[] = [];
-        stream.on("data", (chunk: Buffer) => chunks.push(chunk));
-        stream.on("end", () => {
-          entries.set(entry.fileName.replace(/\\/g, "/"), Buffer.concat(chunks));
+        const target = path.join(tempRoot, `entry-${fileIndex}`);
+        fileIndex += 1;
+        let written = 0;
+        const sink = createWriteStream(target);
+        stream.on("data", (chunk: Buffer) => {
+          written += chunk.length;
+          if (written > entry.uncompressedSize || written > limits.maxBytes) {
+            stream.destroy();
+            sink.destroy();
+            fail(new TeamBundleError("Bundle entry larger than declared", 413));
+          }
+        });
+        sink.on("error", fail);
+        sink.on("finish", () => {
+          files.set(name, { path: target, size: written });
           zipfile.readEntry();
         });
-        stream.on("error", reject);
+        stream.pipe(sink);
       });
     });
 
     zipfile.on("end", () => resolve());
-    zipfile.on("error", reject);
+    zipfile.on("error", fail);
     zipfile.readEntry();
   });
 
-  return entries;
+  return { json, files };
 }
 
 function readJsonEntry<T>(entries: Map<string, Buffer>, name: string): T {
@@ -144,6 +277,22 @@ function readJsonEntry<T>(entries: Map<string, Buffer>, name: string): T {
   } catch {
     throw new TeamBundleError(`Invalid JSON in ${name}`);
   }
+}
+
+function validateFilesManifest(filesData: TeamBundleFiles): TeamBundleFiles {
+  if (!filesData || !Array.isArray(filesData.files)) {
+    throw new TeamBundleError("Invalid files.json");
+  }
+  return {
+    files: filesData.files.map((file) => ({
+      sourceId: assertSafeBundleName(file.sourceId, "sourceId"),
+      fileRef: typeof file.fileRef === "string" ? file.fileRef : "",
+      filename: assertSafeBundleName(file.filename, "filename"),
+      mimeType: assertSafeMimeType(file.mimeType),
+      sizeBytes: Number.isFinite(file.sizeBytes) ? Number(file.sizeBytes) : 0,
+      zipPath: typeof file.zipPath === "string" ? file.zipPath.replace(/\\/g, "/") : "",
+    })),
+  };
 }
 
 function validateManifest(manifest: TeamBundleManifest) {
@@ -456,16 +605,35 @@ export async function importTeamBundle(
   zipBuffer: Buffer,
   options: TeamBundleImportOptions,
 ): Promise<TeamBundleImportResult> {
-  const entries = await readZipEntries(zipBuffer);
+  const tempRoot = await fs.mkdtemp(path.join(os.tmpdir(), "teamflow-import-"));
+  try {
+    return await importTeamBundleExtracted(db, teamId, userId, zipBuffer, options, tempRoot);
+  } finally {
+    await fs.rm(tempRoot, { recursive: true, force: true });
+  }
+}
+
+async function importTeamBundleExtracted(
+  db: Db,
+  teamId: string,
+  userId: string,
+  zipBuffer: Buffer,
+  options: TeamBundleImportOptions,
+  tempRoot: string,
+): Promise<TeamBundleImportResult> {
+  const extracted = await extractZipEntries(zipBuffer, tempRoot);
+  const entries = extracted.json;
   const manifest = readJsonEntry<TeamBundleManifest>(entries, "manifest.json");
   validateManifest(manifest);
 
   const board = readJsonEntry<TeamBundleBoard>(entries, "board.json");
   const issuesData = readJsonEntry<TeamBundleIssues>(entries, "issues.json");
   const refMapSource = readJsonEntry<TeamBundleRefMap>(entries, "ref-map.json");
-  const filesData = entries.has("files.json")
-    ? readJsonEntry<TeamBundleFiles>(entries, "files.json")
-    : { files: [] };
+  const filesData = validateFilesManifest(
+    entries.has("files.json")
+      ? readJsonEntry<TeamBundleFiles>(entries, "files.json")
+      : { files: [] },
+  );
 
   const [team] = await db.select().from(schema.teams).where(eq(schema.teams.id, teamId)).limit(1);
   if (!team) throw new TeamBundleError("Team not found", 404);
@@ -692,15 +860,11 @@ export async function importTeamBundle(
   const fileIdBySourceId = new Map<string, string>();
   let filesCreated = 0;
   const uploadDir = getUploadDir();
-  const tempRoot = await fs.mkdtemp(path.join(os.tmpdir(), "teamflow-import-"));
 
-  try {
+  {
     for (const file of filesData.files) {
-      const zipEntry = entries.get(file.zipPath);
+      const zipEntry = extracted.files.get(file.zipPath);
       if (!zipEntry) continue;
-
-      const tempPath = path.join(tempRoot, `${file.sourceId}_${file.filename}`);
-      await fs.writeFile(tempPath, zipEntry);
 
       const fileId = randomUUID();
       const fileKey = await uniqueFileKey(db);
@@ -709,9 +873,10 @@ export async function importTeamBundle(
       const relativeDir = path.join("import", teamId);
       const storageName = `${fileId}_${file.filename}`;
       const relativePath = path.join(relativeDir, storageName);
-      const finalDir = path.join(uploadDir, relativeDir);
+      const finalDir = resolveInside(uploadDir, relativeDir);
+      const finalPath = resolveInside(uploadDir, relativePath);
       await fs.mkdir(finalDir, { recursive: true });
-      await fs.copyFile(tempPath, path.join(uploadDir, relativePath));
+      await fs.copyFile(zipEntry.path, finalPath);
 
       const now = new Date().toISOString();
       await db.insert(schema.storedFiles).values({
@@ -719,7 +884,7 @@ export async function importTeamBundle(
         uploaderId: userId,
         filename: file.filename,
         mimeType: file.mimeType,
-        sizeBytes: file.sizeBytes,
+        sizeBytes: zipEntry.size,
         storagePath: relativePath,
         key: fileKey,
         createdAt: now,
@@ -758,8 +923,6 @@ export async function importTeamBundle(
         });
       }
     }
-  } finally {
-    await fs.rm(tempRoot, { recursive: true, force: true });
   }
 
   for (const issue of issuesData.issues) {
