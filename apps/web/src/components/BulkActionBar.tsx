@@ -82,8 +82,6 @@ export function BulkActionBar({
         <div className="bulk-action-bar-body">
           <div className="bulk-action-groups">
             <div className="bulk-action-side bulk-action-side--left">
-              <div className="bulk-action-side-title">Left</div>
-
               <div className="bulk-action-field bulk-action-field--move">
                 <span className="bulk-action-label">Move</span>
                 <div className="bulk-action-controls bulk-action-controls--move">
@@ -147,8 +145,6 @@ export function BulkActionBar({
             </div>
 
             <div className="bulk-action-side bulk-action-side--right">
-              <div className="bulk-action-side-title">Right</div>
-
               <div className="bulk-action-field bulk-action-field--assign">
                 <span className="bulk-action-label">Assign</span>
                 <div className="bulk-action-controls bulk-action-controls--assign">
