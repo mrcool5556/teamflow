@@ -23,6 +23,14 @@ Team roles are per team. Server-wide actions (Settings → Updates, Discord bot 
 
 Without the flag those routes return `403 { "error": "Instance admin required" }` even for team Owners, and the web app hides the panels.
 
+### Editing the board (`board.edit`)
+
+Changing the board needs the `board.edit` team permission: creating, editing, moving, completing, deleting and restoring issues; creating, renaming, reordering and deleting rows and columns; posting and deleting comments; uploading, linking, moving and removing attachments; renaming, trashing and restoring team files. Without it these routes return `403 { "error": "Permission denied", "code": "forbidden" }`, and the web board turns read-only (issues still open). Reading is unchanged.
+
+- Owner, Admin and Member have it by default; the built-in **Viewer** does not.
+- On upgrade (schema version 3) every existing role except the built-in Viewer, custom roles included, gets it once, so nobody loses access. Admins can then remove it from custom roles in Settings → Roles ("Board" group); later upgrades do not re-grant it.
+- PATs act as their user, so a token owned by a Viewer cannot change the board (MCP, CLI, Discord bot).
+
 ### Role and member safety rules
 
 - A role can only grant permissions the acting user already holds.

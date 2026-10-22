@@ -7,7 +7,7 @@ import { schema } from "@teamflow/db";
 import { eq } from "drizzle-orm";
 import { db } from "../db.js";
 import { requireAuth, requireWrite } from "../middleware/auth.js";
-import { loadTeam } from "../middleware/team.js";
+import { loadTeam, requirePermission } from "../middleware/team.js";
 
 /** Issue comments. */
 const routes = new Hono<AppEnv>();
@@ -18,6 +18,7 @@ routes.post(
   requireWrite,
   validateParams,
   loadTeam("issue"),
+  requirePermission("board.edit"),
   async (c) => {
     const auth = c.var.auth;
 
@@ -61,6 +62,7 @@ routes.delete(
   requireWrite,
   validateParams,
   loadTeam("issue"),
+  requirePermission("board.edit"),
   async (c) => {
     const auth = c.var.auth;
 

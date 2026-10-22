@@ -14,7 +14,7 @@ const DEFAULT_STATUSES = [
  * an older one runs every (idempotent) patch once, inside a single transaction, then records
  * the new version in schema_version.
  */
-export const SCHEMA_VERSION = 2;
+export const SCHEMA_VERSION = 3;
 
 export function getSchemaVersion(sqlite: Database.Database) {
   sqlite.exec(`
@@ -46,6 +46,8 @@ export function applySchemaPatches(sqlite: Database.Database) {
 
   sqlite.transaction(() => {
     runPatches(sqlite);
+    // One-time data steps tied to a version; unlike patches they must not repeat later.
+    if (current < 3) grantBoardEditToExistingRoles(sqlite);
     sqlite
       .prepare(
         `INSERT INTO schema_version (id, version, applied_at) VALUES (1, ?, datetime('now'))
@@ -54,6 +56,34 @@ export function applySchemaPatches(sqlite: Database.Database) {
       .run(SCHEMA_VERSION);
   })();
   console.log(`Database schema at version ${SCHEMA_VERSION} (was ${current})`);
+}
+
+/**
+ * Version 3 adds the board.edit permission. Before it, every role could edit the board, so
+ * every existing role except the built-in Viewer gets it (custom roles included); admins can
+ * remove it from custom roles afterwards.
+ */
+function grantBoardEditToExistingRoles(sqlite: Database.Database) {
+  const hasRoles = sqlite
+    .prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'team_roles'")
+    .get();
+  if (!hasRoles) return;
+  const roles = sqlite
+    .prepare("SELECT id, permissions FROM team_roles WHERE NOT (slug = 'viewer' AND is_system = 1)")
+    .all() as { id: string; permissions: string }[];
+  const update = sqlite.prepare(
+    "UPDATE team_roles SET permissions = ?, updated_at = datetime('now') WHERE id = ?",
+  );
+  for (const role of roles) {
+    let permissions: string[] = [];
+    try {
+      permissions = JSON.parse(role.permissions) as string[];
+    } catch {
+      permissions = [];
+    }
+    if (permissions.includes("board.edit")) continue;
+    update.run(JSON.stringify(["board.edit", ...permissions]), role.id);
+  }
 }
 
 function runPatches(sqlite: Database.Database) {

@@ -3,6 +3,8 @@ export type SystemRoleSlug = "owner" | "admin" | "member" | "viewer";
 
 /** Granular team permissions stored on each role. */
 export const TEAM_PERMISSIONS = [
+  /** Create, edit, move, assign and delete issues, rows and columns. */
+  "board.edit",
   "team.members.view",
   "team.members.manage",
   "team.invites.manage",
@@ -21,6 +23,7 @@ export const TEAM_PERMISSIONS = [
 export type TeamPermission = (typeof TEAM_PERMISSIONS)[number];
 
 export const TEAM_PERMISSION_LABELS: Record<TeamPermission, string> = {
+  "board.edit": "Edit the board (issues, rows, columns)",
   "team.members.view": "View team members",
   "team.members.manage": "Manage members & assign roles",
   "team.invites.manage": "Create and revoke invites",
@@ -39,6 +42,10 @@ export const TEAM_PERMISSION_GROUPS: {
   label: string;
   permissions: TeamPermission[];
 }[] = [
+  {
+    label: "Board",
+    permissions: ["board.edit"],
+  },
   {
     label: "Team",
     permissions: [
@@ -116,7 +123,7 @@ export const DEFAULT_SYSTEM_ROLE_TEMPLATES: {
     name: "Member",
     isSystem: true,
     position: 2,
-    permissions: ["team.members.view"],
+    permissions: ["board.edit", "team.members.view"],
   },
   {
     slug: "viewer",

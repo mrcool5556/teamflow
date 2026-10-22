@@ -8,11 +8,13 @@ import { schema } from "@teamflow/db";
 import { and, eq, sql } from "drizzle-orm";
 import { db } from "../db.js";
 import { requireAuth, requireWrite } from "../middleware/auth.js";
-import { assertTeamAccess, loadTeam } from "../middleware/team.js";
+import { assertTeamAccess, loadTeam, requirePermission } from "../middleware/team.js";
 import { getDefaultRowId } from "../lib/board.js";
 import { filterValidTeamMemberIds, setIssueAssignees } from "../lib/assignees.js";
 import { logActivity } from "../lib/auth.js";
 import { getDoneStatusId, getTeamKey, listIssuesForUser, mapIssue } from "../lib/issues.js";
+import { forbidden } from "../lib/errors.js";
+import { userHasTeamPermission } from "../lib/permissions.js";
 
 /** Issues: list, read, create, update, complete, trash, restore. */
 const routes = new Hono<AppEnv>();
@@ -72,6 +74,9 @@ routes.post("/issues", requireAuth, requireWrite, async (c) => {
   const body = await parseBody(c, createIssueSchema);
 
   await assertTeamAccess(auth, body.teamId);
+  if (!(await userHasTeamPermission(db, auth.userId, body.teamId, "board.edit"))) {
+    throw forbidden("Permission denied");
+  }
 
   if (auth.patTeamId && auth.patTeamId !== body.teamId) {
     return c.json({ error: "Token restricted to a different team" }, 403);
@@ -186,6 +191,7 @@ routes.patch(
   requireWrite,
   validateParams,
   loadTeam("issue"),
+  requirePermission("board.edit"),
   async (c) => {
     const auth = c.var.auth;
 
@@ -302,6 +308,7 @@ routes.post(
   requireWrite,
   validateParams,
   loadTeam("issue"),
+  requirePermission("board.edit"),
   async (c) => {
     const auth = c.var.auth;
 
@@ -345,6 +352,7 @@ routes.delete(
   requireWrite,
   validateParams,
   loadTeam("issue"),
+  requirePermission("board.edit"),
   async (c) => {
     const auth = c.var.auth;
 
@@ -375,6 +383,7 @@ routes.post(
   requireWrite,
   validateParams,
   loadTeam("issue"),
+  requirePermission("board.edit"),
   async (c) => {
     const auth = c.var.auth;
 
