@@ -72,7 +72,7 @@ export function AdvancedProfileSettingsSection({
               </div>
               {columnWidthMode === "auto" ? (
                 <p className="settings-hint">
-                  Fits four columns in the window (260–420px each); wider boards scroll sideways.
+                  Fits four columns in the window (300–420px each); wider boards scroll sideways.
                 </p>
               ) : (
                 <label className="settings-range-row">
