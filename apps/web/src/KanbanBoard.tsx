@@ -566,6 +566,52 @@ export function KanbanBoard({
 
   useLayer({ open: !previewMode && selectedIssueIds.size > 0, onEscape: clearIssueSelection });
 
+  /**
+   * Keyboard selection on card titles: Space toggles the focused card, arrows move focus to the
+   * previous/next card in board order, and Shift+arrow extends the selection while moving.
+   */
+  const handleBoardKeyDown = useCallback(
+    (event: React.KeyboardEvent<HTMLElement>) => {
+      if (previewMode) return;
+      const activator = (event.target as HTMLElement).closest<HTMLElement>("[data-card-activator]");
+      const issueId = activator?.dataset.cardActivator;
+      if (!activator || !issueId) return;
+
+      if (event.key === " ") {
+        event.preventDefault();
+        setSelectedIssueIds((prev) => {
+          const next = new Set(prev);
+          if (next.has(issueId)) next.delete(issueId);
+          else next.add(issueId);
+          return next;
+        });
+        lastSelectedIssueIdRef.current = issueId;
+        return;
+      }
+
+      const step =
+        event.key === "ArrowDown" || event.key === "ArrowRight"
+          ? 1
+          : event.key === "ArrowUp" || event.key === "ArrowLeft"
+            ? -1
+            : 0;
+      if (!step || event.altKey || event.ctrlKey || event.metaKey) return;
+      const all = Array.from(
+        event.currentTarget.querySelectorAll<HTMLElement>("[data-card-activator]"),
+      );
+      const target = all[all.indexOf(activator) + step];
+      if (!target) return;
+      event.preventDefault();
+      if (event.shiftKey) {
+        const targetId = target.dataset.cardActivator!;
+        setSelectedIssueIds((prev) => new Set(prev).add(issueId).add(targetId));
+        lastSelectedIssueIdRef.current = targetId;
+      }
+      target.focus();
+    },
+    [previewMode],
+  );
+
   const sensors = useSensors(
     useSensor(PointerSensor, {
       activationConstraint: { distance: 6 },
@@ -747,6 +793,7 @@ export function KanbanBoard({
     >
       <div
         className={`board-stack ${previewMode ? "board-stack--preview" : ""} ${selectedIssueIds.size > 0 ? "board-stack--selecting" : ""}`}
+        onKeyDown={handleBoardKeyDown}
         onPointerDown={(event) => {
           if (previewMode || selectedIssueIds.size === 0) return;
           const target = event.target as HTMLElement;
@@ -1171,8 +1218,9 @@ function SortableBoardRow({
     headersVisible: boolean,
   ) => void;
 }) {
+  // dnd-kit's role/tabIndex attributes are not spread on the wrapper: the labelled handle
+  // button (setActivatorNodeRef) is the drag control, not the whole row or column.
   const {
-    attributes,
     listeners,
     setNodeRef,
     setActivatorNodeRef,
@@ -1212,7 +1260,6 @@ function SortableBoardRow({
         style={{ ...style, ...rowStyle }}
         className={`board-row board-row--search-empty ${isDraggingRow ? "board-row-dragging" : ""} ${row.color ? "has-row-color" : ""}`}
         data-row-id={row.id}
-        {...attributes}
       >
         <div className="row-separator-wrap">
           <RowSeparatorBar
@@ -1247,7 +1294,6 @@ function SortableBoardRow({
       style={{ ...style, ...rowStyle }}
       className={`board-row ${isDraggingRow ? "board-row-dragging" : ""} ${row.color ? "has-row-color" : ""}`}
       data-row-id={row.id}
-      {...attributes}
     >
       <div className="row-separator-wrap">
         <RowSeparatorBar
@@ -1420,8 +1466,9 @@ function SortableColumn({
     isDragging: boolean;
   }) => ReactNode;
 }) {
+  // dnd-kit's role/tabIndex attributes are not spread on the wrapper: the labelled handle
+  // button (setActivatorNodeRef) is the drag control, not the whole row or column.
   const {
-    attributes,
     listeners,
     setNodeRef,
     setActivatorNodeRef,
@@ -1441,7 +1488,6 @@ function SortableColumn({
       ref={setNodeRef}
       style={style}
       className={`board-column-stack${isDragging ? " board-column-stack--dragging" : ""}${isDropTarget && !isDragging ? " board-column-stack--drop-target" : ""}`}
-      {...attributes}
     >
       {children({ setActivatorNodeRef, listeners, isDragging })}
     </div>
@@ -1533,7 +1579,9 @@ function SortableIssueCard({
   onContextMenu?: (event: React.MouseEvent) => void;
 }) {
   const canEdit = useCanEditBoard();
-  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
+  // The whole card stays a pointer drag source, but it is not a button: dnd-kit's
+  // role/tabIndex attributes are left off so the card's own buttons are not nested in one.
+  const { listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: issueDndId(issue.id),
     ...(layoutAnimationDisabled ? { animateLayoutChanges: () => false } : {}),
   });
@@ -1552,7 +1600,6 @@ function SortableIssueCard({
       style={style}
       data-issue-id={issue.id}
       className={`issue-card ${issue.color ? "has-card-color" : ""} ${isDragging ? "issue-card-dragging" : ""} ${draggingCompanion ? "issue-card-dragging-companion" : ""} ${highlighted ? "issue-card--highlighted" : ""} ${selected ? "issue-card--selected" : ""}`}
-      {...attributes}
       {...listeners}
       onClick={(event) => {
         if (suppressClickRef.current === issueDndId(issue.id)) return;
@@ -1633,7 +1680,14 @@ function SortableIssueCard({
           ) : null}
         </div>
       </div>
-      <h3 className="issue-card-title">{issue.title}</h3>
+      <h3 className="issue-card-title">
+        {/* Enter opens the issue (the click bubbles to the card); Space and arrows are
+            handled by the board's keyboard selection. */}
+        <button type="button" className="issue-card-title-btn" data-card-activator={issue.id}>
+          {issue.title}
+          {selected ? <span className="sr-only"> (selected)</span> : null}
+        </button>
+      </h3>
     </article>
   );
 }
