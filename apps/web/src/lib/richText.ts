@@ -84,21 +84,6 @@ export function findUrlInRange(text: string, start: number, end: number) {
   return null;
 }
 
-export function shortenUrlInText(
-  text: string,
-  selectionStart: number,
-  selectionEnd: number,
-  promptLabel: (url: string, defaultLabel: string) => string | null,
-) {
-  const found = findUrlInRange(text, selectionStart, selectionEnd);
-  if (!found) return null;
-
-  const label = promptLabel(found.href, defaultLinkLabel(found.href));
-  if (!label?.trim()) return null;
-
-  return applyShortLabel(text, found.start, found.end, found.href, label.trim());
-}
-
 export function applyShortLabel(
   text: string,
   start: number,

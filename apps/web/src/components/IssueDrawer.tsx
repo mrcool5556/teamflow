@@ -53,36 +53,11 @@ import {
   isVideoAttachment,
 } from "./AttachmentVideoPlayer";
 import { LinkRowFilePanel } from "./LinkRowFilePanel";
+import { describeAttachmentLimits, formatFileSize, formatTimestamp } from "../lib/format";
+import { downloadAttachmentFile } from "../lib/download";
 
 const NO_COMMENTS: CommentPublic[] = [];
 const NO_ATTACHMENTS: IssueAttachmentPublic[] = [];
-
-function describeAttachmentLimits(limits: AttachmentLimitsPublic) {
-  return `Images ${formatFileSize(limits.imageBytes)}, videos ${formatFileSize(limits.videoBytes)}, ZIPs ${formatFileSize(limits.zipBytes)}`;
-}
-
-function formatFileSize(bytes: number) {
-  if (bytes < 1024) return `${bytes} B`;
-  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
-  if (bytes < 1024 * 1024 * 1024) return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
-  return `${(bytes / (1024 * 1024 * 1024)).toFixed(1)} GB`;
-}
-
-function formatTimestamp(value: string) {
-  const trimmed = value.trim();
-  const sqliteLike = /^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}(?:\.\d+)?$/;
-  const date = sqliteLike.test(trimmed)
-    ? new Date(trimmed.replace(" ", "T") + "Z")
-    : new Date(trimmed);
-  if (Number.isNaN(date.getTime())) return value;
-  return date.toLocaleString(undefined, {
-    month: "short",
-    day: "numeric",
-    year: "numeric",
-    hour: "numeric",
-    minute: "2-digit",
-  });
-}
 
 function toDateInputValue(iso: string | null) {
   if (!iso) return "";
@@ -314,13 +289,7 @@ export function IssueDrawer({
 
   async function downloadAttachment(attachment: IssueAttachmentPublic) {
     try {
-      const blob = await client.downloadAttachment(attachment.id);
-      const url = URL.createObjectURL(blob);
-      const link = document.createElement("a");
-      link.href = url;
-      link.download = attachment.filename;
-      link.click();
-      URL.revokeObjectURL(url);
+      await downloadAttachmentFile(attachment.id, attachment.filename);
     } catch (error) {
       const message = error instanceof Error ? error.message : "Download failed";
       window.alert(message);

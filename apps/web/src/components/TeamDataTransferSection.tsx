@@ -2,6 +2,7 @@ import { useRef, useState } from "react";
 import { client } from "../api";
 import { errorMessage } from "../lib/errorSink";
 import type { PanelMessage } from "../lib/panelStatus";
+import { downloadBlob } from "../lib/download";
 
 type TeamDataTransferSectionProps = {
   teamId: string;
@@ -10,18 +11,6 @@ type TeamDataTransferSectionProps = {
   onMessage: PanelMessage;
   onImported?: () => void;
 };
-
-function triggerDownload(blob: Blob, filename: string) {
-  const url = URL.createObjectURL(blob);
-  const anchor = document.createElement("a");
-  anchor.href = url;
-  anchor.download = filename;
-  anchor.style.display = "none";
-  document.body.appendChild(anchor);
-  anchor.click();
-  document.body.removeChild(anchor);
-  URL.revokeObjectURL(url);
-}
 
 export function TeamDataTransferSection({
   teamId,
@@ -46,7 +35,7 @@ export function TeamDataTransferSection({
       if (blob.size === 0) {
         throw new Error("Export returned an empty file");
       }
-      triggerDownload(blob, filename);
+      downloadBlob(blob, filename);
       const message = `Exported ${teamKey} bundle${includeFiles ? " with files" : ""} for ${teamName}.`;
       setStatusMessage(message);
       onMessage(message);

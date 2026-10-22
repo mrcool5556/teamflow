@@ -25,20 +25,10 @@ export function useAppRoute() {
   const settings = useMatch("/settings/:panel");
   const teamPlan = useMatch("/t/:teamKey/plan");
   const plan = useMatch("/plan");
-  const login = useMatch("/login");
-  const register = useMatch("/register");
-  const reset = useMatch("/reset");
   const invite = useMatch("/invite/:token");
   const index = useMatch("/");
 
   const panel = teamSettings?.params.panel ?? settings?.params.panel;
-  const authMode: AuthMode | null = login
-    ? "login"
-    : register
-      ? "register"
-      : reset
-        ? "reset"
-        : null;
 
   return {
     teamKey: team?.params.teamKey ?? null,
@@ -47,7 +37,6 @@ export function useAppRoute() {
     settingsPanel: panel ?? null,
     settingsOpen: panel !== undefined,
     planOpen: Boolean(teamPlan || plan),
-    authMode,
     inviteToken: invite?.params.token ?? null,
     isIndex: Boolean(index),
   };

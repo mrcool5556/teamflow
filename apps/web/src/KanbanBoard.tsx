@@ -51,6 +51,7 @@ import { BoardColorPicker } from "./components/BoardColorPicker";
 import { PriorityPicker } from "./components/PriorityPicker";
 import { issueMatchesBoardSearch, buildRefShareUrl } from "./lib/refLinks";
 import { copyTextToClipboard } from "./lib/clipboard";
+import { useInlineRename } from "./hooks/useInlineRename";
 import type { IssueTimerPatch } from "./lib/timer";
 import type { Priority } from "@teamflow/core";
 
@@ -1663,41 +1664,17 @@ function ColumnHeader({
   onAssignColumn?: (assigneeIds: string[]) => void;
   previewMode?: boolean;
 }) {
-  const [editing, setEditing] = useState(false);
-  const [value, setValue] = useState(label);
-
-  useEffect(() => {
-    setValue(label);
-  }, [label]);
+  const rename = useInlineRename(label, onSave);
 
   const columnStyle = color ? ({ "--column-accent": color } as CSSProperties) : undefined;
 
-  if (editing) {
+  if (rename.editing) {
     return (
       <div
         className={`${className}${statusType ? ` column-label--${statusType}` : ""}${color ? " has-column-color" : ""}`}
         style={columnStyle}
       >
-        <input
-          className="column-label-rename-input"
-          autoFocus
-          value={value}
-          onChange={(e) => setValue(e.target.value)}
-          onBlur={() => {
-            setEditing(false);
-            onSave(value);
-          }}
-          onKeyDown={(e) => {
-            if (e.key === "Enter") {
-              setEditing(false);
-              onSave(value);
-            }
-            if (e.key === "Escape") {
-              setValue(label);
-              setEditing(false);
-            }
-          }}
-        />
+        <input className="column-label-rename-input" {...rename.inputProps} />
       </div>
     );
   }
@@ -1735,7 +1712,7 @@ function ColumnHeader({
             <button
               type="button"
               className="column-label-name"
-              onClick={() => setEditing(true)}
+              onClick={rename.start}
               title="Click to rename"
             >
               {label}
@@ -1809,43 +1786,17 @@ function EditableLabel({
   className?: string;
   onSave: (name: string) => void;
 }) {
-  const [editing, setEditing] = useState(false);
-  const [value, setValue] = useState(label);
+  const rename = useInlineRename(label, onSave);
 
-  useEffect(() => {
-    setValue(label);
-  }, [label]);
-
-  if (editing) {
-    return (
-      <input
-        className="row-separator-rename-input"
-        autoFocus
-        value={value}
-        onChange={(e) => setValue(e.target.value)}
-        onBlur={() => {
-          setEditing(false);
-          onSave(value);
-        }}
-        onKeyDown={(e) => {
-          if (e.key === "Enter") {
-            setEditing(false);
-            onSave(value);
-          }
-          if (e.key === "Escape") {
-            setValue(label);
-            setEditing(false);
-          }
-        }}
-      />
-    );
+  if (rename.editing) {
+    return <input className="row-separator-rename-input" {...rename.inputProps} />;
   }
 
   return (
     <button
       type="button"
       className={className}
-      onClick={() => setEditing(true)}
+      onClick={rename.start}
       title="Click to rename"
     >
       {label}

@@ -16,13 +16,8 @@ import { AttachmentVideoLightbox } from "./AttachmentVideoPlayer";
 import { FileRefCopyButton } from "./FileRefCopyButton";
 import { TeamFileEditableName } from "./TeamFileEditableName";
 import { filePreviewAttachment, TeamFilePreview } from "./TeamFilePreview";
-
-function formatFileSize(bytes: number) {
-  if (bytes < 1024) return `${bytes} B`;
-  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
-  if (bytes < 1024 * 1024 * 1024) return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
-  return `${(bytes / (1024 * 1024 * 1024)).toFixed(1)} GB`;
-}
+import { formatFileSize } from "../lib/format";
+import { downloadAttachmentFile } from "../lib/download";
 
 function formatPurgeDate(iso: string | null | undefined) {
   if (!iso) return null;
@@ -180,13 +175,7 @@ export function TeamFilesDrawer({ teamId, open, onClose, onNavigateRef }: TeamFi
 
     setDownloadingFileId(file.fileId);
     try {
-      const blob = await client.downloadAttachment(attachment.id);
-      const url = URL.createObjectURL(blob);
-      const anchor = document.createElement("a");
-      anchor.href = url;
-      anchor.download = getTeamFileDisplayName(file);
-      anchor.click();
-      URL.revokeObjectURL(url);
+      await downloadAttachmentFile(attachment.id, getTeamFileDisplayName(file));
     } catch (err) {
       setError(err instanceof Error ? err.message : "Download failed");
     } finally {
@@ -206,13 +195,7 @@ export function TeamFilesDrawer({ teamId, open, onClose, onNavigateRef }: TeamFi
   }
 
   async function downloadAttachment(attachment: IssueAttachmentPublic) {
-    const blob = await client.downloadAttachment(attachment.id);
-    const url = URL.createObjectURL(blob);
-    const anchor = document.createElement("a");
-    anchor.href = url;
-    anchor.download = attachment.filename;
-    anchor.click();
-    URL.revokeObjectURL(url);
+    await downloadAttachmentFile(attachment.id, attachment.filename);
   }
 
   return (
