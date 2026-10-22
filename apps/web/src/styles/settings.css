@@ -30,51 +30,61 @@
   clip-path: var(--clip-chamfer-md);
 }
 
-.board-preview-close {
-  flex-shrink: 0;
-}
-
-.settings-sidebar-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 0.75rem;
-}
-
-.settings-sidebar-header h2 {
-  margin: 0;
-}
-
-.settings-close-btn {
-  font-size: 1.35rem;
-  line-height: 1;
-  padding: 0.2rem 0.45rem;
+/* Settings page: grouped nav on the left, panel in a readable column (max 720px). */
+.settings-page {
+  display: grid;
+  grid-template-columns: 220px minmax(0, 1fr);
+  min-height: 0;
+  height: 100%;
 }
 
 .settings-sidebar {
-  margin: 0;
-  max-width: none;
-  width: auto;
-  box-shadow: none;
-  border: none;
-  border-right: 3px solid var(--border);
-  border-radius: var(--radius-xs);
-  padding: 1rem 1.25rem 2rem;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding: var(--space-4) var(--space-3);
+  border-right: var(--chrome-frame-border-width) solid var(--border);
+  background: var(--surface);
   overflow-y: auto;
-  max-height: calc(100vh - 4.5rem);
 }
 
-.settings-shell {
+.settings-back-btn {
   display: flex;
-  gap: 0;
-  margin-top: 1rem;
-  min-height: 0;
+  align-items: center;
+  gap: var(--space-2);
+  width: 100%;
+  padding: 0.4rem 0.6rem;
+  font-size: var(--font-size-sm);
+  text-align: left;
+}
+
+.settings-back-kbd {
+  margin-left: auto;
+  font: inherit;
+  font-size: var(--font-size-xs);
+  padding: 0 0.3rem;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-xs);
+  color: var(--muted);
+}
+
+.settings-title {
+  margin: var(--space-2) var(--space-2) 0;
+  font-size: var(--font-size-lg);
 }
 
 .settings-nav {
-  flex: 0 0 9.5rem;
-  border-right: 2px solid var(--border);
-  padding-right: 0.75rem;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.settings-nav-heading {
+  margin: 0 var(--space-2) var(--space-1);
+  font-size: var(--font-size-xs);
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--muted);
 }
 
 .settings-nav-list {
@@ -83,35 +93,38 @@
   margin: 0;
   display: flex;
   flex-direction: column;
-  gap: 0.25rem;
+  gap: 2px;
 }
 
 .settings-nav-btn {
   width: 100%;
   text-align: left;
-  padding: 0.45rem 0.6rem;
-  border: 2px solid transparent;
+  padding: 0.4rem 0.6rem;
+  border: none;
+  border-radius: var(--radius-xs);
   background: transparent;
+  box-shadow: none;
   font: inherit;
+  font-size: var(--font-size-sm);
   cursor: pointer;
-  color: var(--muted);
+  color: var(--text-soft);
 }
 
 .settings-nav-btn:hover {
   color: var(--text);
-  border-color: var(--border);
+  background: color-mix(in srgb, var(--text) 6%, transparent);
 }
 
 .settings-nav-btn.active {
   color: var(--text);
-  border-color: var(--accent);
   font-weight: 600;
+  background: color-mix(in srgb, var(--accent) 14%, transparent);
+  box-shadow: inset 2px 0 0 var(--accent);
 }
 
 :root[data-chrome-style="neon"] .settings-nav-btn {
   color: color-mix(in srgb, var(--accent-text) 68%, var(--muted));
   text-shadow: 0 0 6px color-mix(in srgb, var(--accent) 28%, transparent);
-  box-shadow: none;
 }
 
 :root[data-chrome-style="neon"] .settings-nav-btn:hover,
@@ -121,9 +134,13 @@
 }
 
 .settings-main {
-  flex: 1;
   min-width: 0;
-  padding-left: 1rem;
+  overflow-y: auto;
+  padding: var(--space-6) var(--space-6) var(--space-6) 2rem;
+}
+
+.settings-column {
+  max-width: 720px;
 }
 
 .settings-panel-header {
@@ -476,11 +493,6 @@
   margin: 1rem 1.25rem;
   width: auto;
   max-width: 720px;
-}
-
-.settings-sidebar.panel.settings {
-  margin: 0;
-  max-width: none;
 }
 
 .team-access-list {

@@ -151,15 +151,19 @@
 
 .app-workspace--settings {
   display: grid;
-  grid-template-columns: minmax(420px, 560px) minmax(0, 1fr);
+  grid-template-columns: minmax(0, 1fr);
   align-items: stretch;
   flex: 1;
   min-height: 0;
   overflow: hidden;
 }
 
+/* Appearance shows the board beside the panel so theme changes are visible. */
+.app-workspace--with-preview {
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+}
+
 .board-wrap--preview {
-  cursor: pointer;
   padding: 0.75rem 1.25rem 1.25rem;
   min-height: 0;
   overflow: hidden;

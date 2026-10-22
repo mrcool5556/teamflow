@@ -48,7 +48,8 @@ describe("routing", () => {
     signIn(db);
     const { path } = renderApp("/t/ENG/settings/tokens");
     expect(await screen.findByText("Personal access tokens")).toBeInTheDocument();
-    await screen.findByText("ENG issue 1");
+    // The board has loaded once the team switcher is enabled.
+    await waitFor(() => expect(screen.getByLabelText("Workspace")).toBeEnabled());
     expect(path()).toBe("/t/ENG/settings/tokens");
   });
 

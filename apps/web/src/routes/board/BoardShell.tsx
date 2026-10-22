@@ -112,7 +112,6 @@ export function BoardShell() {
   const [refNavActive, setRefNavActive] = useState(false);
   const refNavTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const boardScrollRef = useRef<HTMLDivElement | null>(null);
-  const settingsPointerDownRef = useRef(false);
   const handledNavStateRef = useRef<unknown>(null);
   const lastSettingsPanelRef = useRef<SettingsPanel>("general");
   const {
@@ -420,14 +419,6 @@ export function BoardShell() {
     navigate(boardPath(teamKey));
   }, [navigate, teamKey]);
 
-  const dismissSettingsFromPreview = useCallback(() => {
-    if (settingsPointerDownRef.current) {
-      settingsPointerDownRef.current = false;
-      return;
-    }
-    closeSettings();
-  }, [closeSettings]);
-
   usePanScroll(boardScrollRef, !settingsOpen);
 
   const shellValue: ShellContextValue = {
@@ -445,14 +436,11 @@ export function BoardShell() {
     onTeamLeft: (leftTeamId) => void handleTeamGone(leftTeamId),
     onTeamDeleted: (deletedTeamId) => void handleTeamGone(deletedTeamId),
     closeSettings,
-    settingsPointerDownRef,
   };
 
   const boardPanel = (
     <div
       className={`board-wrap ${settingsOpen ? "board-wrap--preview" : ""} ${refNavActive ? "board-wrap--ref-nav" : ""}`}
-      onClick={settingsOpen ? dismissSettingsFromPreview : undefined}
-      title={settingsOpen ? "Click board to close settings" : undefined}
     >
       {settingsOpen ? (
         <div className="board-preview-banner">
@@ -461,19 +449,9 @@ export function BoardShell() {
             <p className="settings-copy board-preview-copy">
               {useSamplePreview
                 ? "Sample row and cards — your board is empty."
-                : "Your real board — theme and layout update as you change settings. Click anywhere here to close settings."}
+                : "Your real board — theme and layout update as you change settings."}
             </p>
           </div>
-          <button
-            type="button"
-            className="ghost board-preview-close"
-            onClick={(event) => {
-              event.stopPropagation();
-              closeSettings();
-            }}
-          >
-            Close
-          </button>
         </div>
       ) : (
         <div className="board-toolbar">
@@ -726,9 +704,11 @@ export function BoardShell() {
           {loading && <div className="banner">Loading…</div>}
 
           {settingsOpen ? (
-            <div className="app-workspace app-workspace--settings">
+            <div
+              className={`app-workspace app-workspace--settings${route.settingsPanel === "appearance" ? " app-workspace--with-preview" : ""}`}
+            >
               <Outlet />
-              {boardPanel}
+              {route.settingsPanel === "appearance" ? boardPanel : null}
             </div>
           ) : roadmapOpen ? (
             <div className="app-workspace app-workspace--roadmap">
