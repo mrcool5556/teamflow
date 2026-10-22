@@ -38,7 +38,11 @@ import type { TokenScope } from "@teamflow/core";
 import { and, eq, sql } from "drizzle-orm";
 import { Hono } from "hono";
 import type { Context, Next } from "hono";
+import { HTTPException } from "hono/http-exception";
+import { requestId, type RequestIdVariables } from "hono/request-id";
+import type { ContentfulStatusCode } from "hono/utils/http-status";
 import type { AuthContext } from "./lib/auth.js";
+import { ApiError, codeForStatus } from "./lib/errors.js";
 import { bodyLimit } from "hono/body-limit";
 import { cors } from "hono/cors";
 import { getConnInfo } from "@hono/node-server/conninfo";
@@ -113,7 +117,6 @@ import {
 } from "./lib/profile.js";
 import { resolveTeamRefDetailed } from "./lib/refs.js";
 import {
-  AttachmentError,
   deleteIssueAttachment,
   getAttachmentForDownload,
   getAttachmentLimits,
@@ -166,22 +169,36 @@ import {
   runMaintenanceBackup,
   runMaintenanceUpdate,
 } from "./lib/maintenance.js";
-import { exportTeamBundle, importTeamBundle, TeamBundleError } from "./lib/teamBundle.js";
+import { exportTeamBundle, importTeamBundle } from "./lib/teamBundle.js";
 import { getTeamPermissionsForUser, userHasTeamPermission } from "./lib/permissions.js";
 
 // config.ts validated every env var (and refused a placeholder JWT_SECRET) when it was imported.
 const db = createDb(config.databaseUrl);
 void purgeExpiredUploadSessions(db);
 void purgeExpiredDeletedFiles(db);
-const app = new Hono();
+const app = new Hono<{ Variables: RequestIdVariables }>();
 
+// Every response carries X-Request-Id (an incoming header is echoed) so 5xx log lines can be
+// matched to a client report.
+app.use("*", requestId());
+
+/**
+ * One error handler: ApiError (and anything Hono raised) becomes `{ error, code }` with its
+ * status; anything else is a bug, logged with the request id and returned as a plain 500.
+ */
 app.onError((err, c) => {
-  const status = (err as { status?: number }).status ?? 500;
-  const message = err instanceof Error ? err.message : "Internal Server Error";
-  if (status >= 500) {
-    console.error(err);
+  if (err instanceof ApiError) {
+    return c.json(err.toBody(), err.status as ContentfulStatusCode);
   }
-  return c.json({ error: message }, status as 400 | 401 | 403 | 404 | 409 | 500);
+  if (err instanceof HTTPException) {
+    const status = err.status as ContentfulStatusCode;
+    return c.json({ error: err.message || "Request failed", code: codeForStatus(status) }, status);
+  }
+  console.error(
+    `[teamflow] ${c.req.method} ${c.req.path} failed (request ${c.get("requestId") ?? "-"}):`,
+    err,
+  );
+  return c.json({ error: "Internal Server Error", code: "internal_error" }, 500);
 });
 
 app.use(
@@ -226,7 +243,7 @@ app.use("*", async (c, next) => {
   }
   return bodyLimit({
     maxSize,
-    onError: (ctx) => ctx.json({ error: "Request body too large" }, 413),
+    onError: (ctx) => ctx.json({ error: "Request body too large", code: "payload_too_large" }, 413),
   })(c, next);
 });
 
@@ -245,7 +262,7 @@ async function authRateLimit(c: Context, next: Next) {
   const retryAfter = checkRateLimit(key);
   if (retryAfter !== null) {
     c.header("Retry-After", String(retryAfter));
-    return c.json({ error: "Too many attempts. Try again later." }, 429);
+    return c.json({ error: "Too many attempts. Try again later.", code: "rate_limited" }, 429);
   }
   return next();
 }
@@ -297,11 +314,7 @@ app.post("/auth/register", async (c) => {
   }
 
   if (body.data.inviteToken) {
-    try {
-      await assertInviteAcceptable(db, body.data.inviteToken);
-    } catch (err) {
-      return c.json({ error: err instanceof Error ? err.message : "Invalid invite" }, 400);
-    }
+    await assertInviteAcceptable(db, body.data.inviteToken);
   }
 
   const existing = await db
@@ -355,11 +368,7 @@ app.post("/auth/register", async (c) => {
   await createDefaultBoardRow(db, teamId);
 
   if (body.data.inviteToken) {
-    try {
-      await acceptTeamInvite(db, body.data.inviteToken, userId);
-    } catch (err) {
-      return c.json({ error: err instanceof Error ? err.message : "Failed to accept invite" }, 400);
-    }
+    await acceptTeamInvite(db, body.data.inviteToken, userId);
   }
 
   const [user] = await db.select().from(schema.users).where(eq(schema.users.id, userId)).limit(1);
@@ -406,12 +415,8 @@ app.post("/auth/reset-password", async (c) => {
     return c.json({ error: body.error.issues[0]?.message ?? "Invalid input" }, 400);
   }
 
-  try {
-    await resetPasswordWithToken(db, body.data.token, body.data.password);
-    return c.json({ ok: true });
-  } catch (err) {
-    return c.json({ error: err instanceof Error ? err.message : "Reset failed" }, 400);
-  }
+  await resetPasswordWithToken(db, body.data.token, body.data.password);
+  return c.json({ ok: true });
 });
 
 app.get("/auth/me", async (c) => {
@@ -648,19 +653,8 @@ app.delete("/teams/:teamId", async (c) => {
     return c.json({ error: "Team access denied" }, 403);
   }
 
-  try {
-    await deleteTeam(db, teamId, result.auth.userId);
-    return c.body(null, 204);
-  } catch (err) {
-    const message = err instanceof Error ? err.message : "Failed to delete team";
-    const status =
-      message === "Permission denied" || message === "Admin access required"
-        ? 403
-        : message === "Team not found"
-          ? 404
-          : 400;
-    return c.json({ error: message }, status);
-  }
+  await deleteTeam(db, teamId, result.auth.userId);
+  return c.body(null, 204);
 });
 
 app.get("/teams/:teamId/export", async (c) => {
@@ -680,24 +674,13 @@ app.get("/teams/:teamId/export", async (c) => {
     return c.json({ error: query.error.issues[0]?.message ?? "Invalid query" }, 400);
   }
 
-  try {
-    const { filename, buffer } = await exportTeamBundle(
-      db,
-      teamId,
-      query.data.includeFiles ?? false,
-    );
-    return new Response(buffer, {
-      headers: {
-        "Content-Type": "application/zip",
-        "Content-Disposition": `attachment; filename="${filename}"`,
-      },
-    });
-  } catch (err) {
-    if (err instanceof TeamBundleError) {
-      return c.json({ error: err.message }, err.status as 400 | 404);
-    }
-    throw err;
-  }
+  const { filename, buffer } = await exportTeamBundle(db, teamId, query.data.includeFiles ?? false);
+  return new Response(buffer, {
+    headers: {
+      "Content-Type": "application/zip",
+      "Content-Disposition": `attachment; filename="${filename}"`,
+    },
+  });
 });
 
 app.post("/teams/:teamId/import", async (c) => {
@@ -728,21 +711,14 @@ app.post("/teams/:teamId/import", async (c) => {
 
   const buffer = Buffer.from(await bundlePart.arrayBuffer());
 
-  try {
-    const importResult = await importTeamBundle(
-      db,
-      teamId,
-      result.auth.userId,
-      buffer,
-      optionsInput.data,
-    );
-    return c.json({ result: importResult });
-  } catch (err) {
-    if (err instanceof TeamBundleError) {
-      return c.json({ error: err.message }, err.status as 400 | 404);
-    }
-    throw err;
-  }
+  const importResult = await importTeamBundle(
+    db,
+    teamId,
+    result.auth.userId,
+    buffer,
+    optionsInput.data,
+  );
+  return c.json({ result: importResult });
 });
 
 app.get("/teams/:teamId/statuses", async (c) => {
@@ -1038,29 +1014,14 @@ app.patch("/teams/:teamId/members/:memberId", async (c) => {
     return c.json({ error: body.error.issues[0]?.message ?? "Invalid input" }, 400);
   }
 
-  try {
-    const role = await updateTeamMemberRole(
-      db,
-      teamId,
-      memberId,
-      body.data.roleId,
-      result.auth.userId,
-    );
-    return c.json({ role });
-  } catch (err) {
-    const message = err instanceof Error ? err.message : "Failed to update member role";
-    const status =
-      message === "Permission denied" ||
-      message === "Team access denied" ||
-      message === "Member not found" ||
-      message === "Role not found" ||
-      message === "Cannot remove the last admin" ||
-      message === "Cannot remove the last owner" ||
-      message === "Only an Owner can change Owner membership"
-        ? 403
-        : 400;
-    return c.json({ error: message }, status);
-  }
+  const role = await updateTeamMemberRole(
+    db,
+    teamId,
+    memberId,
+    body.data.roleId,
+    result.auth.userId,
+  );
+  return c.json({ role });
 });
 
 app.delete("/teams/:teamId/members/:memberId", async (c) => {
@@ -1074,24 +1035,12 @@ app.delete("/teams/:teamId/members/:memberId", async (c) => {
     return c.json({ error: "Team access denied" }, 403);
   }
 
-  try {
-    if (memberId === "me") {
-      await leaveTeam(db, teamId, result.auth.userId);
-    } else {
-      await removeTeamMember(db, teamId, memberId, result.auth.userId);
-    }
-    return c.body(null, 204);
-  } catch (err) {
-    const message = err instanceof Error ? err.message : "Failed to remove member";
-    const status =
-      message === "Team access denied" ||
-      message === "Admin access required" ||
-      message === "Permission denied" ||
-      message === "Only an Owner can remove an Owner"
-        ? 403
-        : 400;
-    return c.json({ error: message }, status);
+  if (memberId === "me") {
+    await leaveTeam(db, teamId, result.auth.userId);
+  } else {
+    await removeTeamMember(db, teamId, memberId, result.auth.userId);
   }
+  return c.body(null, 204);
 });
 
 app.get("/teams/:teamId/invites", async (c) => {
@@ -1128,26 +1077,15 @@ app.post("/teams/:teamId/invites", async (c) => {
     return c.json({ error: body.error.issues[0]?.message ?? "Invalid input" }, 400);
   }
 
-  try {
-    const invite = await createTeamInvite(db, {
-      teamId,
-      createdByUserId: result.auth.userId,
-      roleId: body.data.roleId,
-      role: body.data.role,
-      expiresInDays: body.data.expiresInDays,
-      maxUses: body.data.maxUses,
-    });
-    return c.json({ invite }, 201);
-  } catch (err) {
-    const message = err instanceof Error ? err.message : "Failed to create invite";
-    const status =
-      message === "Cannot invite with a role above your own" || message === "Team access denied"
-        ? 403
-        : message === "Role not found"
-          ? 404
-          : 400;
-    return c.json({ error: message }, status);
-  }
+  const invite = await createTeamInvite(db, {
+    teamId,
+    createdByUserId: result.auth.userId,
+    roleId: body.data.roleId,
+    role: body.data.role,
+    expiresInDays: body.data.expiresInDays,
+    maxUses: body.data.maxUses,
+  });
+  return c.json({ invite }, 201);
 });
 
 app.delete("/teams/:teamId/invites/:inviteId", async (c) => {
@@ -1232,15 +1170,8 @@ app.post("/teams/:teamId/roles", async (c) => {
     return c.json({ error: body.error.issues[0]?.message ?? "Invalid input" }, 400);
   }
 
-  try {
-    const role = await createTeamRole(db, teamId, result.auth.userId, body.data);
-    return c.json({ role }, 201);
-  } catch (err) {
-    const message = err instanceof Error ? err.message : "Failed to create role";
-    const status =
-      message === "Permission denied" || message.startsWith("Cannot grant permissions") ? 403 : 400;
-    return c.json({ error: message }, status);
-  }
+  const role = await createTeamRole(db, teamId, result.auth.userId, body.data);
+  return c.json({ role }, 201);
 });
 
 app.patch("/teams/:teamId/roles/:roleId", async (c) => {
@@ -1259,19 +1190,8 @@ app.patch("/teams/:teamId/roles/:roleId", async (c) => {
     return c.json({ error: body.error.issues[0]?.message ?? "Invalid input" }, 400);
   }
 
-  try {
-    const role = await updateTeamRole(db, teamId, roleId, result.auth.userId, body.data);
-    return c.json({ role });
-  } catch (err) {
-    const message = err instanceof Error ? err.message : "Failed to update role";
-    const status =
-      message === "Permission denied" ||
-      message === "Role not found" ||
-      message.startsWith("Cannot grant permissions")
-        ? 403
-        : 400;
-    return c.json({ error: message }, status);
-  }
+  const role = await updateTeamRole(db, teamId, roleId, result.auth.userId, body.data);
+  return c.json({ role });
 });
 
 app.delete("/teams/:teamId/roles/:roleId", async (c) => {
@@ -1285,29 +1205,12 @@ app.delete("/teams/:teamId/roles/:roleId", async (c) => {
     return c.json({ error: "Team access denied" }, 403);
   }
 
-  try {
-    await deleteTeamRole(db, teamId, roleId, result.auth.userId);
-    return c.body(null, 204);
-  } catch (err) {
-    const message = err instanceof Error ? err.message : "Failed to delete role";
-    const status =
-      message === "Permission denied" ||
-      message === "Role not found" ||
-      message === "System roles cannot be deleted"
-        ? 403
-        : 400;
-    return c.json({ error: message }, status);
-  }
+  await deleteTeamRole(db, teamId, roleId, result.auth.userId);
+  return c.body(null, 204);
 });
 
 app.get("/integrations/discord/bot-config", async (c) => {
-  try {
-    assertBotConfigKey(c.req.header("X-Teamflow-Bot-Key"));
-  } catch (err) {
-    const message = err instanceof Error ? err.message : "Unauthorized";
-    const status = message === "Bot config endpoint is disabled" ? 503 : 401;
-    return c.json({ error: message }, status);
-  }
+  assertBotConfigKey(c.req.header("X-Teamflow-Bot-Key"));
 
   const config = await getDiscordBotRuntimeConfig(db);
   if (!config) {
@@ -1348,19 +1251,8 @@ app.patch("/teams/:teamId/discord-settings", async (c) => {
     return c.json({ error: body.error.issues[0]?.message ?? "Invalid input" }, 400);
   }
 
-  try {
-    const settings = await updateTeamDiscordSettings(db, teamId, result.auth.userId, body.data);
-    return c.json({ settings });
-  } catch (err) {
-    const message = err instanceof Error ? err.message : "Failed to update Discord settings";
-    const status =
-      message === "Permission denied" ||
-      message === "Admin access required" ||
-      message === "Team access denied"
-        ? 403
-        : 400;
-    return c.json({ error: message }, status);
-  }
+  const settings = await updateTeamDiscordSettings(db, teamId, result.auth.userId, body.data);
+  return c.json({ settings });
 });
 
 app.get("/teams/:teamId/integrations/discord/secrets", async (c) => {
@@ -1402,14 +1294,8 @@ app.patch("/teams/:teamId/integrations/discord/secrets", async (c) => {
     return c.json({ error: body.error.issues[0]?.message ?? "Invalid input" }, 400);
   }
 
-  try {
-    const secrets = await updateDiscordBotSecrets(db, teamId, result.auth.userId, body.data);
-    return c.json({ secrets });
-  } catch (err) {
-    const message = err instanceof Error ? err.message : "Failed to update Discord secrets";
-    const status = message === "Permission denied" ? 403 : 400;
-    return c.json({ error: message }, status);
-  }
+  const secrets = await updateDiscordBotSecrets(db, teamId, result.auth.userId, body.data);
+  return c.json({ secrets });
 });
 
 app.get("/teams/:teamId/integrations/discord/service", async (c) => {
@@ -1446,13 +1332,8 @@ app.post("/teams/:teamId/integrations/discord/service/enable", async (c) => {
     return c.json({ error: "Instance admin required" }, 403);
   }
 
-  try {
-    const status = await enableDiscordBotService(db);
-    return c.json({ status });
-  } catch (err) {
-    const message = err instanceof Error ? err.message : "Failed to enable Discord bot";
-    return c.json({ error: message }, 400);
-  }
+  const status = await enableDiscordBotService(db);
+  return c.json({ status });
 });
 
 app.post("/teams/:teamId/integrations/discord/service/restart", async (c) => {
@@ -1473,13 +1354,8 @@ app.post("/teams/:teamId/integrations/discord/service/restart", async (c) => {
     return c.json({ error: "Instance admin required" }, 403);
   }
 
-  try {
-    const status = await restartDiscordBotService(db);
-    return c.json({ status });
-  } catch (err) {
-    const message = err instanceof Error ? err.message : "Failed to restart Discord bot";
-    return c.json({ error: message }, 400);
-  }
+  const status = await restartDiscordBotService(db);
+  return c.json({ status });
 });
 
 app.post("/teams/:teamId/integrations/discord/service/stop", async (c) => {
@@ -1500,13 +1376,8 @@ app.post("/teams/:teamId/integrations/discord/service/stop", async (c) => {
     return c.json({ error: "Instance admin required" }, 403);
   }
 
-  try {
-    const status = await stopDiscordBotService(db);
-    return c.json({ status });
-  } catch (err) {
-    const message = err instanceof Error ? err.message : "Failed to stop Discord bot";
-    return c.json({ error: message }, 400);
-  }
+  const status = await stopDiscordBotService(db);
+  return c.json({ status });
 });
 
 app.get("/teams/:teamId/server/maintenance", async (c) => {
@@ -1568,13 +1439,8 @@ app.post("/teams/:teamId/server/maintenance/backup", async (c) => {
     return c.json({ error: body.error.issues[0]?.message ?? "Invalid input" }, 400);
   }
 
-  try {
-    const job = await runMaintenanceBackup(body.data);
-    return c.json({ job }, 202);
-  } catch (err) {
-    const message = err instanceof Error ? err.message : "Failed to start backup";
-    return c.json({ error: message }, 400);
-  }
+  const job = await runMaintenanceBackup(body.data);
+  return c.json({ job }, 202);
 });
 
 app.post("/teams/:teamId/server/maintenance/update", async (c) => {
@@ -1598,13 +1464,8 @@ app.post("/teams/:teamId/server/maintenance/update", async (c) => {
     return c.json({ error: body.error.issues[0]?.message ?? "Invalid input" }, 400);
   }
 
-  try {
-    const job = await runMaintenanceUpdate(body.data);
-    return c.json({ job }, 202);
-  } catch (err) {
-    const message = err instanceof Error ? err.message : "Failed to start update";
-    return c.json({ error: message }, 400);
-  }
+  const job = await runMaintenanceUpdate(body.data);
+  return c.json({ job }, 202);
 });
 
 app.post("/teams/:teamId/server/maintenance/job/dismiss", async (c) => {
@@ -1623,13 +1484,8 @@ app.post("/teams/:teamId/server/maintenance/job/dismiss", async (c) => {
     return c.json({ error: "Instance admin required" }, 403);
   }
 
-  try {
-    const job = await dismissMaintenanceJob();
-    return c.json({ job });
-  } catch (err) {
-    const message = err instanceof Error ? err.message : "Failed to dismiss job";
-    return c.json({ error: message }, 400);
-  }
+  const job = await dismissMaintenanceJob();
+  return c.json({ job });
 });
 
 app.get("/discord/guilds/:guildId/config", async (c) => {
@@ -1637,15 +1493,9 @@ app.get("/discord/guilds/:guildId/config", async (c) => {
   if ("error" in result) return result.error;
 
   const guildId = c.req.param("guildId");
-  try {
-    const config = await getDiscordGuildConfig(db, guildId, result.auth.userId);
-    if (!config) return c.json({ error: "Discord server not linked to a team" }, 404);
-    return c.json({ config });
-  } catch (err) {
-    const message = err instanceof Error ? err.message : "Failed to load Discord config";
-    const status = message === "Team access denied" ? 403 : 400;
-    return c.json({ error: message }, status);
-  }
+  const config = await getDiscordGuildConfig(db, guildId, result.auth.userId);
+  if (!config) return c.json({ error: "Discord server not linked to a team" }, 404);
+  return c.json({ config });
 });
 
 app.get("/invites/:token", async (c) => {
@@ -1669,12 +1519,8 @@ app.post("/invites/:token/accept", async (c) => {
   requireWrite(result.auth);
 
   const token = c.req.param("token");
-  try {
-    const outcome = await acceptTeamInvite(db, token, result.auth.userId);
-    return c.json(outcome);
-  } catch (err) {
-    return c.json({ error: err instanceof Error ? err.message : "Failed to accept invite" }, 400);
-  }
+  const outcome = await acceptTeamInvite(db, token, result.auth.userId);
+  return c.json(outcome);
 });
 
 app.get("/teams/:teamId/resolve", async (c) => {
@@ -1731,15 +1577,8 @@ app.patch("/teams/:teamId/files/:fileId", async (c) => {
     return c.json({ error: body.error.issues[0]?.message ?? "Invalid input" }, 400);
   }
 
-  try {
-    const renamed = await renameTeamFile(db, teamId, fileId, body.data.filename);
-    return c.json(renamed);
-  } catch (error) {
-    if (error instanceof AttachmentError) {
-      return c.json({ error: error.message }, error.status as 400 | 404 | 500);
-    }
-    throw error;
-  }
+  const renamed = await renameTeamFile(db, teamId, fileId, body.data.filename);
+  return c.json(renamed);
 });
 
 app.delete("/teams/:teamId/files/:fileId", async (c) => {
@@ -1753,15 +1592,8 @@ app.delete("/teams/:teamId/files/:fileId", async (c) => {
     return c.json({ error: "Team access denied" }, 403);
   }
 
-  try {
-    const deleted = await softDeleteTeamFile(db, teamId, fileId);
-    return c.json(deleted);
-  } catch (error) {
-    if (error instanceof AttachmentError) {
-      return c.json({ error: error.message }, error.status as 400 | 404);
-    }
-    throw error;
-  }
+  const deleted = await softDeleteTeamFile(db, teamId, fileId);
+  return c.json(deleted);
 });
 
 app.post("/teams/:teamId/files/:fileId/restore", async (c) => {
@@ -1775,15 +1607,8 @@ app.post("/teams/:teamId/files/:fileId/restore", async (c) => {
     return c.json({ error: "Team access denied" }, 403);
   }
 
-  try {
-    const restored = await restoreTeamFile(db, teamId, fileId);
-    return c.json(restored);
-  } catch (error) {
-    if (error instanceof AttachmentError) {
-      return c.json({ error: error.message }, error.status as 400 | 404);
-    }
-    throw error;
-  }
+  const restored = await restoreTeamFile(db, teamId, fileId);
+  return c.json(restored);
 });
 
 app.post("/teams/:teamId/rows", async (c) => {
@@ -2614,15 +2439,8 @@ app.post("/issues/:issueId/attachments", async (c) => {
     return c.json({ error: "Missing file field" }, 400);
   }
 
-  try {
-    const attachment = await saveIssueAttachment(db, issueId, result.auth.userId, file);
-    return c.json({ attachment }, 201);
-  } catch (error) {
-    if (error instanceof AttachmentError) {
-      return c.json({ error: error.message }, error.status as 400 | 413);
-    }
-    throw error;
-  }
+  const attachment = await saveIssueAttachment(db, issueId, result.auth.userId, file);
+  return c.json({ attachment }, 201);
 });
 
 app.post("/issues/:issueId/uploads", async (c) => {
@@ -2647,19 +2465,12 @@ app.post("/issues/:issueId/uploads", async (c) => {
     return c.json({ error: "Team access denied" }, 403);
   }
 
-  try {
-    const session = await createUploadSession(db, { issueId }, result.auth.userId, {
-      filename: body.filename,
-      mimeType: body.mimeType,
-      totalBytes: body.totalBytes,
-    });
-    return c.json({ session }, 201);
-  } catch (error) {
-    if (error instanceof AttachmentError) {
-      return c.json({ error: error.message }, error.status as 400 | 413);
-    }
-    throw error;
-  }
+  const session = await createUploadSession(db, { issueId }, result.auth.userId, {
+    filename: body.filename,
+    mimeType: body.mimeType,
+    totalBytes: body.totalBytes,
+  });
+  return c.json({ session }, 201);
 });
 
 app.get("/uploads/:sessionId", async (c) => {
@@ -2696,15 +2507,8 @@ app.put("/uploads/:sessionId/chunks/:index", async (c) => {
   }
 
   const buffer = Buffer.from(await c.req.arrayBuffer());
-  try {
-    const session = await saveUploadChunk(db, sessionId, chunkIndex, buffer, result.auth.userId);
-    return c.json({ session });
-  } catch (error) {
-    if (error instanceof AttachmentError) {
-      return c.json({ error: error.message }, error.status as 400 | 404 | 410 | 413);
-    }
-    throw error;
-  }
+  const session = await saveUploadChunk(db, sessionId, chunkIndex, buffer, result.auth.userId);
+  return c.json({ session });
 });
 
 app.post("/uploads/:sessionId/complete", async (c) => {
@@ -2720,15 +2524,8 @@ app.post("/uploads/:sessionId/complete", async (c) => {
     return c.json({ error: "Team access denied" }, 403);
   }
 
-  try {
-    const attachment = await completeUploadSession(db, sessionId, result.auth.userId);
-    return c.json({ attachment }, 201);
-  } catch (error) {
-    if (error instanceof AttachmentError) {
-      return c.json({ error: error.message }, error.status as 400 | 404);
-    }
-    throw error;
-  }
+  const attachment = await completeUploadSession(db, sessionId, result.auth.userId);
+  return c.json({ attachment }, 201);
 });
 
 app.delete("/uploads/:sessionId", async (c) => {
@@ -2792,15 +2589,8 @@ app.post("/rows/:rowId/attachments", async (c) => {
     return c.json({ error: "Missing file field" }, 400);
   }
 
-  try {
-    const attachment = await saveRowAttachment(db, rowId, result.auth.userId, file);
-    return c.json({ attachment }, 201);
-  } catch (error) {
-    if (error instanceof AttachmentError) {
-      return c.json({ error: error.message }, error.status as 400 | 413);
-    }
-    throw error;
-  }
+  const attachment = await saveRowAttachment(db, rowId, result.auth.userId, file);
+  return c.json({ attachment }, 201);
 });
 
 app.post("/rows/:rowId/uploads", async (c) => {
@@ -2825,19 +2615,12 @@ app.post("/rows/:rowId/uploads", async (c) => {
     return c.json({ error: "Team access denied" }, 403);
   }
 
-  try {
-    const session = await createUploadSession(db, { rowId }, result.auth.userId, {
-      filename: body.filename,
-      mimeType: body.mimeType,
-      totalBytes: body.totalBytes,
-    });
-    return c.json({ session }, 201);
-  } catch (error) {
-    if (error instanceof AttachmentError) {
-      return c.json({ error: error.message }, error.status as 400 | 413);
-    }
-    throw error;
-  }
+  const session = await createUploadSession(db, { rowId }, result.auth.userId, {
+    filename: body.filename,
+    mimeType: body.mimeType,
+    totalBytes: body.totalBytes,
+  });
+  return c.json({ session }, 201);
 });
 
 app.delete("/rows/:rowId/attachments/:id", async (c) => {
@@ -2892,15 +2675,8 @@ app.post("/rows/:rowId/attachments/link", async (c) => {
     return c.json({ error: "File not found on this team" }, 404);
   }
 
-  try {
-    const attachment = await linkFileToRow(db, rowId, body.fileId);
-    return c.json({ attachment }, 201);
-  } catch (error) {
-    if (error instanceof AttachmentError) {
-      return c.json({ error: error.message }, error.status as 404);
-    }
-    throw error;
-  }
+  const attachment = await linkFileToRow(db, rowId, body.fileId);
+  return c.json({ attachment }, 201);
 });
 
 app.post("/issues/:issueId/attachments/:id/move", async (c) => {
@@ -2936,15 +2712,8 @@ app.post("/issues/:issueId/attachments/:id/move", async (c) => {
     return c.json({ error: "Team access denied" }, 403);
   }
 
-  try {
-    const attachment = await moveIssueAttachment(db, linkId, issueId, body.targetIssueId);
-    return c.json({ attachment });
-  } catch (error) {
-    if (error instanceof AttachmentError) {
-      return c.json({ error: error.message }, error.status as 404);
-    }
-    throw error;
-  }
+  const attachment = await moveIssueAttachment(db, linkId, issueId, body.targetIssueId);
+  return c.json({ attachment });
 });
 
 app.post("/issues/:issueId/attachments/link", async (c) => {
@@ -2974,15 +2743,8 @@ app.post("/issues/:issueId/attachments/link", async (c) => {
     return c.json({ error: "File not found on this team" }, 404);
   }
 
-  try {
-    const attachment = await linkFileToIssue(db, issueId, body.fileId);
-    return c.json({ attachment }, 201);
-  } catch (error) {
-    if (error instanceof AttachmentError) {
-      return c.json({ error: error.message }, error.status as 404);
-    }
-    throw error;
-  }
+  const attachment = await linkFileToIssue(db, issueId, body.fileId);
+  return c.json({ attachment }, 201);
 });
 
 app.post("/attachments/:id/stream-token", async (c) => {

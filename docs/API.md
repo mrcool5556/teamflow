@@ -4,6 +4,30 @@ Base URL: `http://localhost:3000`
 
 Auth: `Authorization: Bearer <session_jwt | pat_...>`
 
+## Errors
+
+Every error response is JSON `{ "error": "<human message>", "code": "<code>" }` with the status
+below. Every response (success or error) carries an `X-Request-Id` header; send one in and it is
+echoed back. Unexpected failures return a generic `Internal Server Error` and are logged on the
+server together with the request id.
+
+| Status | `code` | When |
+|--------|--------|------|
+| 400 | `validation_error` | Body, query or path parameter failed its schema |
+| 400 | `bad_request` | Request is well-formed but cannot be applied (e.g. row belongs to another team, invite expired) |
+| 401 | `unauthorized` | Missing or invalid session / PAT / stream token / bot config key |
+| 403 | `forbidden` | Not a member, PAT scoped to another team, missing permission or write scope, instance admin required |
+| 404 | `not_found` | Team, row, column, issue, comment, file, invite, role or member does not exist |
+| 409 | `conflict` | Email already registered, column/row still has issues, last row on a board |
+| 410 | `gone` | Removed endpoint |
+| 413 | `payload_too_large` | Body over the JSON (1 MB), attachment or bundle limit |
+| 429 | `rate_limited` | Too many login/register/forgot-password attempts (see `Retry-After`) |
+| 500 | `internal_error` | Unexpected server error |
+| 503 | `service_unavailable` | Feature disabled on this host (e.g. bot config endpoint without `TEAMFLOW_BOT_CONFIG_KEY`) |
+
+Server code throws `ApiError` from `apps/server/src/lib/errors.ts` (`badRequest`, `forbidden`,
+`notFound`, `conflict`, ...); one `onError` handler renders it.
+
 ## Health
 
 | Method | Path | Auth |

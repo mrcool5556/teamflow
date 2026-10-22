@@ -10,6 +10,7 @@ import { botConfigKeyConfigured, decryptSecret, encryptSecret } from "./secretsC
 import { userHasTeamPermission } from "./permissions.js";
 import { defaultPublicUrl, syncDiscordBotEnv } from "./botConfigKey.js";
 import { config } from "../config.js";
+import { badRequest, forbidden } from "./errors.js";
 
 const ROW_ID = "default";
 
@@ -72,7 +73,7 @@ export async function updateDiscordBotSecrets(
   input: UpdateDiscordBotSecretsInput,
 ) {
   if (!(await userHasTeamPermission(db, actorUserId, teamId, "integrations.discord.secrets"))) {
-    throw new Error("Permission denied");
+    throw forbidden("Permission denied");
   }
 
   const current = await getSecretsRow(db);
@@ -83,13 +84,13 @@ export async function updateDiscordBotSecrets(
   const nextClientId = input.clientId ?? current?.clientId ?? null;
 
   if (input.botToken !== undefined && !input.botToken.trim()) {
-    throw new Error("Bot token cannot be empty");
+    throw badRequest("Bot token cannot be empty");
   }
   if (input.pat !== undefined && !input.pat.trim()) {
-    throw new Error("PAT cannot be empty");
+    throw badRequest("PAT cannot be empty");
   }
   if (input.clientId !== undefined && !input.clientId.trim()) {
-    throw new Error("Client ID cannot be empty");
+    throw badRequest("Client ID cannot be empty");
   }
 
   const publicUrlDefault = defaultPublicUrl();

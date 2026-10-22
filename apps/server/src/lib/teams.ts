@@ -3,6 +3,7 @@ import type { Db } from "@teamflow/db";
 import { schema } from "@teamflow/db";
 import { userHasTeamPermission } from "./permissions.js";
 import { getTeamRoleBySlug, seedDefaultTeamRoles } from "./roles.js";
+import { forbidden, internalError, notFound } from "./errors.js";
 
 export function personalWorkspaceSlug(userId: string) {
   return `ws-${userId.slice(0, 8)}`;
@@ -40,13 +41,13 @@ export async function countUserTeams(db: Db, userId: string) {
 
 export async function deleteTeam(db: Db, teamId: string, actorUserId: string) {
   if (!(await userHasTeamPermission(db, actorUserId, teamId, "team.delete"))) {
-    throw new Error("Permission denied");
+    throw forbidden("Permission denied");
   }
 
   const [team] = await db.select().from(schema.teams).where(eq(schema.teams.id, teamId)).limit(1);
 
   if (!team) {
-    throw new Error("Team not found");
+    throw notFound("Team not found");
   }
 
   await db.delete(schema.teams).where(eq(schema.teams.id, teamId));
@@ -76,7 +77,7 @@ export async function createTeamForUser(
   await seedDefaultTeamRoles(db, teamId);
   const adminRole = await getTeamRoleBySlug(db, teamId, "admin");
   if (!adminRole) {
-    throw new Error("Failed to seed team roles");
+    throw internalError("Failed to seed team roles");
   }
 
   await db.insert(schema.teamMembers).values({

@@ -6,6 +6,7 @@ import type { Db } from "@teamflow/db";
 import { schema } from "@teamflow/db";
 import type { TokenScope, UserPublic } from "@teamflow/core";
 import { config } from "../config.js";
+import { forbidden } from "./errors.js";
 
 // Secret validation lives in config.ts (it runs at boot); re-exported here for existing callers.
 export {
@@ -175,9 +176,7 @@ export async function resolveAuth(
 
 export function requireWrite(auth: AuthContext) {
   if (!auth.scopes.includes("write")) {
-    const error = new Error("Token does not have write scope");
-    (error as Error & { status: number }).status = 403;
-    throw error;
+    throw forbidden("Token does not have write scope");
   }
 }
 

@@ -4,6 +4,7 @@ import { schema } from "@teamflow/db";
 import { userHasTeamAccess } from "./issues.js";
 import { getTeamMemberRoleSlug, userHasTeamPermission } from "./permissions.js";
 import { countTeamAdmins, countTeamOwners } from "./roles.js";
+import { badRequest, forbidden, notFound } from "./errors.js";
 
 async function getTeamMemberRowWithRole(db: Db, teamId: string, memberId: string) {
   const [member] = await db
@@ -38,33 +39,33 @@ async function assertCanRemoveMember(
   actorUserId: string,
 ) {
   if (!(await userHasTeamAccess(db, actorUserId, teamId))) {
-    throw new Error("Team access denied");
+    throw forbidden("Team access denied");
   }
 
   const isSelf = targetMember.member.userId === actorUserId;
   if (!isSelf && !(await userHasTeamPermission(db, actorUserId, teamId, "team.members.manage"))) {
-    throw new Error("Permission denied");
+    throw forbidden("Permission denied");
   }
 
   // team.members.manage alone cannot remove an Owner; only another Owner can.
   if (!isSelf && targetMember.roleSlug === "owner") {
     const actorSlug = await getTeamMemberRoleSlug(db, actorUserId, teamId);
     if (actorSlug !== "owner") {
-      throw new Error("Only an Owner can remove an Owner");
+      throw forbidden("Only an Owner can remove an Owner");
     }
   }
 
   if (targetMember.roleSlug === "admin") {
     const adminCount = await countTeamAdmins(db, teamId);
     if (adminCount <= 1) {
-      throw new Error("Cannot remove the last admin");
+      throw forbidden("Cannot remove the last admin");
     }
   }
 
   if (targetMember.roleSlug === "owner") {
     const ownerCount = await countTeamOwners(db, teamId);
     if (ownerCount <= 1) {
-      throw new Error("Cannot remove the last owner");
+      throw forbidden("Cannot remove the last owner");
     }
   }
 }
@@ -77,7 +78,7 @@ export async function removeTeamMember(
 ) {
   const member = await getTeamMemberRowWithRole(db, teamId, memberId);
   if (!member) {
-    throw new Error("Member not found");
+    throw notFound("Member not found");
   }
 
   await assertCanRemoveMember(db, teamId, member, actorUserId);
@@ -88,7 +89,7 @@ export async function removeTeamMember(
 export async function leaveTeam(db: Db, teamId: string, userId: string) {
   const member = await getMembershipForUserWithRole(db, teamId, userId);
   if (!member) {
-    throw new Error("Not a member of this team");
+    throw badRequest("Not a member of this team");
   }
 
   await assertCanRemoveMember(db, teamId, member, userId);

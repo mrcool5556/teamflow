@@ -20,6 +20,7 @@ import {
 import { schema, type Db } from "@teamflow/db";
 import { eq, sql, and, isNull, isNotNull, lte } from "drizzle-orm";
 import { config } from "../config.js";
+import { ApiError } from "./errors.js";
 
 const MB = 1024 * 1024;
 const FILE_TRASH_MS = FILE_TRASH_RETENTION_DAYS * 24 * 60 * 60 * 1000;
@@ -34,13 +35,10 @@ function purgeAtFromDeletedAt(deletedAt: string) {
   return new Date(deletedMs + FILE_TRASH_MS).toISOString();
 }
 
-export class AttachmentError extends Error {
-  status: number;
-
+export class AttachmentError extends ApiError {
   constructor(message: string, status: number) {
-    super(message);
+    super(status, message);
     this.name = "AttachmentError";
-    this.status = status;
   }
 }
 
