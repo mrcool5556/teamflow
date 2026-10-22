@@ -5,6 +5,7 @@ import { schema } from "@teamflow/db";
 import { getPublicBaseUrl, isSmtpConfigured, sendPasswordResetEmail } from "./mail.js";
 import { hashPassword } from "./auth.js";
 import { config } from "../config.js";
+import { badRequest } from "./errors.js";
 
 const RESET_TTL_MS = 60 * 60 * 1000;
 
@@ -94,7 +95,7 @@ export async function resetPasswordWithToken(db: Db, token: string, password: st
     .limit(1);
 
   if (!row) {
-    throw new Error("Invalid or expired reset link");
+    throw badRequest("Invalid or expired reset link");
   }
 
   const passwordHash = await hashPassword(password);

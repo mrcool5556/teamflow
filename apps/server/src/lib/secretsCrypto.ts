@@ -7,6 +7,7 @@ import {
   timingSafeEqual,
 } from "node:crypto";
 import { config } from "../config.js";
+import { serviceUnavailable, unauthorized } from "./errors.js";
 
 const ALGO = "aes-256-gcm";
 const IV_BYTES = 12;
@@ -88,15 +89,15 @@ export function botConfigKeyConfigured() {
 export function assertBotConfigKey(provided: string | undefined) {
   const expected = config.botConfigKey ?? undefined;
   if (!expected) {
-    throw new Error("Bot config endpoint is disabled");
+    throw serviceUnavailable("Bot config endpoint is disabled");
   }
   if (!provided?.trim()) {
-    throw new Error("Missing bot config key");
+    throw unauthorized("Missing bot config key");
   }
 
   const a = Buffer.from(provided.trim());
   const b = Buffer.from(expected);
   if (a.length !== b.length || !timingSafeEqual(a, b)) {
-    throw new Error("Invalid bot config key");
+    throw unauthorized("Invalid bot config key");
   }
 }

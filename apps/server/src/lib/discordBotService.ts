@@ -7,6 +7,7 @@ import { getDiscordBotSecretsPublic } from "./discordSecrets.js";
 import type { Db } from "@teamflow/db";
 import { defaultPublicUrl, syncDiscordBotEnv } from "./botConfigKey.js";
 import { config } from "../config.js";
+import { badRequest } from "./errors.js";
 
 const BASH_PATH = "/usr/bin/bash";
 const INSTALLED_SCRIPT_PREFIX = "/usr/local/lib/teamflow/";
@@ -54,7 +55,7 @@ async function runScript(
 ): Promise<{ stdout: string; stderr: string; code: number }> {
   const script = getDiscordBotScript();
   if (!existsSync(script)) {
-    throw new Error(`Discord bot script not found at ${script}`);
+    throw badRequest(`Discord bot script not found at ${script}`);
   }
 
   const shouldSudo = options?.sudo ?? useSudo();
@@ -165,22 +166,22 @@ export async function getDiscordBotServiceStatus(db: Db): Promise<DiscordBotServ
 async function assertCanManage(db: Db) {
   const secrets = await getDiscordBotSecretsPublic(db);
   if (!secrets.configured) {
-    throw new Error("Save bot credentials in Settings before enabling the Discord bot service.");
+    throw badRequest("Save bot credentials in Settings before enabling the Discord bot service.");
   }
 }
 
 async function runManagedAction(action: "enable" | "restart" | "stop") {
   const reason = managementReason();
-  if (reason) throw new Error(reason);
+  if (reason) throw badRequest(reason);
 
   const script = getDiscordBotScript();
   if (!existsSync(script)) {
-    throw new Error(`Discord bot script not found at ${script}`);
+    throw badRequest(`Discord bot script not found at ${script}`);
   }
 
   const sudoProbe = await probeSudo(script);
   if (!sudoProbe.ready) {
-    throw new Error(
+    throw badRequest(
       `${sudoProbe.detail}. Run deploy/proxmox-lxc/setup-maintenance-sudo.sh on the server.`,
     );
   }
@@ -188,7 +189,7 @@ async function runManagedAction(action: "enable" | "restart" | "stop") {
   const result = await runScript([action], { sudo: true });
   if (result.code !== 0) {
     const detail = result.stderr.trim() || result.stdout.trim() || `exit ${result.code}`;
-    throw new Error(`Discord bot ${action} failed: ${detail}`);
+    throw badRequest(`Discord bot ${action} failed: ${detail}`);
   }
 
   try {

@@ -16,6 +16,7 @@ import {
   getTeamPermissionsForUser,
   userHasTeamPermission,
 } from "./permissions.js";
+import { badRequest, forbidden, internalError, notFound } from "./errors.js";
 
 export function parseRolePermissions(raw: string): TeamPermission[] {
   try {
@@ -43,7 +44,7 @@ async function assertCanGrantPermissions(
   const held = new Set(actor?.permissions ?? []);
   const missing = permissions.filter((permission) => !held.has(permission));
   if (missing.length > 0) {
-    throw new Error(`Cannot grant permissions you do not hold: ${missing.join(", ")}`);
+    throw forbidden(`Cannot grant permissions you do not hold: ${missing.join(", ")}`);
   }
 }
 
@@ -169,13 +170,13 @@ export async function resolveInviteRoleId(
 ) {
   if (input.roleId) {
     const role = await getTeamRole(db, teamId, input.roleId);
-    if (!role) throw new Error("Role not found");
+    if (!role) throw notFound("Role not found");
     return role;
   }
 
   const slug = (input.role ?? "member") as SystemRoleSlug;
   const role = await getTeamRoleBySlug(db, teamId, slug);
-  if (!role) throw new Error("Role not found");
+  if (!role) throw notFound("Role not found");
   return role;
 }
 
@@ -186,7 +187,7 @@ export async function createTeamRole(
   input: CreateTeamRoleInput,
 ) {
   if (!(await userHasTeamPermission(db, actorUserId, teamId, "team.roles.manage"))) {
-    throw new Error("Permission denied");
+    throw forbidden("Permission denied");
   }
   await assertCanGrantPermissions(db, actorUserId, teamId, input.permissions);
 
@@ -210,7 +211,7 @@ export async function createTeamRole(
   });
 
   const created = await getTeamRole(db, teamId, roleId);
-  if (!created) throw new Error("Failed to create role");
+  if (!created) throw internalError("Failed to create role");
   return created;
 }
 
@@ -219,17 +220,17 @@ function validateRolePermissions(
   permissions: TeamPermission[],
 ) {
   if (role.slug === "admin" && !permissions.includes("team.delete")) {
-    throw new Error("The Admin role must keep team.delete permission");
+    throw badRequest("The Admin role must keep team.delete permission");
   }
   if (role.slug === "admin" && !permissions.includes("team.roles.manage")) {
-    throw new Error("The Admin role must keep team.roles.manage permission");
+    throw badRequest("The Admin role must keep team.roles.manage permission");
   }
   if (role.slug === "owner") {
     if (!permissions.includes("server.maintenance.view")) {
-      throw new Error("The Owner role must keep server.maintenance.view permission");
+      throw badRequest("The Owner role must keep server.maintenance.view permission");
     }
     if (!permissions.includes("server.maintenance.run")) {
-      throw new Error("The Owner role must keep server.maintenance.run permission");
+      throw badRequest("The Owner role must keep server.maintenance.run permission");
     }
   }
 }
@@ -242,7 +243,7 @@ export async function updateTeamRole(
   input: UpdateTeamRoleInput,
 ) {
   if (!(await userHasTeamPermission(db, actorUserId, teamId, "team.roles.manage"))) {
-    throw new Error("Permission denied");
+    throw forbidden("Permission denied");
   }
 
   const [role] = await db
@@ -251,7 +252,7 @@ export async function updateTeamRole(
     .where(and(eq(schema.teamRoles.teamId, teamId), eq(schema.teamRoles.id, roleId)))
     .limit(1);
 
-  if (!role) throw new Error("Role not found");
+  if (!role) throw notFound("Role not found");
 
   const nextPermissions =
     input.permissions !== undefined ? input.permissions : parseRolePermissions(role.permissions);
@@ -275,13 +276,13 @@ export async function updateTeamRole(
     .where(eq(schema.teamRoles.id, roleId));
 
   const updated = await getTeamRole(db, teamId, roleId);
-  if (!updated) throw new Error("Role not found");
+  if (!updated) throw notFound("Role not found");
   return updated;
 }
 
 export async function deleteTeamRole(db: Db, teamId: string, roleId: string, actorUserId: string) {
   if (!(await userHasTeamPermission(db, actorUserId, teamId, "team.roles.manage"))) {
-    throw new Error("Permission denied");
+    throw forbidden("Permission denied");
   }
 
   const [role] = await db
@@ -290,12 +291,12 @@ export async function deleteTeamRole(db: Db, teamId: string, roleId: string, act
     .where(and(eq(schema.teamRoles.teamId, teamId), eq(schema.teamRoles.id, roleId)))
     .limit(1);
 
-  if (!role) throw new Error("Role not found");
-  if (role.isSystem === 1) throw new Error("System roles cannot be deleted");
+  if (!role) throw notFound("Role not found");
+  if (role.isSystem === 1) throw forbidden("System roles cannot be deleted");
 
   const memberCount = await countRoleMembers(db, teamId, roleId);
   if (memberCount > 0) {
-    throw new Error("Move members to another role before deleting this role");
+    throw badRequest("Move members to another role before deleting this role");
   }
 
   await db.delete(schema.teamRoles).where(eq(schema.teamRoles.id, roleId));
@@ -327,7 +328,7 @@ export async function updateTeamMemberRole(
   actorUserId: string,
 ) {
   if (!(await userHasTeamPermission(db, actorUserId, teamId, "team.members.manage"))) {
-    throw new Error("Permission denied");
+    throw forbidden("Permission denied");
   }
 
   const [member] = await db
@@ -340,28 +341,28 @@ export async function updateTeamMemberRole(
     .where(and(eq(schema.teamMembers.id, memberId), eq(schema.teamMembers.teamId, teamId)))
     .limit(1);
 
-  if (!member) throw new Error("Member not found");
+  if (!member) throw notFound("Member not found");
 
   const nextRole = await getTeamRole(db, teamId, roleId);
-  if (!nextRole) throw new Error("Role not found");
+  if (!nextRole) throw notFound("Role not found");
 
   // Only an Owner may hand out or take away the Owner role.
   const actorIsOwner = (await getTeamMemberRoleSlug(db, actorUserId, teamId)) === "owner";
   if (!actorIsOwner && (nextRole.slug === "owner" || member.roleSlug === "owner")) {
-    throw new Error("Only an Owner can change Owner membership");
+    throw forbidden("Only an Owner can change Owner membership");
   }
 
   if (member.roleSlug === "admin" && nextRole.slug !== "admin") {
     const adminCount = await countTeamAdmins(db, teamId);
     if (adminCount <= 1) {
-      throw new Error("Cannot remove the last admin");
+      throw forbidden("Cannot remove the last admin");
     }
   }
 
   if (member.roleSlug === "owner" && nextRole.slug !== "owner") {
     const ownerCount = await countTeamOwners(db, teamId);
     if (ownerCount <= 1) {
-      throw new Error("Cannot remove the last owner");
+      throw forbidden("Cannot remove the last owner");
     }
   }
 

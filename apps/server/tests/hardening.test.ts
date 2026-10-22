@@ -82,7 +82,7 @@ describe("response hardening", () => {
       body: big,
     });
     expect(res.status).toBe(413);
-    expect(await json(res)).toEqual({ error: "Request body too large" });
+    expect(await json(res)).toEqual({ error: "Request body too large", code: "payload_too_large" });
   });
 
   it("rejects multipart uploads larger than the configured attachment limit", async () => {

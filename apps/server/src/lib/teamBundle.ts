@@ -26,14 +26,12 @@ import { filterValidTeamMemberIds, setBoardRowAssignees, setIssueAssignees } fro
 import { getUploadDir } from "./attachments.js";
 import { uniqueColumnKey, uniqueRowKey } from "./board.js";
 import { config } from "../config.js";
+import { ApiError } from "./errors.js";
 
-export class TeamBundleError extends Error {
-  status: number;
-
+export class TeamBundleError extends ApiError {
   constructor(message: string, status = 400) {
-    super(message);
+    super(status, message);
     this.name = "TeamBundleError";
-    this.status = status;
   }
 }
 

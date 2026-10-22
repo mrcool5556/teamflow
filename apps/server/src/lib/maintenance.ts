@@ -14,6 +14,7 @@ import type {
 import { inferMaintenanceJobOutcome } from "@teamflow/core";
 import { config } from "../config.js";
 import { getMaintenanceVersionInfo } from "./versionInfo.js";
+import { badRequest, internalError } from "./errors.js";
 
 const JOB_FILE = "maintenance-job.json";
 const LOG_FILE = "maintenance.log";
@@ -262,7 +263,7 @@ async function assertJobIdle() {
   await reconcileStaleJob();
   const current = await readStoredJob();
   if (current?.status === "running") {
-    throw new Error("A maintenance job is already running. Wait for it to finish.");
+    throw badRequest("A maintenance job is already running. Wait for it to finish.");
   }
 }
 
@@ -324,7 +325,7 @@ async function startJob(
     });
 
     if (!child.pid) {
-      throw new Error("Failed to start maintenance process");
+      throw internalError("Failed to start maintenance process");
     }
 
     await writeStoredJob({ ...job, pid: child.pid });
@@ -355,7 +356,7 @@ async function startJob(
     });
 
     if (!child.pid) {
-      throw new Error("Failed to start maintenance process");
+      throw internalError("Failed to start maintenance process");
     }
 
     await writeStoredJob({ ...job, pid: child.pid });
@@ -405,16 +406,16 @@ export async function getMaintenanceStatus(): Promise<MaintenanceStatusPublic> {
 
 export async function runMaintenanceBackup(input: RunMaintenanceBackupInput) {
   const reason = disabledReason();
-  if (reason) throw new Error(reason);
+  if (reason) throw badRequest(reason);
 
   const script = getBackupScript();
   if (!existsSync(script)) {
-    throw new Error(`Backup script not found at ${script}`);
+    throw badRequest(`Backup script not found at ${script}`);
   }
 
   const args = input.full ? ["--full"] : ["--db-only"];
   const job = await startJob("backup", script, args, { full: input.full });
-  if (!job) throw new Error("Failed to start backup job");
+  if (!job) throw internalError("Failed to start backup job");
   return job;
 }
 
@@ -427,7 +428,7 @@ export function isValidBranchName(value: string) {
 
 export function assertValidBranchName(value: string | undefined) {
   if (value !== undefined && !isValidBranchName(value)) {
-    throw new Error("Invalid branch name");
+    throw badRequest("Invalid branch name");
   }
 }
 
@@ -435,11 +436,11 @@ export async function runMaintenanceUpdate(input: RunMaintenanceUpdateInput) {
   assertValidBranchName(input.branch);
 
   const reason = disabledReason();
-  if (reason) throw new Error(reason);
+  if (reason) throw badRequest(reason);
 
   const script = getUpdateScript();
   if (!existsSync(script)) {
-    throw new Error(`Update script not found at ${script}`);
+    throw badRequest(`Update script not found at ${script}`);
   }
 
   const args: string[] = [];
@@ -454,7 +455,7 @@ export async function runMaintenanceUpdate(input: RunMaintenanceUpdateInput) {
     skipBackup: input.skipBackup,
     branch: input.branch,
   });
-  if (!job) throw new Error("Failed to start update job");
+  if (!job) throw internalError("Failed to start update job");
   return job;
 }
 
@@ -470,7 +471,7 @@ export async function dismissMaintenanceJob() {
 
   if (job.status === "running") {
     if (job.pid && isProcessRunning(job.pid)) {
-      throw new Error("Job is still running on the server.");
+      throw badRequest("Job is still running on the server.");
     }
     const log = await readLogTail();
     const outcome = inferMaintenanceJobOutcome(job.type, log);

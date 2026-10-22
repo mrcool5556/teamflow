@@ -7,6 +7,7 @@ import { userHasTeamAccess } from "./issues.js";
 import { getTeamMemberWithRole } from "./permissions.js";
 import { resolveInviteRoleId } from "./roles.js";
 import { config } from "../config.js";
+import { badRequest, forbidden, notFound } from "./errors.js";
 
 const DEFAULT_INVITE_DAYS = 30;
 
@@ -100,12 +101,12 @@ export async function createTeamInvite(
 
   // An invite may not carry a role ranked above the inviter's (lower position = higher rank).
   const inviter = await getTeamMemberWithRole(db, input.createdByUserId, input.teamId);
-  if (!inviter) throw new Error("Team access denied");
+  if (!inviter) throw forbidden("Team access denied");
   const outranksInviter =
     role.position < inviter.role.position ||
     (role.slug === "owner" && inviter.role.slug !== "owner");
   if (outranksInviter) {
-    throw new Error("Cannot invite with a role above your own");
+    throw forbidden("Cannot invite with a role above your own");
   }
 
   await db.insert(schema.teamInvites).values({
@@ -218,11 +219,11 @@ export async function getInvitePreview(
 export async function assertInviteAcceptable(db: Db, token: string) {
   const row = await loadInviteRow(db, token);
   if (!row) {
-    throw new Error("Invite not found");
+    throw notFound("Invite not found");
   }
   const error = inviteAcceptError(row);
   if (error) {
-    throw new Error(error);
+    throw badRequest(error);
   }
   return row;
 }

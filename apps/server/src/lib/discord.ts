@@ -4,6 +4,7 @@ import type { Db } from "@teamflow/db";
 import { schema } from "@teamflow/db";
 import { userHasTeamAccess } from "./issues.js";
 import { userHasTeamPermission } from "./permissions.js";
+import { badRequest, forbidden } from "./errors.js";
 
 function parseIdJson(raw: string) {
   try {
@@ -65,7 +66,7 @@ export async function updateTeamDiscordSettings(
   input: UpdateTeamDiscordSettingsInput,
 ) {
   if (!(await userHasTeamPermission(db, actorUserId, teamId, "integrations.discord.manage"))) {
-    throw new Error("Permission denied");
+    throw forbidden("Permission denied");
   }
 
   const current = await getTeamDiscordSettings(db, teamId);
@@ -81,7 +82,7 @@ export async function updateTeamDiscordSettings(
       : current.allowDiscordAdministrators;
 
   if (guildId && allowedRoleIds.includes(guildId)) {
-    throw new Error(
+    throw badRequest(
       "Do not use the server ID as a role ID — that is the @everyone role and would allow everyone.",
     );
   }
@@ -99,7 +100,7 @@ export async function updateTeamDiscordSettings(
       .limit(1);
 
     if (conflict) {
-      throw new Error("That Discord server is already linked to another team");
+      throw badRequest("That Discord server is already linked to another team");
     }
   }
 
@@ -141,7 +142,7 @@ export async function getDiscordGuildConfig(db: Db, guildId: string, userId: str
   }
 
   if (!(await userHasTeamAccess(db, userId, row.teamId))) {
-    throw new Error("Team access denied");
+    throw forbidden("Team access denied");
   }
 
   const settings = mapSettings(row);
