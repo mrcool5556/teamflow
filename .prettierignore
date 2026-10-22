@@ -1,0 +1,10 @@
+node_modules
+dist
+build
+coverage
+data
+packages/data
+pnpm-lock.yaml
+deploy
+docs
+*.md
