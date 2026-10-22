@@ -64,4 +64,3 @@ export function cancelScheduledCustomColorPreview() {
   }
   pendingPreview = null;
 }
-

@@ -106,7 +106,9 @@ export function applyIssuePatch(
   members: TeamMemberPublic[],
 ): IssuePublic {
   const { assigneeIds, ...rest } = patch;
-  const nextStatus = patch.statusId ? statuses.find((status) => status.id === patch.statusId) : null;
+  const nextStatus = patch.statusId
+    ? statuses.find((status) => status.id === patch.statusId)
+    : null;
   const next: IssuePublic = {
     ...issue,
     ...(rest as Partial<IssuePublic>),

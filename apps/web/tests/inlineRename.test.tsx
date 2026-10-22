@@ -51,7 +51,8 @@ describe("row rename on the board", () => {
     const { calls } = installFakeApi(db);
     signIn(db);
     renderApp("/t/ENG");
-    const patches = () => calls.filter((call) => call.method === "PATCH" && call.path.startsWith("/rows/"));
+    const patches = () =>
+      calls.filter((call) => call.method === "PATCH" && call.path.startsWith("/rows/"));
 
     await userEvent.click(await screen.findByRole("button", { name: "ENG row 1" }));
     await userEvent.type(screen.getByDisplayValue("ENG row 1"), " ignored{Escape}");

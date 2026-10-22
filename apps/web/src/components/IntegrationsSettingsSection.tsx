@@ -23,7 +23,6 @@ export function IntegrationsSettingsSection({
 
   return (
     <>
-
       {canManageSecrets ? (
         <DiscordBotSecretsSection
           teamId={teamId}

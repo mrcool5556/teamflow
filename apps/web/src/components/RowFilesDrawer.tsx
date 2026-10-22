@@ -74,9 +74,11 @@ export function RowFilesDrawer({ row, onClose, onNavigateRef }: RowFilesDrawerPr
   const { markContentPointerDown, backdropProps } = useBackdropDismiss(handleClose);
 
   function setAttachments(update: (prev: IssueAttachmentPublic[]) => IssueAttachmentPublic[]) {
-    queryClient.setQueryData<{ attachments: IssueAttachmentPublic[]; limits: AttachmentLimitsPublic }>(
-      queryKeys.rowAttachments(row.id),
-      (data) => (data ? { ...data, attachments: update(data.attachments) } : data),
+    queryClient.setQueryData<{
+      attachments: IssueAttachmentPublic[];
+      limits: AttachmentLimitsPublic;
+    }>(queryKeys.rowAttachments(row.id), (data) =>
+      data ? { ...data, attachments: update(data.attachments) } : data,
     );
   }
 

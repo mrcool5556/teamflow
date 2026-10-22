@@ -132,7 +132,6 @@ export function RolesSettingsSection({
 
   return (
     <>
-
       {loading ? <p className="settings-hint">Loading roles…</p> : null}
 
       {!loading ? (

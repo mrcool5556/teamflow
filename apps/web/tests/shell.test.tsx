@@ -33,7 +33,8 @@ describe("settings panels", () => {
   it("shows a panel's own error message", async () => {
     const db = seedDb();
     installFakeApi(db, {
-      fail: (method, path) => (method === "POST" && path === "/auth/tokens" ? "Token limit reached" : undefined),
+      fail: (method, path) =>
+        method === "POST" && path === "/auth/tokens" ? "Token limit reached" : undefined,
     });
     signIn(db);
     renderApp("/t/ENG/settings/tokens");

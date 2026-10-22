@@ -190,8 +190,9 @@ export function ServerMaintenanceSettingsSection({
   const [updateBranch, setUpdateBranch] = useState("");
 
   const setStatus = useCallback(
-    (update: (current: MaintenanceStatusPublic | undefined) => MaintenanceStatusPublic | undefined) =>
-      queryClient.setQueryData<MaintenanceStatusPublic>(queryKeys.maintenance(teamId), update),
+    (
+      update: (current: MaintenanceStatusPublic | undefined) => MaintenanceStatusPublic | undefined,
+    ) => queryClient.setQueryData<MaintenanceStatusPublic>(queryKeys.maintenance(teamId), update),
     [queryClient, teamId],
   );
 
@@ -248,7 +249,6 @@ export function ServerMaintenanceSettingsSection({
 
   return (
     <>
-
       {loading ? <p className="settings-hint">Loading server status…</p> : null}
 
       {!loading && status ? (

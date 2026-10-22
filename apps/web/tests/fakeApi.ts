@@ -104,8 +104,20 @@ export function seedDb(roleSlug: "owner" | "member" | "viewer" = "owner"): FakeD
     isInstanceAdmin: true,
   };
   const teams: TeamPublic[] = [
-    { id: "00000000-0000-4000-8000-00000000e001", workspaceId: "ws", name: "Engineering", key: "ENG", createdAt: now },
-    { id: "00000000-0000-4000-8000-00000000e002", workspaceId: "ws", name: "Operations", key: "OPS", createdAt: now },
+    {
+      id: "00000000-0000-4000-8000-00000000e001",
+      workspaceId: "ws",
+      name: "Engineering",
+      key: "ENG",
+      createdAt: now,
+    },
+    {
+      id: "00000000-0000-4000-8000-00000000e002",
+      workspaceId: "ws",
+      name: "Operations",
+      key: "OPS",
+      createdAt: now,
+    },
   ];
   const [eng, ops] = teams as [TeamPublic, TeamPublic];
   const rows = [makeRow(eng, 1), makeRow(eng, 2), makeRow(ops, 1)];
@@ -170,11 +182,7 @@ export function seedDb(roleSlug: "owner" | "member" | "viewer" = "owner"): FakeD
   };
 }
 
-type Handler = (args: {
-  params: string[];
-  body: unknown;
-  query: URLSearchParams;
-}) => unknown;
+type Handler = (args: { params: string[]; body: unknown; query: URLSearchParams }) => unknown;
 
 function json(status: number, body: unknown) {
   return new Response(body === undefined ? null : JSON.stringify(body), {
@@ -209,11 +217,7 @@ export function installFakeApi(db: FakeDb, options: FakeApiOptions = {}) {
     ["GET", /^\/auth\/profile$/, () => ({ profile: db.profile })],
     ["PUT", /^\/auth\/profile$/, ({ body }) => ({ profile: (db.profile = body as UserProfile) })],
     ["PATCH", /^\/auth\/profile$/, () => ({ profile: db.profile })],
-    [
-      "POST",
-      /^\/auth\/login$/,
-      () => ({ user: db.user, token: "token-1" }),
-    ],
+    ["POST", /^\/auth\/login$/, () => ({ user: db.user, token: "token-1" })],
     ["GET", /^\/teams$/, () => ({ teams: db.teams })],
     [
       "GET",

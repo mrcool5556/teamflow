@@ -27,10 +27,9 @@ function setup(fail?: (method: string, path: string) => string | undefined) {
       <ErrorSinkProvider>{children}</ErrorSinkProvider>
     </QueryClientProvider>
   );
-  const hook = renderHook(
-    () => ({ mutate: useBoardMutation(team.id), sink: useErrorSink() }),
-    { wrapper },
-  );
+  const hook = renderHook(() => ({ mutate: useBoardMutation(team.id), sink: useErrorSink() }), {
+    wrapper,
+  });
   const cached = () => queryClient.getQueryData<BoardData>(queryKeys.board(team.id))!;
   return { db, api, team, board, hook, cached };
 }
@@ -42,7 +41,12 @@ describe("board mutations", () => {
     let pending!: Promise<unknown>;
     act(() => {
       pending = hook.result.current.mutate(
-        patchIssues(board, db.members, ids.map((id) => ({ id, patch: { priority: "urgent" } })), "x"),
+        patchIssues(
+          board,
+          db.members,
+          ids.map((id) => ({ id, patch: { priority: "urgent" } })),
+          "x",
+        ),
       );
     });
     await waitFor(() => expect(cached().issues.every((i) => i.priority === "urgent")).toBe(true));
@@ -82,7 +86,8 @@ describe("board errors", () => {
   it("rolls back a failed rename and shows the server's message in the banner", async () => {
     const db = seedDb();
     installFakeApi(db, {
-      fail: (method, path) => (method === "PATCH" && path.startsWith("/rows/") ? "Read-only" : undefined),
+      fail: (method, path) =>
+        method === "PATCH" && path.startsWith("/rows/") ? "Read-only" : undefined,
     });
     signIn(db);
     renderApp("/t/ENG");

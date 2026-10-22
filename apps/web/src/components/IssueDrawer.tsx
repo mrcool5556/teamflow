@@ -174,9 +174,11 @@ export function IssueDrawer({
   }, [issue.id, issue.title, issue.description]);
 
   function setAttachments(update: (prev: IssueAttachmentPublic[]) => IssueAttachmentPublic[]) {
-    queryClient.setQueryData<{ attachments: IssueAttachmentPublic[]; limits: AttachmentLimitsPublic }>(
-      queryKeys.issueAttachments(issue.id),
-      (data) => (data ? { ...data, attachments: update(data.attachments) } : data),
+    queryClient.setQueryData<{
+      attachments: IssueAttachmentPublic[];
+      limits: AttachmentLimitsPublic;
+    }>(queryKeys.issueAttachments(issue.id), (data) =>
+      data ? { ...data, attachments: update(data.attachments) } : data,
     );
   }
 
