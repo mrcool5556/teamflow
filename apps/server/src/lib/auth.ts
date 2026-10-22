@@ -121,8 +121,8 @@ export async function verifyPassword(password: string, hash: string) {
   return bcrypt.compare(password, hash);
 }
 
-export async function signSessionToken(userId: string) {
-  return new SignJWT({ sub: userId, type: "session" })
+export async function signSessionToken(userId: string, tokenVersion = 0) {
+  return new SignJWT({ sub: userId, type: "session", ver: tokenVersion })
     .setProtectedHeader({ alg: "HS256" })
     .setIssuer(JWT_ISSUER)
     .setAudience(JWT_AUDIENCE)
@@ -139,7 +139,9 @@ export async function verifySessionToken(token: string) {
   if (payload.type !== "session" || typeof payload.sub !== "string") {
     throw new Error("Invalid session token");
   }
-  return payload.sub;
+  // Tokens issued before token_version existed carry no `ver`; treat them as version 0.
+  const tokenVersion = typeof payload.ver === "number" ? payload.ver : 0;
+  return { userId: payload.sub, tokenVersion };
 }
 
 export function generatePat() {
@@ -198,7 +200,14 @@ export async function resolveAuth(
   }
 
   try {
-    const userId = await verifySessionToken(token);
+    const { userId, tokenVersion } = await verifySessionToken(token);
+    const [user] = await db
+      .select({ tokenVersion: schema.users.tokenVersion })
+      .from(schema.users)
+      .where(eq(schema.users.id, userId))
+      .limit(1);
+    // A password reset bumps token_version, which invalidates every earlier session.
+    if (!user || user.tokenVersion !== tokenVersion) return null;
     return {
       userId,
       authType: "session",

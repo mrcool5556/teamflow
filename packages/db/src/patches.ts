@@ -79,6 +79,7 @@ export function applySchemaPatches(sqlite: Database.Database) {
   ensureTeamInvitesTable(sqlite);
   ensureTeamDiscordSettingsTable(sqlite);
   ensureInstanceAdminColumn(sqlite);
+  ensureTokenVersionColumn(sqlite);
   ensureTeamRolesTable(sqlite);
   ensureDiscordBotSecretsTable(sqlite);
   ensurePasswordResetTokensTable(sqlite);
@@ -982,4 +983,11 @@ function ensureInstanceAdminColumn(sqlite: Database.Database) {
   } else {
     console.log("Added users.is_instance_admin column");
   }
+}
+
+function ensureTokenVersionColumn(sqlite: Database.Database) {
+  const userCols = sqlite.prepare("PRAGMA table_info(users)").all() as { name: string }[];
+  if (userCols.some((col) => col.name === "token_version")) return;
+  sqlite.exec(`ALTER TABLE users ADD COLUMN token_version INTEGER NOT NULL DEFAULT 0`);
+  console.log("Added users.token_version column");
 }

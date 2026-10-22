@@ -20,6 +20,8 @@ export const users = sqliteTable("users", {
   name: text("name").notNull(),
   passwordHash: text("password_hash").notNull(),
   isInstanceAdmin: integer("is_instance_admin").notNull().default(0),
+  /** Bumped on password reset; sessions carry it so older JWTs stop validating. */
+  tokenVersion: integer("token_version").notNull().default(0),
   createdAt: text("created_at")
     .notNull()
     .default(sql`(datetime('now'))`),
