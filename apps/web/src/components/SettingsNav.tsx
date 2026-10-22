@@ -66,6 +66,25 @@ export function SettingsNav({
 
   return (
     <nav className="settings-nav" aria-label="Settings sections">
+      {/* Below 768px the list collapses into this select (CSS shows one or the other). */}
+      <label className="settings-nav-select">
+        <span className="sr-only">Settings section</span>
+        <select value={panel} onChange={(e) => onPanelChange(e.target.value as SettingsPanel)}>
+          {GROUPS.map((group) => {
+            const groupItems = items.filter((item) => item.group === group);
+            if (groupItems.length === 0) return null;
+            return (
+              <optgroup key={group} label={groupLabel(group)}>
+                {groupItems.map((item) => (
+                  <option key={item.id} value={item.id}>
+                    {item.label}
+                  </option>
+                ))}
+              </optgroup>
+            );
+          })}
+        </select>
+      </label>
       {GROUPS.map((group) => {
         const groupItems = items.filter((item) => item.group === group);
         if (groupItems.length === 0) return null;
