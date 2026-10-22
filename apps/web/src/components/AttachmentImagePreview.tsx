@@ -1,8 +1,9 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import type { IssueAttachmentPublic } from "@teamflow/core";
 import { isImageAttachmentFile } from "@teamflow/core";
 import { client } from "../api";
+import { useLayer } from "../ui/layerStack";
 
 export function isImageAttachment(attachment: IssueAttachmentPublic) {
   return isImageAttachmentFile(attachment.filename, attachment.mimeType);
@@ -110,14 +111,8 @@ export function AttachmentLightbox({
   onClose,
   onDownload,
 }: AttachmentLightboxProps) {
-  useEffect(() => {
-    function onKeyDown(event: KeyboardEvent) {
-      if (event.key === "Escape") onClose();
-    }
-
-    window.addEventListener("keydown", onKeyDown);
-    return () => window.removeEventListener("keydown", onKeyDown);
-  }, [onClose]);
+  const figureRef = useRef<HTMLElement>(null);
+  useLayer({ open: true, onEscape: onClose, modal: true, containerRef: figureRef });
 
   return createPortal(
     <div
@@ -129,8 +124,10 @@ export function AttachmentLightbox({
       role="presentation"
     >
       <figure
+        ref={figureRef}
         className="attachment-lightbox"
         role="dialog"
+        aria-modal="true"
         aria-label={attachment.filename}
         onClick={(event) => event.stopPropagation()}
       >
