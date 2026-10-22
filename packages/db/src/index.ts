@@ -70,3 +70,9 @@ export function createDb(databaseUrl?: string) {
 }
 
 export { schema };
+export { SCHEMA_VERSION, getSchemaVersion } from "./patches.js";
+export {
+  DELETED_ISSUE_RETENTION_DAYS,
+  runDataMaintenance,
+  type DataMaintenanceReport,
+} from "./maintenance.js";

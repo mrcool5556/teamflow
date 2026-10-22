@@ -5,6 +5,7 @@ import { db } from "./db.js";
 import { purgeExpiredDeletedFiles } from "./lib/attachments.js";
 import { purgeExpiredUploadSessions } from "./lib/chunkedUpload.js";
 import { checkMaintenanceHost } from "./lib/maintenance.js";
+import { scheduleNightlyMaintenance } from "./lib/dbMaintenance.js";
 
 // config.ts validated every env var (and refused a placeholder JWT_SECRET) when it was imported.
 void purgeExpiredUploadSessions(db);
@@ -16,6 +17,8 @@ if (!process.env.VITEST) {
   const { port, host } = config;
   console.log(`Teamflow API listening on http://${host}:${port}`);
   serve({ fetch: app.fetch, port, hostname: host });
+  // Opt-in data upkeep (trash purge, owner re-grant, renumbering); see packages/db/src/maintenance.ts.
+  if (config.dbMaintenanceNightly) scheduleNightlyMaintenance();
   // Prime the cached maintenance host check so the settings page has sudo/origin info at once.
   if (config.maintenance.enabled) {
     void checkMaintenanceHost().catch((err) =>
