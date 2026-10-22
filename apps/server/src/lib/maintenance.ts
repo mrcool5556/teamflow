@@ -15,18 +15,15 @@ import type {
 import { inferMaintenanceJobOutcome } from "@teamflow/core";
 import { config } from "../config.js";
 import { getMaintenanceVersionInfo } from "./versionInfo.js";
+import { buildSpawnArgs, formatCommand, INSTALLED_SCRIPT_DIR, probeSudo } from "./hostScripts.js";
 import { badRequest, internalError } from "./errors.js";
 
 const JOB_FILE = "maintenance-job.json";
 const LOG_FILE = "maintenance.log";
 const LOG_TAIL_BYTES = 12_000;
 
-function getAppDir() {
-  return config.appDir;
-}
-
 function getDataDir() {
-  return path.join(getAppDir(), "data");
+  return path.join(config.appDir, "data");
 }
 
 function isMaintenanceEnabled() {
@@ -45,11 +42,10 @@ function resolveScriptPath(
 ) {
   if (configured) return configured;
   if (existsSync(installedPath)) return installedPath;
-  return path.join(getAppDir(), repoRelative);
+  return path.join(config.appDir, repoRelative);
 }
 
-/** Root-owned copies installed by deploy/proxmox-lxc/setup-maintenance-sudo.sh. */
-export const INSTALLED_SCRIPT_DIR = "/usr/local/lib/teamflow/";
+export { INSTALLED_SCRIPT_DIR };
 
 function getBackupScript() {
   return resolveScriptPath(
@@ -65,10 +61,6 @@ function getUpdateScript() {
     `${INSTALLED_SCRIPT_DIR}update.sh`,
     "deploy/proxmox-lxc/update.sh",
   );
-}
-
-function useSudo() {
-  return config.maintenance.sudo;
 }
 
 function disabledReason(): string | null {
@@ -204,62 +196,6 @@ async function listBackups(): Promise<MaintenanceBackupPublic[]> {
   return backups.sort((a, b) => Date.parse(b.createdAt) - Date.parse(a.createdAt));
 }
 
-const BASH_PATH = "/usr/bin/bash";
-
-function scriptUsesDirectSudo(script: string) {
-  return script.startsWith(INSTALLED_SCRIPT_DIR);
-}
-
-function formatCommand(command: string, args: string[]) {
-  return [command, ...args].join(" ");
-}
-
-function buildSpawnArgs(script: string, args: string[]) {
-  if (process.platform === "win32") {
-    return { command: "bash", args: [script, ...args] };
-  }
-  if (useSudo()) {
-    if (scriptUsesDirectSudo(script)) {
-      return { command: "sudo", args: ["-n", script, ...args] };
-    }
-    return { command: "sudo", args: ["-n", BASH_PATH, script, ...args] };
-  }
-  return { command: BASH_PATH, args: [script, ...args] };
-}
-
-async function probeSudo(
-  script: string,
-): Promise<{ ready: boolean; command: string; detail: string }> {
-  if (!useSudo() || process.platform === "win32") {
-    return { ready: true, command: "", detail: "sudo not required" };
-  }
-  if (!existsSync(script)) {
-    return { ready: false, command: "", detail: `Script missing: ${script}` };
-  }
-
-  const { command, args } = buildSpawnArgs(script, ["--help"]);
-  const cmdline = formatCommand(command, args);
-
-  return new Promise((resolve) => {
-    const child = spawn(command, args, { stdio: ["ignore", "pipe", "pipe"] });
-    let stderr = "";
-    child.stderr?.on("data", (chunk: Buffer) => {
-      stderr += chunk.toString("utf8");
-    });
-    child.on("error", (err) => {
-      resolve({ ready: false, command: cmdline, detail: err.message });
-    });
-    child.on("close", (code) => {
-      if (code === 0) {
-        resolve({ ready: true, command: cmdline, detail: "ok" });
-        return;
-      }
-      const detail = stderr.trim() || `exit ${code ?? "unknown"}`;
-      resolve({ ready: false, command: cmdline, detail });
-    });
-  });
-}
-
 async function assertJobIdle() {
   await reconcileStaleJob();
   const current = await readStoredJob();
@@ -294,7 +230,7 @@ async function startJob(
   const { command, args: spawnArgs } = buildSpawnArgs(script, args);
   const env = {
     ...process.env,
-    APP_DIR: getAppDir(),
+    APP_DIR: config.appDir,
     BACKUP_DIR: getBackupDir(),
     MAINTENANCE_LOG: logPath,
   };

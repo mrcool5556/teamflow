@@ -14,10 +14,6 @@ import { badRequest, forbidden } from "./errors.js";
 
 const ROW_ID = "default";
 
-function getAppDir() {
-  return config.appDir;
-}
-
 function defaultSecretsPublic(): DiscordBotSecretsPublic {
   return {
     configured: false,
@@ -131,7 +127,7 @@ export async function updateDiscordBotSecrets(
   const publicSecrets = await getDiscordBotSecretsPublic(db);
   if (publicSecrets.configured && process.platform !== "win32") {
     try {
-      await syncDiscordBotEnv(getAppDir(), publicSecrets.teamflowUrl);
+      await syncDiscordBotEnv(config.appDir, publicSecrets.teamflowUrl);
     } catch (err) {
       console.warn(
         "[teamflow] Could not sync Discord bot env:",

@@ -8,24 +8,14 @@ import type { Db } from "@teamflow/db";
 import { defaultPublicUrl, syncDiscordBotEnv } from "./botConfigKey.js";
 import { config } from "../config.js";
 import { badRequest } from "./errors.js";
-
-const BASH_PATH = "/usr/bin/bash";
-const INSTALLED_SCRIPT_PREFIX = "/usr/local/lib/teamflow/";
-
-function getAppDir() {
-  return config.appDir;
-}
-
-function useSudo() {
-  return config.maintenance.sudo;
-}
+import { buildSpawnArgs, INSTALLED_SCRIPT_DIR, probeSudo, useSudo } from "./hostScripts.js";
 
 function getDiscordBotScript() {
   const configured = config.maintenance.discordBotScript;
   if (configured) return configured;
-  const installed = `${INSTALLED_SCRIPT_PREFIX}discord-bot.sh`;
+  const installed = `${INSTALLED_SCRIPT_DIR}discord-bot.sh`;
   if (existsSync(installed)) return installed;
-  return path.join(getAppDir(), "deploy/proxmox-lxc/discord-bot.sh");
+  return path.join(config.appDir, "deploy/proxmox-lxc/discord-bot.sh");
 }
 
 function managementReason(): string | null {
@@ -33,20 +23,6 @@ function managementReason(): string | null {
     return "Discord bot service management is only available on Linux server installs. Run pnpm dev:discord locally.";
   }
   return null;
-}
-
-function scriptUsesDirectSudo(script: string) {
-  return script.startsWith(INSTALLED_SCRIPT_PREFIX);
-}
-
-function buildSpawnArgs(script: string, args: string[]) {
-  if (useSudo()) {
-    if (scriptUsesDirectSudo(script)) {
-      return { command: "sudo", args: ["-n", script, ...args] };
-    }
-    return { command: "sudo", args: ["-n", BASH_PATH, script, ...args] };
-  }
-  return { command: BASH_PATH, args: [script, ...args] };
 }
 
 async function runScript(
@@ -58,14 +34,8 @@ async function runScript(
     throw badRequest(`Discord bot script not found at ${script}`);
   }
 
-  const shouldSudo = options?.sudo ?? useSudo();
-  const { command, args: spawnArgs } = shouldSudo
-    ? buildSpawnArgs(script, args)
-    : { command: BASH_PATH, args: [script, ...args] };
-  const env = {
-    ...process.env,
-    APP_DIR: getAppDir(),
-  };
+  const { command, args: spawnArgs } = buildSpawnArgs(script, args, options?.sudo ?? useSudo());
+  const env = scriptEnv();
 
   return new Promise((resolve, reject) => {
     const child = spawn(command, spawnArgs, { env, stdio: ["ignore", "pipe", "pipe"] });
@@ -84,24 +54,8 @@ async function runScript(
   });
 }
 
-async function probeSudo(script: string): Promise<{ ready: boolean; detail: string }> {
-  if (!useSudo() || process.platform === "win32") {
-    return { ready: true, detail: "sudo not required" };
-  }
-  if (!existsSync(script)) {
-    return { ready: false, detail: `Script missing: ${script}` };
-  }
-
-  try {
-    const result = await runScript(["--help"], { sudo: true });
-    if (result.code === 0) return { ready: true, detail: "ok" };
-    return { ready: false, detail: result.stderr.trim() || `exit ${result.code}` };
-  } catch (err) {
-    return {
-      ready: false,
-      detail: err instanceof Error ? err.message : "sudo probe failed",
-    };
-  }
+function scriptEnv() {
+  return { ...process.env, APP_DIR: config.appDir };
 }
 
 type ScriptStatus = {
@@ -133,10 +87,10 @@ export async function getDiscordBotServiceStatus(db: Db): Promise<DiscordBotServ
   const secrets = await getDiscordBotSecretsPublic(db);
   const managementAvailable = reason === null && scriptReady;
   const sudoProbe = managementAvailable
-    ? await probeSudo(script)
+    ? await probeSudo(script, scriptEnv())
     : { ready: false, detail: reason };
   const scriptStatus = reason === null && scriptReady ? await readScriptStatus() : null;
-  const botEnvPath = path.join(getAppDir(), "data", "discord-bot.env");
+  const botEnvPath = path.join(config.appDir, "data", "discord-bot.env");
 
   return {
     managementAvailable: managementAvailable && sudoProbe.ready,
@@ -179,7 +133,7 @@ async function runManagedAction(action: "enable" | "restart" | "stop") {
     throw badRequest(`Discord bot script not found at ${script}`);
   }
 
-  const sudoProbe = await probeSudo(script);
+  const sudoProbe = await probeSudo(script, scriptEnv());
   if (!sudoProbe.ready) {
     throw badRequest(
       `${sudoProbe.detail}. Run deploy/proxmox-lxc/setup-maintenance-sudo.sh on the server.`,
@@ -202,7 +156,7 @@ async function runManagedAction(action: "enable" | "restart" | "stop") {
 export async function enableDiscordBotService(db: Db) {
   await assertCanManage(db);
   const secrets = await getDiscordBotSecretsPublic(db);
-  await syncDiscordBotEnv(getAppDir(), secrets.teamflowUrl || defaultPublicUrl());
+  await syncDiscordBotEnv(config.appDir, secrets.teamflowUrl || defaultPublicUrl());
   await runManagedAction("enable");
   return getDiscordBotServiceStatus(db);
 }
@@ -210,7 +164,7 @@ export async function enableDiscordBotService(db: Db) {
 export async function restartDiscordBotService(db: Db) {
   await assertCanManage(db);
   const secrets = await getDiscordBotSecretsPublic(db);
-  await syncDiscordBotEnv(getAppDir(), secrets.teamflowUrl || defaultPublicUrl());
+  await syncDiscordBotEnv(config.appDir, secrets.teamflowUrl || defaultPublicUrl());
   await runManagedAction("restart");
   return getDiscordBotServiceStatus(db);
 }

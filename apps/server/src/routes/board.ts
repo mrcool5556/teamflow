@@ -97,16 +97,6 @@ routes.post(
   },
 );
 
-routes.post("/teams/:teamId/statuses", validateParams, async (c) => {
-  return c.json(
-    {
-      error:
-        "Columns are per row. Use POST /rows/:rowId/statuses to add a column to a specific row.",
-    },
-    410,
-  );
-});
-
 routes.patch(
   "/statuses/:statusId",
   requireAuth,

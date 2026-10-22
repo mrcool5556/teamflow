@@ -32,8 +32,10 @@ describe("maintenance sudo layout", () => {
     expect(INSTALLED_SCRIPT_DIR).toBe("/usr/local/lib/teamflow/");
     const maintenance = read("apps/server/src/lib/maintenance.ts");
     const discord = read("apps/server/src/lib/discordBotService.ts");
+    const hostScripts = read("apps/server/src/lib/hostScripts.ts");
     expect(maintenance).not.toMatch(/\/usr\/local\/bin\//);
-    expect(discord).toContain("/usr/local/lib/teamflow/");
+    expect(hostScripts).toContain('INSTALLED_SCRIPT_DIR = "/usr/local/lib/teamflow/"');
+    expect(discord).toContain("${INSTALLED_SCRIPT_DIR}discord-bot.sh");
     expect(discord).not.toMatch(/\/usr\/local\/bin\/teamflow-discord/);
   });
 

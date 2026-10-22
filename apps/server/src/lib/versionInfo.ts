@@ -6,10 +6,6 @@ import { config } from "../config.js";
 
 const execFileAsync = promisify(execFile);
 
-function getAppDir() {
-  return config.appDir;
-}
-
 async function runGit(appDir: string, args: string[], timeoutMs = 12_000) {
   const { stdout } = await execFileAsync("git", ["-C", appDir, ...args], {
     timeout: timeoutMs,
@@ -151,7 +147,7 @@ async function compareWithOrigin(
 export async function getMaintenanceVersionInfo(options?: {
   skipOriginCheck?: boolean;
 }): Promise<MaintenanceVersionPublic> {
-  const appDir = getAppDir();
+  const appDir = config.appDir;
   const version = readPackageVersion(appDir);
 
   if (!existsSync(`${appDir}/.git`)) {
