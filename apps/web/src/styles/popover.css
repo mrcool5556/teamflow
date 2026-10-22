@@ -919,3 +919,136 @@
     grid-template-columns: 1fr;
   }
 }
+
+/* Due date: trigger in the issue drawer and its calendar popover. */
+.due-picker-trigger {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  width: 100%;
+  padding: 0.45rem 0.55rem;
+  background: var(--surface);
+  color: var(--text);
+  border: 2px solid var(--border);
+  box-shadow: none;
+  text-align: left;
+  font-size: var(--font-size-sm);
+}
+
+.due-picker-trigger:hover:not(:disabled) {
+  border-color: var(--accent);
+}
+
+.due-picker-trigger--overdue .due-picker-value {
+  color: var(--danger-text);
+}
+
+.due-picker {
+  padding: var(--space-3);
+  background: var(--panel);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-md);
+  box-shadow: var(--chrome-modal-shadow);
+  font-size: var(--font-size-sm);
+}
+
+.due-picker-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: var(--space-2);
+}
+
+.due-picker-nav {
+  padding: 0.1rem 0.55rem;
+  font-size: 1rem;
+}
+
+.due-picker-grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 2px;
+  text-align: center;
+}
+
+.due-picker-weekday {
+  font-size: var(--font-size-xs);
+  color: var(--muted);
+  padding: 0.2rem 0;
+}
+
+.due-picker-day {
+  padding: 0.3rem 0;
+  border: 1px solid transparent;
+  border-radius: var(--radius-xs);
+  background: transparent;
+  color: var(--text);
+  box-shadow: none;
+  font-size: var(--font-size-sm);
+}
+
+.due-picker-day:hover {
+  border-color: var(--border-strong);
+}
+
+.due-picker-day.is-outside {
+  color: var(--muted);
+}
+
+.due-picker-day.is-today {
+  border-color: var(--accent);
+}
+
+.due-picker-day.is-selected {
+  background: var(--primary);
+  color: var(--chrome-btn-text);
+  font-weight: 600;
+}
+
+.due-picker-chips,
+.due-picker-time {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-1);
+  margin-top: var(--space-2);
+}
+
+.due-picker-chip {
+  padding: 0.15rem 0.6rem;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--text-soft);
+  box-shadow: none;
+  font-size: var(--font-size-xs);
+}
+
+.due-picker-chip:hover,
+.due-picker-chip.is-selected {
+  border-color: var(--accent);
+  color: var(--accent-text);
+}
+
+.due-picker-time input {
+  width: 7.75rem;
+  padding: 0.2rem 0.4rem;
+  background: var(--surface);
+  color: var(--text);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-xs);
+}
+
+.due-picker-actions {
+  display: flex;
+  justify-content: space-between;
+  margin-top: var(--space-3);
+}
+
+.due-picker-actions button {
+  padding: 0.3rem 0.85rem;
+}
+
+.due-picker-clear {
+  color: var(--danger-text);
+}

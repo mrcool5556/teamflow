@@ -100,9 +100,8 @@ describe("issue drawer permissions", () => {
 
     expect(d.getByLabelText("Issue title")).toHaveAttribute("readonly");
     for (const select of drawer.querySelectorAll("select")) expect(select).toBeDisabled();
-    expect(drawer.querySelector("input[type='datetime-local']")).toBeDisabled();
     for (const trigger of drawer.querySelectorAll(
-      ".color-picker-trigger, .assignee-picker-trigger, .issue-timer-trigger",
+      ".due-picker-trigger, .color-picker-trigger, .assignee-picker-trigger, .issue-timer-trigger",
     )) {
       expect(trigger).toBeDisabled();
     }
