@@ -22,7 +22,8 @@ function runSeed(dbFile: string, extraEnv: Record<string, string>) {
   const env: NodeJS.ProcessEnv = { ...process.env, DATABASE_URL: `file:${dbFile}` };
   delete env.TEAMFLOW_SEED_DEMO;
   Object.assign(env, extraEnv);
-  const stdout = execFileSync(tsxBin, ["src/seed.ts"], {
+  // "source" resolves @teamflow/* to package sources, so no build is needed first.
+  const stdout = execFileSync(tsxBin, ["--conditions=source", "src/seed.ts"], {
     cwd: dbPackage,
     env,
     encoding: "utf8",
