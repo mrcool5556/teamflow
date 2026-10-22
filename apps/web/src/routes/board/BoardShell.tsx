@@ -12,7 +12,6 @@ import { mergeUserProfile, permissionsForSystemSlug, type SystemRoleSlug } from 
 import { client } from "../../api";
 import { KanbanBoard } from "../../KanbanBoard";
 import { AboutDialog } from "../../components/AboutDialog";
-import { BoardLayoutPreview } from "../../components/BoardLayoutPreview";
 import { BoardTips } from "../../components/BoardTips";
 import { ChangeHistoryPanel } from "../../components/ChangeHistoryPanel";
 import { GoToRefBar } from "../../components/GoToRefBar";
@@ -413,7 +412,6 @@ export function BoardShell() {
     lastSettingsPanelRef.current = route.settingsPanel;
   }
   const overlayOpen = settingsOpen || roadmapOpen;
-  const useSamplePreview = settingsOpen && rows.length === 0;
 
   const closeSettings = useCallback(() => {
     navigate(boardPath(teamKey));
@@ -439,107 +437,55 @@ export function BoardShell() {
   };
 
   const boardPanel = (
-    <div
-      className={`board-wrap ${settingsOpen ? "board-wrap--preview" : ""} ${refNavActive ? "board-wrap--ref-nav" : ""}`}
-    >
-      {settingsOpen ? (
-        <div className="board-preview-banner">
-          <div>
-            <p className="eyebrow">Live preview</p>
-            <p className="settings-copy board-preview-copy">
-              {useSamplePreview
-                ? "Sample row and cards — your board is empty."
-                : "Your real board — theme and layout update as you change settings."}
-            </p>
-          </div>
-        </div>
-      ) : (
-        <div className="board-toolbar">
-          <button type="button" disabled={!can("board.edit")} onClick={() => addRow()}>
-            + Add row
-          </button>
-          <BoardTips />
-        </div>
-      )}
+    <div className={`board-wrap ${refNavActive ? "board-wrap--ref-nav" : ""}`}>
+      <div className="board-toolbar">
+        <button type="button" disabled={!can("board.edit")} onClick={() => addRow()}>
+          + Add row
+        </button>
+        <BoardTips />
+      </div>
 
-      <div
-        ref={boardScrollRef}
-        className={`board-scroll ${settingsOpen ? "board-scroll--preview" : ""}`}
-      >
-        <div className={settingsOpen ? "board-preview-surface" : undefined}>
-          {useSamplePreview ? (
-            <BoardLayoutPreview />
-          ) : (
-            <KanbanBoard
-              previewMode={settingsOpen}
-              rows={rows}
-              statuses={statuses}
-              issues={issues}
-              defaultRowId={defaultRowId}
-              isRowHeadersVisible={isRowHeadersVisible}
-              toggleRowHeaders={settingsOpen ? () => {} : toggleRowHeaders}
-              issuesForCell={issuesForCell}
-              onSelectIssue={settingsOpen ? () => {} : openIssue}
-              onDeleteIssue={settingsOpen ? () => {} : deleteIssue}
-              onRenameRow={settingsOpen ? () => {} : (row, name) => void renameRow(row, name)}
-              onRenameStatus={
-                settingsOpen ? () => {} : (status, name) => void renameStatus(status, name)
-              }
-              onUpdateStatusColor={
-                settingsOpen ? () => {} : (status, color) => void updateStatusColor(status, color)
-              }
-              onRemoveRow={settingsOpen ? () => {} : removeRow}
-              onRemoveColumn={settingsOpen ? () => {} : removeColumn}
-              onAddColumn={settingsOpen ? () => {} : addColumn}
-              onAddIssue={
-                settingsOpen ? () => {} : (rowId, statusId) => void addIssue(rowId, statusId)
-              }
-              onReorderRows={
-                settingsOpen
-                  ? () => {}
-                  : (activeRowId, overRowId) => void reorderRows(activeRowId, overRowId)
-              }
-              onReorderColumns={
-                settingsOpen
-                  ? () => {}
-                  : (rowId, activeStatusId, overStatusId) =>
-                      void reorderColumns(rowId, activeStatusId, overStatusId)
-              }
-              onReorderIssuesInCell={settingsOpen ? () => {} : reorderIssuesInCell}
-              onAssignIssues={settingsOpen ? () => {} : assignIssues}
-              members={members}
-              onAssignIssue={
-                settingsOpen
-                  ? () => {}
-                  : (issue, assigneeIds) => void assignIssue(issue, assigneeIds)
-              }
-              onAssignRow={
-                settingsOpen ? () => {} : (row, assigneeIds) => void assignRow(row, assigneeIds)
-              }
-              onUpdateRowColor={
-                settingsOpen ? () => {} : (row, color) => void updateRowColor(row, color)
-              }
-              onUpdateIssueColor={
-                settingsOpen ? () => {} : (issue, color) => void updateIssueColor(issue, color)
-              }
-              onUpdateIssuePriority={
-                settingsOpen
-                  ? () => {}
-                  : (issue, priority) => void updateIssuePriority(issue, priority)
-              }
-              onUpdateIssueTimer={settingsOpen ? () => {} : updateIssueTimer}
-              highlightedIssueId={settingsOpen ? null : highlightedIssueId}
-              highlightedColumnKey={settingsOpen ? null : highlightedColumnKey}
-              onGoToRef={settingsOpen ? undefined : (ref) => void goToRef(ref)}
-              onBulkMove={settingsOpen ? undefined : bulkMoveIssues}
-              onBulkAssign={settingsOpen ? undefined : assignIssues}
-              onBulkPriority={settingsOpen ? undefined : bulkSetPriority}
-              onBulkTimer={settingsOpen ? undefined : bulkTimerIssues}
-              onBulkDelete={settingsOpen ? undefined : bulkDeleteIssues}
-              onOpenRowFiles={settingsOpen ? undefined : setRowFilesRow}
-            />
-          )}
-        </div>
+      <div ref={boardScrollRef} className="board-scroll">
+        <KanbanBoard
+          rows={rows}
+          statuses={statuses}
+          issues={issues}
+          defaultRowId={defaultRowId}
+          isRowHeadersVisible={isRowHeadersVisible}
+          toggleRowHeaders={toggleRowHeaders}
+          issuesForCell={issuesForCell}
+          onSelectIssue={openIssue}
+          onDeleteIssue={deleteIssue}
+          onRenameRow={(row, name) => void renameRow(row, name)}
+          onRenameStatus={(status, name) => void renameStatus(status, name)}
+          onUpdateStatusColor={(status, color) => void updateStatusColor(status, color)}
+          onRemoveRow={removeRow}
+          onRemoveColumn={removeColumn}
+          onAddColumn={addColumn}
+          onAddIssue={(rowId, statusId) => void addIssue(rowId, statusId)}
+          onReorderRows={(activeRowId, overRowId) => void reorderRows(activeRowId, overRowId)}
+          onReorderColumns={(rowId, activeStatusId, overStatusId) =>
+            void reorderColumns(rowId, activeStatusId, overStatusId)
+          }
+          onReorderIssuesInCell={reorderIssuesInCell}
+          onAssignIssues={assignIssues}
+          members={members}
+          onAssignIssue={(issue, assigneeIds) => void assignIssue(issue, assigneeIds)}
+          onAssignRow={(row, assigneeIds) => void assignRow(row, assigneeIds)}
+          onUpdateRowColor={(row, color) => void updateRowColor(row, color)}
+          onUpdateIssueColor={(issue, color) => void updateIssueColor(issue, color)}
+          onUpdateIssuePriority={(issue, priority) => void updateIssuePriority(issue, priority)}
+          onUpdateIssueTimer={updateIssueTimer}
+          highlightedIssueId={highlightedIssueId}
+          highlightedColumnKey={highlightedColumnKey}
+          onGoToRef={(ref) => void goToRef(ref)}
+          onBulkMove={bulkMoveIssues}
+          onBulkAssign={assignIssues}
+          onBulkPriority={bulkSetPriority}
+          onBulkTimer={bulkTimerIssues}
+          onBulkDelete={bulkDeleteIssues}
+          onOpenRowFiles={setRowFilesRow}
+        />
       </div>
     </div>
   );
@@ -704,11 +650,8 @@ export function BoardShell() {
           {loading && <div className="banner">Loading…</div>}
 
           {settingsOpen ? (
-            <div
-              className={`app-workspace app-workspace--settings${route.settingsPanel === "appearance" ? " app-workspace--with-preview" : ""}`}
-            >
+            <div className="app-workspace app-workspace--settings">
               <Outlet />
-              {route.settingsPanel === "appearance" ? boardPanel : null}
             </div>
           ) : roadmapOpen ? (
             <div className="app-workspace app-workspace--roadmap">

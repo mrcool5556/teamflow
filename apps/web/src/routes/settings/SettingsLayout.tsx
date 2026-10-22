@@ -34,7 +34,7 @@ export function SettingsLayout() {
         />
       </aside>
       <main className="settings-main">
-        <div className="settings-column">
+        <div className={`settings-column${panel === "appearance" ? " settings-column--wide" : ""}`}>
           <Outlet />
         </div>
       </main>

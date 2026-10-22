@@ -143,6 +143,56 @@
   max-width: 720px;
 }
 
+.settings-column--wide {
+  max-width: 1080px;
+}
+
+/* Appearance: controls beside a small framed sample board (sticky while you scroll). */
+.appearance-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 440px;
+  gap: var(--space-6);
+  align-items: start;
+}
+
+.appearance-preview {
+  position: sticky;
+  top: 0;
+}
+
+.appearance-preview-caption {
+  margin: 0 0 var(--space-2);
+  font-size: var(--font-size-xs);
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.appearance-preview-frame {
+  /* Narrow sample columns so three fit in the frame whatever the board width setting is. */
+  --board-column-width: 124px;
+  padding: var(--space-3);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-md);
+  background: var(--bg);
+  overflow: hidden;
+}
+
+.appearance-preview-frame .issue-card-title {
+  font-size: var(--font-size-sm);
+}
+
+@media (max-width: 1099px) {
+  .appearance-layout {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .appearance-preview {
+    position: static;
+    order: -1;
+  }
+}
+
 .settings-panel-header {
   margin-bottom: 1rem;
 }
@@ -425,19 +475,6 @@
   border: 2px solid var(--border);
   background: var(--bg);
   color: var(--text);
-}
-
-.board-preview-banner {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 1rem;
-  padding-bottom: 0.65rem;
-  border-bottom: 2px solid var(--border);
-}
-
-.board-preview-copy {
-  margin: 0.25rem 0 0;
 }
 
 .board-preview-surface {
@@ -988,4 +1025,13 @@
 .settings-segmented button.active {
   background: var(--accent);
   color: #111;
+}
+
+.appearance-preview-frame .column-label-name,
+.appearance-preview-frame .preview-chip {
+  font-size: var(--font-size-xs);
+}
+
+.appearance-preview-frame .issue-card {
+  padding: var(--space-2);
 }
