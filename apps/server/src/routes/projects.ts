@@ -3,10 +3,10 @@ import type { AppEnv } from "../types.js";
 import { parseBody, parseQuery } from "../lib/validation.js";
 import { createProjectSchema, listProjectsQuerySchema } from "@teamflow/core";
 import { schema } from "@teamflow/db";
-import { eq } from "drizzle-orm";
+import { and, eq, inArray } from "drizzle-orm";
 import { db } from "../db.js";
 import { requireAuth, requireWrite } from "../middleware/auth.js";
-import { assertTeamAccess, patTeamMismatch } from "../middleware/team.js";
+import { assertTeamAccess } from "../middleware/team.js";
 
 /** Projects. */
 const routes = new Hono<AppEnv>();
@@ -15,20 +15,20 @@ routes.get("/projects", requireAuth, async (c) => {
   const auth = c.var.auth;
 
   const { teamId } = parseQuery(c, listProjectsQuerySchema);
-  const memberships = await db
+
+  // Only projects of teams the caller belongs to; a team-scoped PAT sees only its team.
+  const memberTeams = db
     .select({ teamId: schema.teamMembers.teamId })
     .from(schema.teamMembers)
     .where(eq(schema.teamMembers.userId, auth.userId));
+  const conditions = [inArray(schema.projects.teamId, memberTeams)];
+  if (auth.patTeamId) conditions.push(eq(schema.projects.teamId, auth.patTeamId));
+  if (teamId) conditions.push(eq(schema.projects.teamId, teamId));
 
-  const allowedTeamIds = new Set(memberships.map((m) => m.teamId));
-  let projects = await db.select().from(schema.projects);
-
-  projects = projects.filter((p) => {
-    if (!allowedTeamIds.has(p.teamId)) return false;
-    if (patTeamMismatch(auth, p.teamId)) return false;
-    if (teamId && p.teamId !== teamId) return false;
-    return true;
-  });
+  const projects = await db
+    .select()
+    .from(schema.projects)
+    .where(and(...conditions));
 
   return c.json({ projects });
 });
