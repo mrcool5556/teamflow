@@ -86,7 +86,7 @@ Conventions:
 - **Errors.** Throw `ApiError` (or a helper from `lib/errors.ts`); the body is always `{ "error": string, "code": string }` and every response carries `X-Request-Id`. Codes are listed in [API.md](API.md#errors).
 - **Validation.** Every body, query and path param goes through a Zod schema from `packages/core`.
 - **Transactions.** Multi-write flows (register, create team, issue number allocation, reorders, invite use, bundle import) run inside a synchronous `db.transaction`. Issue numbers are protected by `UNIQUE(team_id, number)`.
-- **Config.** Import `config` from `config.ts`; nothing else reads `process.env`. The server does not load `.env` files: systemd (`EnvironmentFile=`), NSSM, Docker or your shell must provide the variables.
+- **Config.** Import `config` from `config.ts`; nothing else reads `process.env`. `index.ts` first imports `loadEnv.ts`, which loads `TEAMFLOW_ENV_FILE` or `<app dir>/.env` with `process.loadEnvFile` (skipped under Vitest); variables already set (systemd `EnvironmentFile=`, NSSM, Docker, your shell) always win.
 - **Host scripts.** Backup, update and Discord bot service actions call root-owned copies in `/usr/local/lib/teamflow/` through `sudo -n` (`lib/hostScripts.ts`). GET routes never spawn them; `POST .../maintenance/check` refreshes the cached status.
 
 ## Web (`apps/web/src`)

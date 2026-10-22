@@ -1,3 +1,4 @@
+import "./loadEnv.js"; // must stay first: loads the env file before config.ts validates
 import { serve } from "@hono/node-server";
 import { app } from "./app.js";
 import { config } from "./config.js";
