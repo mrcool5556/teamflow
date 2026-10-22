@@ -135,10 +135,6 @@
   overflow: hidden;
 }
 
-.app-shell .banner {
-  flex-shrink: 0;
-}
-
 .board-wrap {
   padding: 1rem 1.25rem 1rem;
   display: flex;
@@ -905,12 +901,6 @@ body.board-pan-active {
 }
 
 .ref-link:hover {
-  color: var(--text);
-}
-
-.banner.ref-notice {
-  background: color-mix(in srgb, var(--accent) 14%, var(--panel));
-  border-color: var(--accent);
   color: var(--text);
 }
 
