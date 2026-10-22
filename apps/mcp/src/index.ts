@@ -10,13 +10,9 @@ import type { IssuePublic } from "@teamflow/core";
 
 import { z } from "zod";
 
-
-
 const baseUrl = process.env.TEAMFLOW_URL ?? "http://localhost:3000";
 
 const token = process.env.TEAMFLOW_TOKEN;
-
-
 
 if (!token) {
 
@@ -26,11 +22,7 @@ if (!token) {
 
 }
 
-
-
 const client = new TeamflowClient({ baseUrl, token });
-
-
 
 function json(data: unknown) {
 
@@ -41,8 +33,6 @@ function json(data: unknown) {
   };
 
 }
-
-
 
 async function resolveRowId(teamId: string, rowId?: string, rowName?: string) {
 
@@ -61,8 +51,6 @@ async function resolveRowId(teamId: string, rowId?: string, rowName?: string) {
   return match?.id;
 
 }
-
-
 
 async function resolveAssigneeId(
 
@@ -89,8 +77,6 @@ async function resolveAssigneeId(
   return match?.userId;
 
 }
-
-
 
 function compactIssue(issue: IssuePublic) {
 
@@ -122,8 +108,6 @@ function compactIssue(issue: IssuePublic) {
 
 }
 
-
-
 const server = new McpServer({
 
   name: "teamflow",
@@ -131,8 +115,6 @@ const server = new McpServer({
   version: "0.2.0",
 
 });
-
-
 
 server.tool(
 
@@ -146,8 +128,6 @@ server.tool(
 
 );
 
-
-
 server.tool(
 
   "list_projects",
@@ -160,8 +140,6 @@ server.tool(
 
 );
 
-
-
 server.tool(
 
   "list_rows",
@@ -173,8 +151,6 @@ server.tool(
   async ({ teamId }) => json(await client.listRows(teamId)),
 
 );
-
-
 
 server.tool(
 
@@ -194,8 +170,6 @@ server.tool(
 
 );
 
-
-
 server.tool(
 
   "list_team_members",
@@ -207,8 +181,6 @@ server.tool(
   async ({ teamId }) => json(await client.listTeamMembers(teamId)),
 
 );
-
-
 
 server.tool(
 
@@ -264,8 +236,6 @@ server.tool(
 
       : filters.assigneeId;
 
-
-
     const { issues } = await client.listIssues({
 
       teamId: filters.teamId,
@@ -282,8 +252,6 @@ server.tool(
 
     });
 
-
-
     if (filters.compact === false) {
 
       return json({ issues });
@@ -295,8 +263,6 @@ server.tool(
   },
 
 );
-
-
 
 server.tool(
 
@@ -344,23 +310,17 @@ server.tool(
 
       ]);
 
-
-
     const ownedRowIds = new Set(
 
       rows.filter((row) => row.assigneeId === user.id).map((row) => row.id),
 
     );
 
-
-
     const rowOwned = includeRowOwned
 
       ? allIssues.filter((issue) => issue.rowId && ownedRowIds.has(issue.rowId))
 
       : [];
-
-
 
     const byId = new Map<string, IssuePublic>();
 
@@ -369,8 +329,6 @@ server.tool(
       byId.set(issue.id, issue);
 
     }
-
-
 
     return json({
 
@@ -383,8 +341,6 @@ server.tool(
   },
 
 );
-
-
 
 server.tool(
 
@@ -406,11 +362,7 @@ server.tool(
 
     ]);
 
-
-
     const defaultRowId = rows[0]?.id ?? null;
-
-
 
     const summary = rows.map((row) => {
 
@@ -461,8 +413,6 @@ server.tool(
 
     });
 
-
-
     return json({
 
       teamId,
@@ -489,8 +439,6 @@ server.tool(
 
 );
 
-
-
 server.tool(
 
   "get_issue",
@@ -502,8 +450,6 @@ server.tool(
   async ({ issueId }) => json(await client.getIssue(issueId)),
 
 );
-
-
 
 server.tool(
 
@@ -575,8 +521,6 @@ server.tool(
 
 );
 
-
-
 server.tool(
 
   "update_issue",
@@ -611,8 +555,6 @@ server.tool(
 
 );
 
-
-
 server.tool(
 
   "complete_issue",
@@ -624,8 +566,6 @@ server.tool(
   async ({ issueId }) => json(await client.completeIssue(issueId)),
 
 );
-
-
 
 server.tool(
 
@@ -645,10 +585,7 @@ server.tool(
 
 );
 
-
-
 const transport = new StdioServerTransport();
 
 await server.connect(transport);
-
 

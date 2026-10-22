@@ -18,15 +18,9 @@ import {
 
 } from "@teamflow/core";
 
-
-
 const LEGACY_COLUMN_WIDTH_KEY = "teamflow_board_column_width";
 
-
-
 const UI_COLOR_VARS = ["--primary", "--accent", "--accent-text", "--text", "--text-soft"] as const;
-
-
 
 export function readLegacyLocalProfile(): Partial<UserProfile["board"]> | null {
 
@@ -42,15 +36,11 @@ export function readLegacyLocalProfile(): Partial<UserProfile["board"]> | null {
 
 }
 
-
-
 export function clearLegacyLocalProfile() {
 
   localStorage.removeItem(LEGACY_COLUMN_WIDTH_KEY);
 
 }
-
-
 
 function clearUiColorOverrides(root: HTMLElement) {
 
@@ -62,19 +52,13 @@ function clearUiColorOverrides(root: HTMLElement) {
 
 }
 
-
-
 function applyUiColorOverrides(profile: UserProfile, root: HTMLElement) {
 
   clearUiColorOverrides(root);
 
-
-
   const { appearance } = profile;
 
   const { primary, accent } = resolveUiColors(appearance);
-
-
 
   root.style.setProperty("--primary", primary);
 
@@ -82,11 +66,7 @@ function applyUiColorOverrides(profile: UserProfile, root: HTMLElement) {
 
   root.style.setProperty("--accent-text", accent);
 
-
-
   if (appearance.colorPreset !== "custom") return;
-
-
 
   const { customColors } = appearance;
 
@@ -96,15 +76,11 @@ function applyUiColorOverrides(profile: UserProfile, root: HTMLElement) {
 
 }
 
-
-
 export function applyUserProfile(profile: UserProfile) {
 
   const root = document.documentElement;
 
   const { appearance } = profile;
-
-
 
   root.dataset.theme = appearance.theme;
 
@@ -117,8 +93,6 @@ export function applyUserProfile(profile: UserProfile) {
   root.dataset.semanticContrast = appearance.semanticContrast;
 
   root.dataset.textContrast = appearance.textContrast;
-
-
 
   applyUiColorOverrides(profile, root);
 
@@ -144,8 +118,6 @@ export function applyUserProfile(profile: UserProfile) {
 
 }
 
-
-
 export function mergeWithLegacyDefaults(profile: UserProfile): {
 
   profile: UserProfile;
@@ -162,8 +134,6 @@ export function mergeWithLegacyDefaults(profile: UserProfile): {
 
   }
 
-
-
   const defaults = createDefaultUserProfile();
 
   if (profile.board.columnWidth !== defaults.board.columnWidth) {
@@ -171,8 +141,6 @@ export function mergeWithLegacyDefaults(profile: UserProfile): {
     return { profile, migrated: false };
 
   }
-
-
 
   return {
 
@@ -196,8 +164,5 @@ export function mergeWithLegacyDefaults(profile: UserProfile): {
 
 }
 
-
-
 export type { ThemeMode, ColorPreset, UserProfile };
-
 
