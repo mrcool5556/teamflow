@@ -65,6 +65,7 @@ import {
   toUserPublic,
   verifyPassword,
   signSessionToken,
+  assertSecretsConfigured,
   syncInstanceAdminFromEnv,
   userIsInstanceAdmin,
 } from "./lib/auth.js";
@@ -163,6 +164,9 @@ import {
 } from "./lib/maintenance.js";
 import { exportTeamBundle, importTeamBundle, TeamBundleError } from "./lib/teamBundle.js";
 import { getTeamPermissionsForUser, userHasTeamPermission } from "./lib/permissions.js";
+
+// Refuse to start with an unset or placeholder JWT_SECRET (see lib/auth.ts resolveSecret).
+assertSecretsConfigured();
 
 const db = createDb();
 void purgeExpiredUploadSessions(db);
