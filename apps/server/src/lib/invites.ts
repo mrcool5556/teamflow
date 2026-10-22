@@ -1,7 +1,7 @@
 import { randomBytes } from "node:crypto";
-import { and, eq, isNull } from "drizzle-orm";
+import { and, eq, isNull, sql } from "drizzle-orm";
 import type { TeamInvitePublic, TeamInvitePreview, TeamPublic, TeamRole } from "@teamflow/core";
-import type { Db } from "@teamflow/db";
+import type { Db, DbExecutor } from "@teamflow/db";
 import { schema } from "@teamflow/db";
 import { userHasTeamAccess } from "./issues.js";
 import { getTeamMemberWithRole } from "./permissions.js";
@@ -155,8 +155,8 @@ export async function revokeTeamInvite(db: Db, teamId: string, inviteId: string)
   return invite;
 }
 
-async function loadInviteRow(db: Db, token: string) {
-  const [row] = await db
+function loadInviteRow(db: DbExecutor, token: string) {
+  const row = db
     .select({
       invite: schema.teamInvites,
       team: schema.teams,
@@ -168,7 +168,7 @@ async function loadInviteRow(db: Db, token: string) {
     .innerJoin(schema.teams, eq(schema.teamInvites.teamId, schema.teams.id))
     .innerJoin(schema.teamRoles, eq(schema.teamInvites.roleId, schema.teamRoles.id))
     .where(eq(schema.teamInvites.token, token))
-    .limit(1);
+    .get();
 
   return row ?? null;
 }
@@ -191,7 +191,7 @@ export async function getInvitePreview(
   token: string,
   userId?: string,
 ): Promise<TeamInvitePreview | null> {
-  const row = await loadInviteRow(db, token);
+  const row = loadInviteRow(db, token);
   if (!row) return null;
 
   let alreadyMember = false;
@@ -216,8 +216,8 @@ export async function getInvitePreview(
   };
 }
 
-export async function assertInviteAcceptable(db: Db, token: string) {
-  const row = await loadInviteRow(db, token);
+export function assertInviteAcceptable(db: DbExecutor, token: string) {
+  const row = loadInviteRow(db, token);
   if (!row) {
     throw notFound("Invite not found");
   }
@@ -228,30 +228,36 @@ export async function assertInviteAcceptable(db: Db, token: string) {
   return row;
 }
 
-async function recordInviteUse(db: Db, inviteId: string, currentUseCount: number) {
-  await db
-    .update(schema.teamInvites)
-    .set({ useCount: currentUseCount + 1 })
-    .where(eq(schema.teamInvites.id, inviteId));
+function recordInviteUse(db: DbExecutor, inviteId: string) {
+  db.update(schema.teamInvites)
+    .set({ useCount: sql`${schema.teamInvites.useCount} + 1` })
+    .where(eq(schema.teamInvites.id, inviteId))
+    .run();
 }
 
-export async function acceptTeamInvite(
-  db: Db,
+/**
+ * Join the invite's team. Synchronous and wrapped in a transaction (joining the caller's own
+ * transaction when given one), so the membership and the use count change together and two
+ * concurrent accepts cannot both use a single-use invite.
+ */
+export function acceptTeamInvite(
+  db: DbExecutor,
   token: string,
   userId: string,
-): Promise<{ team: TeamPublic; alreadyMember: boolean }> {
-  const row = await assertInviteAcceptable(db, token);
+): { team: TeamPublic; alreadyMember: boolean } {
+  const run = (tx: DbExecutor) => {
+    const row = assertInviteAcceptable(tx, token);
 
-  const alreadyMember = await userHasTeamAccess(db, userId, row.team.id);
-  if (!alreadyMember) {
-    await db.insert(schema.teamMembers).values({
-      teamId: row.team.id,
-      userId,
-      roleId: row.roleId,
-      role: row.roleSlug,
-    });
-    await recordInviteUse(db, row.invite.id, row.invite.useCount);
-  }
+    const alreadyMember = userHasTeamAccess(tx, userId, row.team.id);
+    if (!alreadyMember) {
+      tx.insert(schema.teamMembers)
+        .values({ teamId: row.team.id, userId, roleId: row.roleId, role: row.roleSlug })
+        .run();
+      recordInviteUse(tx, row.invite.id);
+    }
+    return { row, alreadyMember };
+  };
+  const { row, alreadyMember } = db.transaction((tx) => run(tx));
 
   return {
     team: {

@@ -1,5 +1,5 @@
 import { and, eq, inArray } from "drizzle-orm";
-import type { Db } from "@teamflow/db";
+import type { Db, DbExecutor } from "@teamflow/db";
 import { schema } from "@teamflow/db";
 import type { AssigneePublic } from "@teamflow/core";
 
@@ -29,41 +29,44 @@ export async function loadBoardRowAssignees(db: Db, rowId: string): Promise<Assi
   return rows.map((row) => ({ userId: row.userId, name: row.name }));
 }
 
-export async function setIssueAssignees(db: Db, issueId: string, userIds: string[]) {
+/** Replace an issue's assignees (synchronous so it can run inside db.transaction). */
+export function setIssueAssignees(db: DbExecutor, issueId: string, userIds: string[]) {
   const uniqueIds = [...new Set(userIds)];
-  await db.delete(schema.issueAssignees).where(eq(schema.issueAssignees.issueId, issueId));
+  db.delete(schema.issueAssignees).where(eq(schema.issueAssignees.issueId, issueId)).run();
 
   for (const userId of uniqueIds) {
-    await db.insert(schema.issueAssignees).values({ issueId, userId });
+    db.insert(schema.issueAssignees).values({ issueId, userId }).run();
   }
 
-  await db
-    .update(schema.issues)
+  db.update(schema.issues)
     .set({ assigneeId: uniqueIds[0] ?? null })
-    .where(eq(schema.issues.id, issueId));
+    .where(eq(schema.issues.id, issueId))
+    .run();
 }
 
-export async function setBoardRowAssignees(db: Db, rowId: string, userIds: string[]) {
+/** Replace a board row's assignees (synchronous so it can run inside db.transaction). */
+export function setBoardRowAssignees(db: DbExecutor, rowId: string, userIds: string[]) {
   const uniqueIds = [...new Set(userIds)];
-  await db.delete(schema.boardRowAssignees).where(eq(schema.boardRowAssignees.rowId, rowId));
+  db.delete(schema.boardRowAssignees).where(eq(schema.boardRowAssignees.rowId, rowId)).run();
 
   for (const userId of uniqueIds) {
-    await db.insert(schema.boardRowAssignees).values({ rowId, userId });
+    db.insert(schema.boardRowAssignees).values({ rowId, userId }).run();
   }
 
-  await db
-    .update(schema.boardRows)
+  db.update(schema.boardRows)
     .set({ assigneeId: uniqueIds[0] ?? null })
-    .where(eq(schema.boardRows.id, rowId));
+    .where(eq(schema.boardRows.id, rowId))
+    .run();
 }
 
-export async function filterValidTeamMemberIds(db: Db, teamId: string, userIds: string[]) {
+export function filterValidTeamMemberIds(db: DbExecutor, teamId: string, userIds: string[]) {
   if (userIds.length === 0) return [];
 
-  const members = await db
+  const members = db
     .select({ userId: schema.teamMembers.userId })
     .from(schema.teamMembers)
-    .where(and(eq(schema.teamMembers.teamId, teamId), inArray(schema.teamMembers.userId, userIds)));
+    .where(and(eq(schema.teamMembers.teamId, teamId), inArray(schema.teamMembers.userId, userIds)))
+    .all();
 
   const allowed = new Set(members.map((member) => member.userId));
   return userIds.filter((userId) => allowed.has(userId));

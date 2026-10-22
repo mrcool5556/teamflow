@@ -223,47 +223,52 @@ export const boardRows = sqliteTable(
   (table) => [uniqueIndex("board_rows_team_key_unique").on(table.teamId, table.key)],
 );
 
-export const issues = sqliteTable("issues", {
-  id: text("id")
-    .primaryKey()
-    .$defaultFn(() => crypto.randomUUID()),
-  teamId: text("team_id")
-    .notNull()
-    .references(() => teams.id, { onDelete: "cascade" }),
-  projectId: text("project_id").references(() => projects.id, {
-    onDelete: "set null",
-  }),
-  rowId: text("row_id").references(() => boardRows.id, {
-    onDelete: "set null",
-  }),
-  number: integer("number").notNull(),
-  title: text("title").notNull(),
-  description: text("description"),
-  statusId: text("status_id")
-    .notNull()
-    .references(() => issueStatuses.id),
-  priority: text("priority").notNull().default("none"),
-  assigneeId: text("assignee_id").references(() => users.id, {
-    onDelete: "set null",
-  }),
-  creatorId: text("creator_id")
-    .notNull()
-    .references(() => users.id),
-  dueDate: text("due_date"),
-  boardSort: integer("board_sort").notNull().default(0),
-  timerActiveAt: text("timer_active_at"),
-  timerElapsedSec: integer("timer_elapsed_sec").notNull().default(0),
-  timerTargetSec: integer("timer_target_sec"),
-  completedAt: text("completed_at"),
-  deletedAt: text("deleted_at"),
-  color: text("color"),
-  createdAt: text("created_at")
-    .notNull()
-    .default(sql`(datetime('now'))`),
-  updatedAt: text("updated_at")
-    .notNull()
-    .default(sql`(datetime('now'))`),
-});
+export const issues = sqliteTable(
+  "issues",
+  {
+    id: text("id")
+      .primaryKey()
+      .$defaultFn(() => crypto.randomUUID()),
+    teamId: text("team_id")
+      .notNull()
+      .references(() => teams.id, { onDelete: "cascade" }),
+    projectId: text("project_id").references(() => projects.id, {
+      onDelete: "set null",
+    }),
+    rowId: text("row_id").references(() => boardRows.id, {
+      onDelete: "set null",
+    }),
+    number: integer("number").notNull(),
+    title: text("title").notNull(),
+    description: text("description"),
+    statusId: text("status_id")
+      .notNull()
+      .references(() => issueStatuses.id),
+    priority: text("priority").notNull().default("none"),
+    assigneeId: text("assignee_id").references(() => users.id, {
+      onDelete: "set null",
+    }),
+    creatorId: text("creator_id")
+      .notNull()
+      .references(() => users.id),
+    dueDate: text("due_date"),
+    boardSort: integer("board_sort").notNull().default(0),
+    timerActiveAt: text("timer_active_at"),
+    timerElapsedSec: integer("timer_elapsed_sec").notNull().default(0),
+    timerTargetSec: integer("timer_target_sec"),
+    completedAt: text("completed_at"),
+    deletedAt: text("deleted_at"),
+    color: text("color"),
+    createdAt: text("created_at")
+      .notNull()
+      .default(sql`(datetime('now'))`),
+    updatedAt: text("updated_at")
+      .notNull()
+      .default(sql`(datetime('now'))`),
+  },
+  // Created by patches.ts (ensureIssueNumberUnique) when existing data allows it.
+  (table) => [uniqueIndex("issues_team_number_unique").on(table.teamId, table.number)],
+);
 
 export const labels = sqliteTable(
   "labels",

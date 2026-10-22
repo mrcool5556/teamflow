@@ -90,6 +90,7 @@ export function applySchemaPatches(sqlite: Database.Database) {
   ensureRowFileLinksTable(sqlite);
   purgeExpiredDeletedIssues(sqlite);
   ensureTeamBundleTablesAndPermissions(sqlite);
+  ensureIssueNumberUnique(sqlite);
 }
 
 function ensureTeamBundleTablesAndPermissions(sqlite: Database.Database) {
@@ -990,4 +991,27 @@ function ensureTokenVersionColumn(sqlite: Database.Database) {
   if (userCols.some((col) => col.name === "token_version")) return;
   sqlite.exec(`ALTER TABLE users ADD COLUMN token_version INTEGER NOT NULL DEFAULT 0`);
   console.log("Added users.token_version column");
+}
+
+/**
+ * Issue numbers are allocated inside a transaction; the unique index makes a duplicate impossible.
+ * Databases that already hold duplicates (from the old read-then-write allocation) keep working
+ * without the index until they are renumbered; the warning says so on every boot.
+ */
+function ensureIssueNumberUnique(sqlite: Database.Database) {
+  const duplicate = sqlite
+    .prepare(
+      "SELECT team_id, number FROM issues GROUP BY team_id, number HAVING COUNT(*) > 1 LIMIT 1",
+    )
+    .get() as { team_id: string; number: number } | undefined;
+  if (duplicate) {
+    console.warn(
+      `[teamflow] Duplicate issue number ${duplicate.number} in team ${duplicate.team_id}; ` +
+        "UNIQUE(team_id, number) not created. Run pnpm db:maintenance to renumber duplicates.",
+    );
+    return;
+  }
+  sqlite.exec(
+    "CREATE UNIQUE INDEX IF NOT EXISTS issues_team_number_unique ON issues(team_id, number)",
+  );
 }

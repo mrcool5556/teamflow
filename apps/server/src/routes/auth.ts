@@ -14,7 +14,6 @@ import { schema } from "@teamflow/db";
 import { eq, sql } from "drizzle-orm";
 import { db } from "../db.js";
 import { requireAuth, requireWrite } from "../middleware/auth.js";
-import { createDefaultBoardRow } from "../lib/board.js";
 import {
   hashPassword,
   signSessionToken,
@@ -32,8 +31,7 @@ import {
   assertInviteAcceptable,
   isInviteOnlyRegistration,
 } from "../lib/invites.js";
-import { getTeamRoleBySlug, seedDefaultTeamRoles } from "../lib/roles.js";
-import { getOrCreatePersonalWorkspace } from "../lib/teams.js";
+import { createTeamWithOwner } from "../lib/teams.js";
 import {
   buildProfileExport,
   getUserProfile,
@@ -75,47 +73,39 @@ routes.post("/auth/register", async (c) => {
 
   const userId = crypto.randomUUID();
   const passwordHash = await hashPassword(body.password);
+  const inviteToken = body.inviteToken;
 
-  // The first account on a fresh install becomes instance admin (server-wide settings).
-  const [userCount] = await db.select({ count: sql<number>`count(*)` }).from(schema.users);
-  const isFirstUser = Number(userCount?.count ?? 0) === 0;
+  // User, "General" team (Owner), default board and invite acceptance land together or not at all.
+  db.transaction((tx) => {
+    // The first account on a fresh install becomes instance admin (server-wide settings).
+    const userCount = tx
+      .select({ count: sql<number>`count(*)` })
+      .from(schema.users)
+      .get();
+    const isFirstUser = Number(userCount?.count ?? 0) === 0;
 
-  await db.insert(schema.users).values({
-    id: userId,
-    email: body.email,
-    name: body.name,
-    passwordHash,
-    isInstanceAdmin: isFirstUser ? 1 : 0,
+    tx.insert(schema.users)
+      .values({
+        id: userId,
+        email: body.email,
+        name: body.name,
+        passwordHash,
+        isInstanceAdmin: isFirstUser ? 1 : 0,
+      })
+      .run();
+
+    createTeamWithOwner(tx, {
+      userId,
+      userName: body.name,
+      name: "General",
+      key: "GEN",
+      role: "owner",
+    });
+
+    if (inviteToken) {
+      acceptTeamInvite(tx, inviteToken, userId);
+    }
   });
-
-  const workspaceId = await getOrCreatePersonalWorkspace(db, userId, body.name);
-
-  const teamId = crypto.randomUUID();
-  await db.insert(schema.teams).values({
-    id: teamId,
-    workspaceId,
-    name: "General",
-    key: "GEN",
-  });
-
-  await seedDefaultTeamRoles(db, teamId);
-  const ownerRole = await getTeamRoleBySlug(db, teamId, "owner");
-  if (!ownerRole) {
-    return c.json({ error: "Failed to initialize team roles" }, 500);
-  }
-
-  await db.insert(schema.teamMembers).values({
-    teamId,
-    userId,
-    roleId: ownerRole.id,
-    role: ownerRole.slug,
-  });
-
-  await createDefaultBoardRow(db, teamId);
-
-  if (body.inviteToken) {
-    await acceptTeamInvite(db, body.inviteToken, userId);
-  }
 
   const [user] = await db.select().from(schema.users).where(eq(schema.users.id, userId)).limit(1);
   await syncInstanceAdminFromEnv(db, user!);

@@ -13,8 +13,7 @@ import { eq } from "drizzle-orm";
 import { db } from "../db.js";
 import { requireAuth, requireWrite } from "../middleware/auth.js";
 import { loadTeam, requirePermission } from "../middleware/team.js";
-import { createDefaultBoardRow } from "../lib/board.js";
-import { createTeamForUser, deleteTeam } from "../lib/teams.js";
+import { createTeamWithOwner, deleteTeam } from "../lib/teams.js";
 import { resolveTeamRefDetailed } from "../lib/refs.js";
 import { exportTeamBundle, importTeamBundle } from "../lib/teamBundle.js";
 import { getTeamPermissionsForUser } from "../lib/permissions.js";
@@ -51,14 +50,15 @@ routes.post("/teams", requireAuth, requireWrite, async (c) => {
     .where(eq(schema.users.id, auth.userId))
     .limit(1);
 
-  const team = await createTeamForUser(db, {
-    userId: auth.userId,
-    userName: user?.name ?? "User",
-    name: body.name,
-    key: body.key,
-  });
-
-  await createDefaultBoardRow(db, team.id);
+  const team = db.transaction((tx) =>
+    createTeamWithOwner(tx, {
+      userId: auth.userId,
+      userName: user?.name ?? "User",
+      name: body.name,
+      key: body.key,
+      role: "admin",
+    }),
+  );
 
   return c.json({ team }, 201);
 });

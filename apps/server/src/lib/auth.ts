@@ -2,7 +2,7 @@ import { createHash, randomBytes } from "node:crypto";
 import bcrypt from "bcryptjs";
 import { SignJWT, jwtVerify } from "jose";
 import { eq } from "drizzle-orm";
-import type { Db } from "@teamflow/db";
+import type { Db, DbExecutor } from "@teamflow/db";
 import { schema } from "@teamflow/db";
 import type { TokenScope, UserPublic } from "@teamflow/core";
 import { config } from "../config.js";
@@ -180,8 +180,9 @@ export function requireWrite(auth: AuthContext) {
   }
 }
 
-export async function logActivity(
-  db: Db,
+/** Append an activity row (synchronous so it can run inside db.transaction). */
+export function logActivity(
+  db: DbExecutor,
   input: {
     issueId?: string;
     userId?: string;
@@ -190,11 +191,13 @@ export async function logActivity(
     source?: string;
   },
 ) {
-  await db.insert(schema.activity).values({
-    issueId: input.issueId,
-    userId: input.userId,
-    action: input.action,
-    metadata: input.metadata ? JSON.stringify(input.metadata) : null,
-    source: input.source ?? "api",
-  });
+  db.insert(schema.activity)
+    .values({
+      issueId: input.issueId,
+      userId: input.userId,
+      action: input.action,
+      metadata: input.metadata ? JSON.stringify(input.metadata) : null,
+      source: input.source ?? "api",
+    })
+    .run();
 }

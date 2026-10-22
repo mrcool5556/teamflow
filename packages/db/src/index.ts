@@ -3,10 +3,18 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import Database from "better-sqlite3";
 import { drizzle } from "drizzle-orm/better-sqlite3";
+import type { BaseSQLiteDatabase } from "drizzle-orm/sqlite-core";
 import { applySchemaPatches } from "./patches.js";
 import * as schema from "./schema.js";
 
 export type Db = ReturnType<typeof createDb>;
+/** A transaction handle from db.transaction((tx) => ...). better-sqlite3 transactions are synchronous. */
+export type DbTx = Parameters<Parameters<Db["transaction"]>[0]>[0];
+/**
+ * Anything that can run queries synchronously: the database or a transaction. Helpers that must
+ * work inside db.transaction take this and use .get() / .all() / .run() instead of await.
+ */
+export type DbExecutor = BaseSQLiteDatabase<"sync", Database.RunResult, typeof schema>;
 
 export function findRepoRoot(start = process.cwd()) {
   let dir = start;
