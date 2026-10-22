@@ -33,7 +33,9 @@ export function BoardLayoutPreview() {
           <div className="row-separator-bar">
             <div className="row-separator-main">
               <div className="row-separator-title">
-                <span className="row-drag-handle preview-muted">⋮⋮</span>
+                <span className="row-drag-handle preview-muted" aria-hidden>
+                  ⋮⋮
+                </span>
                 <span className="row-separator-name-wrap">
                   <span className="row-separator-name preview-label">Preview row</span>
                 </span>
