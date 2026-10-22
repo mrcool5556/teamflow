@@ -13,6 +13,7 @@ import { client } from "../../api";
 import { KanbanBoard } from "../../KanbanBoard";
 import { AboutDialog } from "../../components/AboutDialog";
 import { BoardLayoutPreview } from "../../components/BoardLayoutPreview";
+import { BoardTips } from "../../components/BoardTips";
 import { ChangeHistoryPanel } from "../../components/ChangeHistoryPanel";
 import { GoToRefBar } from "../../components/GoToRefBar";
 import { IssueDrawer } from "../../components/IssueDrawer";
@@ -479,10 +480,7 @@ export function BoardShell() {
           <button type="button" disabled={!can("board.edit")} onClick={() => addRow()}>
             + Add row
           </button>
-          <span className="board-toolbar-hint">
-            Ctrl/Shift+Click to multi-select · drag a selected card to move all · Alt+drag or
-            middle-click to pan · wheel scroll passes through columns
-          </span>
+          <BoardTips />
         </div>
       )}
 
