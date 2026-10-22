@@ -42,9 +42,8 @@ sudo teamflow-update --backup-full # include uploads (slow)
 If you installed before `update` existed, install the command once:
 
 ```bash
-sudo install -m 755 /opt/teamflow/deploy/proxmox-lxc/update.sh /usr/local/bin/teamflow-update
-sudo install -m 755 /opt/teamflow/deploy/proxmox-lxc/backup.sh /usr/local/bin/teamflow-backup
-sudo ln -sf teamflow-update /usr/local/bin/update
+sudo bash /opt/teamflow/deploy/proxmox-lxc/setup-maintenance-sudo.sh
+# installs root-owned copies in /usr/local/lib/teamflow and the /usr/local/bin/teamflow-* symlinks
 ```
 
 Each `sudo update` refreshes these wrappers from the repo automatically.
@@ -84,8 +83,8 @@ systemctl restart teamflow
 Test (must match how the app invokes sudo — direct wrapper, no bash prefix):
 
 ```bash
-sudo -u teamflow sudo -n /usr/local/bin/teamflow-backup --db-only
-sudo -u teamflow sudo -n /usr/local/bin/teamflow-update --help
+sudo -u teamflow sudo -n /usr/local/lib/teamflow/backup.sh --db-only
+sudo -u teamflow sudo -n /usr/local/lib/teamflow/update.sh --help
 ```
 
 If you see `command not found`, the script may have Windows line endings or is not executable — re-run `setup-maintenance-sudo.sh` (it fixes both).
@@ -94,7 +93,12 @@ Manual sudoers (only if you prefer not to use the helper):
 
 ```bash
 cat >/etc/sudoers.d/teamflow-maintenance <<'EOF'
-teamflow ALL=(root) NOPASSWD: /usr/local/bin/teamflow-backup *, /usr/local/bin/teamflow-update *, /usr/bin/bash /opt/teamflow/deploy/proxmox-lxc/backup.sh *, /usr/bin/bash /opt/teamflow/deploy/proxmox-lxc/update.sh *
+teamflow ALL=(root) NOPASSWD: /usr/local/lib/teamflow/backup.sh *, /usr/local/lib/teamflow/update.sh *, /usr/local/lib/teamflow/discord-bot.sh *
+```
+
+Only the root-owned copies under `/usr/local/lib/teamflow/` are allowed. The checkout in `/opt/teamflow` is owned by the `teamflow` user, so it must never appear in sudoers (the app user could edit a script and run it as root). `update.sh` re-runs `setup-maintenance-sudo.sh` so the copies stay current.
+
+```
 EOF
 chmod 440 /etc/sudoers.d/teamflow-maintenance
 visudo -cf /etc/sudoers.d/teamflow-maintenance
