@@ -45,6 +45,7 @@ import { refreshTeams, useTeamPermissionsQuery, useTeamsQuery } from "./queries/
 import { updateBoard, useBoardQuery, type BoardData } from "./queries/board";
 import {
   createColumn as createColumnChange,
+  completeIssue as completeIssueChange,
   createIssue as createIssueChange,
   createRow as createRowChange,
   insertIssueSorted,
@@ -54,7 +55,6 @@ import {
   patchRow,
   reorderColumns as reorderColumnsChange,
   reorderRows as reorderRowsChange,
-  replaceById,
   useBoardMutation,
 } from "./queries/boardMutations";
 import { errorMessage, useErrorSink } from "./lib/errorSink";
@@ -120,7 +120,10 @@ export function App() {
   const boardTeamId = boardQuery.isSuccess ? teamId : null;
   const membersQuery = useMembersQuery(teamId);
   const members = membersQuery.data ?? NO_MEMBERS;
-  const [selectedIssue, setSelectedIssue] = useState<IssuePublic | null>(null);
+  // The open issue is whatever /t/:teamKey/issue/:issueRef names, read from the board cache.
+  const selectedIssue = route.issueRef
+    ? (issues.find((issue) => issue.identifier === route.issueRef) ?? null)
+    : null;
   const [rowFilesRow, setRowFilesRow] = useState<BoardRowPublic | null>(null);
   const [teamFilesOpen, setTeamFilesOpen] = useState(false);
   const [refBackLabel, setRefBackLabel] = useState<string | null>(
@@ -366,19 +369,13 @@ export function App() {
     void goToRef(ref);
   }, [navState, teamId, loading]);
 
-  // The selected issue follows /t/:teamKey/issue/:issueRef.
+  // An issue the URL names but the board list lacks is resolved once and added to the cache.
   useEffect(() => {
-    if (!route.issueRef) {
-      setSelectedIssue(null);
-      return;
-    }
-    const match = issues.find((issue) => issue.identifier === route.issueRef);
-    if (match) {
-      setSelectedIssue((prev) => (prev?.id === match.id ? prev : match));
-    } else if (teamId && boardTeamId === teamId && !loading) {
+    if (!route.issueRef || selectedIssue) return;
+    if (teamId && boardTeamId === teamId && !loading) {
       void goToRef(route.issueRef, { skipBackPush: true });
     }
-  }, [route.issueRef, issues, teamId, boardTeamId, loading]);
+  }, [route.issueRef, selectedIssue, teamId, boardTeamId, loading]);
 
   function openIssue(issue: Pick<IssuePublic, "identifier">) {
     if (!teamKey) return;
@@ -848,7 +845,6 @@ export function App() {
             ? current.issues
             : [...current.issues, found],
         }));
-        setSelectedIssue(result.issue);
         if (route.issueRef !== result.issue.identifier) openIssue(result.issue);
         setHighlightedIssueId(result.issue.id);
         setHighlightedColumnKey(null);
@@ -1498,15 +1494,12 @@ export function App() {
           currentUserId={user?.id ?? null}
           onClose={closeIssue}
           onNavigateRef={(ref) => void goToRef(ref)}
-          onUpdate={(updated) => {
-            if (teamId) {
-              updateBoard(queryClient, teamId, (current) => ({
-                ...current,
-                issues: replaceById(current.issues, updated),
-              }));
-            }
-            setSelectedIssue(updated);
-          }}
+          onPatch={(patch) =>
+            mutateBoard(
+              patchIssue(board, members, selectedIssue.id, patch, "Failed to update issue"),
+            )
+          }
+          onComplete={() => mutateBoard(completeIssueChange(selectedIssue.id))}
           onDelete={deleteIssue}
         />
       )}

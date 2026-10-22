@@ -106,7 +106,9 @@ type IssueDrawerProps = {
   rows: BoardRowPublic[];
   currentUserId: string | null;
   onClose: () => void;
-  onUpdate: (issue: IssuePublic) => void;
+  /** Save a change; the board cache (and so `issue`) updates optimistically. */
+  onPatch: (patch: UpdateIssueInput) => Promise<unknown>;
+  onComplete: () => Promise<unknown>;
   onDelete: (issue: IssuePublic) => void;
   onNavigateRef?: (ref: string) => void;
 };
@@ -118,7 +120,8 @@ export function IssueDrawer({
   rows,
   currentUserId,
   onClose,
-  onUpdate,
+  onPatch,
+  onComplete,
   onDelete,
   onNavigateRef,
 }: IssueDrawerProps) {
@@ -182,14 +185,12 @@ export function IssueDrawer({
     async (patch: UpdateIssueInput) => {
       setSaving(true);
       try {
-        const { issue: updated } = await client.updateIssue(issue.id, patch);
-        onUpdate(updated);
-        return updated;
+        await onPatch(patch);
       } finally {
         setSaving(false);
       }
     },
-    [issue.id, onUpdate],
+    [onPatch],
   );
 
   useEffect(() => {
@@ -366,8 +367,7 @@ export function IssueDrawer({
   }
 
   async function markDone() {
-    const { issue: updated } = await client.completeIssue(issue.id);
-    onUpdate(updated);
+    await onComplete();
   }
 
   function handleDrawerClose() {
