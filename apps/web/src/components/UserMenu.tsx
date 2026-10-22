@@ -1,8 +1,19 @@
 import { useRef, useState } from "react";
 import { Popover } from "../ui/Popover";
 
+/** A board tool that the topbar shows as a button on wide screens and in this menu below 768px. */
+export type UserMenuTool = {
+  key: string;
+  icon: string;
+  label: string;
+  badge?: number;
+  disabled?: boolean;
+  onSelect: () => void;
+};
+
 type UserMenuProps = {
   name: string;
+  tools?: UserMenuTool[];
   email?: string;
   onSettings: () => void;
   onAbout: () => void;
@@ -16,8 +27,18 @@ function initialsOf(name: string) {
   return letters.toUpperCase();
 }
 
-/** Avatar button in the topbar; Settings, About and Log out live in its menu. */
-export function UserMenu({ name, email, onSettings, onAbout, onLogout }: UserMenuProps) {
+/**
+ * Avatar button in the topbar; Settings, About and Log out live in its menu. Below 768px the
+ * trigger turns into a menu icon and the menu also lists the board tools (CSS decides).
+ */
+export function UserMenu({
+  name,
+  tools = [],
+  email,
+  onSettings,
+  onAbout,
+  onLogout,
+}: UserMenuProps) {
   const [open, setOpen] = useState(false);
   const anchorRef = useRef<HTMLButtonElement | null>(null);
 
@@ -37,7 +58,10 @@ export function UserMenu({ name, email, onSettings, onAbout, onLogout }: UserMen
         aria-expanded={open}
         onClick={() => setOpen((value) => !value)}
       >
-        {initialsOf(name)}
+        <span className="user-menu-initials">{initialsOf(name)}</span>
+        <span className="user-menu-burger" aria-hidden="true">
+          ☰
+        </span>
       </button>
       <Popover
         open={open}
@@ -53,6 +77,24 @@ export function UserMenu({ name, email, onSettings, onAbout, onLogout }: UserMen
           {email ? <span>{email}</span> : null}
         </div>
         <div className="user-menu-separator" role="separator" />
+        {tools.length > 0 ? (
+          <div className="user-menu-tools">
+            {tools.map((tool) => (
+              <button
+                key={tool.key}
+                type="button"
+                role="menuitem"
+                className="user-menu-item"
+                disabled={tool.disabled}
+                onClick={choose(tool.onSelect)}
+              >
+                <span aria-hidden="true">{tool.icon}</span> {tool.label}
+                {tool.badge ? <span className="topbar-btn-badge">{tool.badge}</span> : null}
+              </button>
+            ))}
+            <div className="user-menu-separator" role="separator" />
+          </div>
+        ) : null}
         <button
           type="button"
           role="menuitem"

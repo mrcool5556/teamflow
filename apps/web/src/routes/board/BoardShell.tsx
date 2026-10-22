@@ -680,6 +680,32 @@ export function BoardShell() {
               <UserMenu
                 name={user?.name ?? ""}
                 email={user?.email}
+                tools={[
+                  {
+                    key: "recent",
+                    icon: "⟲",
+                    label: "Recent",
+                    badge: changeHistory.length,
+                    disabled: changeHistory.length === 0,
+                    onSelect: () => setHistoryOpen(true),
+                  },
+                  ...(!overlayOpen && teamId
+                    ? [
+                        {
+                          key: "files",
+                          icon: "▤",
+                          label: "Files",
+                          onSelect: () => setTeamFilesOpen(true),
+                        },
+                      ]
+                    : []),
+                  {
+                    key: "plan",
+                    icon: "◫",
+                    label: roadmapOpen ? "Back to board" : "Plan",
+                    onSelect: () => navigate(roadmapOpen ? boardPath(teamKey) : planPath(teamKey)),
+                  },
+                ]}
                 onSettings={() => navigate(settingsPath(teamKey, lastSettingsPanelRef.current))}
                 onAbout={() => setAboutOpen(true)}
                 onLogout={logout}

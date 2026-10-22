@@ -237,3 +237,98 @@
 .user-menu-item:focus-visible {
   background: color-mix(in srgb, var(--accent) 12%, transparent);
 }
+
+.user-menu-burger,
+.user-menu-tools {
+  display: none;
+}
+
+/* 768–1199: tools keep their icon; the label becomes the tooltip and accessible name only. */
+@media (max-width: 1199px) {
+  .topbar-btn-label {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+  }
+
+  .topbar-btn {
+    padding: 0.4rem 0.55rem;
+  }
+}
+
+/* Below 768: team switcher, a search icon that expands, and one menu for everything else. */
+@media (max-width: 767px) {
+  .topbar {
+    position: relative;
+    gap: var(--space-2);
+    padding: var(--space-2) var(--space-3);
+  }
+
+  .topbar-brand,
+  .topbar-actions > .topbar-btn,
+  .topbar-divider {
+    display: none;
+  }
+
+  .topbar-team-switch select {
+    min-width: 0;
+    max-width: 11rem;
+  }
+
+  .go-to-ref {
+    flex: 0 0 2.25rem;
+    min-width: 2.25rem;
+    margin-left: auto;
+  }
+
+  .go-to-ref-input {
+    padding-right: 0.5rem;
+    color: transparent;
+  }
+
+  .go-to-ref-input::placeholder,
+  .go-to-ref-kbd {
+    visibility: hidden;
+  }
+
+  .go-to-ref:focus-within {
+    position: absolute;
+    inset: var(--space-2) var(--space-3);
+    z-index: var(--z-sticky);
+    flex: none;
+    margin: 0;
+  }
+
+  .go-to-ref:focus-within .go-to-ref-input {
+    height: 100%;
+    color: var(--text);
+  }
+
+  .go-to-ref:focus-within .go-to-ref-input::placeholder {
+    visibility: visible;
+  }
+
+  .user-menu-initials {
+    display: none;
+  }
+
+  .user-menu-burger {
+    display: inline;
+    font-size: 1rem;
+  }
+
+  .user-menu-trigger {
+    border-radius: var(--radius-sm);
+    background: transparent;
+    color: var(--text);
+    width: 2.25rem;
+    height: 2.25rem;
+  }
+
+  .user-menu-tools {
+    display: block;
+  }
+}
