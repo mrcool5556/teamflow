@@ -174,6 +174,15 @@ export function patchIssues(
   };
 }
 
+/** Mark done: the server moves the issue to the row's done column. */
+export function completeIssue(issueId: string): BoardChange<IssuePublic> {
+  return {
+    run: async () => (await client.completeIssue(issueId)).issue,
+    settle: (current, issue) => ({ ...current, issues: replaceById(current.issues, issue) }),
+    errorMessage: "Failed to complete issue",
+  };
+}
+
 export function patchIssue(
   board: BoardData,
   members: TeamMemberPublic[],
