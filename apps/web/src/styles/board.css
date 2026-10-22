@@ -1102,3 +1102,21 @@ body.board-pan-active {
 .board-row-scroll-btn--after {
   right: var(--space-2);
 }
+
+.column-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-1);
+  margin: var(--space-2) 0;
+  padding: var(--space-6) var(--space-3);
+  border: 1px dashed var(--border-strong);
+  border-radius: var(--radius-sm);
+  color: var(--muted);
+  font-size: var(--font-size-sm);
+  text-align: center;
+}
+
+.column-empty-hint {
+  font-size: var(--font-size-xs);
+}

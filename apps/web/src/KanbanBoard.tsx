@@ -1399,6 +1399,14 @@ function SortableBoardRow({
                         {columnHint &&
                           columnHint.anchorIssueId === null &&
                           cellIssues.length === 0 && <IssueDropIndicator />}
+                        {cellIssues.length === 0 && !columnHint ? (
+                          <ColumnEmptyState
+                            filtered={Boolean(
+                              rowQuery || (columnSearchQueries[status.id] ?? "").trim(),
+                            )}
+                            canEdit={canEdit && !previewMode}
+                          />
+                        ) : null}
                         {cellIssues.map((issue) => (
                           <Fragment key={issue.id}>
                             {columnHint?.anchorIssueId === issue.id && !columnHint.insertAfter && (
@@ -1519,6 +1527,19 @@ function BoardCell({
       </SortableContext>
       {footer}
     </section>
+  );
+}
+
+/** Shown in a cell with no cards: says why, and how to add one when the user can edit. */
+function ColumnEmptyState({ filtered, canEdit }: { filtered: boolean; canEdit: boolean }) {
+  if (filtered) {
+    return <p className="column-empty">No matching issues</p>;
+  }
+  return (
+    <p className="column-empty">
+      No issues here yet
+      {canEdit ? <span className="column-empty-hint">Add one below or drag a card in</span> : null}
+    </p>
   );
 }
 
