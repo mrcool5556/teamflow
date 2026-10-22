@@ -356,6 +356,14 @@ export function installFakeApi(db: FakeDb, options: FakeApiOptions = {}) {
     ],
     [
       "DELETE",
+      /^\/issues\/([^/]+)\/comments\/([^/]+)$/,
+      ({ params }) => {
+        db.comments = db.comments.filter((c) => c.id !== params[1]);
+        return undefined;
+      },
+    ],
+    [
+      "DELETE",
       /^\/statuses\/([^/]+)$/,
       ({ params }) => {
         db.statuses = db.statuses.filter((s) => s.id !== params[0]);

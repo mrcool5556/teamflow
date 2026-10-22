@@ -15,6 +15,8 @@ import {
 } from "@teamflow/core";
 import type { AttachmentLimitsPublic } from "@teamflow/core";
 import { useQueryClient } from "@tanstack/react-query";
+import { useConfirm } from "../ui/confirmContext";
+import { useErrorSink } from "../lib/errorSink";
 import { client } from "../api";
 import { queryKeys } from "../queries/keys";
 import { useRowAttachmentsQuery } from "../queries/attachments";
@@ -47,6 +49,8 @@ type RowFilesDrawerProps = {
 
 export function RowFilesDrawer({ row, onClose, onNavigateRef }: RowFilesDrawerProps) {
   const queryClient = useQueryClient();
+  const confirm = useConfirm();
+  const { report, show } = useErrorSink();
   const attachmentsQuery = useRowAttachmentsQuery(row.id);
   const attachments = attachmentsQuery.data?.attachments ?? NO_ATTACHMENTS;
   const attachmentsLoading = attachmentsQuery.isPending;
@@ -105,7 +109,7 @@ export function RowFilesDrawer({ row, onClose, onNavigateRef }: RowFilesDrawerPr
       const imageUrl = await attachmentBlobCache.get(attachment.id);
       setAttachmentLightbox({ attachment, imageUrl });
     } catch {
-      window.alert("Could not load image preview.");
+      show("Could not load image preview.");
     }
   }
 
@@ -117,7 +121,7 @@ export function RowFilesDrawer({ row, onClose, onNavigateRef }: RowFilesDrawerPr
       attachmentLimits,
     );
     if (file.size > maxBytes) {
-      window.alert(
+      show(
         `File is too large (${formatFileSize(file.size, 2)}). Max for this type is ${formatFileSize(maxBytes, 2)}.`,
       );
       return;
@@ -135,8 +139,7 @@ export function RowFilesDrawer({ row, onClose, onNavigateRef }: RowFilesDrawerPr
         attachmentBlobCache.set(attachment.id, URL.createObjectURL(file));
       }
     } catch (error) {
-      const message = error instanceof Error ? error.message : "Upload failed";
-      window.alert(message);
+      report(error, "Upload failed");
     } finally {
       setUploadingAttachment(false);
       setAttachmentUploadProgress(null);
@@ -161,13 +164,17 @@ export function RowFilesDrawer({ row, onClose, onNavigateRef }: RowFilesDrawerPr
     try {
       await downloadAttachmentFile(attachment.id, attachment.filename);
     } catch (error) {
-      const message = error instanceof Error ? error.message : "Download failed";
-      window.alert(message);
+      report(error, "Download failed");
     }
   }
 
   async function deleteAttachment(attachment: IssueAttachmentPublic) {
-    if (!window.confirm(`Remove ${attachment.filename}?`)) return;
+    const ok = await confirm({
+      title: `Remove ${attachment.filename}?`,
+      confirmLabel: "Remove",
+      danger: true,
+    });
+    if (!ok) return;
     setDeletingAttachmentId(attachment.id);
     try {
       await client.deleteRowAttachment(row.id, attachment.id);

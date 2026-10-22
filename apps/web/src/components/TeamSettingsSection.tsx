@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
+import { useConfirm } from "../ui/confirmContext";
 import type {
   TeamInvitePublic,
   TeamMemberPublic,
@@ -47,6 +48,7 @@ export function TeamSettingsSection({
   onBoardChanged,
 }: TeamSettingsSectionProps) {
   const queryClient = useQueryClient();
+  const confirm = useConfirm();
   const [creatingInvite, setCreatingInvite] = useState(false);
   const [multiUseInvite, setMultiUseInvite] = useState(false);
   const [latestInviteUrl, setLatestInviteUrl] = useState<string | null>(null);
@@ -162,13 +164,13 @@ export function TeamSettingsSection({
   }
 
   async function removeMember(member: TeamMemberPublic) {
-    if (
-      !window.confirm(
-        `Remove ${member.name} from ${teamName}? They will lose access until re-invited.`,
-      )
-    ) {
-      return;
-    }
+    const ok = await confirm({
+      title: `Remove ${member.name} from ${teamName}?`,
+      message: "They will lose access until re-invited.",
+      confirmLabel: "Remove",
+      danger: true,
+    });
+    if (!ok) return;
     setRemovingMemberId(member.id);
     onMessage(null);
     try {
@@ -183,13 +185,13 @@ export function TeamSettingsSection({
   }
 
   async function leaveCurrentTeam() {
-    if (
-      !window.confirm(
-        `Leave ${teamName}? You can rejoin later with an invite link. Your personal board is not deleted.`,
-      )
-    ) {
-      return;
-    }
+    const ok = await confirm({
+      title: `Leave ${teamName}?`,
+      message: "You can rejoin later with an invite link. Your personal board is not deleted.",
+      confirmLabel: "Leave team",
+      danger: true,
+    });
+    if (!ok) return;
     setLeavingTeam(true);
     onMessage(null);
     try {
@@ -205,20 +207,20 @@ export function TeamSettingsSection({
 
   async function deleteCurrentTeam() {
     const label = `${teamKey} — ${teamName}`;
-    if (
-      !window.confirm(
-        `Delete team "${label}"?\n\nAll rows, columns, and issues for this team will be removed.`,
-      )
-    ) {
-      return;
-    }
-    if (
-      !window.confirm(
-        `This cannot be undone.\n\nPermanently delete "${label}" and all of its board data?`,
-      )
-    ) {
-      return;
-    }
+    const ok = await confirm({
+      title: `Delete team "${label}"?`,
+      message: "All rows, columns, and issues for this team will be removed.",
+      confirmLabel: "Delete team",
+      danger: true,
+    });
+    if (!ok) return;
+    const sure = await confirm({
+      title: "This cannot be undone",
+      message: `Permanently delete "${label}" and all of its board data?`,
+      confirmLabel: "Delete permanently",
+      danger: true,
+    });
+    if (!sure) return;
 
     setDeletingTeam(true);
     onMessage(null);

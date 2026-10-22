@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
+import { useConfirm } from "../ui/confirmContext";
 import type { MaintenanceJobPublic, MaintenanceStatusPublic } from "@teamflow/core";
 import { MAINTENANCE_UPDATE_STEPS, inferUpdatePhase, updatePhaseIndex } from "@teamflow/core";
 import { client } from "../api";
@@ -180,6 +181,7 @@ export function ServerMaintenanceSettingsSection({
   onMessage,
 }: ServerMaintenanceSettingsSectionProps) {
   const queryClient = useQueryClient();
+  const confirm = useConfirm();
   const statusQuery = useMaintenanceStatusQuery(teamId);
   const status = statusQuery.data ?? null;
   const loading = statusQuery.isPending;
@@ -224,9 +226,11 @@ export function ServerMaintenanceSettingsSection({
 
   async function runAction(label: string, action: () => Promise<{ job: MaintenanceJobPublic }>) {
     if (!canRun) return;
-    const confirmed = window.confirm(
-      `${label} will run on the server host. The app may restart during an update. Continue?`,
-    );
+    const confirmed = await confirm({
+      title: `${label}?`,
+      message: `${label} will run on the server host. The app may restart during an update.`,
+      confirmLabel: "Continue",
+    });
     if (!confirmed) return;
 
     setRunningAction(label);

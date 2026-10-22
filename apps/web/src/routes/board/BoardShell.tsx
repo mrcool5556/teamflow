@@ -51,6 +51,7 @@ import { refreshTeams, useTeamPermissionsQuery } from "../../queries/teams";
 import { useSession, useTeams } from "../../session/session";
 import { ShellContext, type ShellContextValue } from "./shellContext";
 import { useBoardActions } from "./useBoardActions";
+import { Toast } from "../../ui/BottomDock";
 
 const APP_VERSION = __TEAMFLOW_VERSION__;
 
@@ -73,6 +74,7 @@ export function BoardShell() {
   const { user, sessionLoading, profile, profileRef, updateProfile, logout } = useSession();
   const { teams, teamsLoaded } = useTeams();
   const { error, report, clear: clearError } = useErrorSink();
+  const [dismissedBoardError, setDismissedBoardError] = useState<string | null>(null);
 
   const routeTeam = route.teamKey
     ? (teams.find((team) => team.key === route.teamKey) ?? null)
@@ -88,6 +90,8 @@ export function BoardShell() {
   const membersQuery = useMembersQuery(teamId);
   const members = membersQuery.data ?? NO_MEMBERS;
   const loading = sessionLoading || (Boolean(teamId) && boardQuery.isPending);
+  const boardError = boardQuery.error?.message ?? null;
+  const shownError = error ?? (boardError !== dismissedBoardError ? boardError : null);
   // The open issue is whatever /t/:teamKey/issue/:issueRef names, read from the board cache.
   const selectedIssue = route.issueRef
     ? (issues.find((issue) => issue.identifier === route.issueRef) ?? null)
@@ -670,9 +674,17 @@ export function BoardShell() {
             </div>
           </header>
 
-          {(error ?? boardQuery.error?.message) && (
-            <div className="banner error">{error ?? boardQuery.error?.message}</div>
-          )}
+          {shownError ? (
+            <Toast
+              tone="error"
+              onDismiss={() => {
+                if (error) clearError();
+                else setDismissedBoardError(shownError);
+              }}
+            >
+              {shownError}
+            </Toast>
+          ) : null}
           {refNotice && <div className="banner ref-notice">{refNotice}</div>}
           {loading && <div className="banner">Loading…</div>}
 

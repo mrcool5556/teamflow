@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
+import { useConfirm } from "../ui/confirmContext";
 import type { TeamPermission, TeamRolePublic } from "@teamflow/core";
 import { TEAM_PERMISSION_GROUPS, TEAM_PERMISSION_LABELS } from "@teamflow/core";
 import { client } from "../api";
@@ -24,6 +25,7 @@ export function RolesSettingsSection({
   onRolesChange,
 }: RolesSettingsSectionProps) {
   const queryClient = useQueryClient();
+  const confirm = useConfirm();
   const rolesQuery = useTeamRolesQuery(teamId);
   const roles = rolesQuery.data ?? NO_ROLES;
   const loading = rolesQuery.isPending;
@@ -109,13 +111,13 @@ export function RolesSettingsSection({
 
   async function deleteRole(role: TeamRolePublic) {
     if (!canManage || role.isSystem) return;
-    if (
-      !window.confirm(
-        `Delete role "${role.name}"? This cannot be undone. Members must be moved first.`,
-      )
-    ) {
-      return;
-    }
+    const ok = await confirm({
+      title: `Delete role "${role.name}"?`,
+      message: "This cannot be undone. Members must be moved first.",
+      confirmLabel: "Delete role",
+      danger: true,
+    });
+    if (!ok) return;
 
     onMessage(null);
     try {
