@@ -1,6 +1,7 @@
 import type {
   ApiError,
   ApiTokenCreated,
+  ApiTokenPublic,
   BoardRowPublic,
   CommentPublic,
   CreateCommentInput,
@@ -188,6 +189,17 @@ export class TeamflowClient {
     return this.request<ApiTokenCreated>("/auth/tokens", {
       method: "POST",
       body: JSON.stringify(input),
+    });
+  }
+
+  /** List the caller's API tokens (prefix only, never the secret). */
+  listTokens() {
+    return this.request<{ tokens: ApiTokenPublic[] }>("/auth/tokens");
+  }
+
+  deleteToken(tokenId: string) {
+    return this.request<void>(`/auth/tokens/${encodeURIComponent(tokenId)}`, {
+      method: "DELETE",
     });
   }
 
