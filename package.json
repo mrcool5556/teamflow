@@ -9,6 +9,7 @@
     "db:generate": "pnpm --filter @teamflow/db generate",
     "db:migrate": "pnpm --filter @teamflow/db migrate",
     "db:seed": "pnpm --filter @teamflow/db seed",
+    "db:maintenance": "pnpm --filter @teamflow/db maintenance",
     "db:setup": "pnpm db:migrate && pnpm db:seed",
     "typecheck": "pnpm -r typecheck",
     "lint": "eslint .",

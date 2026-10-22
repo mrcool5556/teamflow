@@ -9,7 +9,54 @@ const DEFAULT_STATUSES = [
   { name: "Canceled", type: "canceled", position: 4 },
 ] as const;
 
+/**
+ * Bump when a patch is added below. A database at this version skips the patch run entirely;
+ * an older one runs every (idempotent) patch once, inside a single transaction, then records
+ * the new version in schema_version.
+ */
+export const SCHEMA_VERSION = 2;
+
+export function getSchemaVersion(sqlite: Database.Database) {
+  sqlite.exec(`
+    CREATE TABLE IF NOT EXISTS schema_version (
+      id INTEGER PRIMARY KEY CHECK (id = 1),
+      version INTEGER NOT NULL,
+      applied_at TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+  `);
+  const row = sqlite.prepare("SELECT version FROM schema_version WHERE id = 1").get() as
+    { version: number } | undefined;
+  return row?.version ?? 0;
+}
+
+/**
+ * Bring the schema up to SCHEMA_VERSION. Schema only: data upkeep (trash purge, permission
+ * re-grants, owner promotion, renumbering) lives in maintenance.ts and runs on demand.
+ */
 export function applySchemaPatches(sqlite: Database.Database) {
+  const current = getSchemaVersion(sqlite);
+  if (current > SCHEMA_VERSION) {
+    console.warn(
+      `[teamflow] Database schema version ${current} is newer than this build (${SCHEMA_VERSION}); ` +
+        "skipping patches. Update the app before using this database.",
+    );
+    return;
+  }
+  if (current === SCHEMA_VERSION) return;
+
+  sqlite.transaction(() => {
+    runPatches(sqlite);
+    sqlite
+      .prepare(
+        `INSERT INTO schema_version (id, version, applied_at) VALUES (1, ?, datetime('now'))
+         ON CONFLICT(id) DO UPDATE SET version = excluded.version, applied_at = excluded.applied_at`,
+      )
+      .run(SCHEMA_VERSION);
+  })();
+  console.log(`Database schema at version ${SCHEMA_VERSION} (was ${current})`);
+}
+
+function runPatches(sqlite: Database.Database) {
   sqlite.exec(`
     CREATE TABLE IF NOT EXISTS board_rows (
       id TEXT PRIMARY KEY,
@@ -88,13 +135,12 @@ export function applySchemaPatches(sqlite: Database.Database) {
   ensureStoredFileRefKeys(sqlite);
   ensureStoredFileDeletedAt(sqlite);
   ensureRowFileLinksTable(sqlite);
-  purgeExpiredDeletedIssues(sqlite);
-  ensureTeamBundleTablesAndPermissions(sqlite);
+  ensureTeamBundleTables(sqlite);
   ensureIssueNumberUnique(sqlite);
   ensureQueryIndexes(sqlite);
 }
 
-function ensureTeamBundleTablesAndPermissions(sqlite: Database.Database) {
+function ensureTeamBundleTables(sqlite: Database.Database) {
   sqlite.exec(`
     CREATE TABLE IF NOT EXISTS team_bundle_imports (
       id TEXT PRIMARY KEY,
@@ -115,25 +161,6 @@ function ensureTeamBundleTablesAndPermissions(sqlite: Database.Database) {
       UNIQUE(import_id, entity_type, source_id)
     );
   `);
-
-  const ownerRoles = sqlite
-    .prepare("SELECT id, permissions FROM team_roles WHERE slug = 'owner'")
-    .all() as { id: string; permissions: string }[];
-
-  for (const role of ownerRoles) {
-    let permissions: string[] = [];
-    try {
-      permissions = JSON.parse(role.permissions) as string[];
-    } catch {
-      permissions = [];
-    }
-    if (!permissions.includes("team.data.transfer")) {
-      permissions.push("team.data.transfer");
-      sqlite
-        .prepare("UPDATE team_roles SET permissions = ?, updated_at = datetime('now') WHERE id = ?")
-        .run(JSON.stringify(permissions), role.id);
-    }
-  }
 }
 
 function ensureIssueAttachmentsTable(sqlite: Database.Database) {
@@ -610,28 +637,6 @@ function ensureColorColumns(sqlite: Database.Database) {
   }
 }
 
-const DELETED_ISSUE_RETENTION_DAYS = 7;
-
-function purgeExpiredDeletedIssues(sqlite: Database.Database) {
-  const issueCols = sqlite.prepare("PRAGMA table_info(issues)").all() as { name: string }[];
-  if (!issueCols.some((col) => col.name === "deleted_at")) return;
-
-  const cutoff = new Date(
-    Date.now() - DELETED_ISSUE_RETENTION_DAYS * 24 * 60 * 60 * 1000,
-  ).toISOString();
-  const expired = sqlite
-    .prepare("SELECT id FROM issues WHERE deleted_at IS NOT NULL AND deleted_at < ?")
-    .all(cutoff) as { id: string }[];
-
-  if (expired.length === 0) return;
-
-  const deleteIssue = sqlite.prepare("DELETE FROM issues WHERE id = ?");
-  for (const issue of expired) {
-    deleteIssue.run(issue.id);
-  }
-  console.log(`Purged ${expired.length} expired deleted issue(s)`);
-}
-
 function ensureExtendedTables(sqlite: Database.Database) {
   const issueCols = sqlite.prepare("PRAGMA table_info(issues)").all() as { name: string }[];
 
@@ -930,39 +935,6 @@ function migrateStatusesToRows(sqlite: Database.Database) {
       promoteFirstAdmin.run(ownerRoleId, firstAdmin.id);
     }
     console.log(`Seeded owner role for team ${team.id}`);
-  }
-
-  const teamsWithoutOwnerMember = sqlite
-    .prepare(
-      `SELECT t.id AS team_id, owner_role.id AS owner_role_id
-       FROM teams t
-       INNER JOIN team_roles owner_role
-         ON owner_role.team_id = t.id AND owner_role.slug = 'owner'
-       WHERE NOT EXISTS (
-         SELECT 1
-         FROM team_members tm
-         INNER JOIN team_roles tr ON tr.id = tm.role_id
-         WHERE tm.team_id = t.id AND tr.slug = 'owner'
-       )`,
-    )
-    .all() as { team_id: string; owner_role_id: string }[];
-
-  const findFirstAdminMember = sqlite.prepare(
-    `SELECT tm.id
-     FROM team_members tm
-     INNER JOIN team_roles tr ON tr.id = tm.role_id
-     WHERE tm.team_id = ? AND tr.slug = 'admin'
-     ORDER BY tm.created_at ASC
-     LIMIT 1`,
-  );
-
-  for (const team of teamsWithoutOwnerMember) {
-    const firstAdmin = findFirstAdminMember.get(team.team_id) as { id: string } | undefined;
-    if (!firstAdmin) continue;
-    const result = promoteFirstAdmin.run(team.owner_role_id, firstAdmin.id);
-    if (result.changes > 0) {
-      console.log(`Promoted first admin to owner for team ${team.team_id}`);
-    }
   }
 }
 
