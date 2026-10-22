@@ -234,9 +234,33 @@ export function IssueDrawer({
           </div>
           {saving && <span className="issue-drawer-saving">Saving…</span>}
         </div>
-        <button type="button" className="ghost" onClick={handleDrawerClose}>
-          Close
-        </button>
+        <div className="issue-drawer-header-actions">
+          <button
+            type="button"
+            className="ghost issue-drawer-action"
+            disabled={!canEdit}
+            onClick={() => void markDone()}
+          >
+            <span aria-hidden="true">✓</span> Mark done
+          </button>
+          <button
+            type="button"
+            className="danger issue-drawer-action"
+            disabled={!canEdit}
+            onClick={() => onDelete(issue)}
+          >
+            Delete
+          </button>
+          <button
+            type="button"
+            className="ghost drawer-close-btn"
+            aria-label="Close"
+            title="Close (Esc)"
+            onClick={handleDrawerClose}
+          >
+            ✕
+          </button>
+        </div>
       </header>
 
       <div
@@ -259,27 +283,19 @@ export function IssueDrawer({
             }}
             aria-label="Issue title"
           />
-          <div className="issue-drawer-timestamps">
-            <p>
-              <span className="issue-drawer-timestamp-label">Created</span>
-              <span>{formatTimestamp(issue.createdAt)}</span>
-              <span className="issue-drawer-timestamp-by">by {issue.creatorName}</span>
-            </p>
-            <p>
-              <span className="issue-drawer-timestamp-label">Edited</span>
-              <span>{formatTimestamp(issue.updatedAt)}</span>
-            </p>
-            {issue.completedAt && (
-              <p>
-                <span className="issue-drawer-timestamp-label">Completed</span>
-                <span>{formatTimestamp(issue.completedAt)}</span>
-              </p>
-            )}
-          </div>
+          <p className="issue-drawer-timestamps">
+            <span>
+              Created {formatTimestamp(issue.createdAt)} by {issue.creatorName}
+            </span>
+            <span>Edited {formatTimestamp(issue.updatedAt)}</span>
+            {issue.completedAt ? <span>Completed {formatTimestamp(issue.completedAt)}</span> : null}
+          </p>
         </div>
 
-        <section className="issue-drawer-section issue-drawer-section--status">
-          <h3>Status</h3>
+        <section className="issue-drawer-group" aria-labelledby="issue-drawer-workflow">
+          <h3 className="issue-drawer-group-title" id="issue-drawer-workflow">
+            Workflow
+          </h3>
           <div className="issue-drawer-meta">
             <label className="issue-drawer-field">
               <span className="issue-drawer-label">Status</span>
@@ -315,19 +331,6 @@ export function IssueDrawer({
               </select>
             </label>
 
-            <div className="issue-drawer-field">
-              <span className="issue-drawer-label">Card color</span>
-              <BoardColorPicker
-                color={issue.color}
-                onSelect={(color) => {
-                  void patchIssue({ color });
-                }}
-                title="Card color"
-                hint="Left accent on the board card."
-                disabled={!canEdit}
-              />
-            </div>
-
             {rows.length > 1 && (
               <label className="issue-drawer-field">
                 <span className="issue-drawer-label">Row</span>
@@ -359,7 +362,14 @@ export function IssueDrawer({
                 }}
               />
             </label>
+          </div>
+        </section>
 
+        <section className="issue-drawer-group" aria-labelledby="issue-drawer-people">
+          <h3 className="issue-drawer-group-title" id="issue-drawer-people">
+            People &amp; time
+          </h3>
+          <div className="issue-drawer-meta">
             <div className="issue-drawer-field issue-drawer-field--assignee">
               <span className="issue-drawer-label">Assignees</span>
               <MultiAssigneePicker
@@ -383,6 +393,19 @@ export function IssueDrawer({
                 onUpdate={(patch) => {
                   void patchIssue(patch);
                 }}
+              />
+            </div>
+
+            <div className="issue-drawer-field">
+              <span className="issue-drawer-label">Card color</span>
+              <BoardColorPicker
+                color={issue.color}
+                onSelect={(color) => {
+                  void patchIssue({ color });
+                }}
+                title="Card color"
+                hint="Left accent on the board card."
+                disabled={!canEdit}
               />
             </div>
           </div>
@@ -607,20 +630,6 @@ export function IssueDrawer({
             </div>
           </div>
         </section>
-
-        <div className="row drawer-actions issue-drawer-actions">
-          <button type="button" disabled={!canEdit} onClick={() => void markDone()}>
-            Mark done
-          </button>
-          <button
-            type="button"
-            className="danger"
-            disabled={!canEdit}
-            onClick={() => onDelete(issue)}
-          >
-            Delete
-          </button>
-        </div>
       </div>
       <AttachmentLightboxes list={files} />
     </Drawer>
