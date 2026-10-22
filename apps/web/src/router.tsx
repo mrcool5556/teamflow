@@ -1,10 +1,7 @@
 import { createBrowserRouter, type RouteObject } from "react-router";
 import { App } from "./App";
-
-/** The marker routes below render nothing themselves; App draws the screen. */
-function RouteMarker() {
-  return null;
-}
+import { ErrorSinkProvider } from "./components/ErrorSinkProvider";
+import { RouteMarker } from "./components/RouteMarker";
 
 /**
  * URL map. App renders every screen and reads the matched route; the child routes only declare
@@ -15,7 +12,11 @@ function RouteMarker() {
 export const routes: RouteObject[] = [
   {
     path: "/",
-    element: <App />,
+    element: (
+      <ErrorSinkProvider>
+        <App />
+      </ErrorSinkProvider>
+    ),
     children: [
       { index: true, Component: RouteMarker },
       { path: "login", Component: RouteMarker },

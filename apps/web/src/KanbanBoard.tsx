@@ -51,6 +51,7 @@ import { BoardColorPicker } from "./components/BoardColorPicker";
 import { PriorityPicker } from "./components/PriorityPicker";
 import { issueMatchesBoardSearch, buildRefShareUrl } from "./lib/refLinks";
 import { copyTextToClipboard } from "./lib/clipboard";
+import type { IssueTimerPatch } from "./lib/timer";
 import type { Priority } from "@teamflow/core";
 
 export const issueDndId = (issueId: string) => `issue:${issueId}`;
@@ -274,18 +275,13 @@ type KanbanBoardProps = {
   ) => void;
   members: TeamMemberPublic[];
   onAssignIssue: (issue: IssuePublic, assigneeIds: string[]) => void;
+  /** Assign many issues at once (column header picker). */
+  onAssignIssues: (issueIds: string[], assigneeIds: string[]) => void;
   onUpdateIssueColor: (issue: IssuePublic, color: string | null) => void;
   onUpdateIssuePriority: (issue: IssuePublic, priority: Priority) => void;
   onAssignRow: (row: BoardRowPublic, assigneeIds: string[]) => void;
   onUpdateRowColor: (row: BoardRowPublic, color: string | null) => void;
-  onUpdateIssueTimer: (
-    issue: IssuePublic,
-    patch: {
-      timerActiveAt: string | null;
-      timerElapsedSec: number;
-      timerTargetSec: number | null;
-    },
-  ) => void;
+  onUpdateIssueTimer: (issue: IssuePublic, patch: IssueTimerPatch) => void;
   highlightedIssueId?: string | null;
   highlightedColumnKey?: string | null;
   onGoToRef?: (ref: string) => void;
@@ -320,6 +316,7 @@ export function KanbanBoard({
   onReorderIssuesInCell,
   members,
   onAssignIssue,
+  onAssignIssues,
   onUpdateIssueColor,
   onUpdateIssuePriority,
   onAssignRow,
@@ -794,6 +791,7 @@ export function KanbanBoard({
                 onAssignRow={onAssignRow}
                 onUpdateRowColor={onUpdateRowColor}
                 onAssignIssue={onAssignIssue}
+                onAssignIssues={onAssignIssues}
                 onUpdateIssueColor={onUpdateIssueColor}
                 onUpdateIssuePriority={onUpdateIssuePriority}
                 onUpdateIssueTimer={onUpdateIssueTimer}
@@ -1094,6 +1092,7 @@ function SortableBoardRow({
   onAssignRow,
   onUpdateRowColor,
   onAssignIssue,
+  onAssignIssues,
   onUpdateIssueColor,
   onUpdateIssuePriority,
   onUpdateIssueTimer,
@@ -1136,16 +1135,10 @@ function SortableBoardRow({
   onAssignRow: (row: BoardRowPublic, assigneeIds: string[]) => void;
   onUpdateRowColor: (row: BoardRowPublic, color: string | null) => void;
   onAssignIssue: (issue: IssuePublic, assigneeIds: string[]) => void;
+  onAssignIssues: (issueIds: string[], assigneeIds: string[]) => void;
   onUpdateIssueColor: (issue: IssuePublic, color: string | null) => void;
   onUpdateIssuePriority: (issue: IssuePublic, priority: Priority) => void;
-  onUpdateIssueTimer: (
-    issue: IssuePublic,
-    patch: {
-      timerActiveAt: string | null;
-      timerElapsedSec: number;
-      timerTargetSec: number | null;
-    },
-  ) => void;
+  onUpdateIssueTimer: (issue: IssuePublic, patch: IssueTimerPatch) => void;
   highlightedIssueId?: string | null;
   highlightedColumnKey?: string | null;
   rowSearch?: string;
@@ -1312,11 +1305,12 @@ function SortableBoardRow({
                           onColumnSearchChange={(value) => onColumnSearchChange?.(status.id, value)}
                           members={members}
                           columnAssigneeIds={uniqueAssigneeIdsFromIssues(cellIssues)}
-                          onAssignColumn={(assigneeIds) => {
-                            for (const issue of cellIssues) {
-                              onAssignIssue(issue, assigneeIds);
-                            }
-                          }}
+                          onAssignColumn={(assigneeIds) =>
+                            onAssignIssues(
+                              cellIssues.map((issue) => issue.id),
+                              assigneeIds,
+                            )
+                          }
                           previewMode={previewMode}
                           className={`column-label column-label-row${isDragging ? " column-label--dragging" : ""}`}
                           onSave={(name) => onRenameStatus(status, name)}
@@ -1523,14 +1517,7 @@ function SortableIssueCard({
   onAssignIssue: (issue: IssuePublic, assigneeIds: string[]) => void;
   onUpdateIssueColor: (issue: IssuePublic, color: string | null) => void;
   onUpdateIssuePriority: (issue: IssuePublic, priority: Priority) => void;
-  onUpdateIssueTimer: (
-    issue: IssuePublic,
-    patch: {
-      timerActiveAt: string | null;
-      timerElapsedSec: number;
-      timerTargetSec: number | null;
-    },
-  ) => void;
+  onUpdateIssueTimer: (issue: IssuePublic, patch: IssueTimerPatch) => void;
   onGoToRef?: (ref: string) => void;
   onContextMenu?: (event: React.MouseEvent) => void;
 }) {

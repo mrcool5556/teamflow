@@ -10,7 +10,6 @@ import type {
   TeamPublic,
   UserPublic,
   UserProfile,
-  UpdateIssueInput,
 } from "@teamflow/core";
 import {
   createDefaultUserProfile,
@@ -43,7 +42,23 @@ import { AboutDialog } from "./components/AboutDialog";
 import { useChangeHistory } from "./hooks/useChangeHistory";
 import { queryKeys } from "./queries/keys";
 import { refreshTeams, useTeamPermissionsQuery, useTeamsQuery } from "./queries/teams";
-import { updateBoard, useBoardQuery } from "./queries/board";
+import { updateBoard, useBoardQuery, type BoardData } from "./queries/board";
+import {
+  createColumn as createColumnChange,
+  createIssue as createIssueChange,
+  createRow as createRowChange,
+  insertIssueSorted,
+  patchColumn,
+  patchIssue,
+  patchIssues,
+  patchRow,
+  reorderColumns as reorderColumnsChange,
+  reorderRows as reorderRowsChange,
+  replaceById,
+  useBoardMutation,
+} from "./queries/boardMutations";
+import { errorMessage, useErrorSink } from "./lib/errorSink";
+import type { IssueTimerPatch } from "./lib/timer";
 import { useMembersQuery } from "./queries/members";
 import { useAuthConfigQuery } from "./queries/auth";
 import { hasTeamPermission } from "./lib/teamPermissions";
@@ -76,12 +91,6 @@ const NO_ROWS: BoardRowPublic[] = [];
 const NO_STATUSES: IssueStatusPublic[] = [];
 const NO_ISSUES: IssuePublic[] = [];
 const NO_MEMBERS: TeamMemberPublic[] = [];
-
-type ListUpdate<T> = T[] | ((prev: T[]) => T[]);
-
-function applyListUpdate<T>(prev: T[], next: ListUpdate<T>) {
-  return typeof next === "function" ? next(prev) : next;
-}
 
 type QuickAddTarget =
   | { kind: "row" }
@@ -117,7 +126,7 @@ export function App() {
   const [refBackLabel, setRefBackLabel] = useState<string | null>(
     () => peekRefBack()?.label ?? null,
   );
-  const [error, setError] = useState<string | null>(null);
+  const { error, report, clear: clearError } = useErrorSink();
   const [sessionLoading, setSessionLoading] = useState(false);
   const loading = sessionLoading || (Boolean(teamId) && boardQuery.isPending);
   const [patName, setPatName] = useState("Cursor MCP");
@@ -196,7 +205,7 @@ export function App() {
       setProfile(merged);
       applyUserProfile(merged);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to save profile");
+      report(err, "Failed to save profile");
     }
   }, []);
 
@@ -237,28 +246,13 @@ export function App() {
     );
   }
 
-  // Handlers below still edit board lists in place; these write into the team's query cache.
-  // Each captures the team it was created for, so a late result never lands on another team.
-  function setRows(next: ListUpdate<BoardRowPublic>) {
-    if (teamId) updateBoard(queryClient, teamId, (b) => ({ ...b, rows: applyListUpdate(b.rows, next) }));
-  }
-  function setStatuses(next: ListUpdate<IssueStatusPublic>) {
-    if (teamId) {
-      updateBoard(queryClient, teamId, (b) => ({ ...b, statuses: applyListUpdate(b.statuses, next) }));
-    }
-  }
-  function setIssues(next: ListUpdate<IssuePublic>) {
-    if (teamId) {
-      updateBoard(queryClient, teamId, (b) => ({ ...b, issues: applyListUpdate(b.issues, next) }));
-    }
-  }
   function reloadBoard() {
     if (teamId) void queryClient.invalidateQueries({ queryKey: queryKeys.board(teamId) });
   }
 
   const bootstrap = useCallback(async () => {
     setSessionLoading(true);
-    setError(null);
+    clearError();
     try {
       const { user: me } = await client.me();
       setUser(me);
@@ -357,7 +351,7 @@ export function App() {
         );
         navigate(boardPath(team.key), { replace: true });
       } catch (err) {
-        setError(err instanceof Error ? err.message : "Failed to accept invite");
+        report(err, "Failed to accept invite");
         navigate("/", { replace: true });
       }
     })();
@@ -435,14 +429,14 @@ export function App() {
 
   async function handleLogin(email: string, password: string) {
     setSessionLoading(true);
-    setError(null);
+    clearError();
     try {
       const result = await client.login({ email, password });
       setSession(result.token, result.user);
       setUser(result.user);
       await bootstrap();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Login failed");
+      report(err, "Login failed");
     } finally {
       setSessionLoading(false);
     }
@@ -450,7 +444,7 @@ export function App() {
 
   async function handleRegister(name: string, email: string, password: string) {
     setSessionLoading(true);
-    setError(null);
+    clearError();
     try {
       const inviteToken = takePendingInvite() ?? undefined;
       const result = await client.register({
@@ -463,279 +457,140 @@ export function App() {
       setUser(result.user);
       await bootstrap();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Registration failed");
+      report(err, "Registration failed");
     } finally {
       setSessionLoading(false);
     }
   }
 
-  async function reorderRows(activeRowId: string, overRowId: string) {
-    const oldIndex = rows.findIndex((row) => row.id === activeRowId);
-    const newIndex = rows.findIndex((row) => row.id === overRowId);
-    if (oldIndex === -1 || newIndex === -1 || oldIndex === newIndex) return;
+  const board: BoardData = { rows, statuses, issues };
+  const mutateBoard = useBoardMutation(teamId);
 
-    const next = [...rows];
-    const [moved] = next.splice(oldIndex, 1);
-    next.splice(newIndex, 0, moved!);
-    setRows(next.map((row, position) => ({ ...row, position })));
-
-    try {
-      await client.updateRow(activeRowId, { position: newIndex });
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to reorder row");
-      reloadBoard();
-    }
+  function reorderRows(activeRowId: string, overRowId: string) {
+    const change = reorderRowsChange(board, activeRowId, overRowId);
+    if (change) void mutateBoard(change);
   }
 
-  async function reorderColumns(rowId: string, activeStatusId: string, overStatusId: string) {
-    const rowStatuses = statuses
-      .filter((status) => status.rowId === rowId)
-      .sort((a, b) => a.position - b.position);
-    const oldIndex = rowStatuses.findIndex((status) => status.id === activeStatusId);
-    const newIndex = rowStatuses.findIndex((status) => status.id === overStatusId);
-    if (oldIndex === -1 || newIndex === -1 || oldIndex === newIndex) return;
-
-    const next = [...rowStatuses];
-    const [moved] = next.splice(oldIndex, 1);
-    next.splice(newIndex, 0, moved!);
-    const reordered = next.map((status, position) => ({ ...status, position }));
-
-    setStatuses((prev) => {
-      const others = prev.filter((status) => status.rowId !== rowId);
-      return [...others, ...reordered];
-    });
-
-    try {
-      await client.updateStatus(activeStatusId, { position: newIndex });
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to reorder column");
-      reloadBoard();
-    }
+  function reorderColumns(rowId: string, activeStatusId: string, overStatusId: string) {
+    const change = reorderColumnsChange(board, rowId, activeStatusId, overStatusId);
+    if (change) void mutateBoard(change);
   }
 
-  function reorderIssuesInCell(
-    rowId: string,
-    statusId: string,
-    orderedIssueIds: string[],
-    movedIssuePatch?: Pick<IssuePublic, "rowId" | "statusId">,
-  ) {
-    const statusName = statuses.find((status) => status.id === statusId)?.name;
-
-    setIssues((prev) =>
-      prev.map((issue) => {
-        const index = orderedIssueIds.indexOf(issue.id);
-        if (index === -1) return issue;
-        return {
-          ...issue,
-          rowId,
-          statusId,
-          statusName: statusName ?? issue.statusName,
-          boardSort: index,
-          ...movedIssuePatch,
-        };
-      }),
-    );
-
-    void Promise.all(
-      orderedIssueIds.map((id, boardSort) =>
-        client.updateIssue(id, { rowId, statusId, boardSort }),
+  function reorderIssuesInCell(rowId: string, statusId: string, orderedIssueIds: string[]) {
+    void mutateBoard(
+      patchIssues(
+        board,
+        members,
+        orderedIssueIds.map((id, boardSort) => ({ id, patch: { rowId, statusId, boardSort } })),
+        "Failed to reorder issue",
       ),
-    ).catch((err) => {
-      setError(err instanceof Error ? err.message : "Failed to reorder issue");
-      reloadBoard();
-    });
+    );
   }
-  async function assignIssue(issue: IssuePublic, assigneeIds: string[]) {
+
+  function assignIssue(issue: IssuePublic, assigneeIds: string[]) {
+    void mutateBoard(patchIssue(board, members, issue.id, { assigneeIds }, "Failed to assign issue"));
+  }
+
+  /** Column assign and bulk assign: one change, parallel requests, one rollback. */
+  function assignIssues(issueIds: string[], assigneeIds: string[]) {
+    if (issueIds.length === 0) return;
+    void mutateBoard(
+      patchIssues(
+        board,
+        members,
+        issueIds.map((id) => ({ id, patch: { assigneeIds } })),
+        "Failed to assign issues",
+      ),
+    );
+  }
+
+  function assignRow(row: BoardRowPublic, assigneeIds: string[]) {
     const assignees = members
       .filter((member) => assigneeIds.includes(member.userId))
       .map((member) => ({ userId: member.userId, name: member.name }));
-
-    setIssues((prev) =>
-      prev.map((item) =>
-        item.id === issue.id
-          ? {
-              ...item,
-              assignees,
-              assigneeId: assigneeIds[0] ?? null,
-              assigneeName: assignees[0]?.name ?? null,
-            }
-          : item,
-      ),
+    void mutateBoard(
+      patchRow(row, { assigneeIds }, "Failed to assign row", {
+        assignees,
+        assigneeId: assigneeIds[0] ?? null,
+        assigneeName: assignees[0]?.name ?? null,
+      }),
     );
-    if (selectedIssue?.id === issue.id) {
-      setSelectedIssue((prev) =>
-        prev
-          ? {
-              ...prev,
-              assignees,
-              assigneeId: assigneeIds[0] ?? null,
-              assigneeName: assignees[0]?.name ?? null,
-            }
-          : prev,
-      );
-    }
-
-    try {
-      const { issue: updated } = await client.updateIssue(issue.id, { assigneeIds });
-      setIssues((prev) => prev.map((item) => (item.id === updated.id ? updated : item)));
-      if (selectedIssue?.id === updated.id) setSelectedIssue(updated);
-    } catch (err) {
-      setIssues((prev) => prev.map((item) => (item.id === issue.id ? issue : item)));
-      if (selectedIssue?.id === issue.id) setSelectedIssue(issue);
-      setError(err instanceof Error ? err.message : "Failed to assign issue");
-    }
-  }
-
-  async function assignRow(row: BoardRowPublic, assigneeIds: string[]) {
-    try {
-      const { row: updated } = await client.updateRow(row.id, { assigneeIds });
-      setRows((prev) => prev.map((item) => (item.id === updated.id ? updated : item)));
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to assign row");
-    }
-  }
-
-  function insertIssueSorted(list: IssuePublic[], issue: IssuePublic) {
-    if (list.some((item) => item.id === issue.id)) return list;
-    return [...list, issue].sort((a, b) => {
-      const rowA = a.rowId ?? "";
-      const rowB = b.rowId ?? "";
-      if (rowA !== rowB) return rowA.localeCompare(rowB);
-      if (a.statusId !== b.statusId) return a.statusId.localeCompare(b.statusId);
-      return (a.boardSort ?? 0) - (b.boardSort ?? 0);
-    });
-  }
-
-  function applyIssuePatch(issue: IssuePublic, patch: UpdateIssueInput): IssuePublic {
-    const nextStatus = patch.statusId
-      ? statuses.find((status) => status.id === patch.statusId)
-      : null;
-    const next: IssuePublic = {
-      ...issue,
-      ...patch,
-      statusName: nextStatus?.name ?? issue.statusName,
-      boardSort: patch.boardSort ?? issue.boardSort,
-    };
-    if (patch.assigneeIds !== undefined) {
-      const assignees = members
-        .filter((member) => patch.assigneeIds!.includes(member.userId))
-        .map((member) => ({ userId: member.userId, name: member.name }));
-      next.assignees = assignees;
-      next.assigneeId = patch.assigneeIds[0] ?? null;
-      next.assigneeName = assignees[0]?.name ?? null;
-    }
-    return next;
-  }
-
-  async function bulkPatchIssues(issueIds: string[], patch: UpdateIssueInput) {
-    if (issueIds.length === 0) return;
-    setIssues((prev) =>
-      prev.map((issue) => (issueIds.includes(issue.id) ? applyIssuePatch(issue, patch) : issue)),
-    );
-    try {
-      const results = await Promise.all(issueIds.map((id) => client.updateIssue(id, patch)));
-      setIssues((prev) => {
-        const updatedById = new Map(results.map(({ issue }) => [issue.id, issue]));
-        return prev.map((issue) => updatedById.get(issue.id) ?? issue);
-      });
-      if (selectedIssue && issueIds.includes(selectedIssue.id)) {
-        const refreshed = results.find(({ issue }) => issue.id === selectedIssue.id)?.issue;
-        if (refreshed) setSelectedIssue(refreshed);
-      }
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to update issues");
-      reloadBoard();
-    }
   }
 
   function bulkMoveIssues(issueIds: string[], rowId: string, statusId: string) {
     if (issueIds.length === 0) return;
-    const statusName = statuses.find((status) => status.id === statusId)?.name;
     const baseSort = issues.filter((issue) => {
       const issueRow = issue.rowId ?? defaultRowId;
       return issueRow === rowId && issue.statusId === statusId && !issueIds.includes(issue.id);
     }).length;
-
-    setIssues((prev) =>
-      prev.map((issue) => {
-        if (!issueIds.includes(issue.id)) return issue;
-        const index = issueIds.indexOf(issue.id);
-        return {
-          ...issue,
-          rowId,
-          statusId,
-          statusName: statusName ?? issue.statusName,
-          boardSort: baseSort + index,
-        };
-      }),
-    );
-
-    void Promise.all(
-      issueIds.map((id, index) =>
-        client.updateIssue(id, { rowId, statusId, boardSort: baseSort + index }),
+    void mutateBoard(
+      patchIssues(
+        board,
+        members,
+        issueIds.map((id, index) => ({
+          id,
+          patch: { rowId, statusId, boardSort: baseSort + index },
+        })),
+        "Failed to move issues",
       ),
-    ).catch((err) => {
-      setError(err instanceof Error ? err.message : "Failed to move issues");
-      reloadBoard();
-    });
-  }
-
-  function bulkAssignIssues(issueIds: string[], assigneeIds: string[]) {
-    void bulkPatchIssues(issueIds, { assigneeIds });
+    );
   }
 
   function bulkSetPriority(issueIds: string[], priority: Priority) {
-    void bulkPatchIssues(issueIds, { priority });
+    if (issueIds.length === 0) return;
+    void mutateBoard(
+      patchIssues(
+        board,
+        members,
+        issueIds.map((id) => ({ id, patch: { priority } })),
+        "Failed to update issues",
+      ),
+    );
   }
 
   function bulkTimerIssues(issueIds: string[], action: "pause" | "reset") {
-    if (issueIds.length === 0) return;
     const now = Date.now();
-    const patchById = new Map<string, UpdateIssueInput>();
+    const patches = issues
+      .filter((issue) => issueIds.includes(issue.id))
+      .map((issue) => ({
+        id: issue.id,
+        patch:
+          action === "reset"
+            ? { timerActiveAt: null, timerElapsedSec: 0, timerTargetSec: null }
+            : {
+                timerActiveAt: null,
+                timerElapsedSec: issue.timerActiveAt
+                  ? issue.timerElapsedSec +
+                    Math.max(0, Math.floor((now - Date.parse(issue.timerActiveAt)) / 1000))
+                  : issue.timerElapsedSec,
+                timerTargetSec: issue.timerTargetSec,
+              },
+      }));
+    if (patches.length === 0) return;
+    void mutateBoard(patchIssues(board, members, patches, "Failed to update timers"));
+  }
 
-    for (const id of issueIds) {
-      const issue = issues.find((item) => item.id === id);
-      if (!issue) continue;
-      if (action === "reset") {
-        patchById.set(id, {
-          timerActiveAt: null,
-          timerElapsedSec: 0,
-          timerTargetSec: null,
-        });
-      } else {
-        const elapsed = issue.timerActiveAt
-          ? issue.timerElapsedSec +
-            Math.max(0, Math.floor((now - Date.parse(issue.timerActiveAt)) / 1000))
-          : issue.timerElapsedSec;
-        patchById.set(id, {
-          timerActiveAt: null,
-          timerElapsedSec: elapsed,
-          timerTargetSec: issue.timerTargetSec,
-        });
-      }
-    }
-
-    setIssues((prev) =>
-      prev.map((issue) => {
-        const patch = patchById.get(issue.id);
-        return patch ? applyIssuePatch(issue, patch) : issue;
-      }),
-    );
-
-    void Promise.all(
-      [...patchById.entries()].map(([id, patch]) => client.updateIssue(id, patch)),
-    ).catch((err) => {
-      setError(err instanceof Error ? err.message : "Failed to update timers");
-      reloadBoard();
-    });
+  /** Remove issues from the cached board; returns a function that puts them back. */
+  function hideIssues(issueIds: Set<string>) {
+    if (!teamId) return () => {};
+    const forTeamId = teamId;
+    const removed = issues.filter((issue) => issueIds.has(issue.id));
+    updateBoard(queryClient, forTeamId, (current) => ({
+      ...current,
+      issues: current.issues.filter((issue) => !issueIds.has(issue.id)),
+    }));
+    return () =>
+      updateBoard(queryClient, forTeamId, (current) => ({
+        ...current,
+        issues: removed.reduce(insertIssueSorted, current.issues),
+      }));
   }
 
   function bulkDeleteIssues(issuesToDelete: IssuePublic[]) {
     if (issuesToDelete.length === 0) return;
     const ids = new Set(issuesToDelete.map((issue) => issue.id));
     const wasSelected = selectedIssue && ids.has(selectedIssue.id);
-
-    setIssues((prev) => prev.filter((issue) => !ids.has(issue.id)));
+    const putBack = hideIssues(ids);
     if (wasSelected) closeIssue();
 
     scheduleUndo({
@@ -745,137 +600,90 @@ export function App() {
           : `Deleted ${issuesToDelete.length} issues`,
       issueId: issuesToDelete.length === 1 ? issuesToDelete[0]!.id : undefined,
       restore: () => {
-        setIssues((prev) => {
-          let next = prev;
-          for (const issue of issuesToDelete) {
-            next = insertIssueSorted(next, issue);
-          }
-          return next;
-        });
+        putBack();
         if (wasSelected) openIssue(issuesToDelete[0]!);
       },
       commit: async () => {
-        await Promise.all(issuesToDelete.map((issue) => client.deleteIssue(issue.id)));
+        try {
+          await Promise.all(issuesToDelete.map((issue) => client.deleteIssue(issue.id)));
+        } catch (err) {
+          report(err, "Failed to delete issues");
+          throw err;
+        }
       },
       restoreFromTrash:
         issuesToDelete.length === 1
           ? async () => {
-              const { issue: restored } = await client.restoreIssue(issuesToDelete[0]!.id);
-              setIssues((prev) => insertIssueSorted(prev, restored));
-              if (wasSelected) openIssue(restored);
+              await client.restoreIssue(issuesToDelete[0]!.id);
+              putBack();
+              if (wasSelected) openIssue(issuesToDelete[0]!);
             }
           : undefined,
     });
   }
 
-  async function updateRowColor(row: BoardRowPublic, color: string | null) {
-    try {
-      const { row: updated } = await client.updateRow(row.id, { color });
-      setRows((prev) => prev.map((item) => (item.id === updated.id ? updated : item)));
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to update row color");
-    }
+  function updateRowColor(row: BoardRowPublic, color: string | null) {
+    void mutateBoard(patchRow(row, { color }, "Failed to update row color"));
   }
 
-  async function updateStatusColor(status: IssueStatusPublic, color: string | null) {
-    try {
-      const { status: updated } = await client.updateStatus(status.id, { color });
-      setStatuses((prev) => prev.map((item) => (item.id === updated.id ? updated : item)));
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to update column color");
-    }
+  function updateStatusColor(status: IssueStatusPublic, color: string | null) {
+    void mutateBoard(patchColumn(status, { color }, "Failed to update column color"));
   }
 
-  async function updateIssueColor(issue: IssuePublic, color: string | null) {
-    try {
-      const { issue: updated } = await client.updateIssue(issue.id, { color });
-      setIssues((prev) => prev.map((item) => (item.id === updated.id ? updated : item)));
-      if (selectedIssue?.id === updated.id) {
-        setSelectedIssue(updated);
-      }
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to update card color");
-    }
+  function updateIssueColor(issue: IssuePublic, color: string | null) {
+    void mutateBoard(patchIssue(board, members, issue.id, { color }, "Failed to update card color"));
   }
 
-  async function updateIssuePriority(issue: IssuePublic, priority: Priority) {
+  function updateIssuePriority(issue: IssuePublic, priority: Priority) {
     if (issue.priority === priority) return;
-    try {
-      const { issue: updated } = await client.updateIssue(issue.id, { priority });
-      setIssues((prev) => prev.map((item) => (item.id === updated.id ? updated : item)));
-      if (selectedIssue?.id === updated.id) {
-        setSelectedIssue(updated);
-      }
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to update priority");
-    }
+    void mutateBoard(
+      patchIssue(board, members, issue.id, { priority }, "Failed to update priority"),
+    );
   }
 
-  function updateIssueTimer(
-    issue: IssuePublic,
-    patch: {
-      timerActiveAt: string | null;
-      timerElapsedSec: number;
-      timerTargetSec: number | null;
-    },
-  ) {
-    setIssues((prev) => prev.map((item) => (item.id === issue.id ? { ...item, ...patch } : item)));
-    if (selectedIssue?.id === issue.id) {
-      setSelectedIssue((prev) => (prev ? { ...prev, ...patch } : prev));
-    }
-
-    void client
-      .updateIssue(issue.id, patch)
-      .then(({ issue: updated }) => {
-        setIssues((prev) => prev.map((item) => (item.id === updated.id ? updated : item)));
-        setSelectedIssue((prev) => (prev?.id === updated.id ? updated : prev));
-      })
-      .catch((err) => {
-        setError(err instanceof Error ? err.message : "Failed to update timer");
-        reloadBoard();
-      });
+  function updateIssueTimer(issue: IssuePublic, patch: IssueTimerPatch) {
+    void mutateBoard(patchIssue(board, members, issue.id, patch, "Failed to update timer"));
   }
 
-  async function renameStatus(status: IssueStatusPublic, name: string) {
+  function renameStatus(status: IssueStatusPublic, name: string) {
     const trimmed = name.trim();
     if (!trimmed || trimmed === status.name) return;
-    try {
-      const { status: updated } = await client.updateStatus(status.id, { name: trimmed });
-      setStatuses((prev) => prev.map((s) => (s.id === updated.id ? updated : s)));
-      setIssues((prev) =>
-        prev.map((issue) =>
-          issue.statusId === updated.id ? { ...issue, statusName: updated.name } : issue,
-        ),
-      );
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to rename column");
-    }
+    void mutateBoard(patchColumn(status, { name: trimmed }, "Failed to rename column"));
   }
 
   function removeRow(row: BoardRowPublic) {
+    if (!teamId) return;
+    const forTeamId = teamId;
     const rowStatuses = statuses.filter((status) => status.rowId === row.id);
 
-    setRows((prev) => prev.filter((item) => item.id !== row.id));
-    setStatuses((prev) => prev.filter((status) => status.rowId !== row.id));
+    updateBoard(queryClient, forTeamId, (current) => ({
+      ...current,
+      rows: current.rows.filter((item) => item.id !== row.id),
+      statuses: current.statuses.filter((status) => status.rowId !== row.id),
+    }));
 
     scheduleUndo({
       label: `Removed row "${row.name}"`,
       restore: () => {
-        setRows((prev) => {
-          if (prev.some((item) => item.id === row.id)) return prev;
-          return [...prev, row].sort((a, b) => a.position - b.position);
-        });
-        setStatuses((prev) => {
-          const existing = new Set(prev.map((status) => status.id));
-          const restored = rowStatuses.filter((status) => !existing.has(status.id));
-          return restored.length > 0 ? [...prev, ...restored] : prev;
+        updateBoard(queryClient, forTeamId, (current) => {
+          const existing = new Set(current.statuses.map((status) => status.id));
+          return {
+            ...current,
+            rows: current.rows.some((item) => item.id === row.id)
+              ? current.rows
+              : [...current.rows, row].sort((a, b) => a.position - b.position),
+            statuses: [
+              ...current.statuses,
+              ...rowStatuses.filter((status) => !existing.has(status.id)),
+            ],
+          };
         });
       },
       commit: async () => {
         try {
           await client.deleteRow(row.id);
         } catch (err) {
-          setError(err instanceof Error ? err.message : "Failed to remove row");
+          report(err, "Failed to remove row");
           throw err;
         }
       },
@@ -883,24 +691,31 @@ export function App() {
   }
 
   function removeColumn(status: IssueStatusPublic) {
-    setStatuses((prev) => prev.filter((item) => item.id !== status.id));
+    if (!teamId) return;
+    const forTeamId = teamId;
+    updateBoard(queryClient, forTeamId, (current) => ({
+      ...current,
+      statuses: current.statuses.filter((item) => item.id !== status.id),
+    }));
 
     scheduleUndo({
       label: `Removed column "${status.name}"`,
       restore: () => {
-        setStatuses((prev) => {
-          if (prev.some((item) => item.id === status.id)) return prev;
-          return [...prev, status].sort((a, b) => {
-            if (a.rowId !== b.rowId) return a.rowId.localeCompare(b.rowId);
-            return a.position - b.position;
-          });
-        });
+        updateBoard(queryClient, forTeamId, (current) => ({
+          ...current,
+          statuses: current.statuses.some((item) => item.id === status.id)
+            ? current.statuses
+            : [...current.statuses, status].sort((a, b) => {
+                if (a.rowId !== b.rowId) return a.rowId.localeCompare(b.rowId);
+                return a.position - b.position;
+              }),
+        }));
       },
       commit: async () => {
         try {
           await client.deleteStatus(status.id);
         } catch (err) {
-          setError(err instanceof Error ? err.message : "Failed to remove column");
+          report(err, "Failed to remove column");
           throw err;
         }
       },
@@ -909,29 +724,28 @@ export function App() {
 
   function deleteIssue(issue: IssuePublic) {
     const wasSelected = selectedIssue?.id === issue.id;
-
-    setIssues((prev) => prev.filter((item) => item.id !== issue.id));
+    const putBack = hideIssues(new Set([issue.id]));
     if (wasSelected) closeIssue();
 
     scheduleUndo({
       label: `Deleted ${issue.identifier}`,
       issueId: issue.id,
       restore: () => {
-        setIssues((prev) => insertIssueSorted(prev, issue));
+        putBack();
         if (wasSelected) openIssue(issue);
       },
       commit: async () => {
         try {
           await client.deleteIssue(issue.id);
         } catch (err) {
-          setError(err instanceof Error ? err.message : "Failed to delete issue");
+          report(err, "Failed to delete issue");
           throw err;
         }
       },
       restoreFromTrash: async () => {
-        const { issue: restored } = await client.restoreIssue(issue.id);
-        setIssues((prev) => insertIssueSorted(prev, restored));
-        if (wasSelected) openIssue(restored);
+        await client.restoreIssue(issue.id);
+        putBack();
+        if (wasSelected) openIssue(issue);
       },
     });
   }
@@ -939,7 +753,7 @@ export function App() {
   function openQuickAdd(target: QuickAddTarget, initialValue = "") {
     setQuickAdd(target);
     setQuickAddValue(initialValue);
-    setError(null);
+    clearError();
   }
 
   function closeQuickAdd() {
@@ -947,42 +761,26 @@ export function App() {
     setQuickAddValue("");
   }
 
-  async function submitQuickAdd() {
+  function submitQuickAdd() {
     if (!quickAdd || !teamId) return;
     const value = quickAddValue.trim();
     if (!value) return;
 
-    try {
-      if (quickAdd.kind === "column") {
-        const { status } = await client.createStatus(quickAdd.rowId, { name: value });
-        setStatuses((prev) => [...prev, status]);
-      } else if (quickAdd.kind === "row") {
-        const { row } = await client.createRow(teamId, { name: value });
-        setRows((prev) => [...prev, row]);
-        const { statuses: rowStatuses } = await client.listRowStatuses(row.id);
-        setStatuses((prev) => [...prev, ...rowStatuses]);
-      } else {
-        const { issue } = await client.createIssue({
+    if (quickAdd.kind === "column") {
+      void mutateBoard(createColumnChange(board, teamId, quickAdd.rowId, value));
+    } else if (quickAdd.kind === "row") {
+      void mutateBoard(createRowChange(board, value, teamId));
+    } else {
+      void mutateBoard(
+        createIssueChange(board, {
           teamId,
           rowId: quickAdd.rowId,
           statusId: quickAdd.statusId,
           title: value,
-          priority: "none",
-        });
-        setIssues((prev) => [issue, ...prev]);
-      }
-      closeQuickAdd();
-    } catch (err) {
-      setError(
-        err instanceof Error
-          ? err.message
-          : quickAdd.kind === "issue"
-            ? "Failed to create issue"
-            : quickAdd.kind === "row"
-              ? "Failed to add row"
-              : "Failed to add column",
+        }),
       );
     }
+    closeQuickAdd();
   }
 
   function addColumn(rowId: string) {
@@ -990,7 +788,7 @@ export function App() {
     openQuickAdd({ kind: "column", rowId });
   }
 
-  async function addRow() {
+  function addRow() {
     if (!teamId) return;
     openQuickAdd({ kind: "row" }, `Row ${rows.length + 1}`);
   }
@@ -1000,15 +798,10 @@ export function App() {
     openQuickAdd({ kind: "issue", rowId, statusId });
   }
 
-  async function renameRow(row: BoardRowPublic, name: string) {
+  function renameRow(row: BoardRowPublic, name: string) {
     const trimmed = name.trim();
     if (!trimmed || trimmed === row.name) return;
-    try {
-      const { row: updated } = await client.updateRow(row.id, { name: trimmed });
-      setRows((prev) => prev.map((r) => (r.id === updated.id ? updated : r)));
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to rename row");
-    }
+    void mutateBoard(patchRow(row, { name: trimmed }, "Failed to rename row"));
   }
 
   function refreshRefBackLabel() {
@@ -1041,17 +834,20 @@ export function App() {
       }
     }
 
-    setError(null);
+    clearError();
     setRefNotice(null);
     try {
       const result = await client.resolveRef(teamId, ref);
       triggerRefNavMotion();
 
       if (result.issue) {
-        setIssues((prev) => {
-          if (prev.some((item) => item.id === result.issue!.id)) return prev;
-          return [...prev, result.issue!];
-        });
+        const found = result.issue;
+        updateBoard(queryClient, teamId, (current) => ({
+          ...current,
+          issues: current.issues.some((item) => item.id === found.id)
+            ? current.issues
+            : [...current.issues, found],
+        }));
         setSelectedIssue(result.issue);
         if (route.issueRef !== result.issue.identifier) openIssue(result.issue);
         setHighlightedIssueId(result.issue.id);
@@ -1088,7 +884,7 @@ export function App() {
         return;
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Reference not found");
+      report(err, "Reference not found");
       if (route.issueRef) navigate(boardPath(teamKey), { replace: true });
     }
   }
@@ -1115,7 +911,7 @@ export function App() {
       URL.revokeObjectURL(url);
       setProfileMessage("Profile exported. Share this file so others can import your layout.");
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to export profile");
+      report(err, "Failed to export profile");
     }
   }
 
@@ -1131,7 +927,7 @@ export function App() {
       setProfileImportText("");
       setProfileMessage("Profile imported and saved to your account.");
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to import profile");
+      report(err, "Failed to import profile");
     }
   }
 
@@ -1143,7 +939,7 @@ export function App() {
       });
       setCreatedPat(token.token);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to create token");
+      report(err, "Failed to create token");
     }
   }
 
@@ -1303,6 +1099,7 @@ export function App() {
                       void reorderColumns(rowId, activeStatusId, overStatusId)
               }
               onReorderIssuesInCell={settingsOpen ? () => {} : reorderIssuesInCell}
+              onAssignIssues={settingsOpen ? () => {} : assignIssues}
               members={members}
               onAssignIssue={
                 settingsOpen
@@ -1328,7 +1125,7 @@ export function App() {
               highlightedColumnKey={settingsOpen ? null : highlightedColumnKey}
               onGoToRef={settingsOpen ? undefined : (ref) => void goToRef(ref)}
               onBulkMove={settingsOpen ? undefined : bulkMoveIssues}
-              onBulkAssign={settingsOpen ? undefined : bulkAssignIssues}
+              onBulkAssign={settingsOpen ? undefined : assignIssues}
               onBulkPriority={settingsOpen ? undefined : bulkSetPriority}
               onBulkTimer={settingsOpen ? undefined : bulkTimerIssues}
               onBulkDelete={settingsOpen ? undefined : bulkDeleteIssues}
@@ -1669,7 +1466,7 @@ export function App() {
         placeholder={quickAdd?.kind === "issue" ? "What needs to be done?" : "Name"}
         value={quickAddValue}
         onChange={setQuickAddValue}
-        onSubmit={() => void submitQuickAdd()}
+        onSubmit={submitQuickAdd}
         onClose={closeQuickAdd}
       />
 
@@ -1702,7 +1499,12 @@ export function App() {
           onClose={closeIssue}
           onNavigateRef={(ref) => void goToRef(ref)}
           onUpdate={(updated) => {
-            setIssues((prev) => prev.map((item) => (item.id === updated.id ? updated : item)));
+            if (teamId) {
+              updateBoard(queryClient, teamId, (current) => ({
+                ...current,
+                issues: replaceById(current.issues, updated),
+              }));
+            }
             setSelectedIssue(updated);
           }}
           onDelete={deleteIssue}
@@ -1786,7 +1588,7 @@ function LoginScreen({
       const result = await client.requestPasswordReset({ email: email.trim() });
       setStatusMessage(result.message);
     } catch (err) {
-      setLocalError(err instanceof Error ? err.message : "Request failed");
+      setLocalError(errorMessage(err, "Request failed"));
     } finally {
       setSubmitting(false);
     }
@@ -1816,7 +1618,7 @@ function LoginScreen({
       setMode("login");
       setStatusMessage("Password updated. Log in with your new password.");
     } catch (err) {
-      setLocalError(err instanceof Error ? err.message : "Reset failed");
+      setLocalError(errorMessage(err, "Reset failed"));
     } finally {
       setSubmitting(false);
     }

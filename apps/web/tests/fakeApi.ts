@@ -190,6 +190,8 @@ function abortError() {
 export type FakeApiOptions = {
   /** Return a promise to hold a response until it resolves (for race tests). Path has the query. */
   gate?: (method: string, path: string) => Promise<void> | undefined;
+  /** Return an error message to make that request fail with HTTP 500. */
+  fail?: (method: string, path: string) => string | undefined;
 };
 
 export function installFakeApi(db: FakeDb, options: FakeApiOptions = {}) {
@@ -370,6 +372,9 @@ export function installFakeApi(db: FakeDb, options: FakeApiOptions = {}) {
         void gate.then(resolve);
       });
     }
+
+    const failure = options.fail?.(method, `${path}${url.search}`);
+    if (failure) return json(500, { error: failure });
 
     for (const [routeMethod, pattern, handler] of routes) {
       if (routeMethod !== method) continue;
