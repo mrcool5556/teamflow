@@ -12,7 +12,7 @@ import type {
   RunMaintenanceUpdateInput,
 } from "@teamflow/core";
 import { inferMaintenanceJobOutcome } from "@teamflow/core";
-import { findRepoRoot } from "@teamflow/db";
+import { config } from "../config.js";
 import { getMaintenanceVersionInfo } from "./versionInfo.js";
 
 const JOB_FILE = "maintenance-job.json";
@@ -20,11 +20,7 @@ const LOG_FILE = "maintenance.log";
 const LOG_TAIL_BYTES = 12_000;
 
 function getAppDir() {
-  const configured = process.env.TEAMFLOW_APP_DIR?.trim();
-  if (configured) {
-    return path.isAbsolute(configured) ? configured : path.resolve(findRepoRoot(), configured);
-  }
-  return findRepoRoot();
+  return config.appDir;
 }
 
 function getDataDir() {
@@ -32,26 +28,20 @@ function getDataDir() {
 }
 
 function isMaintenanceEnabled() {
-  return process.env.TEAMFLOW_MAINTENANCE_ENABLED === "true";
+  return config.maintenance.enabled;
 }
 
 function getBackupDir() {
-  const configured = process.env.TEAMFLOW_BACKUP_DIR?.trim();
-  if (configured) {
-    return path.isAbsolute(configured) ? configured : path.resolve(getAppDir(), configured);
-  }
-  return "/var/backups/teamflow";
+  return config.maintenance.backupDir;
 }
 
+/** Configured path (already absolute) > root-owned installed copy > checkout copy. */
 function resolveScriptPath(
   configured: string | undefined,
   installedPath: string,
   repoRelative: string,
 ) {
-  if (configured?.trim()) {
-    const value = configured.trim();
-    return path.isAbsolute(value) ? value : path.resolve(getAppDir(), value);
-  }
+  if (configured) return configured;
   if (existsSync(installedPath)) return installedPath;
   return path.join(getAppDir(), repoRelative);
 }
@@ -61,7 +51,7 @@ export const INSTALLED_SCRIPT_DIR = "/usr/local/lib/teamflow/";
 
 function getBackupScript() {
   return resolveScriptPath(
-    process.env.TEAMFLOW_BACKUP_SCRIPT,
+    config.maintenance.backupScript,
     `${INSTALLED_SCRIPT_DIR}backup.sh`,
     "deploy/proxmox-lxc/backup.sh",
   );
@@ -69,14 +59,14 @@ function getBackupScript() {
 
 function getUpdateScript() {
   return resolveScriptPath(
-    process.env.TEAMFLOW_UPDATE_SCRIPT,
+    config.maintenance.updateScript,
     `${INSTALLED_SCRIPT_DIR}update.sh`,
     "deploy/proxmox-lxc/update.sh",
   );
 }
 
 function useSudo() {
-  return process.env.TEAMFLOW_MAINTENANCE_SUDO !== "false";
+  return config.maintenance.sudo;
 }
 
 function disabledReason(): string | null {

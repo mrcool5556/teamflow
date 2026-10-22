@@ -2,32 +2,26 @@ import { spawn } from "node:child_process";
 import { existsSync } from "node:fs";
 import path from "node:path";
 import type { DiscordBotServiceStatusPublic } from "@teamflow/core";
-import { findRepoRoot } from "@teamflow/db";
 import { botConfigKeyConfigured } from "./secretsCrypto.js";
 import { getDiscordBotSecretsPublic } from "./discordSecrets.js";
 import type { Db } from "@teamflow/db";
 import { defaultPublicUrl, syncDiscordBotEnv } from "./botConfigKey.js";
+import { config } from "../config.js";
 
 const BASH_PATH = "/usr/bin/bash";
 const INSTALLED_SCRIPT_PREFIX = "/usr/local/lib/teamflow/";
 
 function getAppDir() {
-  const configured = process.env.TEAMFLOW_APP_DIR?.trim();
-  if (configured) {
-    return path.isAbsolute(configured) ? configured : path.resolve(findRepoRoot(), configured);
-  }
-  return findRepoRoot();
+  return config.appDir;
 }
 
 function useSudo() {
-  return process.env.TEAMFLOW_MAINTENANCE_SUDO !== "false";
+  return config.maintenance.sudo;
 }
 
 function getDiscordBotScript() {
-  const configured = process.env.TEAMFLOW_DISCORD_BOT_SCRIPT?.trim();
-  if (configured) {
-    return path.isAbsolute(configured) ? configured : path.resolve(getAppDir(), configured);
-  }
+  const configured = config.maintenance.discordBotScript;
+  if (configured) return configured;
   const installed = `${INSTALLED_SCRIPT_PREFIX}discord-bot.sh`;
   if (existsSync(installed)) return installed;
   return path.join(getAppDir(), "deploy/proxmox-lxc/discord-bot.sh");

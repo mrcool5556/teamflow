@@ -7,7 +7,6 @@ import { pipeline } from "node:stream/promises";
 import {
   attachmentFileKind,
   buildFriendlyFilename,
-  DEFAULT_ATTACHMENT_LIMITS,
   generateEntityKey,
   isOpaqueUploadFilename,
   isStreamableAttachmentFile,
@@ -18,8 +17,9 @@ import {
   type TeamFilePublic,
   FILE_TRASH_RETENTION_DAYS,
 } from "@teamflow/core";
-import { findRepoRoot, schema, type Db } from "@teamflow/db";
+import { schema, type Db } from "@teamflow/db";
 import { eq, sql, and, isNull, isNotNull, lte } from "drizzle-orm";
+import { config } from "../config.js";
 
 const MB = 1024 * 1024;
 const FILE_TRASH_MS = FILE_TRASH_RETENTION_DAYS * 24 * 60 * 60 * 1000;
@@ -44,33 +44,12 @@ export class AttachmentError extends Error {
   }
 }
 
-function parseEnvBytes(key: string, fallback: number) {
-  const raw = process.env[key];
-  if (!raw) return fallback;
-  const parsed = Number(raw);
-  return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
-}
-
 export function getAttachmentLimits(): AttachmentLimitsPublic {
-  return {
-    imageBytes: parseEnvBytes("ATTACHMENT_MAX_IMAGE_BYTES", DEFAULT_ATTACHMENT_LIMITS.imageBytes),
-    videoBytes: parseEnvBytes("ATTACHMENT_MAX_VIDEO_BYTES", DEFAULT_ATTACHMENT_LIMITS.videoBytes),
-    zipBytes: parseEnvBytes("ATTACHMENT_MAX_ZIP_BYTES", DEFAULT_ATTACHMENT_LIMITS.zipBytes),
-    defaultBytes: parseEnvBytes("ATTACHMENT_MAX_BYTES", DEFAULT_ATTACHMENT_LIMITS.defaultBytes),
-    chunkBytes: parseEnvBytes("UPLOAD_CHUNK_BYTES", DEFAULT_ATTACHMENT_LIMITS.chunkBytes),
-    chunkThresholdBytes: parseEnvBytes(
-      "UPLOAD_CHUNK_THRESHOLD_BYTES",
-      DEFAULT_ATTACHMENT_LIMITS.chunkThresholdBytes,
-    ),
-  };
+  return { ...config.attachments };
 }
 
 export function getUploadDir() {
-  const configured = process.env.UPLOAD_DIR?.trim();
-  if (configured) {
-    return path.isAbsolute(configured) ? configured : path.resolve(findRepoRoot(), configured);
-  }
-  return path.join(findRepoRoot(), "data", "uploads");
+  return config.uploadDir;
 }
 
 export function getUploadTempDir() {

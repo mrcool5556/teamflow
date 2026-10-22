@@ -2,6 +2,7 @@ import { createCipheriv, createHash, randomBytes } from "node:crypto";
 import { afterEach, describe, expect, it } from "vitest";
 import { isPlaceholderSecret, resolveSecret } from "../src/lib/auth.js";
 import { decryptSecret, encryptSecret } from "../src/lib/secretsCrypto.js";
+import { reloadConfig } from "../src/config.js";
 
 const STRONG = "a-sufficiently-long-random-secret-value-1234567890";
 
@@ -41,13 +42,17 @@ describe("secret validation", () => {
 describe("secrets at rest", () => {
   const saved = { ...process.env };
   afterEach(() => {
-    process.env.TEAMFLOW_SECRETS_KEY = saved.TEAMFLOW_SECRETS_KEY;
-    process.env.JWT_SECRET = saved.JWT_SECRET;
-    process.env.NODE_ENV = saved.NODE_ENV;
+    // Assigning undefined to process.env stores the string "undefined"; delete instead.
+    for (const key of ["TEAMFLOW_SECRETS_KEY", "JWT_SECRET", "NODE_ENV"] as const) {
+      if (saved[key] === undefined) delete process.env[key];
+      else process.env[key] = saved[key];
+    }
+    reloadConfig();
   });
 
   it("encrypts with a v2 scrypt-derived key and round-trips", () => {
     process.env.TEAMFLOW_SECRETS_KEY = STRONG;
+    reloadConfig();
     const blob = encryptSecret("bot-token-123");
     expect(blob.startsWith("v2:")).toBe(true);
     expect(decryptSecret(blob)).toBe("bot-token-123");
@@ -55,6 +60,7 @@ describe("secrets at rest", () => {
 
   it("still decrypts v1 blobs written with the old SHA-256 key", () => {
     process.env.TEAMFLOW_SECRETS_KEY = STRONG;
+    reloadConfig();
     const legacyKey = createHash("sha256").update(STRONG).digest();
     const iv = randomBytes(12);
     const cipher = createCipheriv("aes-256-gcm", legacyKey, iv);
@@ -68,10 +74,14 @@ describe("secrets at rest", () => {
     expect(decryptSecret(blob)).toBe("legacy-pat");
   });
 
-  it("refuses to derive a key from a placeholder outside development", () => {
+  it("refuses to boot with a placeholder key material outside development", () => {
     process.env.NODE_ENV = "production";
     delete process.env.TEAMFLOW_SECRETS_KEY;
     process.env.JWT_SECRET = "change-me-to-a-long-random-string";
-    expect(() => encryptSecret("x")).toThrow(/placeholder/);
+    // Key material is validated when the config loads, so the server never starts like this.
+    expect(() => reloadConfig()).toThrow(/placeholder/);
+    process.env.JWT_SECRET = STRONG;
+    process.env.TEAMFLOW_SECRETS_KEY = "change-me-to-a-long-random-string";
+    expect(() => reloadConfig()).toThrow(/TEAMFLOW_SECRETS_KEY/);
   });
 });

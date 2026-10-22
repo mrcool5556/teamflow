@@ -5,70 +5,30 @@ import { eq } from "drizzle-orm";
 import type { Db } from "@teamflow/db";
 import { schema } from "@teamflow/db";
 import type { TokenScope, UserPublic } from "@teamflow/core";
+import { config } from "../config.js";
+
+// Secret validation lives in config.ts (it runs at boot); re-exported here for existing callers.
+export {
+  PLACEHOLDER_SECRETS,
+  devSecretsAllowed,
+  isPlaceholderSecret,
+  resolveSecret,
+} from "../config.js";
 
 const JWT_ISSUER = "teamflow";
 const JWT_AUDIENCE = "teamflow-web";
 
-/** Placeholder values shipped in .env templates. Never accepted as a real secret. */
-export const PLACEHOLDER_SECRETS = [
-  "change-me-in-production-use-long-random-string",
-  "change-me-to-a-long-random-string",
-  "dev-secret",
-] as const;
-
-const DEV_FALLBACK_SECRET = "dev-secret";
-const MIN_SECRET_LENGTH = 16;
-
-export function isPlaceholderSecret(value: string | undefined) {
-  const trimmed = value?.trim() ?? "";
-  return (
-    trimmed.length < MIN_SECRET_LENGTH ||
-    (PLACEHOLDER_SECRETS as readonly string[]).includes(trimmed)
-  );
-}
-
-export function devSecretsAllowed(env: NodeJS.ProcessEnv = process.env) {
-  return env.NODE_ENV === "development" || env.TEAMFLOW_ALLOW_DEV_SECRET === "1";
-}
-
-/**
- * Resolve a secret from the environment, refusing placeholders and unset values unless the
- * process explicitly opts into development mode. Throws so the server refuses to start.
- */
-export function resolveSecret(
-  name: string,
-  value: string | undefined,
-  env: NodeJS.ProcessEnv = process.env,
-): string {
-  if (!isPlaceholderSecret(value)) return value!.trim();
-  if (devSecretsAllowed(env)) {
-    console.warn(
-      `[teamflow] ${name} is unset or a placeholder; using an insecure development value. ` +
-        "Never run like this in production.",
-    );
-    return DEV_FALLBACK_SECRET;
-  }
-  throw new Error(
-    `${name} is unset or still a placeholder. Set a long random value (e.g. openssl rand -hex 32), ` +
-      "or set NODE_ENV=development / TEAMFLOW_ALLOW_DEV_SECRET=1 for local development only.",
-  );
-}
-
 let cachedJwtSecret: Uint8Array | null = null;
 let cachedJwtSource: string | undefined;
 
+/** The validated JWT secret as key bytes (config.jwtSecret is refused at boot if unsafe). */
 export function getJwtSecret() {
-  const raw = process.env.JWT_SECRET;
+  const raw = config.jwtSecret;
   if (!cachedJwtSecret || cachedJwtSource !== raw) {
-    cachedJwtSecret = new TextEncoder().encode(resolveSecret("JWT_SECRET", raw));
+    cachedJwtSecret = new TextEncoder().encode(raw);
     cachedJwtSource = raw;
   }
   return cachedJwtSecret;
-}
-
-/** Call once at startup so a bad JWT_SECRET fails fast instead of on the first login. */
-export function assertSecretsConfigured() {
-  getJwtSecret();
 }
 
 export function toUserPublic(user: typeof schema.users.$inferSelect): UserPublic {
@@ -83,13 +43,7 @@ export function toUserPublic(user: typeof schema.users.$inferSelect): UserPublic
 
 /** Emails listed in TEAMFLOW_INSTANCE_ADMINS (comma-separated, case-insensitive). */
 export function instanceAdminEmailsFromEnv(): Set<string> {
-  const raw = process.env.TEAMFLOW_INSTANCE_ADMINS ?? "";
-  return new Set(
-    raw
-      .split(",")
-      .map((value) => value.trim().toLowerCase())
-      .filter(Boolean),
-  );
+  return new Set(config.instanceAdminEmails);
 }
 
 /**

@@ -15,6 +15,8 @@ export default defineConfig({
   },
   test: {
     include: ["packages/*/tests/**/*.test.ts", "apps/*/tests/**/*.test.ts"],
+    // Safe env defaults; the server validates its config at import time.
+    setupFiles: ["./apps/server/tests/setupEnv.ts"],
     environment: "node",
     server: {
       // Workspace packages are symlinked into node_modules; inline them so the aliases apply.

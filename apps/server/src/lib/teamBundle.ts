@@ -25,6 +25,7 @@ import { schema } from "@teamflow/db";
 import { filterValidTeamMemberIds, setBoardRowAssignees, setIssueAssignees } from "./assignees.js";
 import { getUploadDir } from "./attachments.js";
 import { uniqueColumnKey, uniqueRowKey } from "./board.js";
+import { config } from "../config.js";
 
 export class TeamBundleError extends Error {
   status: number;
@@ -93,23 +94,12 @@ function zipToBuffer(append: (archive: ZipArchive) => void | Promise<void>): Pro
   });
 }
 
-const DEFAULT_BUNDLE_MAX_ENTRIES = 5000;
-const DEFAULT_BUNDLE_MAX_BYTES = 2 * 1024 * 1024 * 1024; // 2 GiB uncompressed
 const JSON_ENTRY_MAX_BYTES = 64 * 1024 * 1024;
 const MAX_NAME_LENGTH = 255;
 
-function parseEnvInt(key: string, fallback: number) {
-  const raw = process.env[key];
-  if (!raw) return fallback;
-  const parsed = Number(raw);
-  return Number.isFinite(parsed) && parsed > 0 ? Math.floor(parsed) : fallback;
-}
-
+/** TEAMFLOW_BUNDLE_MAX_ENTRIES / TEAMFLOW_BUNDLE_MAX_BYTES (defaults 5000 / 2 GiB). */
 export function getBundleImportLimits() {
-  return {
-    maxEntries: parseEnvInt("TEAMFLOW_BUNDLE_MAX_ENTRIES", DEFAULT_BUNDLE_MAX_ENTRIES),
-    maxBytes: parseEnvInt("TEAMFLOW_BUNDLE_MAX_BYTES", DEFAULT_BUNDLE_MAX_BYTES),
-  };
+  return { ...config.bundle };
 }
 
 /**

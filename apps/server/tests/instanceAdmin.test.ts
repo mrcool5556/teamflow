@@ -8,6 +8,7 @@ import {
   type RegisteredUser,
   type TestApp,
 } from "./helpers";
+import { reloadConfig } from "../src/config.js";
 
 let app: TestApp;
 let first: RegisteredUser;
@@ -63,6 +64,7 @@ describe("instance admin", () => {
 
   it("TEAMFLOW_INSTANCE_ADMINS grants the flag at login", async () => {
     process.env.TEAMFLOW_INSTANCE_ADMINS = ` Other@example.test , ${second.email.toUpperCase()} `;
+    reloadConfig();
     const session = await login(app, second.email, second.password);
     expect(session.user.isInstanceAdmin).toBe(true);
     const res = await api(app, "GET", `/teams/${second.teamId}/server/maintenance`, {
@@ -70,5 +72,6 @@ describe("instance admin", () => {
     });
     expect(res.status).toBe(200);
     process.env.TEAMFLOW_INSTANCE_ADMINS = "";
+    reloadConfig();
   });
 });
