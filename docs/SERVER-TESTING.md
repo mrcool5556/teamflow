@@ -63,7 +63,7 @@ ssh teamflow bash /opt/teamflow/deploy/proxmox-lxc/diagnose.sh
 | `/opt/teamflow` | App root |
 | `/opt/teamflow/data/maintenance.log` | In-app / CLI update log |
 | `/etc/systemd/system/teamflow.service` | systemd unit |
-| `/usr/local/bin/teamflow-update` | Update wrapper |
-| `/usr/local/bin/teamflow-backup` | Backup wrapper |
+| `/usr/local/lib/teamflow/update.sh` | Root-owned update script (sudoers target); `/usr/local/bin/teamflow-update` symlinks to it |
+| `/usr/local/lib/teamflow/backup.sh` | Root-owned backup script; `/usr/local/bin/teamflow-backup` symlinks to it |
 
 Fix procedures: [deploy/proxmox-lxc/README.md](../deploy/proxmox-lxc/README.md) (KillMode, manual deploy, sudoers).

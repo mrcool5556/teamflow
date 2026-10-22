@@ -9,7 +9,7 @@ import type { Db } from "@teamflow/db";
 import { defaultPublicUrl, syncDiscordBotEnv } from "./botConfigKey.js";
 
 const BASH_PATH = "/usr/bin/bash";
-const INSTALLED_SCRIPT_PREFIX = "/usr/local/bin/";
+const INSTALLED_SCRIPT_PREFIX = "/usr/local/lib/teamflow/";
 
 function getAppDir() {
   const configured = process.env.TEAMFLOW_APP_DIR?.trim();
@@ -28,7 +28,7 @@ function getDiscordBotScript() {
   if (configured) {
     return path.isAbsolute(configured) ? configured : path.resolve(getAppDir(), configured);
   }
-  const installed = "/usr/local/bin/teamflow-discord";
+  const installed = `${INSTALLED_SCRIPT_PREFIX}discord-bot.sh`;
   if (existsSync(installed)) return installed;
   return path.join(getAppDir(), "deploy/proxmox-lxc/discord-bot.sh");
 }

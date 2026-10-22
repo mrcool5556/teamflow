@@ -56,10 +56,13 @@ function resolveScriptPath(
   return path.join(getAppDir(), repoRelative);
 }
 
+/** Root-owned copies installed by deploy/proxmox-lxc/setup-maintenance-sudo.sh. */
+export const INSTALLED_SCRIPT_DIR = "/usr/local/lib/teamflow/";
+
 function getBackupScript() {
   return resolveScriptPath(
     process.env.TEAMFLOW_BACKUP_SCRIPT,
-    "/usr/local/bin/teamflow-backup",
+    `${INSTALLED_SCRIPT_DIR}backup.sh`,
     "deploy/proxmox-lxc/backup.sh",
   );
 }
@@ -67,7 +70,7 @@ function getBackupScript() {
 function getUpdateScript() {
   return resolveScriptPath(
     process.env.TEAMFLOW_UPDATE_SCRIPT,
-    "/usr/local/bin/teamflow-update",
+    `${INSTALLED_SCRIPT_DIR}update.sh`,
     "deploy/proxmox-lxc/update.sh",
   );
 }
@@ -210,10 +213,9 @@ async function listBackups(): Promise<MaintenanceBackupPublic[]> {
 }
 
 const BASH_PATH = "/usr/bin/bash";
-const INSTALLED_SCRIPT_PREFIX = "/usr/local/bin/";
 
 function scriptUsesDirectSudo(script: string) {
-  return script.startsWith(INSTALLED_SCRIPT_PREFIX);
+  return script.startsWith(INSTALLED_SCRIPT_DIR);
 }
 
 function formatCommand(command: string, args: string[]) {

@@ -10,24 +10,41 @@ echo ""
 echo "=== Discord systemd unit ==="
 systemctl list-unit-files '*discord*' 2>/dev/null || true
 
+# Print whether each key is set, never its value (keys and URLs are secrets or near-secrets).
+report_keys() {
+  local file=$1
+  shift
+  for key in "$@"; do
+    if grep -Eq "^${key}=.+" "$file" 2>/dev/null; then
+      echo "$key: set"
+    else
+      echo "$key: unset"
+    fi
+  done
+}
+
 echo ""
 echo "=== Bot .env ==="
 if [[ -f "$APP_DIR/apps/discord-bot/.env" ]]; then
-  grep -E '^(TEAMFLOW_URL|TEAMFLOW_PUBLIC_URL|TEAMFLOW_BOT_CONFIG_KEY)=' "$APP_DIR/apps/discord-bot/.env" || true
+  report_keys "$APP_DIR/apps/discord-bot/.env" TEAMFLOW_URL TEAMFLOW_PUBLIC_URL TEAMFLOW_BOT_CONFIG_KEY
 else
   echo "missing: $APP_DIR/apps/discord-bot/.env"
 fi
 
 echo ""
 echo "=== Server .env (bot-related keys only) ==="
-grep -E '^(PUBLIC_URL|TEAMFLOW_BOT_CONFIG_KEY|TEAMFLOW_SECRETS_KEY)=' "$APP_DIR/.env" 2>/dev/null || echo "(no bot keys in root .env)"
+if [[ -f "$APP_DIR/.env" ]]; then
+  report_keys "$APP_DIR/.env" PUBLIC_URL TEAMFLOW_BOT_CONFIG_KEY TEAMFLOW_SECRETS_KEY
+else
+  echo "missing: $APP_DIR/.env"
+fi
 
 echo ""
 echo "=== Discord secrets in database ==="
 DB="$APP_DIR/data/teamflow.db"
 if [[ -f "$DB" ]] && command -v sqlite3 >/dev/null 2>&1; then
   sqlite3 -header -column "$DB" \
-    "SELECT teamflow_url, public_url, length(pat_enc) AS pat_len, length(bot_token_enc) AS token_len, length(client_id) AS client_len FROM discord_bot_secrets;" \
+    "SELECT (pat_enc IS NOT NULL AND pat_enc != '') AS pat_set, (bot_token_enc IS NOT NULL AND bot_token_enc != '') AS token_set, (client_id IS NOT NULL AND client_id != '') AS client_set FROM discord_bot_secrets;" \
     || echo "sqlite3 query failed"
 else
   echo "missing sqlite3 or db at $DB"

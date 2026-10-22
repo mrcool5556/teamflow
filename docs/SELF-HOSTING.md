@@ -171,8 +171,7 @@ Same as `sudo teamflow-update` — backup DB → `git pull` → build → migrat
 If `update` is missing (older install):
 
 ```bash
-sudo install -m 755 /opt/teamflow/deploy/proxmox-lxc/update.sh /usr/local/bin/teamflow-update
-sudo ln -sf teamflow-update /usr/local/bin/update
+sudo bash /opt/teamflow/deploy/proxmox-lxc/setup-maintenance-sudo.sh   # root-owned copies + /usr/local/bin symlinks
 ```
 
 **Important:** `/opt/teamflow` must be a **git clone** (have a `.git` folder). Snapshot installs without git cannot `git pull`; re-clone once and restore `.env` + `data/`.

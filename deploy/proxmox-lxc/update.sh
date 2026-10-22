@@ -136,10 +136,8 @@ systemctl start teamflow
 SERVICE_STOPPED=false
 trap - EXIT
 
-install -m 755 "$APP_DIR/deploy/proxmox-lxc/update.sh" /usr/local/bin/teamflow-update
-install -m 755 "$APP_DIR/deploy/proxmox-lxc/backup.sh" /usr/local/bin/teamflow-backup
-install -m 755 "$APP_DIR/deploy/proxmox-lxc/discord-bot.sh" /usr/local/bin/teamflow-discord
-ln -sf teamflow-update /usr/local/bin/update
+# Root-owned copies under /usr/local/lib/teamflow (+ /usr/local/bin symlinks) and the sudoers
+# rule that points only at them are refreshed by setup-maintenance-sudo.sh.
 cp "$APP_DIR/deploy/proxmox-lxc/teamflow.service" /etc/systemd/system/teamflow.service
 systemctl daemon-reload
 bash "$APP_DIR/deploy/proxmox-lxc/setup-maintenance-sudo.sh" || true
