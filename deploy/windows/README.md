@@ -69,6 +69,6 @@ Default install keeps files in the repo. For a dedicated path:
 
 ## Demo login
 
-After seed: `demo@teamflow.local` / `changeme123`
+No demo account is created. Open the URL and register; the first account becomes the instance admin. For throwaway demo data run `$env:TEAMFLOW_SEED_DEMO = "1"; pnpm db:seed`.
 
 See [docs/SELF-HOSTING.md](../../docs/SELF-HOSTING.md#windows)

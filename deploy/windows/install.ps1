@@ -32,7 +32,8 @@ Invoke-Pnpm -r build
 
 Write-Host "Setting up database..."
 Invoke-Pnpm --filter "@teamflow/db" migrate
-Invoke-Pnpm --filter "@teamflow/db" seed
+# No demo account: the first registered user becomes the instance admin.
+# For throwaway demo data run:  $env:TEAMFLOW_SEED_DEMO = "1"; pnpm db:seed
 
 if ($InstallPath) {
   Write-Host "Install path mode: $InstallPath (copy not automated yet - run from repo or set TEAMFLOW_HOME)"
@@ -42,4 +43,4 @@ Write-Host ""
 Write-Host "Install complete." -ForegroundColor Green
 Write-Host "Start:  .\deploy\windows\start.ps1"
 Write-Host "URL:    http://localhost:$Port"
-Write-Host "Demo:   demo@teamflow.local / changeme123"
+Write-Host "Open the URL and register; the first account becomes the instance admin."

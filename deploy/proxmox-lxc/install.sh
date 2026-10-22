@@ -82,7 +82,9 @@ sudo -u "$APP_USER" pnpm build
 
 # Note: Postgres driver migration is Phase 2 — for now SQLite fallback on LXC if DATABASE_URL uses file:
 if grep -q '^DATABASE_URL=file:' .env 2>/dev/null; then
-  sudo -u "$APP_USER" pnpm db:setup
+  # Migrations only. No demo account is created; the first registered user becomes
+  # the instance admin. For throwaway demo data run: TEAMFLOW_SEED_DEMO=1 pnpm db:seed
+  sudo -u "$APP_USER" pnpm db:migrate
 else
   echo "PostgreSQL configured — run Drizzle Postgres migrations when added (Phase 2)."
   echo "For now, set DATABASE_URL=file:./data/teamflow.db in .env for SQLite on LXC."
