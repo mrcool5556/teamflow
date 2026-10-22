@@ -32,6 +32,7 @@ routes.post(
   requireWrite,
   validateParams,
   loadTeam(),
+  requirePermission("team.roles.manage"),
   async (c) => {
     const auth = c.var.auth;
 
@@ -50,6 +51,7 @@ routes.patch(
   requireWrite,
   validateParams,
   loadTeam(),
+  requirePermission("team.roles.manage"),
   async (c) => {
     const auth = c.var.auth;
 
@@ -69,6 +71,7 @@ routes.delete(
   requireWrite,
   validateParams,
   loadTeam(),
+  requirePermission("team.roles.manage"),
   async (c) => {
     const auth = c.var.auth;
 

@@ -28,58 +28,224 @@ server together with the request id.
 Server code throws `ApiError` from `apps/server/src/lib/errors.ts` (`badRequest`, `forbidden`,
 `notFound`, `conflict`, ...); one `onError` handler renders it.
 
-## Health
+<!-- BEGIN GENERATED ROUTES (scripts/gen-api-docs.mjs) -->
 
-| Method | Path | Auth |
-|--------|------|------|
-| GET | `/health` | none |
+## Routes (92)
 
-## Auth
+Generated from `apps/server/src/routes/*.ts` by `pnpm docs:api`; do not edit by hand.
 
-| Method | Path | Body |
-|--------|------|------|
-| GET | `/auth/config` | — → `{ inviteOnly, passwordResetEmail }` |
-| POST | `/auth/register` | `{ email, name, password, inviteToken? }` |
-| POST | `/auth/login` | `{ email, password }` |
-| POST | `/auth/forgot-password` | `{ email }` |
-| POST | `/auth/reset-password` | `{ token, password }` |
-| GET | `/auth/me` | — |
-| POST | `/auth/tokens` | `{ name, scopes?, teamId? }` → returns `token` once |
+- **Auth**: `bearer` = session JWT or PAT required; `optional` = works signed out too; `none` = public; `bot key` = `X-Teamflow-Bot-Key` header; `stream token` = `?token=` from `POST /attachments/:id/stream-token`.
+- **Write**: needs a token with the `write` scope.
+- **Team**: caller must be a member of the owning team (resolved from the path, or from the row/issue/column/upload/attachment named in it); a team-scoped PAT must match it.
+- **Input**: schema names are exports of `@teamflow/core`. Path ids are UUIDs (`idParamSchema`).
 
-Details: [AUTH.md](AUTH.md)
+### Health
 
-## Teams
+Liveness probe.
 
-| Method | Path |
-|--------|------|
-| GET | `/teams` |
-| POST | `/teams` | `{ name, key }` |
-| GET | `/teams/:teamId/statuses` |
+| Method | Path | Auth | Write | Team | Permission | Input |
+|--------|------|------|-------|------|------------|-------|
+| GET | `/health` | none |  |  |  |  |
 
-## Projects
+### Auth and profile
 
-| Method | Path |
-|--------|------|
-| GET | `/projects?teamId=` |
-| POST | `/projects` | `{ teamId, name, description? }` |
+Registration, login, password reset and the signed-in user's profile.
 
-## Issues
+| Method | Path | Auth | Write | Team | Permission | Input |
+|--------|------|------|-------|------|------------|-------|
+| GET | `/auth/config` | none |  |  |  |  |
+| POST | `/auth/register` | none |  |  |  | body `registerSchema` |
+| POST | `/auth/login` | none |  |  |  | body `loginSchema` |
+| POST | `/auth/forgot-password` | none |  |  |  | body `forgotPasswordSchema` |
+| POST | `/auth/reset-password` | none |  |  |  | body `resetPasswordSchema` |
+| GET | `/auth/me` | bearer |  |  |  |  |
+| GET | `/auth/profile` | bearer |  |  |  |  |
+| PUT | `/auth/profile` | bearer | yes |  |  | body `userProfileSchema` |
+| PATCH | `/auth/profile` | bearer | yes |  |  | body `userProfilePatchSchema` |
+| GET | `/auth/profile/export` | bearer |  |  |  |  |
+| POST | `/auth/profile/import` | bearer | yes |  |  | body profile export → `userProfileSchema` |
 
-| Method | Path |
-|--------|------|
-| GET | `/issues?teamId&projectId&statusId&assigneeId&search` |
-| GET | `/issues/:id` |
-| POST | `/issues` | see `createIssueSchema` in `@teamflow/core` |
-| PATCH | `/issues/:id` |
-| POST | `/issues/:id/complete` |
-| DELETE | `/issues/:id` |
-| POST | `/issues/:id/comments` | `{ body }` |
-| GET | `/issues/:issueId/attachments` | List file attachments |
-| POST | `/issues/:issueId/attachments` | `multipart/form-data` field `file` |
-| GET | `/attachments/:id/download` | Download attachment |
-| DELETE | `/issues/:issueId/attachments/:id` | Remove attachment |
+### API tokens
 
-Attachments: [ATTACHMENTS.md](ATTACHMENTS.md)
+Personal access tokens (list, create, revoke).
+
+| Method | Path | Auth | Write | Team | Permission | Input |
+|--------|------|------|-------|------|------------|-------|
+| GET | `/auth/tokens` | bearer |  |  |  |  |
+| DELETE | `/auth/tokens/:id` | bearer | yes |  |  |  |
+| POST | `/auth/tokens` | bearer | yes |  |  | body `createTokenSchema` |
+
+### Teams
+
+Team list/create/delete, bundle export/import, permissions and ref resolution.
+
+| Method | Path | Auth | Write | Team | Permission | Input |
+|--------|------|------|-------|------|------------|-------|
+| GET | `/teams` | bearer |  |  |  |  |
+| POST | `/teams` | bearer | yes |  |  | body `createTeamSchema` |
+| DELETE | `/teams/:teamId` | bearer | yes | member | `team.delete` |  |
+| GET | `/teams/:teamId/export` | bearer |  | member | `team.data.transfer` | query `teamBundleExportQuerySchema` |
+| POST | `/teams/:teamId/import` | bearer | yes | member | `team.data.transfer` | query `teamBundleImportOptionsSchema` (`force`), multipart field `bundle` |
+| GET | `/teams/:teamId/permissions/me` | bearer |  | member |  |  |
+| GET | `/teams/:teamId/resolve` | bearer |  | member |  | query `resolveRefSchema` (`ref`) |
+
+### Board rows and columns
+
+Board rows and columns (statuses).
+
+| Method | Path | Auth | Write | Team | Permission | Input |
+|--------|------|------|-------|------|------------|-------|
+| GET | `/teams/:teamId/statuses` | bearer |  | member |  |  |
+| GET | `/rows/:rowId/statuses` | bearer |  | member (via row) |  |  |
+| POST | `/rows/:rowId/statuses` | bearer | yes | member (via row) |  | body `createStatusSchema` |
+| PATCH | `/statuses/:statusId` | bearer | yes | member (via status) |  | body `updateStatusSchema` |
+| DELETE | `/statuses/:statusId` | bearer | yes | member (via status) |  |  |
+| GET | `/teams/:teamId/rows` | bearer |  | member |  |  |
+| POST | `/teams/:teamId/rows` | bearer | yes | member |  | body `createBoardRowSchema` |
+| PATCH | `/rows/:rowId` | bearer | yes | member (via row) |  | body `updateBoardRowSchema` |
+| DELETE | `/rows/:rowId` | bearer | yes | member (via row) |  |  |
+
+### Members
+
+Team membership: list, change role, remove, leave.
+
+| Method | Path | Auth | Write | Team | Permission | Input |
+|--------|------|------|-------|------|------------|-------|
+| GET | `/teams/:teamId/members` | bearer |  | member | `team.members.view` |  |
+| PATCH | `/teams/:teamId/members/:memberId` | bearer | yes | member | `team.members.manage` | body `updateTeamMemberRoleSchema` |
+| DELETE | `/teams/:teamId/members/:memberId` | bearer | yes | member |  |  |
+
+### Invites
+
+Team invites and invite acceptance.
+
+| Method | Path | Auth | Write | Team | Permission | Input |
+|--------|------|------|-------|------|------------|-------|
+| GET | `/teams/:teamId/invites` | bearer |  | member | `team.invites.manage` |  |
+| POST | `/teams/:teamId/invites` | bearer | yes | member | `team.invites.manage` | body `createTeamInviteSchema` |
+| DELETE | `/teams/:teamId/invites/:inviteId` | bearer | yes | member | `team.invites.manage` |  |
+| GET | `/invites/:token` | optional |  |  |  |  |
+| POST | `/invites/:token/accept` | bearer | yes |  |  |  |
+
+### Roles
+
+Team roles and their permissions.
+
+| Method | Path | Auth | Write | Team | Permission | Input |
+|--------|------|------|-------|------|------------|-------|
+| GET | `/teams/:teamId/roles` | bearer |  | member | `team.roles.view` or `team.members.manage` or `team.invites.manage` |  |
+| POST | `/teams/:teamId/roles` | bearer | yes | member | `team.roles.manage` | body `createTeamRoleSchema` |
+| PATCH | `/teams/:teamId/roles/:roleId` | bearer | yes | member | `team.roles.manage` | body `updateTeamRoleSchema` |
+| DELETE | `/teams/:teamId/roles/:roleId` | bearer | yes | member | `team.roles.manage` |  |
+
+### Discord integration
+
+Discord integration settings, bot secrets, bot service and bot config.
+
+| Method | Path | Auth | Write | Team | Permission | Input |
+|--------|------|------|-------|------|------------|-------|
+| GET | `/integrations/discord/bot-config` | bot key |  |  |  |  |
+| GET | `/teams/:teamId/discord-settings` | bearer |  | member | `integrations.discord.view` |  |
+| PATCH | `/teams/:teamId/discord-settings` | bearer | yes | member | `integrations.discord.manage` | body `updateTeamDiscordSettingsSchema` |
+| GET | `/teams/:teamId/integrations/discord/secrets` | bearer |  | member | `integrations.discord.secrets` + instance admin |  |
+| PATCH | `/teams/:teamId/integrations/discord/secrets` | bearer | yes | member | `integrations.discord.secrets` + instance admin | body `updateDiscordBotSecretsSchema` |
+| GET | `/teams/:teamId/integrations/discord/service` | bearer |  | member | `integrations.discord.view` |  |
+| POST | `/teams/:teamId/integrations/discord/service/enable` | bearer | yes | member | `integrations.discord.secrets` + instance admin |  |
+| POST | `/teams/:teamId/integrations/discord/service/restart` | bearer | yes | member | `integrations.discord.secrets` + instance admin |  |
+| POST | `/teams/:teamId/integrations/discord/service/stop` | bearer | yes | member | `integrations.discord.secrets` + instance admin |  |
+| GET | `/discord/guilds/:guildId/config` | bearer |  |  |  |  |
+
+### Server maintenance
+
+Server maintenance: status, backups, updates (instance admin only).
+
+| Method | Path | Auth | Write | Team | Permission | Input |
+|--------|------|------|-------|------|------------|-------|
+| GET | `/teams/:teamId/server/maintenance` | bearer |  | member | `server.maintenance.view` + instance admin |  |
+| POST | `/teams/:teamId/server/maintenance/check` | bearer | yes | member | `server.maintenance.view` + instance admin |  |
+| GET | `/teams/:teamId/server/maintenance/job` | bearer |  | member | `server.maintenance.view` + instance admin |  |
+| POST | `/teams/:teamId/server/maintenance/backup` | bearer | yes | member | `server.maintenance.run` + instance admin | body `runMaintenanceBackupSchema` |
+| POST | `/teams/:teamId/server/maintenance/update` | bearer | yes | member | `server.maintenance.run` + instance admin | body `runMaintenanceUpdateSchema` |
+| POST | `/teams/:teamId/server/maintenance/job/dismiss` | bearer | yes | member | `server.maintenance.run` + instance admin |  |
+
+### Team files
+
+Team file library: list, rename, trash, restore.
+
+| Method | Path | Auth | Write | Team | Permission | Input |
+|--------|------|------|-------|------|------------|-------|
+| GET | `/teams/:teamId/files` | bearer |  | member |  | query `listTeamFilesQuerySchema` |
+| PATCH | `/teams/:teamId/files/:fileId` | bearer | yes | member |  | body `renameTeamFileSchema` |
+| DELETE | `/teams/:teamId/files/:fileId` | bearer | yes | member |  |  |
+| POST | `/teams/:teamId/files/:fileId/restore` | bearer | yes | member |  |  |
+
+### Projects
+
+Projects.
+
+| Method | Path | Auth | Write | Team | Permission | Input |
+|--------|------|------|-------|------|------------|-------|
+| GET | `/projects` | bearer |  |  |  | query `listProjectsQuerySchema` |
+| POST | `/projects` | bearer | yes |  |  | body `createProjectSchema` |
+
+### Issues
+
+Issues: list, read, create, update, complete, trash, restore.
+
+| Method | Path | Auth | Write | Team | Permission | Input |
+|--------|------|------|-------|------|------------|-------|
+| GET | `/issues` | bearer |  |  |  | query `listIssuesSchema` |
+| GET | `/issues/:id` | bearer |  | member (via issue) |  |  |
+| POST | `/issues` | bearer | yes |  |  | body `createIssueSchema` |
+| PATCH | `/issues/:id` | bearer | yes | member (via issue) |  | body `updateIssueSchema` |
+| POST | `/issues/:id/complete` | bearer | yes | member (via issue) |  |  |
+| DELETE | `/issues/:id` | bearer | yes | member (via issue) |  |  |
+| POST | `/issues/:id/restore` | bearer | yes | member (via issue) |  |  |
+
+### Comments
+
+Issue comments.
+
+| Method | Path | Auth | Write | Team | Permission | Input |
+|--------|------|------|-------|------|------------|-------|
+| POST | `/issues/:id/comments` | bearer | yes | member (via issue) |  | body `createCommentSchema` |
+| DELETE | `/issues/:issueId/comments/:commentId` | bearer | yes | member (via issue) |  |  |
+
+### Attachments
+
+Issue/row attachments, linking, moving, streaming and downloads.
+
+| Method | Path | Auth | Write | Team | Permission | Input |
+|--------|------|------|-------|------|------------|-------|
+| GET | `/issues/:issueId/attachments` | bearer |  | member (via issue) |  |  |
+| POST | `/issues/:issueId/attachments` | bearer | yes | member (via issue) |  | multipart field `file` |
+| GET | `/rows/:rowId/attachments` | bearer |  | member (via row) |  |  |
+| POST | `/rows/:rowId/attachments` | bearer | yes | member (via row) |  | multipart field `file` |
+| DELETE | `/rows/:rowId/attachments/:id` | bearer | yes | member (via row) |  |  |
+| POST | `/rows/:rowId/attachments/link` | bearer | yes | member (via row) |  | body `linkAttachmentSchema` |
+| POST | `/issues/:issueId/attachments/:id/move` | bearer | yes |  |  | body `moveAttachmentSchema` |
+| POST | `/issues/:issueId/attachments/link` | bearer | yes | member (via issue) |  | body `linkAttachmentSchema` |
+| POST | `/attachments/:id/stream-token` | bearer |  | member (via attachment) |  |  |
+| GET | `/attachments/:id/stream` | stream token |  |  |  | query `token` |
+| GET | `/attachments/:id/download` | bearer |  | member (via attachment) |  |  |
+| DELETE | `/issues/:issueId/attachments/:id` | bearer | yes | member (via issue) |  |  |
+
+### Chunked uploads
+
+Chunked upload sessions for issue and row attachments.
+
+| Method | Path | Auth | Write | Team | Permission | Input |
+|--------|------|------|-------|------|------------|-------|
+| POST | `/issues/:issueId/uploads` | bearer | yes | member (via issue) |  | body `createUploadSessionSchema` |
+| GET | `/uploads/:sessionId` | bearer |  | member (via upload) |  |  |
+| PUT | `/uploads/:sessionId/chunks/:index` | bearer | yes | member (via upload) |  | raw bytes |
+| POST | `/uploads/:sessionId/complete` | bearer | yes | member (via upload) |  |  |
+| DELETE | `/uploads/:sessionId` | bearer | yes | member (via upload) |  |  |
+| POST | `/rows/:rowId/uploads` | bearer | yes | member (via row) |  | body `createUploadSessionSchema` |
+
+<!-- END GENERATED ROUTES -->
+
+Auth details: [AUTH.md](AUTH.md). Attachments and uploads: [ATTACHMENTS.md](ATTACHMENTS.md).
 
 ## Issue response shape
 

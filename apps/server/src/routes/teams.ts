@@ -69,6 +69,7 @@ routes.delete(
   requireWrite,
   validateParams,
   loadTeam(),
+  requirePermission("team.delete"),
   async (c) => {
     const auth = c.var.auth;
 
