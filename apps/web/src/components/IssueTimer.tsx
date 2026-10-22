@@ -5,6 +5,7 @@ import { useFloatingPanelStyle } from "../hooks/useFloatingPanelStyle";
 import { useDismissOnClickOutside } from "../hooks/useDismissOnClickOutside";
 import {
   EMPTY_TIMER_PARTS,
+  type IssueTimerPatch,
   TIMER_FIELD_LABELS,
   formatTimer,
   getElapsedSeconds,
@@ -21,11 +22,7 @@ import {
 
 type IssueTimerProps = {
   issue: IssuePublic;
-  onUpdate: (patch: {
-    timerActiveAt: string | null;
-    timerElapsedSec: number;
-    timerTargetSec: number | null;
-  }) => void;
+  onUpdate: (patch: IssueTimerPatch) => void;
   compact?: boolean;
   floatingPanel?: boolean;
 };

@@ -1,5 +1,8 @@
 import type { IssuePublic } from "@teamflow/core";
 
+/** The timer fields a card, the drawer or a bulk action writes back. */
+export type IssueTimerPatch = Pick<IssuePublic, "timerActiveAt" | "timerElapsedSec" | "timerTargetSec">;
+
 export type TimerDisplay = {
   mode: "stopwatch" | "countdown";
   seconds: number;
