@@ -1,0 +1,664 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Teamflow layout v1</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600&family=Space+Grotesk:wght@500;700&display=swap" rel="stylesheet" />
+<!-- Same tokens the app uses (dark default, :root[data-theme="light"] overrides). -->
+<link rel="stylesheet" href="../../apps/web/src/styles/tokens.css" />
+<style>
+  /* ---------- page chrome (mock-up document, not the app) ---------- */
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text); font-family: "JetBrains Mono", monospace; font-size: 14px; line-height: 1.5; }
+  h1, h2, h3, h4 { font-family: "Space Grotesk", sans-serif; margin: 0 0 var(--space-2); }
+  a { color: var(--accent-text); }
+  .doc-head { position: sticky; top: 0; z-index: 50; display: flex; gap: var(--space-4); align-items: center; flex-wrap: wrap; padding: var(--space-3) var(--space-6); background: var(--surface); border-bottom: 1px solid var(--border); }
+  .doc-head nav { display: flex; gap: var(--space-2); flex-wrap: wrap; font-size: var(--font-size-sm); }
+  .doc-head nav a { text-decoration: none; padding: 2px 8px; border: 1px solid var(--border); border-radius: var(--radius-sm); }
+  .doc-head .spacer { flex: 1; }
+  main { max-width: 1500px; margin: 0 auto; padding: var(--space-6); }
+  section.item { border-top: 1px solid var(--border); padding: var(--space-6) 0; }
+  .eyebrow { color: var(--accent-text); letter-spacing: .18em; font-size: var(--font-size-xs); text-transform: uppercase; margin: 0 0 var(--space-1); }
+  .lead { color: var(--text-soft); max-width: 80ch; }
+  .cmp { display: grid; grid-template-columns: minmax(0, 5fr) minmax(0, 7fr); gap: var(--space-6); margin-top: var(--space-4); }
+  @media (max-width: 1100px) { .cmp { grid-template-columns: 1fr; } }
+  .col-label { font-size: var(--font-size-xs); letter-spacing: .14em; text-transform: uppercase; color: var(--muted); margin-bottom: var(--space-2); }
+  .shots { display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-2); align-items: start; }
+  .shots figure { margin: 0; }
+  .shots img { width: 100%; display: block; border: 1px solid var(--border); border-radius: var(--radius-xs); }
+  .shots figcaption { font-size: var(--font-size-xs); color: var(--muted); }
+  .shots .narrow { max-width: 150px; }
+  .problems { margin: var(--space-3) 0 0; padding-left: 1.2rem; color: var(--text-soft); font-size: var(--font-size-sm); }
+  .problems li::marker { color: var(--danger); }
+  .changes { margin: var(--space-3) 0 0; padding-left: 1.2rem; font-size: var(--font-size-sm); }
+  .changes li::marker { color: var(--done); }
+  .mocks { display: flex; flex-wrap: wrap; gap: var(--space-4); align-items: flex-start; }
+  .tag { display: inline-block; font-size: var(--font-size-xs); padding: 0 6px; border: 1px solid var(--border-strong); border-radius: var(--radius-xs); color: var(--text-soft); }
+  .note { font-size: var(--font-size-xs); color: var(--muted); margin-top: var(--space-2); }
+  table.list { border-collapse: collapse; width: 100%; font-size: var(--font-size-sm); }
+  table.list td, table.list th { border-bottom: 1px solid var(--border); padding: 6px 8px; text-align: left; vertical-align: top; }
+  table.list th { color: var(--muted); font-weight: 400; font-size: var(--font-size-xs); text-transform: uppercase; letter-spacing: .1em; }
+  table.list td:first-child { color: var(--accent-text); white-space: nowrap; }
+
+  /* ---------- device frame: content authored at real px, scaled down ---------- */
+  .frame { --s: .5; width: calc(var(--w) * var(--s) * 1px); height: calc(var(--h) * var(--s) * 1px); overflow: hidden; border: 1px solid var(--border-strong); border-radius: var(--radius-sm); background: var(--bg); position: relative; flex: none; }
+  .frame > .vp { width: calc(var(--w) * 1px); height: calc(var(--h) * 1px); transform: scale(var(--s)); transform-origin: 0 0; position: relative; overflow: hidden; background: var(--bg); }
+  .frame-cap { font-size: var(--font-size-xs); color: var(--muted); margin-top: 4px; }
+
+  /* ---------- mock app parts (proposed look, built from app tokens) ---------- */
+  .m-btn { display: inline-flex; align-items: center; gap: 6px; font: inherit; font-size: 13px; padding: 6px 10px; border-radius: var(--radius-sm); border: 1px solid var(--border); background: transparent; color: var(--text); white-space: nowrap; }
+  .m-btn.primary { background: var(--primary); color: var(--chrome-btn-text); border: var(--chrome-btn-border-width) solid var(--chrome-btn-border-color); box-shadow: var(--chrome-btn-shadow); }
+  .m-btn.icon { padding: 6px 8px; }
+  .m-btn.active { border-color: var(--accent); color: var(--accent-text); }
+  .m-badge { font-size: 11px; padding: 0 5px; border-radius: 99px; background: var(--panel); border: 1px solid var(--border-strong); color: var(--text-soft); }
+  .m-input { display: inline-flex; align-items: center; gap: 8px; padding: 6px 10px; border: 1px solid var(--border); border-radius: var(--radius-sm); background: var(--cell); color: var(--muted); font-size: 13px; }
+  .m-kbd { font-size: 10px; border: 1px solid var(--border-strong); border-radius: 3px; padding: 0 4px; color: var(--muted); }
+  .m-top { display: flex; align-items: center; gap: 10px; height: 56px; padding: 0 20px; border-bottom: 1px solid var(--border); background: var(--surface); }
+  .m-top .grow { flex: 1; }
+  .m-logo { font-family: "Space Grotesk", sans-serif; font-weight: 700; color: var(--accent-text); letter-spacing: .12em; font-size: 12px; }
+  .m-team { display: inline-flex; align-items: center; gap: 8px; padding: 6px 10px; border: 1px solid var(--border-strong); border-radius: var(--radius-sm); font-weight: 600; font-size: 14px; }
+  .m-team .key { font-size: 11px; color: var(--accent-text); border: 1px solid var(--accent); border-radius: 3px; padding: 0 4px; }
+  .m-avatar { width: 30px; height: 30px; border-radius: 50%; background: var(--accent); color: #111; display: grid; place-items: center; font-weight: 600; font-size: 12px; }
+  .m-menu { position: absolute; background: var(--panel); border: 1px solid var(--border-strong); border-radius: var(--radius-md); box-shadow: var(--chrome-modal-shadow); padding: 6px; min-width: 200px; font-size: 13px; z-index: 5; }
+  .m-menu .mi { display: flex; align-items: center; gap: 10px; padding: 7px 10px; border-radius: var(--radius-xs); }
+  .m-menu .mi:hover, .m-menu .mi.hl { background: color-mix(in srgb, var(--accent) 12%, transparent); }
+  .m-menu .sep { height: 1px; background: var(--border); margin: 4px 0; }
+  .m-menu .who { padding: 6px 10px 8px; color: var(--muted); font-size: 12px; }
+
+  .m-board { padding: 12px 20px; }
+  .m-toolbar { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; }
+  .m-row { border: 1px solid var(--border); border-left: 4px solid var(--primary); border-radius: var(--radius-sm); background: var(--surface); padding: 8px 10px; display: flex; align-items: center; gap: 8px; margin-bottom: 8px; font-size: 13px; }
+  .m-row b { font-family: "Space Grotesk", sans-serif; font-size: 15px; }
+  .m-cols { display: grid; grid-auto-flow: column; grid-auto-columns: var(--colw, 330px); gap: 12px; position: relative; }
+  .m-col { border: 1px solid var(--border); border-radius: var(--radius-sm); background: var(--cell); min-height: 260px; }
+  .m-col-h { display: flex; align-items: center; gap: 6px; padding: 8px; border-bottom: 1px solid var(--border); font-size: 12px; font-weight: 600; letter-spacing: .06em; }
+  .m-col-h .cnt { font-size: 11px; background: var(--panel); border-radius: 3px; padding: 0 5px; }
+  .m-col-h .dot { width: 8px; height: 8px; border-radius: 50%; }
+  .m-card { margin: 8px; padding: 8px 10px; border: 1px solid var(--border); border-radius: var(--radius-sm); background: var(--surface); }
+  .m-card .ref { font-size: 11px; color: var(--accent-text); border: 1px solid color-mix(in srgb, var(--accent) 50%, transparent); border-radius: 3px; padding: 0 4px; }
+  .m-card .t { font-family: "Space Grotesk", sans-serif; font-weight: 700; font-size: 14px; margin-top: 4px; }
+  .m-card .meta { display: flex; justify-content: space-between; align-items: center; }
+  .prio { font-size: 10px; padding: 0 4px; border: 1px solid; border-radius: 3px; }
+  .prio.u { color: var(--danger); } .prio.h { color: #ff9a4d; } .prio.m { color: #e3c34f; } .prio.l { color: var(--accent-text); }
+  .m-empty { margin: 8px; padding: 24px 10px; border: 1px dashed var(--border-strong); border-radius: var(--radius-sm); text-align: center; color: var(--muted); font-size: 12px; }
+  .m-add { margin: 8px; padding: 6px; border: 1px dashed var(--border); border-radius: var(--radius-sm); text-align: center; color: var(--muted); font-size: 12px; }
+  .m-fade { position: absolute; top: 0; bottom: 0; right: 0; width: 80px; background: linear-gradient(to right, transparent, var(--bg)); pointer-events: none; }
+  .m-more { position: absolute; right: 8px; top: 110px; }
+  .m-scrollbar { height: 6px; border-radius: 3px; background: var(--panel); margin-top: 8px; position: relative; }
+  .m-scrollbar::after { content: ""; position: absolute; left: 0; top: 0; bottom: 0; width: 82%; border-radius: 3px; background: var(--border-strong); }
+
+  .m-pop { position: absolute; background: var(--panel); border: 1px solid var(--border-strong); border-radius: var(--radius-md); box-shadow: var(--chrome-modal-shadow); padding: 12px 14px; font-size: 12px; z-index: 5; width: 330px; }
+  .m-pop dl { display: grid; grid-template-columns: auto 1fr; gap: 4px 10px; margin: 6px 0 0; }
+  .m-pop dt { color: var(--accent-text); white-space: nowrap; }
+  .m-pop dd { margin: 0; color: var(--text-soft); }
+
+  .m-drawer { position: absolute; top: 0; right: 0; bottom: 0; background: var(--surface); border-left: 1px solid var(--border-strong); box-shadow: var(--chrome-modal-shadow); display: flex; flex-direction: column; }
+  .m-scrim { position: absolute; inset: 0; background: color-mix(in srgb, #000 50%, transparent); }
+  .m-dh { display: flex; align-items: flex-start; gap: 10px; padding: 14px 18px; border-bottom: 1px solid var(--border); }
+  .m-dh h3 { font-size: 22px; }
+  .m-dmeta { font-size: 11px; color: var(--muted); }
+  .m-db { padding: 14px 18px; overflow: hidden; flex: 1; }
+  .m-group { border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 10px 12px; margin-bottom: 12px; }
+  .m-group > .gl { font-size: 11px; letter-spacing: .12em; text-transform: uppercase; color: var(--muted); margin-bottom: 6px; }
+  .m-fields { display: grid; grid-template-columns: 1fr 1fr; gap: 10px 14px; }
+  .m-fields.one { grid-template-columns: 1fr; }
+  .m-f label { display: block; font-size: 10px; letter-spacing: .12em; text-transform: uppercase; color: var(--muted); margin-bottom: 3px; }
+  .m-f .v { display: flex; align-items: center; justify-content: space-between; gap: 6px; padding: 6px 9px; border: 1px solid var(--border-strong); border-radius: var(--radius-sm); font-size: 13px; background: var(--cell); }
+  .m-md { font-family: system-ui, sans-serif; font-size: 14px; line-height: 1.55; }
+  .m-md ol { margin: 4px 0 8px; padding-left: 20px; }
+  .m-md .img { height: 90px; border-radius: var(--radius-sm); border: 1px solid var(--border); background: repeating-linear-gradient(45deg, var(--panel) 0 10px, var(--cell) 10px 20px); display: grid; place-items: center; color: var(--muted); font-size: 12px; margin: 6px 0; }
+  .m-md a { text-decoration: underline; }
+  .m-cal { position: absolute; width: 270px; background: var(--panel); border: 1px solid var(--border-strong); border-radius: var(--radius-md); box-shadow: var(--chrome-modal-shadow); padding: 10px; font-size: 12px; z-index: 5; }
+  .m-cal .grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 2px; text-align: center; margin: 6px 0; }
+  .m-cal .grid span { padding: 4px 0; border-radius: 4px; }
+  .m-cal .grid .dim { color: var(--muted); }
+  .m-cal .grid .sel { background: var(--primary); color: #111; font-weight: 600; }
+  .m-cal .grid .today { outline: 1px solid var(--accent); }
+  .m-cal .chips { display: flex; gap: 4px; flex-wrap: wrap; }
+  .m-cal .chips span { border: 1px solid var(--border); border-radius: 99px; padding: 1px 8px; }
+
+  .m-toasts { position: absolute; right: 16px; bottom: 16px; display: flex; flex-direction: column; gap: 8px; width: 340px; z-index: 6; }
+  .m-toast { display: flex; gap: 10px; align-items: flex-start; padding: 10px 12px; border-radius: var(--radius-sm); background: var(--panel); border: 1px solid var(--border-strong); border-left: 4px solid var(--accent); font-size: 12px; box-shadow: var(--chrome-modal-shadow); }
+  .m-toast.err { border-left-color: var(--danger); }
+  .m-toast .x { margin-left: auto; color: var(--muted); }
+  .m-progress { position: absolute; left: 0; right: 0; top: 56px; height: 2px; background: linear-gradient(90deg, transparent, var(--accent) 40%, transparent 70%); }
+  .m-bulk { position: absolute; bottom: 16px; display: flex; align-items: center; gap: 8px; padding: 8px 12px; border-radius: var(--radius-md); background: var(--panel); border: 1px solid var(--accent); box-shadow: var(--chrome-modal-shadow); font-size: 12px; z-index: 4; }
+
+  .m-settings { display: grid; grid-template-columns: 220px minmax(0, 1fr); height: calc(100% - 56px); }
+  .m-snav { border-right: 1px solid var(--border); padding: 14px 10px; font-size: 13px; }
+  .m-snav .back { color: var(--text-soft); margin-bottom: 14px; display: block; }
+  .m-snav .h { font-size: 10px; letter-spacing: .14em; color: var(--muted); text-transform: uppercase; margin: 10px 8px 4px; }
+  .m-snav .it { padding: 6px 10px; border-radius: var(--radius-xs); color: var(--text-soft); }
+  .m-snav .it.on { background: color-mix(in srgb, var(--accent) 14%, transparent); color: var(--text); box-shadow: inset 2px 0 0 var(--accent); }
+  .m-scontent { padding: 22px 32px; overflow: hidden; }
+  .m-scontent .colw { max-width: 720px; }
+  .m-scontent h2 { font-size: 24px; }
+  .m-scontent p { color: var(--text-soft); font-size: 13px; }
+  .m-card-s { border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 12px 14px; margin: 12px 0; background: var(--surface); }
+  .m-seg { display: inline-flex; border: 1px solid var(--border-strong); border-radius: var(--radius-sm); overflow: hidden; font-size: 12px; }
+  .m-seg span { padding: 4px 10px; }
+  .m-seg span.on { background: var(--accent); color: #111; }
+  .m-preview { border: 1px solid var(--border-strong); border-radius: var(--radius-md); padding: 10px; background: var(--bg); }
+  .m-preview .cap { font-size: 10px; letter-spacing: .14em; color: var(--muted); text-transform: uppercase; margin-bottom: 6px; }
+
+  .m-mob-top { display: flex; align-items: center; gap: 8px; height: 52px; padding: 0 12px; border-bottom: 1px solid var(--border); background: var(--surface); }
+  .m-tabs { display: flex; gap: 6px; overflow: hidden; padding: 8px 12px; border-bottom: 1px solid var(--border); font-size: 12px; white-space: nowrap; }
+  .m-tabs span { padding: 4px 10px; border: 1px solid var(--border); border-radius: 99px; }
+  .m-tabs span.on { border-color: var(--accent); color: var(--accent-text); background: color-mix(in srgb, var(--accent) 10%, transparent); }
+  .m-select { display: flex; justify-content: space-between; align-items: center; padding: 8px 12px; border: 1px solid var(--border-strong); border-radius: var(--radius-sm); font-size: 14px; background: var(--cell); }
+</style>
+</head>
+<body>
+<header class="doc-head">
+  <strong style="font-family:'Space Grotesk'">Teamflow · layout v1 mock-up</strong>
+  <nav>
+    <a href="#topbar">1 Topbar</a><a href="#board">2 Board</a><a href="#settings">3 Settings</a><a href="#drawer">4 Issue drawer</a><a href="#toasts">5 Toasts</a><a href="#mobile">6 Mobile</a><a href="#small">Small fixes</a><a href="#list">Change list</a>
+  </nav>
+  <span class="spacer"></span>
+  <button class="m-btn" id="theme" type="button">☀ Light</button>
+</header>
+
+<main>
+  <p class="eyebrow">Lane 6 · phase 1 · 2026-10-22</p>
+  <h1>Layout and positioning, before and after</h1>
+  <p class="lead">Left: screenshots of branch <code>claude/ui-primitives</code> today (demo data, dark theme; click any shot for full size; all 36 are in <code>docs/mockups/before/</code>). Right: the proposed layout, drawn with the app's own tokens so colours, radii and chrome match. Mock frames are real pixel sizes scaled down. Nothing in the app has changed yet. The numbered change list at the bottom is what to pick from.</p>
+
+  <!-- 1 TOPBAR -->
+  <section class="item" id="topbar">
+    <p class="eyebrow">1</p><h2>Topbar</h2>
+    <div class="cmp">
+      <div>
+        <div class="col-label">Now</div>
+        <div class="shots">
+          <figure><a href="before/02-board-1440.png"><img src="before/02-board-1440.png" alt="Board at 1440"></a><figcaption>1440: nine orange controls, 110px tall</figcaption></figure>
+          <figure><a href="before/02-board-1024.png"><img src="before/02-board-1024.png" alt="Board at 1024"></a><figcaption>1024: "About" and "Log out" pushed off screen</figcaption></figure>
+          <figure class="narrow"><a href="before/02-board-375.png"><img src="before/02-board-375.png" alt="Board at 375"></a><figcaption>375: only Go-to survives</figcaption></figure>
+        </div>
+        <ul class="problems">
+          <li>Nine controls in one non-wrapping row; overflow is hidden, so on narrow screens Recent, Files, Plan, Settings and Log out disappear.</li>
+          <li>Every button is primary orange, so nothing stands out.</li>
+          <li>The "TEAMFLOW / Engineering" heading repeats the team switcher and costs ~55px of height.</li>
+          <li>Go-to placeholder is cut ("Go to ENG-42 or"); the separate Go button is redundant (Enter submits).</li>
+          <li>Recent is a disabled button with no hint when there is no history.</li>
+        </ul>
+      </div>
+      <div>
+        <div class="col-label">Proposed</div>
+        <div class="mocks">
+          <div>
+            <div class="frame" style="--w:1440;--h:260;--s:.56"><div class="vp">
+              <div class="m-top">
+                <span class="m-logo">TEAMFLOW</span>
+                <span class="m-team"><span class="key">ENG</span>Engineering ▾</span>
+                <span class="m-input" style="width:300px">⌕ Go to issue (ENG-42) or paste a link <span class="grow"></span><span class="m-kbd">/</span></span>
+                <span class="grow"></span>
+                <span class="m-btn">⟲ Recent <span class="m-badge">3</span></span>
+                <span class="m-btn">▤ Files</span>
+                <span class="m-btn">◫ Plan</span>
+                <span style="width:1px;height:24px;background:var(--border)"></span>
+                <span class="m-avatar">DU</span>
+              </div>
+              <div class="m-menu" style="right:16px;top:60px">
+                <div class="who">Demo User<br>demo@teamflow.local</div>
+                <div class="sep"></div>
+                <div class="mi hl">⚙ Settings <span class="grow"></span></div>
+                <div class="mi">ⓘ About Teamflow</div>
+                <div class="sep"></div>
+                <div class="mi">⇥ Log out</div>
+              </div>
+            </div></div>
+            <div class="frame-cap">≥1200: icon + label, user menu open (Settings, About, Log out)</div>
+          </div>
+          <div>
+            <div class="frame" style="--w:1024;--h:70;--s:.56"><div class="vp">
+              <div class="m-top">
+                <span class="m-logo">TF</span>
+                <span class="m-team"><span class="key">ENG</span>Engineering ▾</span>
+                <span class="m-input" style="width:240px">⌕ Go to ENG-42… <span class="grow"></span><span class="m-kbd">/</span></span>
+                <span class="grow"></span>
+                <span class="m-btn icon" title="Recent">⟲<span class="m-badge">3</span></span>
+                <span class="m-btn icon" title="Files">▤</span>
+                <span class="m-btn icon" title="Plan">◫</span>
+                <span class="m-avatar">DU</span>
+              </div>
+            </div></div>
+            <div class="frame-cap">768–1199: icons only, labels as tooltips</div>
+          </div>
+          <div>
+            <div class="frame" style="--w:375;--h:330;--s:.56"><div class="vp">
+              <div class="m-mob-top">
+                <span class="m-team" style="font-size:13px"><span class="key">ENG</span>Engineering ▾</span>
+                <span class="grow" style="flex:1"></span>
+                <span class="m-btn icon">⌕</span>
+                <span class="m-btn icon">☰</span>
+              </div>
+              <div class="m-menu" style="right:8px;top:56px;min-width:230px">
+                <div class="mi">⟲ Recent <span class="m-badge">3</span></div>
+                <div class="mi">▤ Files</div>
+                <div class="mi">◫ Plan</div>
+                <div class="sep"></div>
+                <div class="mi">⚙ Settings</div>
+                <div class="mi">ⓘ About</div>
+                <div class="mi">⇥ Log out</div>
+              </div>
+            </div></div>
+            <div class="frame-cap">&lt;768: team, search icon, one menu</div>
+          </div>
+        </div>
+        <ul class="changes">
+          <li>Left: team switcher (shows key + name, replaces the h1) and ref search with a <span class="tag">/</span> shortcut; Enter goes, the Go button is dropped.</li>
+          <li>Right: Recent / Files / Plan as quiet ghost buttons (icon + label ≥1200, icon + tooltip below). Recent stays enabled and shows "No recent changes yet" when empty.</li>
+          <li>Settings, About and Log out move into a user menu (Popover from <code>src/ui/</code>). Settings becomes a page you leave with "← Board", not a toggle.</li>
+          <li>Topbar height ~56px instead of ~110px; "← Back" (ref back) stays as a small button next to search when present.</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <!-- 2 BOARD -->
+  <section class="item" id="board">
+    <p class="eyebrow">2</p><h2>Board</h2>
+    <div class="cmp">
+      <div>
+        <div class="col-label">Now</div>
+        <div class="shots">
+          <figure><a href="before/02-board-1440.png"><img src="before/02-board-1440.png" alt=""></a><figcaption>1440: DONE clipped, no hint there is more</figcaption></figure>
+          <figure><a href="before/02-board-1024.png"><img src="before/02-board-1024.png" alt=""></a><figcaption>1024: 2½ columns</figcaption></figure>
+        </div>
+        <ul class="problems">
+          <li>Columns are a fixed 420px (<code>--board-column-width</code>), so four never fit at 1440 and the 4th is cut mid-card.</li>
+          <li>No visible cue that the board scrolls sideways; the scrollbar sits at the very bottom of a tall board.</li>
+          <li>The long drag/pan hint is squeezed into three lines next to "+ Add row".</li>
+          <li>An empty column is just a blank box with "+ Add issue" at the bottom.</li>
+        </ul>
+      </div>
+      <div>
+        <div class="col-label">Proposed</div>
+        <div class="frame" style="--w:1440;--h:560;--s:.5"><div class="vp">
+          <div class="m-top"><span class="m-logo">TEAMFLOW</span><span class="m-team"><span class="key">ENG</span>Engineering ▾</span><span class="m-input" style="width:300px">⌕ Go to issue (ENG-42)…</span><span style="flex:1"></span><span class="m-btn">⟲ Recent</span><span class="m-btn">▤ Files</span><span class="m-btn">◫ Plan</span><span class="m-avatar">DU</span></div>
+          <div class="m-board">
+            <div class="m-toolbar"><span class="m-btn primary">+ Add row</span><span class="m-btn icon" style="border-color:var(--accent)">? Board tips</span><span style="flex:1"></span><span class="m-input">Filter board…</span></div>
+            <div class="m-pop" style="left:120px;top:110px">
+              <strong>Board tips</strong>
+              <dl>
+                <dt>Ctrl/Shift+click</dt><dd>select several cards</dd>
+                <dt>Drag a selected card</dt><dd>moves all selected</dd>
+                <dt>Alt+drag / middle-click</dt><dd>pan the board</dd>
+                <dt>Wheel</dt><dd>scrolls through columns</dd>
+                <dt>/</dt><dd>jump to an issue</dd>
+              </dl>
+            </div>
+            <div class="m-row"><span>⠿</span><b>Row 1</b><span style="flex:1"></span><span class="m-btn">Users +</span><span class="m-btn">Files</span><span class="m-btn">+ Column</span><span class="m-btn">Edit ▾</span></div>
+            <div style="position:relative">
+              <div class="m-cols" style="--colw:336px">
+                <div class="m-col"><div class="m-col-h"><span class="dot" style="background:#888"></span>BACKLOG <span class="cnt">2</span></div>
+                  <div class="m-card"><div class="meta"><span class="ref">ENG-4</span><span class="prio u">URGENT</span></div><div class="t">Fix login redirect loop</div></div>
+                  <div class="m-card"><div class="meta"><span class="ref">ENG-9</span><span class="prio h">HIGH</span></div><div class="t">Webhook retries</div></div>
+                  <div class="m-add">+ Add issue</div></div>
+                <div class="m-col"><div class="m-col-h"><span class="dot" style="background:#ccc"></span>TODO <span class="cnt">3</span></div>
+                  <div class="m-card"><div class="meta"><span class="ref">ENG-3</span><span class="prio m">MEDIUM</span></div><div class="t">Wire MCP and CLI</div></div>
+                  <div class="m-card"><div class="meta"><span class="ref">ENG-5</span><span class="prio h">HIGH</span></div><div class="t">Card drag jitter on Firefox</div></div>
+                  <div class="m-card"><div class="meta"><span class="ref">ENG-10</span><span class="prio m">MEDIUM</span></div><div class="t">Rate limit API tokens</div></div></div>
+                <div class="m-col"><div class="m-col-h"><span class="dot" style="background:var(--accent)"></span>IN PROGRESS <span class="cnt">0</span></div>
+                  <div class="m-empty">No issues here yet<br><br><span class="m-btn">+ Add issue</span><br><br>or drag a card in</div></div>
+                <div class="m-col"><div class="m-col-h"><span class="dot" style="background:var(--done)"></span>DONE <span class="cnt">2</span></div>
+                  <div class="m-card"><div class="meta"><span class="ref">ENG-1</span><span class="prio l">LOW</span></div><div class="t">Set up Teamflow monorepo</div></div>
+                  <div class="m-card"><div class="meta"><span class="ref">ENG-7</span><span class="prio l">LOW</span></div><div class="t">Slow board load</div></div></div>
+                <div class="m-col"><div class="m-col-h">CANCELLED <span class="cnt">1</span></div></div>
+              </div>
+              <div class="m-fade"></div>
+              <span class="m-btn m-more" style="background:var(--panel)">1 more →</span>
+            </div>
+            <div class="m-scrollbar"></div>
+          </div>
+        </div></div>
+        <div class="frame-cap">1440: four 336px columns fit; a 5th column fades out with a "1 more →" button; tips in a popover; empty column state.</div>
+        <ul class="changes">
+          <li>Default column width becomes "fit": <code>clamp(260px, (board width − gaps) / 4, 420px)</code>, so four fit from ~1200px up. A width the user picked in Appearance still wins (setting gains an "Auto" option, default).</li>
+          <li>Horizontal scroll affordance: right-edge fade plus a "n more →" button that scrolls one column; a left fade/← appears once scrolled. Thin scrollbar under each row's columns, not only at the page bottom.</li>
+          <li>"+ Add row" stays; the hint text moves to a "? Board tips" popover.</li>
+          <li>Empty column: dashed panel "No issues here yet", Add issue button, "or drag a card in". Viewers (no <code>board.edit</code>) just see "No issues".</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <!-- 3 SETTINGS -->
+  <section class="item" id="settings">
+    <p class="eyebrow">3</p><h2>Settings</h2>
+    <div class="cmp">
+      <div>
+        <div class="col-label">Now</div>
+        <div class="shots">
+          <figure><a href="before/05-settings-team-1440.png"><img src="before/05-settings-team-1440.png" alt=""></a><figcaption>Team: content squeezed to ~300px, whole board as "preview"</figcaption></figure>
+          <figure><a href="before/05-settings-appearance-1440.png"><img src="before/05-settings-appearance-1440.png" alt=""></a><figcaption>Appearance</figcaption></figure>
+          <figure><a href="before/05-settings-general-1024.png"><img src="before/05-settings-general-1024.png" alt=""></a><figcaption>1024 General</figcaption></figure>
+          <figure class="narrow"><a href="before/05-settings-general-375.png"><img src="before/05-settings-general-375.png" alt=""></a><figcaption>375: content cut off, × off screen</figcaption></figure>
+        </div>
+        <ul class="problems">
+          <li>Three close controls: "Close settings" (topbar), "Close" (preview), "×" (panel). Clicking the preview also closes.</li>
+          <li>The live board is shown on every panel (Team, Roles, Tokens…), where it means nothing; it is the real KanbanBoard fed ~30 no-op props.</li>
+          <li>Panel content lives in a ~300px column; nav buttons look like raised buttons.</li>
+        </ul>
+      </div>
+      <div>
+        <div class="col-label">Proposed</div>
+        <div class="mocks">
+          <div>
+            <div class="frame" style="--w:1440;--h:620;--s:.5"><div class="vp">
+              <div class="m-top"><span class="m-logo">TEAMFLOW</span><span class="m-team"><span class="key">ENG</span>Engineering ▾</span><span class="m-input" style="width:300px">⌕ Go to issue…</span><span style="flex:1"></span><span class="m-btn">⟲ Recent</span><span class="m-btn">▤ Files</span><span class="m-btn">◫ Plan</span><span class="m-avatar">DU</span></div>
+              <div class="m-settings">
+                <div class="m-snav">
+                  <span class="back">← Back to board <span class="m-kbd">Esc</span></span>
+                  <div class="h">Account</div><div class="it">General</div><div class="it">Appearance</div><div class="it">API tokens</div>
+                  <div class="h">Team · ENG</div><div class="it on">Team</div><div class="it">Roles</div><div class="it">Integrations</div>
+                  <div class="h">Server</div><div class="it">Updates</div>
+                </div>
+                <div class="m-scontent"><div class="colw">
+                  <h2>Team</h2><p>Members, invites and team lifecycle for Engineering. Your role is <b>Owner</b>.</p>
+                  <div class="m-card-s"><strong>Members</strong><div style="display:flex;justify-content:space-between;margin-top:8px;font-size:13px"><span>Demo User <span style="color:var(--muted)">demo@teamflow.local</span></span><span class="m-btn">Owner ▾</span></div></div>
+                  <div class="m-card-s"><strong>Invite link</strong><p>Anyone with the link joins as Member.</p><span class="m-btn primary">Create invite link</span></div>
+                  <div class="m-card-s" style="border-color:color-mix(in srgb,var(--danger) 50%,var(--border))"><strong style="color:var(--danger)">Danger zone</strong><p>Leave or delete Engineering.</p><span class="m-btn" style="color:var(--danger);border-color:var(--danger)">Leave Engineering</span></div>
+                </div></div>
+              </div>
+            </div></div>
+            <div class="frame-cap">Team panel: one "← Back to board", nav grouped by scope, 720px content, no board.</div>
+          </div>
+          <div>
+            <div class="frame" style="--w:1440;--h:620;--s:.5"><div class="vp">
+              <div class="m-top"><span class="m-logo">TEAMFLOW</span><span class="m-team"><span class="key">ENG</span>Engineering ▾</span><span style="flex:1"></span><span class="m-avatar">DU</span></div>
+              <div class="m-settings">
+                <div class="m-snav"><span class="back">← Back to board</span><div class="h">Account</div><div class="it">General</div><div class="it on">Appearance</div><div class="it">API tokens</div><div class="h">Team · ENG</div><div class="it">Team</div><div class="it">Roles</div><div class="it">Integrations</div><div class="h">Server</div><div class="it">Updates</div></div>
+                <div class="m-scontent" style="display:grid;grid-template-columns:minmax(0,560px) 380px;gap:28px;align-items:start">
+                  <div>
+                    <h2>Appearance</h2><p>Theme, chrome and board density. Changes apply as you go.</p>
+                    <div class="m-card-s"><strong>Theme</strong><div style="margin-top:8px"><span class="m-seg"><span class="on">Dark</span><span>Light</span><span>System</span></span></div></div>
+                    <div class="m-card-s"><strong>Chrome style</strong><div style="margin-top:8px"><span class="m-seg"><span class="on">Brutal</span><span>Minimal</span><span>Soft</span><span>Glass</span><span>…</span></span></div></div>
+                    <div class="m-card-s"><strong>Column width</strong><div style="margin-top:8px"><span class="m-seg"><span class="on">Auto</span><span>Custom</span></span> <span style="color:var(--muted);font-size:12px">fits 4 columns on this screen</span></div></div>
+                  </div>
+                  <div class="m-preview" style="position:sticky;top:0">
+                    <div class="cap">Preview</div>
+                    <div class="m-row" style="font-size:11px;padding:5px 8px"><b style="font-size:12px">Sample row</b></div>
+                    <div class="m-cols" style="--colw:170px;gap:8px">
+                      <div class="m-col" style="min-height:150px"><div class="m-col-h" style="font-size:10px">TODO <span class="cnt">2</span></div><div class="m-card"><div class="meta"><span class="ref">ENG-1</span><span class="prio h">HIGH</span></div><div class="t" style="font-size:12px">Sample card</div></div><div class="m-card"><div class="meta"><span class="ref">ENG-2</span></div><div class="t" style="font-size:12px">Another card</div></div></div>
+                      <div class="m-col" style="min-height:150px"><div class="m-col-h" style="font-size:10px">DONE <span class="cnt">1</span></div><div class="m-card"><div class="meta"><span class="ref">ENG-3</span><span class="prio l">LOW</span></div><div class="t" style="font-size:12px">Finished</div></div></div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div></div>
+            <div class="frame-cap">Appearance only: small framed preview built from sample data (no live KanbanBoard, no no-op props).</div>
+          </div>
+        </div>
+        <ul class="changes">
+          <li>Settings is a full page under the topbar: left nav (220px) grouped Account / Team / Server, content column max 720px.</li>
+          <li>One way out: "← Back to board" at the top of the nav, plus Escape. The topbar no longer flips to "Close settings"; the "×" and the preview "Close" go.</li>
+          <li>Preview only on Appearance, as a ~380px framed sample (one row, two columns, three cards) that is sticky beside the controls; below 1100px it sits above the controls.</li>
+          <li>Removes the <code>board-wrap--preview</code> path and the ~30 <code>settingsOpen ? () =&gt; {} : …</code> props from BoardShell.</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <!-- 4 ISSUE DRAWER -->
+  <section class="item" id="drawer">
+    <p class="eyebrow">4</p><h2>Issue drawer</h2>
+    <div class="cmp">
+      <div>
+        <div class="col-label">Now</div>
+        <div class="shots">
+          <figure><a href="before/03-issue-drawer-1440.png"><img src="before/03-issue-drawer-1440.png" alt=""></a><figcaption>1440: raw <code>![](…)</code>, native date input</figcaption></figure>
+          <figure class="narrow"><a href="before/03-issue-drawer-375.png"><img src="before/03-issue-drawer-375.png" alt=""></a><figcaption>375: already full width, but no sticky header</figcaption></figure>
+        </div>
+        <ul class="problems">
+          <li>Image markdown shows as text <code>![](https://…)</code> with a link; images never render.</li>
+          <li>Due date is the browser's <code>mm/dd/yyyy --:--</code> input, which looks different in every browser.</li>
+          <li>One box headed "Status" holds status, priority, colour, row, due, assignees and timer.</li>
+          <li>Created/Edited stack sits beside the title and squeezes it; "Close" is a large text button.</li>
+        </ul>
+      </div>
+      <div>
+        <div class="col-label">Proposed</div>
+        <div class="mocks">
+          <div>
+            <div class="frame" style="--w:1440;--h:800;--s:.5"><div class="vp">
+              <div class="m-scrim"></div>
+              <div class="m-drawer" style="width:720px">
+                <div class="m-dh">
+                  <div style="flex:1">
+                    <div style="display:flex;gap:6px;align-items:center"><span class="ref" style="font-size:12px;color:var(--accent-text);border:1px solid var(--accent);border-radius:3px;padding:0 5px">ENG-4</span><span class="m-btn icon" style="padding:2px 6px">⧉</span><span class="m-btn icon" style="padding:2px 6px">↗</span></div>
+                    <h3 style="margin-top:6px">Fix login redirect loop</h3>
+                    <div class="m-dmeta">Created Oct 22, 12:11 by Demo User · edited 2 min ago · <a>History</a></div>
+                  </div>
+                  <span class="m-btn icon">⋯</span><span class="m-btn icon">✕</span>
+                </div>
+                <div class="m-db">
+                  <div class="m-group"><div class="gl">Workflow</div>
+                    <div class="m-fields">
+                      <div class="m-f"><label>Status</label><div class="v">● Backlog <span>▾</span></div></div>
+                      <div class="m-f"><label>Priority</label><div class="v"><span class="prio u">URGENT</span><span>▾</span></div></div>
+                      <div class="m-f"><label>Row</label><div class="v">Row 1 <span>▾</span></div></div>
+                      <div class="m-f" style="position:relative"><label>Due</label><div class="v" style="border-color:var(--accent)">📅 Fri 24 Oct · 17:00 <span>✕</span></div></div>
+                    </div>
+                  </div>
+                  <div class="m-group"><div class="gl">People &amp; time</div>
+                    <div class="m-fields">
+                      <div class="m-f"><label>Assignees</label><div class="v"><span><span class="m-avatar" style="width:20px;height:20px;font-size:9px;display:inline-grid">DU</span> Demo User</span><span>+</span></div></div>
+                      <div class="m-f"><label>Timer</label><div class="v">⏱ Not running <span>▾</span></div></div>
+                      <div class="m-f"><label>Card colour</label><div class="v"><span>■ Default</span><span>▾</span></div></div>
+                    </div>
+                  </div>
+                  <div class="m-group"><div class="gl">Description <span style="float:right;text-transform:none;letter-spacing:0">✎ Edit</span></div>
+                    <div class="m-md">Repro steps:<ol><li>Open the board</li><li>Drag a card</li></ol><div class="img">image · placehold.co/600x200 (click to enlarge)</div>See <a>the spec ↗</a> and <a>ENG-1</a>.</div>
+                  </div>
+                  <div class="m-group"><div class="gl">Attachments · 0</div><span class="m-btn">⇪ Upload</span> <span class="m-btn">Link a row file</span></div>
+                </div>
+              </div>
+              <div class="m-cal" style="right:30px;top:250px">
+                <div style="display:flex;justify-content:space-between"><span>‹</span><strong>October 2026</strong><span>›</span></div>
+                <div class="grid"><span class="dim">Mo</span><span class="dim">Tu</span><span class="dim">We</span><span class="dim">Th</span><span class="dim">Fr</span><span class="dim">Sa</span><span class="dim">Su</span><span class="dim">28</span><span class="dim">29</span><span class="dim">30</span><span>1</span><span>2</span><span>3</span><span>4</span><span>5</span><span>6</span><span>7</span><span>8</span><span>9</span><span>10</span><span>11</span><span>12</span><span>13</span><span>14</span><span>15</span><span>16</span><span>17</span><span>18</span><span>19</span><span>20</span><span>21</span><span class="today">22</span><span>23</span><span class="sel">24</span><span>25</span><span>26</span><span>27</span><span>28</span><span>29</span><span>30</span><span>31</span><span class="dim">1</span></div>
+                <div class="chips"><span>Today</span><span>Tomorrow</span><span>Next Mon</span><span>+1 week</span></div>
+                <div style="display:flex;gap:6px;align-items:center;margin-top:8px"><span class="m-input" style="padding:3px 8px;color:var(--text)">17:00</span><span class="chips"><span>09:00</span><span>12:00</span><span>17:00</span></span></div>
+                <div style="display:flex;justify-content:space-between;margin-top:8px"><span style="color:var(--danger)">Clear</span><span class="m-btn primary" style="padding:2px 10px">Set</span></div>
+              </div>
+            </div></div>
+            <div class="frame-cap">≥1200: 720px drawer, fields in two columns by group, rendered description, date-time popover open.</div>
+          </div>
+          <div>
+            <div class="frame" style="--w:375;--h:800;--s:.5"><div class="vp">
+              <div class="m-drawer" style="left:0;border:0;box-shadow:none">
+                <div class="m-dh" style="padding:10px 12px;position:sticky;top:0;background:var(--surface)"><span class="m-btn icon">←</span><span class="ref" style="color:var(--accent-text);font-size:12px;align-self:center">ENG-4</span><span style="flex:1"></span><span class="m-btn icon">⋯</span></div>
+                <div class="m-db" style="padding:12px">
+                  <h3 style="font-size:20px">Fix login redirect loop</h3>
+                  <div class="m-dmeta" style="margin-bottom:10px">Created Oct 22 · edited 2 min ago</div>
+                  <div class="m-group"><div class="m-fields">
+                    <div class="m-f"><label>Status</label><div class="v">Backlog ▾</div></div>
+                    <div class="m-f"><label>Priority</label><div class="v">Urgent ▾</div></div>
+                    <div class="m-f"><label>Row</label><div class="v">Row 1 ▾</div></div>
+                    <div class="m-f"><label>Due</label><div class="v">Fri 24 Oct</div></div>
+                  </div></div>
+                  <div class="m-group"><div class="gl">Description</div><div class="m-md" style="font-size:13px">Repro steps:<ol><li>Open the board</li><li>Drag a card</li></ol><div class="img" style="height:60px">image</div></div></div>
+                </div>
+              </div>
+            </div></div>
+            <div class="frame-cap">&lt;768: full-screen sheet, sticky header with ← back, date opens as a bottom sheet.</div>
+          </div>
+        </div>
+        <ul class="changes">
+          <li>Header: ref chip + copy/open, title on its own full-width line, one meta line (created · edited · History), "⋯" (delete, complete) and an ✕ icon.</li>
+          <li>Groups: Workflow (status, priority, row, due) and People &amp; time (assignees, timer, colour), two columns ≥ 900px drawer width, one column below.</li>
+          <li>Description renderer gains image segments (<code>![alt](https://…)</code> and Teamflow attachment URLs only, lazy, max-height, click opens the existing lightbox) and opens external links in a new tab. Extends <code>lib/descriptionFormat.ts</code>, no new markdown dependency.</li>
+          <li>Due: a button showing "Fri 24 Oct · 17:00" that opens a Popover calendar with quick chips and a time field. No new dependency (small in-house month grid).</li>
+          <li>Drawer width 720px ≥1200, 560px 768–1199, full-screen sheet below 768 (all three drawers: issue, row files, team files).</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <!-- 5 TOASTS -->
+  <section class="item" id="toasts">
+    <p class="eyebrow">5</p><h2>Banners, toasts and the bulk bar</h2>
+    <div class="cmp">
+      <div>
+        <div class="col-label">Now</div>
+        <ul class="problems" style="margin-top:0">
+          <li>The ref notice ("Jumped to ENG-12…") and "Loading…" are <code>.banner</code> blocks in normal flow; they push the whole board down and back up.</li>
+          <li>Errors already moved to a dismissible toast (lane 5); notices did not.</li>
+          <li>The bulk action bar sits in the toast dock at <code>--z-toast</code>; if a selection survives opening a drawer, it covers the drawer's bottom (lane 5 leftover).</li>
+          <li>Bulk bar headings read literally "Left" / "Right".</li>
+        </ul>
+      </div>
+      <div>
+        <div class="col-label">Proposed</div>
+        <div class="frame" style="--w:1440;--h:520;--s:.5"><div class="vp">
+          <div class="m-top"><span class="m-logo">TEAMFLOW</span><span class="m-team"><span class="key">ENG</span>Engineering ▾</span><span style="flex:1"></span><span class="m-btn">⟲ Recent</span><span class="m-avatar">DU</span></div>
+          <div class="m-progress"></div>
+          <div class="m-board">
+            <div class="m-row"><b>Row 1</b></div>
+            <div class="m-cols" style="--colw:300px">
+              <div class="m-col" style="outline:2px solid var(--accent)"><div class="m-col-h">BACKLOG <span class="cnt">2</span></div><div class="m-card" style="border-color:var(--accent)"><div class="t">Fix login redirect loop</div></div><div class="m-card" style="border-color:var(--accent)"><div class="t">Webhook retries</div></div></div>
+              <div class="m-col"><div class="m-col-h">TODO <span class="cnt">3</span></div></div>
+            </div>
+          </div>
+          <div class="m-drawer" style="width:560px"><div class="m-dh"><h3>Row 1 · Files</h3><span style="flex:1"></span><span class="m-btn icon">✕</span></div><div class="m-db" style="color:var(--muted)">…</div></div>
+          <div class="m-bulk" style="left:20px;right:calc(560px + 20px)"><strong>2 selected</strong><span class="m-btn">Move ▾</span><span class="m-btn">Assign ▾</span><span class="m-btn">Priority ▾</span><span class="m-btn">Timer ▾</span><span class="m-btn" style="color:var(--danger)">Delete</span><span style="flex:1"></span><span class="m-btn icon">✕</span></div>
+          <div class="m-toasts" style="right:calc(560px + 16px);bottom:80px">
+            <div class="m-toast">↪ Jumped to ENG-12 in row Design <span class="x">✕</span></div>
+            <div class="m-toast err">Couldn't move 1 issue: forbidden. Changes rolled back. <span class="x">✕</span></div>
+          </div>
+        </div></div>
+        <div class="frame-cap">Loading = 2px bar under the topbar. Notices and errors stack in the toast dock. With a drawer open, dock and bulk bar shift left of it.</div>
+        <ul class="changes">
+          <li>Ref notice becomes an info toast (auto-dismiss 5 s); loading becomes a 2px progress bar under the topbar. No banner remains in the board's flow.</li>
+          <li>The dock (toasts + bulk bar) gets a right inset equal to the open drawer's width (<code>--drawer-inset</code> set by <code>Drawer</code>), so neither ever covers a drawer. Below 768 the bulk bar hides while a full-screen drawer is open.</li>
+          <li>Bulk bar: "Left/Right" headings removed, actions in one line, count + clear (✕).</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <!-- 6 MOBILE -->
+  <section class="item" id="mobile">
+    <p class="eyebrow">6</p><h2>Mobile (below 768px)</h2>
+    <div class="cmp">
+      <div>
+        <div class="col-label">Now (375)</div>
+        <div class="shots" style="grid-template-columns:repeat(3,1fr)">
+          <figure><a href="before/02-board-375.png"><img src="before/02-board-375.png" alt=""></a><figcaption>Board</figcaption></figure>
+          <figure><a href="before/04-files-drawer-375.png"><img src="before/04-files-drawer-375.png" alt=""></a><figcaption>Files</figcaption></figure>
+          <figure><a href="before/05-settings-team-375.png"><img src="before/05-settings-team-375.png" alt=""></a><figcaption>Settings</figcaption></figure>
+        </div>
+        <ul class="problems">
+          <li>A 420px column in a 375px screen: cards cut at the right; row header buttons overflow.</li>
+          <li>Settings nav takes half the width and pushes content off screen.</li>
+        </ul>
+      </div>
+      <div>
+        <div class="col-label">Proposed</div>
+        <div class="mocks">
+          <div>
+            <div class="frame" style="--w:375;--h:740;--s:.55"><div class="vp">
+              <div class="m-mob-top"><span class="m-team" style="font-size:13px"><span class="key">ENG</span>Engineering ▾</span><span style="flex:1"></span><span class="m-btn icon">⌕</span><span class="m-btn icon">☰</span></div>
+              <div style="padding:10px 12px 0"><div class="m-select">Row 1 <span>▾</span></div></div>
+              <div class="m-tabs"><span>Backlog 2</span><span class="on">Todo 3</span><span>In progress 0</span><span>Done 2</span></div>
+              <div style="padding:0 4px">
+                <div class="m-card"><div class="meta"><span class="ref">ENG-3</span><span class="prio m">MEDIUM</span></div><div class="t">Wire MCP and CLI for AI assistants</div></div>
+                <div class="m-card"><div class="meta"><span class="ref">ENG-5</span><span class="prio h">HIGH</span></div><div class="t">Card drag jitter on Firefox</div></div>
+                <div class="m-card"><div class="meta"><span class="ref">ENG-10</span><span class="prio m">MEDIUM</span></div><div class="t">Rate limit API tokens</div></div>
+                <div class="m-add">+ Add issue to Todo</div>
+              </div>
+              <div style="position:absolute;bottom:10px;left:0;right:0;text-align:center;font-size:11px;color:var(--muted)">swipe ← → to change column</div>
+            </div></div>
+            <div class="frame-cap">Board: row select + column chips, one full-width column, swipe between columns.</div>
+          </div>
+          <div>
+            <div class="frame" style="--w:375;--h:740;--s:.55"><div class="vp">
+              <div class="m-mob-top"><span class="m-btn icon">←</span><strong>Settings</strong></div>
+              <div style="padding:12px"><div class="m-select">Team <span>▾</span></div></div>
+              <div class="m-scontent" style="padding:4px 14px"><h2 style="font-size:20px">Team</h2><p>Members, invites and team lifecycle for Engineering.</p>
+                <div class="m-card-s"><strong>Members</strong><div style="font-size:12px;margin-top:6px">Demo User · Owner ▾</div></div>
+                <div class="m-card-s"><strong>Invite link</strong><p>Anyone with the link joins as Member.</p><span class="m-btn primary">Create invite link</span></div>
+              </div>
+            </div></div>
+            <div class="frame-cap">Settings: nav becomes a select at the top; content full width.</div>
+          </div>
+          <div>
+            <div class="frame" style="--w:375;--h:740;--s:.55"><div class="vp">
+              <div class="m-mob-top"><span class="m-btn icon">←</span><strong>Team files</strong><span style="flex:1"></span></div>
+              <div style="padding:12px"><span class="m-seg"><span class="on">Active</span><span>Trash</span></span><div class="m-input" style="width:100%;margin-top:10px">⌕ Search files…</div></div>
+              <div class="m-empty" style="margin:12px">No files yet. Upload from an issue's Attachments or a row's Files.</div>
+            </div></div>
+            <div class="frame-cap">Drawers: full screen with ← back.</div>
+          </div>
+        </div>
+        <ul class="changes">
+          <li>Board below 768: one column at a time, full width; a row select and a scrollable chip strip of columns (with counts); horizontal swipe changes column. Drag between columns works through the chips as drop targets.</li>
+          <li>All drawers become full-screen sheets with a sticky "←" header.</li>
+          <li>Settings nav becomes a <code>&lt;select&gt;</code> at the top of the page.</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <!-- SMALL FIXES -->
+  <section class="item" id="small">
+    <p class="eyebrow">Extra</p><h2>Smaller fixes spotted</h2>
+    <div class="shots" style="grid-template-columns:repeat(4,1fr);max-width:1000px">
+      <figure><a href="before/01-login-1440.png"><img src="before/01-login-1440.png" alt=""></a><figcaption>Login</figcaption></figure>
+      <figure><a href="before/04-files-drawer-1440.png"><img src="before/04-files-drawer-1440.png" alt=""></a><figcaption>Files drawer</figcaption></figure>
+      <figure><a href="before/06-plan-1440.png"><img src="before/06-plan-1440.png" alt=""></a><figcaption>Plan</figcaption></figure>
+      <figure><a href="before/05-settings-tokens-1440.png"><img src="before/05-settings-tokens-1440.png" alt=""></a><figcaption>API tokens</figcaption></figure>
+    </div>
+    <table class="list" style="margin-top:var(--space-4)">
+      <tr><th>Where</th><th>What</th><th>Fix</th></tr>
+      <tr><td>Login</td><td>"Log in / Register" mode switch looks exactly like the submit button; two orange "Log in" buttons on one card.</td><td>Segmented tab control for the mode; only the submit is primary.</td></tr>
+      <tr><td>Files drawer</td><td>"Active / Trash" are orange primary buttons; empty state gives no hint where files come from. Uses <code>issue-drawer</code> classes (lane 5 leftover).</td><td>Segmented tabs, helpful empty state, own <code>team-files-drawer*</code> classes.</td></tr>
+      <tr><td>Cards</td><td>Every card shows an empty colour square and a "+" assign square even when unset; delete × appears only on some.</td><td>Show unset colour/assign controls on hover/focus only; keep set values visible.</td></tr>
+      <tr><td>Row/column headers</td><td>"Filter row…" and "Search column…" take a full line in every row and column (~60px per row); "Copy" button meaning unclear; "USERS +" label.</td><td>Search behind a ⌕ icon that expands; "Copy" → copy icon with tooltip "Copy column link"; "Users" → avatar stack + "+".</td></tr>
+      <tr><td>Drawers</td><td>Big text "Close" button.</td><td>✕ icon button, same as dialogs.</td></tr>
+      <tr><td>Recent</td><td>Disabled with no explanation when empty.</td><td>Enabled; panel says "No recent changes yet".</td></tr>
+      <tr><td>Plan</td><td>Stat tiles and cards fine; "Updated 2026-06-17" is stale and the production URL is shown to all users.</td><td>Content issue for lane 7 (docs), not layout. At 375 the four stat tiles should go 2×2.</td></tr>
+      <tr><td>Topbar</td><td>Ref "← Back" button only appears when there is history and shifts the search box.</td><td>Reserve its slot (or put it inside the search field).</td></tr>
+    </table>
+  </section>
+
+  <!-- CHANGE LIST -->
+  <section class="item" id="list">
+    <p class="eyebrow">Pick</p><h2>Proposed changes (one commit each)</h2>
+    <table class="list">
+      <tr><th>#</th><th>Change</th><th>Area</th></tr>
+      <tr><td>1</td><td>Topbar regroup: team switcher + ref search left, Recent/Files/Plan right, user menu for Settings/About/Log out; drop the h1; ghost buttons.</td><td>Topbar</td></tr>
+      <tr><td>2</td><td>Topbar responsive: icons-only 768–1199, single ☰ menu below 768.</td><td>Topbar</td></tr>
+      <tr><td>3</td><td>Board column "Auto" width so four fit at 1440 (custom width still available in Appearance).</td><td>Board</td></tr>
+      <tr><td>4</td><td>Horizontal scroll affordance: edge fades and "n more →" / "←" buttons.</td><td>Board</td></tr>
+      <tr><td>5</td><td>Board tips popover replaces the inline drag/pan hint.</td><td>Board</td></tr>
+      <tr><td>6</td><td>Empty-column state.</td><td>Board</td></tr>
+      <tr><td>7</td><td>Settings full page: grouped left nav, 720px content, one "← Back to board" + Escape.</td><td>Settings</td></tr>
+      <tr><td>8</td><td>Appearance-only framed sample preview; remove the live-board preview and its no-op props.</td><td>Settings</td></tr>
+      <tr><td>9</td><td>Issue drawer: new header, grouped two-column fields.</td><td>Drawer</td></tr>
+      <tr><td>10</td><td>Description: inline images and new-tab external links.</td><td>Drawer</td></tr>
+      <tr><td>11</td><td>Date-time picker popover for Due.</td><td>Drawer</td></tr>
+      <tr><td>12</td><td>Drawer widths 720/560 and full-screen sheet below 768 (issue, row files, team files).</td><td>Drawer</td></tr>
+      <tr><td>13</td><td>Ref notice → info toast; Loading → progress bar; no banners in flow.</td><td>Toasts</td></tr>
+      <tr><td>14</td><td><b>Required (lane 5 leftover):</b> dock and bulk bar inset by the open drawer's width; bulk bar "Left/Right" headings removed.</td><td>Toasts</td></tr>
+      <tr><td>15</td><td><b>Required (lane 5 leftover):</b> TeamFilesDrawer gets its own <code>team-files-drawer*</code> classes.</td><td>Drawer</td></tr>
+      <tr><td>16</td><td>Mobile board: one column, row select + column chips, swipe.</td><td>Mobile</td></tr>
+      <tr><td>17</td><td>Mobile settings: nav as a top select.</td><td>Mobile</td></tr>
+      <tr><td>18</td><td>Small fixes batch: login mode tabs, Files segmented tabs + empty state, card hover-only empty controls, Recent empty state, ✕ close icons.</td><td>Small</td></tr>
+      <tr><td>19</td><td>Row/column header compaction: search behind an icon, copy icon, avatar stack.</td><td>Small</td></tr>
+    </table>
+    <p class="note">After screenshots at 1440×900, 1024×768 and 375×812 will go in <code>docs/mockups/after/</code> with the same file names.</p>
+  </section>
+</main>
+<script>
+  const root = document.documentElement, btn = document.getElementById("theme");
+  btn.addEventListener("click", () => {
+    const light = root.dataset.theme !== "light";
+    root.dataset.theme = light ? "light" : "dark";
+    btn.textContent = light ? "☾ Dark" : "☀ Light";
+  });
+</script>
+</body>
+</html>
