@@ -1009,3 +1009,63 @@ body.board-pan-active {
   min-height: 0;
   overflow: hidden;
 }
+
+/* Row scroll affordance: fade the edge that has more columns, and a button to step one column. */
+.board-row-scroll-frame {
+  position: relative;
+  min-width: 0;
+}
+
+.board-row-scroll-frame::before,
+.board-row-scroll-frame::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 12px;
+  width: 64px;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.15s ease;
+  z-index: var(--z-sticky);
+}
+
+.board-row-scroll-frame::before {
+  left: 0;
+  background: linear-gradient(to left, transparent, var(--bg));
+}
+
+.board-row-scroll-frame::after {
+  right: 0;
+  background: linear-gradient(to right, transparent, var(--bg));
+}
+
+.board-row-scroll-frame.has-before::before,
+.board-row-scroll-frame.has-after::after {
+  opacity: 1;
+}
+
+.board-row-scroll-btn {
+  position: absolute;
+  top: 5.5rem;
+  z-index: var(--z-sticky);
+  padding: 0.35rem 0.7rem;
+  font-size: var(--font-size-sm);
+  background: var(--panel);
+  color: var(--text);
+  border: 1px solid var(--border-strong);
+  border-radius: 999px;
+  box-shadow: var(--chrome-modal-shadow);
+}
+
+.board-row-scroll-btn:hover {
+  border-color: var(--accent);
+  color: var(--accent-text);
+}
+
+.board-row-scroll-btn--before {
+  left: var(--space-2);
+}
+
+.board-row-scroll-btn--after {
+  right: var(--space-2);
+}
