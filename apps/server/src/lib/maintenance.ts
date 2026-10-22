@@ -8,6 +8,7 @@ import type {
   MaintenanceBackupPublic,
   MaintenanceJobPublic,
   MaintenanceStatusPublic,
+  MaintenanceVersionPublic,
   RunMaintenanceBackupInput,
   RunMaintenanceUpdateInput,
 } from "@teamflow/core";
@@ -368,6 +369,43 @@ async function startJob(
   return mapJob(await readStoredJob());
 }
 
+type HostCheck = {
+  sudo: { ready: boolean; command: string; detail: string };
+  version: MaintenanceVersionPublic;
+  checkedAt: string;
+};
+
+/** Result of the last explicit host check (sudo probe + origin comparison), shown by the GET. */
+let hostCheck: HostCheck | null = null;
+
+const HOST_NOT_CHECKED = "Host not checked yet. Use Refresh status to probe sudo and origin.";
+
+/**
+ * The slow, side-effecting part of the status: run the sudo probe and compare with origin
+ * (git ls-remote / fetch). Only called from POST .../maintenance/check and once at boot; the
+ * GET status reads the cached result.
+ */
+export async function checkMaintenanceHost(): Promise<MaintenanceStatusPublic> {
+  await reconcileStaleJob();
+  const reason = disabledReason();
+  const job = await readStoredJob();
+  const sudo =
+    reason === null
+      ? await probeSudo(getBackupScript())
+      : { ready: false, command: "", detail: reason };
+  const version = await getMaintenanceVersionInfo({
+    skipOriginCheck: job?.status === "running",
+  });
+  hostCheck = { sudo, version, checkedAt: new Date().toISOString() };
+  return getMaintenanceStatus();
+}
+
+/** Test hook. */
+export function resetMaintenanceHostCheck() {
+  hostCheck = null;
+}
+
+/** Status for the GET route: reads files and local git only; no network, no sudo. */
 export async function getMaintenanceStatus(): Promise<MaintenanceStatusPublic> {
   await reconcileStaleJob();
   const reason = disabledReason();
@@ -377,11 +415,10 @@ export async function getMaintenanceStatus(): Promise<MaintenanceStatusPublic> {
   const backups = enabled ? await listBackups() : [];
   const job = await mapJob(await readStoredJob());
   const sudoProbe = enabled
-    ? await probeSudo(backupScript)
+    ? (hostCheck?.sudo ?? { ready: false, command: "", detail: HOST_NOT_CHECKED })
     : { ready: false, command: "", detail: reason };
-  const version = await getMaintenanceVersionInfo({
-    skipOriginCheck: job?.status === "running",
-  });
+  const version =
+    hostCheck?.version ?? (await getMaintenanceVersionInfo({ skipOriginCheck: true }));
 
   return {
     enabled,
