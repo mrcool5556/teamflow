@@ -1,96 +1,141 @@
-import { and, eq } from "drizzle-orm";
+import { and, eq, inArray, isNull, sql, type SQL } from "drizzle-orm";
 import type { Db, DbExecutor } from "@teamflow/db";
 import { schema } from "@teamflow/db";
-import type { IssuePublic, ListIssuesInput } from "@teamflow/core";
-import { loadIssueAssignees } from "./assignees.js";
+import type { AssigneePublic, IssuePublic, ListIssuesInput } from "@teamflow/core";
 
-export async function mapIssue(
+type IssueRow = typeof schema.issues.$inferSelect;
+
+/**
+ * Map issues to their public shape with a fixed number of queries regardless of how many issues
+ * there are: statuses, users (creator + legacy assignee), multi-assignees and team keys are each
+ * loaded once with IN (...).
+ */
+export async function mapIssues(
   db: Db,
-  issue: typeof schema.issues.$inferSelect,
-  teamKey: string,
-): Promise<IssuePublic> {
-  const [status] = await db
-    .select()
-    .from(schema.issueStatuses)
-    .where(eq(schema.issueStatuses.id, issue.statusId))
-    .limit(1);
+  issues: IssueRow[],
+  teamKeys?: Map<string, string>,
+): Promise<IssuePublic[]> {
+  if (issues.length === 0) return [];
 
-  const [creator] = await db
-    .select()
+  const unique = <T>(values: (T | null | undefined)[]) =>
+    [...new Set(values.filter((v): v is T => v != null))] as T[];
+
+  const statusIds = unique(issues.map((issue) => issue.statusId));
+  const issueIds = issues.map((issue) => issue.id);
+
+  const [statuses, assigneeRows] = await Promise.all([
+    db
+      .select({ id: schema.issueStatuses.id, name: schema.issueStatuses.name })
+      .from(schema.issueStatuses)
+      .where(inArray(schema.issueStatuses.id, statusIds)),
+    db
+      .select({
+        issueId: schema.issueAssignees.issueId,
+        userId: schema.issueAssignees.userId,
+        name: schema.users.name,
+      })
+      .from(schema.issueAssignees)
+      .innerJoin(schema.users, eq(schema.issueAssignees.userId, schema.users.id))
+      .where(inArray(schema.issueAssignees.issueId, issueIds)),
+  ]);
+
+  const userIds = unique([
+    ...issues.map((issue) => issue.creatorId),
+    ...issues.map((issue) => issue.assigneeId),
+  ]);
+  const users = await db
+    .select({ id: schema.users.id, name: schema.users.name })
     .from(schema.users)
-    .where(eq(schema.users.id, issue.creatorId))
-    .limit(1);
+    .where(inArray(schema.users.id, userIds));
 
-  let assigneeName: string | null = null;
-  const assignees = await loadIssueAssignees(db, issue.id);
-  if (assignees[0]) {
-    assigneeName = assignees[0].name;
-  } else if (issue.assigneeId) {
-    const [assignee] = await db
-      .select()
-      .from(schema.users)
-      .where(eq(schema.users.id, issue.assigneeId))
-      .limit(1);
-    assigneeName = assignee?.name ?? null;
+  let keys = teamKeys;
+  if (!keys) {
+    const teams = await db
+      .select({ id: schema.teams.id, key: schema.teams.key })
+      .from(schema.teams)
+      .where(inArray(schema.teams.id, unique(issues.map((issue) => issue.teamId))));
+    keys = new Map(teams.map((team) => [team.id, team.key]));
   }
 
-  return {
-    id: issue.id,
-    identifier: `${teamKey}-${issue.number}`,
-    teamId: issue.teamId,
-    projectId: issue.projectId,
-    rowId: issue.rowId,
-    number: issue.number,
-    title: issue.title,
-    description: issue.description,
-    statusId: issue.statusId,
-    statusName: status?.name ?? "Unknown",
-    priority: issue.priority as IssuePublic["priority"],
-    assigneeId: issue.assigneeId,
-    assigneeName,
-    assignees,
-    creatorId: issue.creatorId,
-    creatorName: creator?.name ?? "Unknown",
-    dueDate: issue.dueDate,
-    boardSort: issue.boardSort ?? 0,
-    timerActiveAt: issue.timerActiveAt,
-    timerElapsedSec: issue.timerElapsedSec ?? 0,
-    timerTargetSec: issue.timerTargetSec,
-    completedAt: issue.completedAt,
-    createdAt: issue.createdAt,
-    updatedAt: issue.updatedAt,
-    color: issue.color,
-  };
+  const statusName = new Map(statuses.map((status) => [status.id, status.name]));
+  const userName = new Map(users.map((user) => [user.id, user.name]));
+  const assigneesByIssue = new Map<string, AssigneePublic[]>();
+  for (const row of assigneeRows) {
+    const list = assigneesByIssue.get(row.issueId) ?? [];
+    list.push({ userId: row.userId, name: row.name });
+    assigneesByIssue.set(row.issueId, list);
+  }
+
+  return issues.map((issue) => {
+    const assignees = assigneesByIssue.get(issue.id) ?? [];
+    const assigneeName =
+      assignees[0]?.name ?? (issue.assigneeId ? (userName.get(issue.assigneeId) ?? null) : null);
+    return {
+      id: issue.id,
+      identifier: `${keys!.get(issue.teamId) ?? "ISS"}-${issue.number}`,
+      teamId: issue.teamId,
+      projectId: issue.projectId,
+      rowId: issue.rowId,
+      number: issue.number,
+      title: issue.title,
+      description: issue.description,
+      statusId: issue.statusId,
+      statusName: statusName.get(issue.statusId) ?? "Unknown",
+      priority: issue.priority as IssuePublic["priority"],
+      assigneeId: issue.assigneeId,
+      assigneeName,
+      assignees,
+      creatorId: issue.creatorId,
+      creatorName: userName.get(issue.creatorId) ?? "Unknown",
+      dueDate: issue.dueDate,
+      boardSort: issue.boardSort ?? 0,
+      timerActiveAt: issue.timerActiveAt,
+      timerElapsedSec: issue.timerElapsedSec ?? 0,
+      timerTargetSec: issue.timerTargetSec,
+      completedAt: issue.completedAt,
+      createdAt: issue.createdAt,
+      updatedAt: issue.updatedAt,
+      color: issue.color,
+    };
+  });
 }
 
+export async function mapIssue(db: Db, issue: IssueRow, teamKey: string): Promise<IssuePublic> {
+  const [mapped] = await mapIssues(db, [issue], new Map([[issue.teamId, teamKey]]));
+  return mapped!;
+}
+
+/**
+ * Issues visible to `userId`, filtered in SQL: only teams the user belongs to (a subquery on
+ * team_members), not trashed, plus the optional filters. Board ordering is applied in JS so it
+ * matches the web client's comparator exactly.
+ */
 export async function listIssuesForUser(db: Db, userId: string, filters: ListIssuesInput) {
-  const memberships = await db
+  const memberTeams = db
     .select({ teamId: schema.teamMembers.teamId })
     .from(schema.teamMembers)
     .where(eq(schema.teamMembers.userId, userId));
 
-  const teamIds = memberships.map((m) => m.teamId);
-  if (teamIds.length === 0) {
-    return [];
+  const conditions: SQL[] = [
+    inArray(schema.issues.teamId, memberTeams),
+    isNull(schema.issues.deletedAt),
+  ];
+  if (filters.teamId) conditions.push(eq(schema.issues.teamId, filters.teamId));
+  if (filters.projectId) conditions.push(eq(schema.issues.projectId, filters.projectId));
+  if (filters.statusId) conditions.push(eq(schema.issues.statusId, filters.statusId));
+  if (filters.assigneeId) conditions.push(eq(schema.issues.assigneeId, filters.assigneeId));
+  if (filters.rowId) conditions.push(eq(schema.issues.rowId, filters.rowId));
+  if (filters.search) {
+    const needle = filters.search.toLowerCase();
+    conditions.push(
+      sql`instr(lower(${schema.issues.title} || ' ' || coalesce(${schema.issues.description}, '')), ${needle}) > 0`,
+    );
   }
 
-  let rows = await db.select().from(schema.issues);
-
-  rows = rows.filter((issue) => {
-    if (issue.deletedAt) return false;
-    if (!teamIds.includes(issue.teamId)) return false;
-    if (filters.teamId && issue.teamId !== filters.teamId) return false;
-    if (filters.projectId && issue.projectId !== filters.projectId) return false;
-    if (filters.statusId && issue.statusId !== filters.statusId) return false;
-    if (filters.assigneeId && issue.assigneeId !== filters.assigneeId) return false;
-    if (filters.rowId && issue.rowId !== filters.rowId) return false;
-    if (filters.search) {
-      const q = filters.search.toLowerCase();
-      const hay = `${issue.title} ${issue.description ?? ""}`.toLowerCase();
-      if (!hay.includes(q)) return false;
-    }
-    return true;
-  });
+  const rows = await db
+    .select()
+    .from(schema.issues)
+    .where(and(...conditions));
 
   rows.sort((a, b) => {
     const rowA = a.rowId ?? "";
@@ -102,13 +147,7 @@ export async function listIssuesForUser(db: Db, userId: string, filters: ListIss
     return new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime();
   });
 
-  const teamKeys = new Map<string, string>();
-  for (const teamId of new Set(rows.map((r) => r.teamId))) {
-    const [team] = await db.select().from(schema.teams).where(eq(schema.teams.id, teamId)).limit(1);
-    if (team) teamKeys.set(teamId, team.key);
-  }
-
-  return Promise.all(rows.map((issue) => mapIssue(db, issue, teamKeys.get(issue.teamId) ?? "ISS")));
+  return mapIssues(db, rows);
 }
 
 export function userHasTeamAccess(db: DbExecutor, userId: string, teamId: string) {

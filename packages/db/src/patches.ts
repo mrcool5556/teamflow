@@ -91,6 +91,7 @@ export function applySchemaPatches(sqlite: Database.Database) {
   purgeExpiredDeletedIssues(sqlite);
   ensureTeamBundleTablesAndPermissions(sqlite);
   ensureIssueNumberUnique(sqlite);
+  ensureQueryIndexes(sqlite);
 }
 
 function ensureTeamBundleTablesAndPermissions(sqlite: Database.Database) {
@@ -1014,4 +1015,18 @@ function ensureIssueNumberUnique(sqlite: Database.Database) {
   sqlite.exec(
     "CREATE UNIQUE INDEX IF NOT EXISTS issues_team_number_unique ON issues(team_id, number)",
   );
+}
+
+/** Indexes for the hot lookups (team boards, issue detail, PAT auth, activity per issue). */
+function ensureQueryIndexes(sqlite: Database.Database) {
+  sqlite.exec(`
+    CREATE INDEX IF NOT EXISTS issues_team_id_idx ON issues(team_id);
+    CREATE INDEX IF NOT EXISTS issues_status_id_idx ON issues(status_id);
+    CREATE INDEX IF NOT EXISTS issues_row_id_idx ON issues(row_id);
+    CREATE INDEX IF NOT EXISTS comments_issue_id_idx ON comments(issue_id);
+    CREATE INDEX IF NOT EXISTS api_tokens_token_hash_idx ON api_tokens(token_hash);
+    CREATE INDEX IF NOT EXISTS activity_issue_created_idx ON activity(issue_id, created_at);
+    CREATE INDEX IF NOT EXISTS projects_team_id_idx ON projects(team_id);
+    CREATE INDEX IF NOT EXISTS team_members_user_id_idx ON team_members(user_id);
+  `);
 }

@@ -110,6 +110,15 @@ export function hashPat(raw: string) {
   return createHash("sha256").update(raw).digest("hex");
 }
 
+export const LAST_USED_THROTTLE_MS = 5 * 60 * 1000;
+
+/** True when a PAT's last_used_at is unset or older than the throttle window. */
+export function shouldTouchLastUsed(lastUsedAt: string | null, now = Date.now()) {
+  if (!lastUsedAt) return true;
+  const last = Date.parse(lastUsedAt);
+  return !Number.isFinite(last) || now - last >= LAST_USED_THROTTLE_MS;
+}
+
 export type AuthContext = {
   userId: string;
   authType: "session" | "pat";
@@ -140,10 +149,13 @@ export async function resolveAuth(
     const row = rows[0];
     if (!row) return null;
 
-    await db
-      .update(schema.apiTokens)
-      .set({ lastUsedAt: new Date().toISOString() })
-      .where(eq(schema.apiTokens.id, row.id));
+    // Throttled: at most one write per token every 5 minutes instead of one per request.
+    if (shouldTouchLastUsed(row.lastUsedAt)) {
+      await db
+        .update(schema.apiTokens)
+        .set({ lastUsedAt: new Date().toISOString() })
+        .where(eq(schema.apiTokens.id, row.id));
+    }
 
     return {
       userId: row.userId,
