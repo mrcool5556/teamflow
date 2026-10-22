@@ -39,4 +39,15 @@ describe("board layout", () => {
     );
     expect((await screen.findAllByText("No issues here yet")).length).toBeGreaterThan(0);
   });
+
+  it("shows a sample preview on Appearance instead of the real board", async () => {
+    const db = seedDb();
+    installFakeApi(db);
+    signIn(db);
+    renderApp("/t/ENG/settings/appearance");
+    expect(await screen.findByRole("complementary", { name: "Preview" })).toBeInTheDocument();
+    expect(screen.getByText("Preview row")).toBeInTheDocument();
+    await waitFor(() => expect(screen.getByLabelText("Workspace")).toBeEnabled());
+    expect(screen.queryByText("ENG issue 1")).not.toBeInTheDocument();
+  });
 });
