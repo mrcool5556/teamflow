@@ -6,10 +6,10 @@ globs:
 
 Before editing Teamflow code:
 
-1. Read `docs/STATUS.md` for current build state
-2. Read `docs/AI_CONTEXT.md` for architecture and locked decisions
-3. Read the relevant `docs/steps/NN-*.md` for the area you are changing
+1. Read `docs/ARCHITECTURE.md` for the layout, auth model and conventions.
+2. Read the doc for the area you are changing (`docs/AUTH.md`, `docs/ATTACHMENTS.md`, `docs/MCP.md`, `docs/CLI.md`, `docs/discord-bot.md`, `docs/SELF-HOSTING.md`). Route changes: run `pnpm docs:api` to regenerate `docs/API.md`.
+3. Maintainers may keep local, gitignored planning notes in `docs/`; read them if your checkout has them, but never link to them from committed files.
 
-After completing work, update `docs/STATUS.md` and the step doc.
+After completing work, update the public doc for that area. Run `pnpm test`, `pnpm lint` and `pnpm typecheck` with Node 20.
 
-Deployment: Setup A (Windows native) and Setup B (Proxmox LXC) — Docker is not the primary path.
+Deployment: Setup A (Windows native) and Setup B (Proxmox LXC). Docker is an optional extra, not a primary path. SQLite only; Postgres is deferred.

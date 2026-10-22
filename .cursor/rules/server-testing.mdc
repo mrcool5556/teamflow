@@ -7,7 +7,7 @@ alwaysApply: true
 
 When debugging deployment, updates, 502s, maintenance jobs, or "works locally but not on server":
 
-1. **SSH is available** — use Host `teamflow` (see [docs/CONNECTIONS.md](../../docs/CONNECTIONS.md) and [docs/SERVER-TESTING.md](../../docs/SERVER-TESTING.md)).
+1. **SSH is available** — use Host `teamflow` (see [docs/SERVER-TESTING.md](../../docs/SERVER-TESTING.md); host, user and key details are kept in a local, uncommitted note).
 2. **Run diagnostics yourself** — do not only tell the user what to run. Start with:
    ```powershell
    Get-Content deploy/proxmox-lxc/diagnose.sh | ssh teamflow bash
