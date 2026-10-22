@@ -57,6 +57,7 @@ import {
   reorderRows as reorderRowsChange,
   useBoardMutation,
 } from "./queries/boardMutations";
+import { hideBoardItems } from "./queries/hiddenBoardItems";
 import { errorMessage, useErrorSink } from "./lib/errorSink";
 import type { IssueTimerPatch } from "./lib/timer";
 import { useMembersQuery } from "./queries/members";
@@ -567,56 +568,58 @@ export function App() {
     void mutateBoard(patchIssues(board, members, patches, "Failed to update timers"));
   }
 
-  /** Remove issues from the cached board; returns a function that puts them back. */
-  function hideIssues(issueIds: Set<string>) {
-    if (!teamId) return () => {};
+  /**
+   * Issues go to the server trash at once. Undo (and Restore in the history) calls the restore
+   * route for every one of them, so an undone delete survives the next refetch.
+   */
+  function trashIssues(issuesToDelete: IssuePublic[], label: string) {
+    if (!teamId || issuesToDelete.length === 0) return;
     const forTeamId = teamId;
-    const removed = issues.filter((issue) => issueIds.has(issue.id));
-    updateBoard(queryClient, forTeamId, (current) => ({
-      ...current,
-      issues: current.issues.filter((issue) => !issueIds.has(issue.id)),
-    }));
-    return () =>
-      updateBoard(queryClient, forTeamId, (current) => ({
-        ...current,
-        issues: removed.reduce(insertIssueSorted, current.issues),
-      }));
-  }
-
-  function bulkDeleteIssues(issuesToDelete: IssuePublic[]) {
-    if (issuesToDelete.length === 0) return;
-    const ids = new Set(issuesToDelete.map((issue) => issue.id));
-    const wasSelected = selectedIssue && ids.has(selectedIssue.id);
-    const putBack = hideIssues(ids);
-    if (wasSelected) closeIssue();
+    const ids = issuesToDelete.map((issue) => issue.id);
+    const idSet = new Set(ids);
+    const reopen = selectedIssue && idSet.has(selectedIssue.id) ? selectedIssue : null;
+    const show = hideBoardItems({ issueIds: ids });
+    if (reopen) closeIssue();
 
     scheduleUndo({
-      label:
-        issuesToDelete.length === 1
-          ? `Deleted ${issuesToDelete[0]!.identifier}`
-          : `Deleted ${issuesToDelete.length} issues`,
-      issueId: issuesToDelete.length === 1 ? issuesToDelete[0]!.id : undefined,
+      label,
+      issueId: ids.length === 1 ? ids[0] : undefined,
+      timing: "now",
       restore: () => {
-        putBack();
-        if (wasSelected) openIssue(issuesToDelete[0]!);
+        show();
+        if (reopen) openIssue(reopen);
       },
       commit: async () => {
         try {
-          await Promise.all(issuesToDelete.map((issue) => client.deleteIssue(issue.id)));
+          await Promise.all(ids.map((id) => client.deleteIssue(id)));
         } catch (err) {
-          report(err, "Failed to delete issues");
+          report(err, ids.length === 1 ? "Failed to delete issue" : "Failed to delete issues");
+          void queryClient.invalidateQueries({ queryKey: queryKeys.board(forTeamId) });
           throw err;
         }
+        updateBoard(queryClient, forTeamId, (current) => ({
+          ...current,
+          issues: current.issues.filter((issue) => !idSet.has(issue.id)),
+        }));
+        show();
       },
-      restoreFromTrash:
-        issuesToDelete.length === 1
-          ? async () => {
-              await client.restoreIssue(issuesToDelete[0]!.id);
-              putBack();
-              if (wasSelected) openIssue(issuesToDelete[0]!);
-            }
-          : undefined,
+      restoreFromTrash: async () => {
+        const restored = await Promise.all(ids.map((id) => client.restoreIssue(id)));
+        updateBoard(queryClient, forTeamId, (current) => ({
+          ...current,
+          issues: restored.map(({ issue }) => issue).reduce(insertIssueSorted, current.issues),
+        }));
+      },
     });
+  }
+
+  function bulkDeleteIssues(issuesToDelete: IssuePublic[]) {
+    trashIssues(
+      issuesToDelete,
+      issuesToDelete.length === 1
+        ? `Deleted ${issuesToDelete[0]!.identifier}`
+        : `Deleted ${issuesToDelete.length} issues`,
+    );
   }
 
   function updateRowColor(row: BoardRowPublic, color: string | null) {
@@ -648,103 +651,69 @@ export function App() {
     void mutateBoard(patchColumn(status, { name: trimmed }, "Failed to rename column"));
   }
 
-  function removeRow(row: BoardRowPublic) {
+  /**
+   * Rows and columns have no restore route, so their delete is only sent when the undo window
+   * closes. Until then the board query hides them and a refetch cannot bring them back.
+   */
+  function scheduleStructureDelete(options: {
+    label: string;
+    hide: { rowIds?: string[]; statusIds?: string[] };
+    send: () => Promise<unknown>;
+    drop: (board: BoardData) => BoardData;
+    errorMessage: string;
+  }) {
     if (!teamId) return;
     const forTeamId = teamId;
-    const rowStatuses = statuses.filter((status) => status.rowId === row.id);
-
-    updateBoard(queryClient, forTeamId, (current) => ({
-      ...current,
-      rows: current.rows.filter((item) => item.id !== row.id),
-      statuses: current.statuses.filter((status) => status.rowId !== row.id),
-    }));
-
+    const show = hideBoardItems(options.hide);
     scheduleUndo({
-      label: `Removed row "${row.name}"`,
-      restore: () => {
-        updateBoard(queryClient, forTeamId, (current) => {
-          const existing = new Set(current.statuses.map((status) => status.id));
-          return {
-            ...current,
-            rows: current.rows.some((item) => item.id === row.id)
-              ? current.rows
-              : [...current.rows, row].sort((a, b) => a.position - b.position),
-            statuses: [
-              ...current.statuses,
-              ...rowStatuses.filter((status) => !existing.has(status.id)),
-            ],
-          };
-        });
-      },
+      label: options.label,
+      timing: "deferred",
+      restore: show,
       commit: async () => {
         try {
-          await client.deleteRow(row.id);
+          await options.send();
         } catch (err) {
-          report(err, "Failed to remove row");
+          report(err, options.errorMessage);
           throw err;
         }
+        updateBoard(queryClient, forTeamId, options.drop);
+        show();
       },
+    });
+  }
+
+  function removeRow(row: BoardRowPublic) {
+    scheduleStructureDelete({
+      label: `Removed row "${row.name}"`,
+      hide: {
+        rowIds: [row.id],
+        statusIds: statuses.filter((status) => status.rowId === row.id).map((status) => status.id),
+      },
+      send: () => client.deleteRow(row.id),
+      drop: (current) => ({
+        ...current,
+        rows: current.rows.filter((item) => item.id !== row.id),
+        statuses: current.statuses.filter((status) => status.rowId !== row.id),
+      }),
+      errorMessage: "Failed to remove row",
     });
   }
 
   function removeColumn(status: IssueStatusPublic) {
-    if (!teamId) return;
-    const forTeamId = teamId;
-    updateBoard(queryClient, forTeamId, (current) => ({
-      ...current,
-      statuses: current.statuses.filter((item) => item.id !== status.id),
-    }));
-
-    scheduleUndo({
+    scheduleStructureDelete({
       label: `Removed column "${status.name}"`,
-      restore: () => {
-        updateBoard(queryClient, forTeamId, (current) => ({
-          ...current,
-          statuses: current.statuses.some((item) => item.id === status.id)
-            ? current.statuses
-            : [...current.statuses, status].sort((a, b) => {
-                if (a.rowId !== b.rowId) return a.rowId.localeCompare(b.rowId);
-                return a.position - b.position;
-              }),
-        }));
-      },
-      commit: async () => {
-        try {
-          await client.deleteStatus(status.id);
-        } catch (err) {
-          report(err, "Failed to remove column");
-          throw err;
-        }
-      },
+      hide: { statusIds: [status.id] },
+      send: () => client.deleteStatus(status.id),
+      drop: (current) => ({
+        ...current,
+        statuses: current.statuses.filter((item) => item.id !== status.id),
+      }),
+      errorMessage: "Failed to remove column",
     });
   }
 
   function deleteIssue(issue: IssuePublic) {
-    const wasSelected = selectedIssue?.id === issue.id;
-    const putBack = hideIssues(new Set([issue.id]));
-    if (wasSelected) closeIssue();
-
-    scheduleUndo({
-      label: `Deleted ${issue.identifier}`,
-      issueId: issue.id,
-      restore: () => {
-        putBack();
-        if (wasSelected) openIssue(issue);
-      },
-      commit: async () => {
-        try {
-          await client.deleteIssue(issue.id);
-        } catch (err) {
-          report(err, "Failed to delete issue");
-          throw err;
-        }
-      },
-      restoreFromTrash: async () => {
-        await client.restoreIssue(issue.id);
-        putBack();
-        if (wasSelected) openIssue(issue);
-      },
-    });
+    trashIssues([issue], `Deleted ${issue.identifier}`);
   }
 
   function openQuickAdd(target: QuickAddTarget, initialValue = "") {

@@ -1,6 +1,8 @@
+import { useCallback } from "react";
 import { useQuery, type QueryClient } from "@tanstack/react-query";
 import type { BoardRowPublic, IssuePublic, IssueStatusPublic } from "@teamflow/core";
 import { client } from "../api";
+import { useHiddenBoardItems, withoutHidden } from "./hiddenBoardItems";
 import { queryKeys } from "./keys";
 
 export type BoardData = {
@@ -22,12 +24,16 @@ async function fetchBoard(teamId: string, signal: AbortSignal): Promise<BoardDat
   return { rows, statuses, issues };
 }
 
+/** The team's board as the user should see it: server data minus deletes awaiting undo. */
 export function useBoardQuery(teamId: string | null) {
+  const hidden = useHiddenBoardItems();
+  const select = useCallback((board: BoardData) => withoutHidden(board, hidden), [hidden]);
   return useQuery({
     queryKey: queryKeys.board(teamId ?? ""),
     queryFn: ({ signal }) => fetchBoard(teamId!, signal),
     enabled: Boolean(teamId),
     refetchInterval: BOARD_REFETCH_MS,
+    select,
   });
 }
 

@@ -15,13 +15,22 @@ export type ChangeHistoryEntry = {
   restorableUntil?: number;
 };
 
-type UndoPayload = {
+/**
+ * A delete the user can undo. Undo must also hold on the server, so there are two shapes:
+ *
+ * - `timing: "now"` deletes on the server at once (issues go to the trash) and undoes with
+ *   `restoreFromTrash`, which also serves "Restore" in the history for a week.
+ * - `timing: "deferred"` sends the delete only when the undo window closes (rows and columns
+ *   have no restore route); undo then never reaches the server.
+ *
+ * `restore` puts the item back on screen; it runs on undo and when the delete fails.
+ */
+export type UndoPayload = {
   label: string;
   issueId?: string;
   restore: () => void;
   commit: () => Promise<void>;
-  restoreFromTrash?: () => Promise<void>;
-};
+} & ({ timing: "deferred" } | { timing: "now"; restoreFromTrash: () => Promise<void> });
 
 function createEntryId() {
   return crypto.randomUUID();
@@ -30,6 +39,8 @@ function createEntryId() {
 export function useChangeHistory() {
   const [history, setHistory] = useState<ChangeHistoryEntry[]>([]);
   const payloadsRef = useRef<Map<string, UndoPayload>>(new Map());
+  /** In-flight "now" deletes; undo waits for them so the restore lands after the delete. */
+  const commitsRef = useRef<Map<string, Promise<boolean>>>(new Map());
   const restoreCallbacksRef = useRef<Map<string, () => Promise<void>>>(new Map());
   const timersRef = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
 
@@ -48,28 +59,43 @@ export function useChangeHistory() {
     [],
   );
 
-  const clearTimer = useCallback((id: string) => {
-    const t = timersRef.current.get(id);
-    if (!t) return;
-    clearTimeout(t);
-    timersRef.current.delete(id);
-  }, []);
-
-  const finalizePending = useCallback(
-    (id: string, payload: UndoPayload) => {
-      const restorableUntil =
-        payload.issueId && payload.restoreFromTrash ? Date.now() + RESTORE_RETENTION_MS : undefined;
-      patchEntry(id, "committed", {
-        issueId: payload.issueId,
-        restorableUntil,
-      });
-      if (payload.restoreFromTrash) {
-        restoreCallbacksRef.current.set(id, payload.restoreFromTrash);
+  const runCommit = useCallback(
+    async (id: string, payload: UndoPayload) => {
+      try {
+        await payload.commit();
+        return true;
+      } catch {
+        payloadsRef.current.delete(id);
+        const timer = timersRef.current.get(id);
+        if (timer) clearTimeout(timer);
+        timersRef.current.delete(id);
+        payload.restore();
+        patchEntry(id, "failed");
+        return false;
       }
-      payloadsRef.current.delete(id);
-      timersRef.current.delete(id);
     },
     [patchEntry],
+  );
+
+  const closeWindow = useCallback(
+    async (id: string) => {
+      const payload = payloadsRef.current.get(id);
+      if (!payload) return;
+      timersRef.current.delete(id);
+      if (payload.timing === "deferred" && !(await runCommit(id, payload))) return;
+      if (payload.timing === "now" && !(await commitsRef.current.get(id))) return;
+      payloadsRef.current.delete(id);
+      commitsRef.current.delete(id);
+      if (payload.timing === "now") {
+        restoreCallbacksRef.current.set(id, payload.restoreFromTrash);
+      }
+      patchEntry(id, "committed", {
+        issueId: payload.issueId,
+        restorableUntil:
+          payload.timing === "now" ? Date.now() + RESTORE_RETENTION_MS : undefined,
+      });
+    },
+    [patchEntry, runCommit],
   );
 
   const schedule = useCallback(
@@ -88,26 +114,15 @@ export function useChangeHistory() {
         return [next, ...prev].slice(0, MAX_CHANGE_HISTORY);
       });
 
-      void (async () => {
-        try {
-          await payload.commit();
-        } catch {
-          clearTimer(id);
-          payloadsRef.current.delete(id);
-          payload.restore();
-          patchEntry(id, "failed");
-          return;
-        }
-
-        const t = setTimeout(() => {
-          const current = payloadsRef.current.get(id);
-          if (!current) return;
-          finalizePending(id, current);
-        }, UNDO_DELAY_MS);
-        timersRef.current.set(id, t);
-      })();
+      if (payload.timing === "now") {
+        commitsRef.current.set(id, runCommit(id, payload));
+      }
+      timersRef.current.set(
+        id,
+        setTimeout(() => void closeWindow(id), UNDO_DELAY_MS),
+      );
     },
-    [clearTimer, finalizePending, patchEntry],
+    [closeWindow, runCommit],
   );
 
   const undoEntry = useCallback(
@@ -117,21 +132,26 @@ export function useChangeHistory() {
       const entry = history.find((item) => item.id === id);
       if (!entry || entry.status !== "pending") return;
 
-      clearTimer(id);
+      const timer = timersRef.current.get(id);
+      if (timer) clearTimeout(timer);
+      timersRef.current.delete(id);
       payloadsRef.current.delete(id);
 
       try {
-        if (payload.restoreFromTrash) {
+        if (payload.timing === "now") {
+          const committed = await commitsRef.current.get(id);
+          commitsRef.current.delete(id);
+          // A failed delete already put the item back and marked the entry.
+          if (!committed) return;
           await payload.restoreFromTrash();
-        } else {
-          payload.restore();
         }
+        payload.restore();
         patchEntry(id, "undone");
       } catch {
         patchEntry(id, "failed");
       }
     },
-    [clearTimer, history, patchEntry],
+    [history, patchEntry],
   );
 
   const restoreEntry = useCallback(
@@ -160,10 +180,23 @@ export function useChangeHistory() {
     void undoEntry(id);
   }, [history, undoEntry]);
 
+  // Leaving the page (or the shell) ends every undo window: send the deferred deletes.
   useEffect(() => {
+    const payloads = payloadsRef.current;
+    const timers = timersRef.current;
+    function flushDeferred() {
+      for (const [id, payload] of payloads) {
+        if (payload.timing !== "deferred") continue;
+        payloads.delete(id);
+        void payload.commit().catch(() => undefined);
+      }
+    }
+    window.addEventListener("pagehide", flushDeferred);
     return () => {
-      for (const t of timersRef.current.values()) clearTimeout(t);
-      timersRef.current.clear();
+      window.removeEventListener("pagehide", flushDeferred);
+      for (const timer of timers.values()) clearTimeout(timer);
+      timers.clear();
+      flushDeferred();
     };
   }, []);
 
