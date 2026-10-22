@@ -35,7 +35,7 @@ import {
   resolveRefSchema,
 } from "@teamflow/core";
 import { createDb, schema } from "@teamflow/db";
-import { and, eq } from "drizzle-orm";
+import { and, eq, sql } from "drizzle-orm";
 import { Hono } from "hono";
 import type { Context } from "hono";
 import { cors } from "hono/cors";
@@ -65,6 +65,8 @@ import {
   toUserPublic,
   verifyPassword,
   signSessionToken,
+  syncInstanceAdminFromEnv,
+  userIsInstanceAdmin,
 } from "./lib/auth.js";
 import {
   getPasswordResetAuthConfig,
@@ -233,11 +235,16 @@ app.post("/auth/register", async (c) => {
   const userId = crypto.randomUUID();
   const passwordHash = await hashPassword(body.data.password);
 
+  // The first account on a fresh install becomes instance admin (server-wide settings).
+  const [userCount] = await db.select({ count: sql<number>`count(*)` }).from(schema.users);
+  const isFirstUser = Number(userCount?.count ?? 0) === 0;
+
   await db.insert(schema.users).values({
     id: userId,
     email: body.data.email,
     name: body.data.name,
     passwordHash,
+    isInstanceAdmin: isFirstUser ? 1 : 0,
   });
 
   const workspaceId = await getOrCreatePersonalWorkspace(db, userId, body.data.name);
@@ -274,6 +281,7 @@ app.post("/auth/register", async (c) => {
   }
 
   const [user] = await db.select().from(schema.users).where(eq(schema.users.id, userId)).limit(1);
+  await syncInstanceAdminFromEnv(db, user!);
 
   const token = await signSessionToken(userId);
   return c.json({ user: toUserPublic(user!), token }, 201);
@@ -295,6 +303,7 @@ app.post("/auth/login", async (c) => {
     return c.json({ error: "Invalid credentials" }, 401);
   }
 
+  await syncInstanceAdminFromEnv(db, user);
   const token = await signSessionToken(user.id);
   return c.json({ user: toUserPublic(user), token });
 });
@@ -1175,6 +1184,9 @@ app.get("/teams/:teamId/integrations/discord/secrets", async (c) => {
   ) {
     return c.json({ error: "Permission denied" }, 403);
   }
+  if (!(await userIsInstanceAdmin(db, result.auth.userId))) {
+    return c.json({ error: "Instance admin required" }, 403);
+  }
 
   const secrets = await getDiscordBotSecretsPublic(db);
   return c.json({ secrets });
@@ -1188,6 +1200,9 @@ app.patch("/teams/:teamId/integrations/discord/secrets", async (c) => {
   const teamId = c.req.param("teamId");
   if (!(await userHasTeamAccess(db, result.auth.userId, teamId))) {
     return c.json({ error: "Team access denied" }, 403);
+  }
+  if (!(await userIsInstanceAdmin(db, result.auth.userId))) {
+    return c.json({ error: "Instance admin required" }, 403);
   }
 
   const body = updateDiscordBotSecretsSchema.safeParse(await c.req.json().catch(() => ({})));
@@ -1235,6 +1250,9 @@ app.post("/teams/:teamId/integrations/discord/service/enable", async (c) => {
   ) {
     return c.json({ error: "Permission denied" }, 403);
   }
+  if (!(await userIsInstanceAdmin(db, result.auth.userId))) {
+    return c.json({ error: "Instance admin required" }, 403);
+  }
 
   try {
     const status = await enableDiscordBotService(db);
@@ -1258,6 +1276,9 @@ app.post("/teams/:teamId/integrations/discord/service/restart", async (c) => {
     !(await userHasTeamPermission(db, result.auth.userId, teamId, "integrations.discord.secrets"))
   ) {
     return c.json({ error: "Permission denied" }, 403);
+  }
+  if (!(await userIsInstanceAdmin(db, result.auth.userId))) {
+    return c.json({ error: "Instance admin required" }, 403);
   }
 
   try {
@@ -1283,6 +1304,9 @@ app.post("/teams/:teamId/integrations/discord/service/stop", async (c) => {
   ) {
     return c.json({ error: "Permission denied" }, 403);
   }
+  if (!(await userIsInstanceAdmin(db, result.auth.userId))) {
+    return c.json({ error: "Instance admin required" }, 403);
+  }
 
   try {
     const status = await stopDiscordBotService(db);
@@ -1304,6 +1328,9 @@ app.get("/teams/:teamId/server/maintenance", async (c) => {
   if (!(await userHasTeamPermission(db, result.auth.userId, teamId, "server.maintenance.view"))) {
     return c.json({ error: "Permission denied" }, 403);
   }
+  if (!(await userIsInstanceAdmin(db, result.auth.userId))) {
+    return c.json({ error: "Instance admin required" }, 403);
+  }
 
   const status = await getMaintenanceStatus();
   return c.json({ status });
@@ -1319,6 +1346,9 @@ app.get("/teams/:teamId/server/maintenance/job", async (c) => {
   }
   if (!(await userHasTeamPermission(db, result.auth.userId, teamId, "server.maintenance.view"))) {
     return c.json({ error: "Permission denied" }, 403);
+  }
+  if (!(await userIsInstanceAdmin(db, result.auth.userId))) {
+    return c.json({ error: "Instance admin required" }, 403);
   }
 
   const job = await getMaintenanceJob();
@@ -1336,6 +1366,9 @@ app.post("/teams/:teamId/server/maintenance/backup", async (c) => {
   }
   if (!(await userHasTeamPermission(db, result.auth.userId, teamId, "server.maintenance.run"))) {
     return c.json({ error: "Permission denied" }, 403);
+  }
+  if (!(await userIsInstanceAdmin(db, result.auth.userId))) {
+    return c.json({ error: "Instance admin required" }, 403);
   }
 
   const body = runMaintenanceBackupSchema.safeParse(await c.req.json().catch(() => ({})));
@@ -1364,6 +1397,9 @@ app.post("/teams/:teamId/server/maintenance/update", async (c) => {
   if (!(await userHasTeamPermission(db, result.auth.userId, teamId, "server.maintenance.run"))) {
     return c.json({ error: "Permission denied" }, 403);
   }
+  if (!(await userIsInstanceAdmin(db, result.auth.userId))) {
+    return c.json({ error: "Instance admin required" }, 403);
+  }
 
   const body = runMaintenanceUpdateSchema.safeParse(await c.req.json().catch(() => ({})));
   if (!body.success) {
@@ -1390,6 +1426,9 @@ app.post("/teams/:teamId/server/maintenance/job/dismiss", async (c) => {
   }
   if (!(await userHasTeamPermission(db, result.auth.userId, teamId, "server.maintenance.run"))) {
     return c.json({ error: "Permission denied" }, 403);
+  }
+  if (!(await userIsInstanceAdmin(db, result.auth.userId))) {
+    return c.json({ error: "Instance admin required" }, 403);
   }
 
   try {

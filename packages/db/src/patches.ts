@@ -78,6 +78,7 @@ export function applySchemaPatches(sqlite: Database.Database) {
   ensureColorColumns(sqlite);
   ensureTeamInvitesTable(sqlite);
   ensureTeamDiscordSettingsTable(sqlite);
+  ensureInstanceAdminColumn(sqlite);
   ensureTeamRolesTable(sqlite);
   ensureDiscordBotSecretsTable(sqlite);
   ensurePasswordResetTokensTable(sqlite);
@@ -959,5 +960,26 @@ function migrateStatusesToRows(sqlite: Database.Database) {
     if (result.changes > 0) {
       console.log(`Promoted first admin to owner for team ${team.team_id}`);
     }
+  }
+}
+
+/**
+ * Instance admin is a server-wide flag separate from team roles. When the column is first
+ * added to an existing database, the oldest account is promoted so maintenance and bot
+ * secrets stay reachable after upgrading. New databases grant it to the first registration.
+ */
+function ensureInstanceAdminColumn(sqlite: Database.Database) {
+  const userCols = sqlite.prepare("PRAGMA table_info(users)").all() as { name: string }[];
+  if (userCols.some((col) => col.name === "is_instance_admin")) return;
+
+  sqlite.exec(`ALTER TABLE users ADD COLUMN is_instance_admin INTEGER NOT NULL DEFAULT 0`);
+  const oldest = sqlite
+    .prepare("SELECT id FROM users ORDER BY created_at ASC, rowid ASC LIMIT 1")
+    .get() as { id: string } | undefined;
+  if (oldest) {
+    sqlite.prepare("UPDATE users SET is_instance_admin = 1 WHERE id = ?").run(oldest.id);
+    console.log(`Added users.is_instance_admin column; promoted first user ${oldest.id}`);
+  } else {
+    console.log("Added users.is_instance_admin column");
   }
 }
