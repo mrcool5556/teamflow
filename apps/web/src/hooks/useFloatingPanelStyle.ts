@@ -34,7 +34,7 @@ export function useFloatingPanelStyle(
         left,
         top: preferTop ? rect.top - 8 : rect.bottom + 6,
         transform: preferTop ? "translateY(-100%)" : undefined,
-        zIndex: 500,
+        zIndex: "var(--z-popover)",
         width,
         maxWidth: width,
       });
