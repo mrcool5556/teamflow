@@ -1,6 +1,7 @@
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { useDismissOnClickOutside } from "../hooks/useDismissOnClickOutside";
+import { useLayer } from "../ui/layerStack";
 
 export type ContextMenuSubmenuEntry = {
   kind: "item";
@@ -89,30 +90,25 @@ export function ContextMenu({ x, y, entries, onClose, ariaLabel = "Actions" }: C
     setOpenSubmenuId(null);
   }, [entries]);
 
-  useEffect(() => {
-    function onKeyDown(event: KeyboardEvent) {
-      if (event.key === "Escape") {
-        if (openSubmenuId) {
-          setOpenSubmenuId(null);
-          return;
-        }
-        onClose();
-      }
-    }
+  useLayer({
+    open: true,
+    containerRef: shellRef,
+    onEscape: () => {
+      if (openSubmenuId) setOpenSubmenuId(null);
+      else onClose();
+    },
+  });
 
+  useEffect(() => {
     function onContextMenu(event: MouseEvent) {
       const target = event.target as Node;
       if (shellRef.current?.contains(target)) return;
       onClose();
     }
 
-    window.addEventListener("keydown", onKeyDown);
     window.addEventListener("contextmenu", onContextMenu, true);
-    return () => {
-      window.removeEventListener("keydown", onKeyDown);
-      window.removeEventListener("contextmenu", onContextMenu, true);
-    };
-  }, [onClose, openSubmenuId]);
+    return () => window.removeEventListener("contextmenu", onContextMenu, true);
+  }, [onClose]);
 
   return createPortal(
     <div

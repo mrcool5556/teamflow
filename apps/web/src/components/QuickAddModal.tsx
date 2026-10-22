@@ -1,5 +1,6 @@
-import { useEffect, useRef } from "react";
+import { useRef } from "react";
 import { useBackdropDismiss } from "../hooks/useBackdropDismiss";
+import { useLayer } from "../ui/layerStack";
 
 type QuickAddModalProps = {
   open: boolean;
@@ -25,23 +26,14 @@ export function QuickAddModal({
   onClose,
 }: QuickAddModalProps) {
   const inputRef = useRef<HTMLInputElement>(null);
-
-  useEffect(() => {
-    if (!open) return;
-    const id = window.setTimeout(() => inputRef.current?.focus(), 0);
-    return () => window.clearTimeout(id);
-  }, [open]);
-
-  useEffect(() => {
-    if (!open) return;
-
-    function onKeyDown(event: KeyboardEvent) {
-      if (event.key === "Escape") onClose();
-    }
-
-    window.addEventListener("keydown", onKeyDown);
-    return () => window.removeEventListener("keydown", onKeyDown);
-  }, [open, onClose]);
+  const formRef = useRef<HTMLFormElement>(null);
+  useLayer({
+    open,
+    onEscape: onClose,
+    modal: true,
+    containerRef: formRef,
+    initialFocusRef: inputRef,
+  });
 
   const { markContentPointerDown, backdropProps } = useBackdropDismiss(onClose);
 
@@ -50,6 +42,7 @@ export function QuickAddModal({
   return (
     <div className="quick-add-backdrop" {...backdropProps}>
       <form
+        ref={formRef}
         className="quick-add-modal"
         onPointerDown={markContentPointerDown}
         onClick={(e) => e.stopPropagation()}

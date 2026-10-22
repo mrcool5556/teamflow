@@ -1,8 +1,8 @@
-import { useEffect } from "react";
 import { Outlet, useNavigate } from "react-router";
 import { SettingsNav } from "../../components/SettingsNav";
 import { isSettingsPanel, settingsPath, useAppRoute } from "../../lib/appRoute";
 import { useShell } from "../board/shellContext";
+import { useLayer } from "../../ui/layerStack";
 
 /** The settings sidebar: header, panel navigation and the panel route. */
 export function SettingsLayout() {
@@ -11,13 +11,7 @@ export function SettingsLayout() {
   const { team, teamKey, access, closeSettings, settingsPointerDownRef } = useShell();
   const panel = isSettingsPanel(settingsPanel) ? settingsPanel : "general";
 
-  useEffect(() => {
-    function onKeyDown(event: KeyboardEvent) {
-      if (event.key === "Escape") closeSettings();
-    }
-    window.addEventListener("keydown", onKeyDown);
-    return () => window.removeEventListener("keydown", onKeyDown);
-  }, [closeSettings]);
+  useLayer({ open: true, onEscape: closeSettings });
 
   return (
     <aside

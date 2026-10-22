@@ -24,7 +24,6 @@ import {
 import { CSS } from "@dnd-kit/utilities";
 import {
   useCallback,
-  useEffect,
   useMemo,
   useRef,
   useState,
@@ -53,6 +52,7 @@ import { issueMatchesBoardSearch, buildRefShareUrl } from "./lib/refLinks";
 import { copyTextToClipboard } from "./lib/clipboard";
 import { useInlineRename } from "./hooks/useInlineRename";
 import { useCanEditBoard } from "./lib/teamPermissions";
+import { useLayer } from "./ui/layerStack";
 import type { IssueTimerPatch } from "./lib/timer";
 import type { Priority } from "@teamflow/core";
 
@@ -564,18 +564,7 @@ export function KanbanBoard({
     [previewMode, selectedIssueIds.size, clearIssueSelection, onSelectIssue],
   );
 
-  useEffect(() => {
-    if (previewMode) return;
-
-    function handleKeyDown(event: KeyboardEvent) {
-      if (event.key === "Escape") {
-        clearIssueSelection();
-      }
-    }
-
-    window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [previewMode, clearIssueSelection]);
+  useLayer({ open: !previewMode && selectedIssueIds.size > 0, onEscape: clearIssueSelection });
 
   const sensors = useSensors(
     useSensor(PointerSensor, {

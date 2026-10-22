@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import type { IssueAttachmentPublic } from "@teamflow/core";
 import { client } from "../api";
+import { useLayer } from "../ui/layerStack";
 
 const PLAYBACK_SPEEDS = [0.5, 0.75, 1, 1.25, 1.5, 2] as const;
 
@@ -116,14 +117,8 @@ export function AttachmentVideoLightbox({
     };
   }, [releasePlayback]);
 
-  useEffect(() => {
-    function onKeyDown(event: KeyboardEvent) {
-      if (event.key === "Escape") handleClose();
-    }
-
-    window.addEventListener("keydown", onKeyDown);
-    return () => window.removeEventListener("keydown", onKeyDown);
-  }, [handleClose]);
+  const figureRef = useRef<HTMLElement>(null);
+  useLayer({ open: true, onEscape: handleClose, modal: true, containerRef: figureRef });
 
   useEffect(() => {
     if (videoElementRef.current) {
@@ -141,8 +136,10 @@ export function AttachmentVideoLightbox({
       role="presentation"
     >
       <figure
+        ref={figureRef}
         className="attachment-lightbox attachment-lightbox--video"
         role="dialog"
+        aria-modal="true"
         aria-label={attachment.filename}
         onClick={(event) => event.stopPropagation()}
       >

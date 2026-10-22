@@ -1,5 +1,6 @@
-import { useEffect } from "react";
+import { useRef } from "react";
 import { TEAMFLOW_ABOUT, getVisibleSupportLinks } from "@teamflow/core";
+import { useLayer } from "../ui/layerStack";
 
 type AboutDialogProps = {
   open: boolean;
@@ -10,24 +11,18 @@ type AboutDialogProps = {
 export function AboutDialog({ open, version, onClose }: AboutDialogProps) {
   const supportLinks = getVisibleSupportLinks();
 
-  useEffect(() => {
-    if (!open) return;
-
-    function onKeyDown(event: KeyboardEvent) {
-      if (event.key === "Escape") onClose();
-    }
-
-    window.addEventListener("keydown", onKeyDown);
-    return () => window.removeEventListener("keydown", onKeyDown);
-  }, [open, onClose]);
+  const dialogRef = useRef<HTMLElement>(null);
+  useLayer({ open, onEscape: onClose, modal: true, containerRef: dialogRef });
 
   if (!open) return null;
 
   return (
     <div className="about-backdrop" onClick={onClose}>
       <section
+        ref={dialogRef}
         className="about-dialog"
         role="dialog"
+        aria-modal="true"
         aria-labelledby="about-dialog-title"
         onClick={(event) => event.stopPropagation()}
       >
