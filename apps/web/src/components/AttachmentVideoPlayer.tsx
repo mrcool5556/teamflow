@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { createPortal } from "react-dom";
 import type { IssueAttachmentPublic } from "@teamflow/core";
 import { client } from "../api";
-import { useLayer } from "../ui/layerStack";
+import { Dialog } from "../ui/Dialog";
+import { DialogTitle } from "../ui/DialogTitle";
 
 const PLAYBACK_SPEEDS = [0.5, 0.75, 1, 1.25, 1.5, 2] as const;
 
@@ -117,74 +117,61 @@ export function AttachmentVideoLightbox({
     };
   }, [releasePlayback]);
 
-  const figureRef = useRef<HTMLElement>(null);
-  useLayer({ open: true, onEscape: handleClose, modal: true, containerRef: figureRef });
-
   useEffect(() => {
     if (videoElementRef.current) {
       videoElementRef.current.playbackRate = speed;
     }
   }, [speed, src]);
 
-  return createPortal(
-    <div
-      className="attachment-lightbox-backdrop"
-      onClick={(event) => {
-        event.stopPropagation();
-        if (event.target === event.currentTarget) handleClose();
-      }}
-      role="presentation"
+  return (
+    <Dialog
+      onClose={handleClose}
+      backdropClassName="attachment-lightbox-backdrop"
+      className="attachment-lightbox attachment-lightbox--video"
+      as="figure"
     >
-      <figure
-        ref={figureRef}
-        className="attachment-lightbox attachment-lightbox--video"
-        role="dialog"
-        aria-modal="true"
-        aria-label={attachment.filename}
-        onClick={(event) => event.stopPropagation()}
-      >
-        {loading ? (
-          <p className="attachment-video-status muted">Loading stream…</p>
-        ) : error || !src ? (
-          <p className="attachment-video-status">Could not load video stream.</p>
-        ) : (
-          <video
-            ref={setVideoRef}
-            src={src}
-            controls
-            playsInline
-            preload="metadata"
-            disableRemotePlayback
-          />
-        )}
-        <figcaption className="attachment-lightbox-caption">
-          <span className="attachment-lightbox-name">{attachment.filename}</span>
-          <span className="attachment-lightbox-actions">
-            <label className="attachment-video-speed">
-              <span className="muted">Speed</span>
-              <select
-                value={speed}
-                onChange={(event) => setSpeed(Number(event.target.value))}
-                disabled={!src}
-              >
-                {PLAYBACK_SPEEDS.map((value) => (
-                  <option key={value} value={value}>
-                    {value}×
-                  </option>
-                ))}
-              </select>
-            </label>
-            <button type="button" className="ghost" onClick={onDownload}>
-              Download
-            </button>
-            <button type="button" className="ghost" onClick={handleClose}>
-              Close
-            </button>
-          </span>
-        </figcaption>
-      </figure>
-    </div>,
-    document.body,
+      {loading ? (
+        <p className="attachment-video-status muted">Loading stream…</p>
+      ) : error || !src ? (
+        <p className="attachment-video-status">Could not load video stream.</p>
+      ) : (
+        <video
+          ref={setVideoRef}
+          src={src}
+          controls
+          playsInline
+          preload="metadata"
+          disableRemotePlayback
+        />
+      )}
+      <figcaption className="attachment-lightbox-caption">
+        <DialogTitle as="span" className="attachment-lightbox-name">
+          {attachment.filename}
+        </DialogTitle>
+        <span className="attachment-lightbox-actions">
+          <label className="attachment-video-speed">
+            <span className="muted">Speed</span>
+            <select
+              value={speed}
+              onChange={(event) => setSpeed(Number(event.target.value))}
+              disabled={!src}
+            >
+              {PLAYBACK_SPEEDS.map((value) => (
+                <option key={value} value={value}>
+                  {value}×
+                </option>
+              ))}
+            </select>
+          </label>
+          <button type="button" className="ghost" onClick={onDownload}>
+            Download
+          </button>
+          <button type="button" className="ghost" onClick={handleClose}>
+            Close
+          </button>
+        </span>
+      </figcaption>
+    </Dialog>
   );
 }
 

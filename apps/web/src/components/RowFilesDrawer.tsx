@@ -18,7 +18,8 @@ import { useQueryClient } from "@tanstack/react-query";
 import { client } from "../api";
 import { queryKeys } from "../queries/keys";
 import { useRowAttachmentsQuery } from "../queries/attachments";
-import { useBackdropDismiss } from "../hooks/useBackdropDismiss";
+import { Drawer } from "../ui/Dialog";
+import { DialogTitle } from "../ui/DialogTitle";
 import { FileRefCopyButton } from "./FileRefCopyButton";
 import { LinkFromFileRef } from "./LinkFromFileRef";
 import { RefCopyButton } from "./RefCopyButton";
@@ -70,8 +71,6 @@ export function RowFilesDrawer({ row, onClose, onNavigateRef }: RowFilesDrawerPr
     attachmentBlobCache.revokeAll();
     onClose();
   }, [attachmentBlobCache, onClose]);
-
-  const { markContentPointerDown, backdropProps } = useBackdropDismiss(handleClose);
 
   function setAttachments(update: (prev: IssueAttachmentPublic[]) => IssueAttachmentPublic[]) {
     queryClient.setQueryData<{
@@ -179,175 +178,169 @@ export function RowFilesDrawer({ row, onClose, onNavigateRef }: RowFilesDrawerPr
   }
 
   return (
-    <div className="drawer-backdrop" {...backdropProps}>
-      <aside
-        className="drawer issue-drawer"
-        onPointerDown={markContentPointerDown}
-        onClick={(event) => event.stopPropagation()}
-      >
-        <header className="issue-drawer-header">
-          <div className="issue-drawer-header-ids">
-            <div className="issue-drawer-id-row">
-              <p className="eyebrow issue-drawer-id">{row.key}</p>
-              <RefCopyButton
-                value={row.key}
-                display="icon"
-                share
-                title={`Row ${row.name}`}
-                onGo={onNavigateRef ? () => onNavigateRef(row.key) : undefined}
+    <Drawer onClose={handleClose} className="issue-drawer">
+      <header className="issue-drawer-header">
+        <div className="issue-drawer-header-ids">
+          <div className="issue-drawer-id-row">
+            <p className="eyebrow issue-drawer-id">{row.key}</p>
+            <RefCopyButton
+              value={row.key}
+              display="icon"
+              share
+              title={`Row ${row.name}`}
+              onGo={onNavigateRef ? () => onNavigateRef(row.key) : undefined}
+            />
+          </div>
+          <DialogTitle className="issue-drawer-title" style={{ margin: 0 }}>
+            {row.name} — shared files
+          </DialogTitle>
+        </div>
+        <button type="button" className="ghost" onClick={handleClose}>
+          Close
+        </button>
+      </header>
+
+      <div className="issue-drawer-surface">
+        <section className="issue-drawer-section">
+          <p className="muted" style={{ marginTop: 0 }}>
+            Tools, docs, and assets for everyone working in this row.
+          </p>
+          <p className="muted" style={{ marginTop: 0 }}>
+            Tools, docs, and assets for everyone working in this row.
+          </p>
+
+          {attachments.length > 0 ? (
+            <div className="row-files-search">
+              <input
+                type="search"
+                value={fileSearch}
+                placeholder="Search row files…"
+                onChange={(e) => setFileSearch(e.target.value)}
               />
             </div>
-            <h2 className="issue-drawer-title" style={{ margin: 0 }}>
-              {row.name} — shared files
-            </h2>
-          </div>
-          <button type="button" className="ghost" onClick={handleClose}>
-            Close
-          </button>
-        </header>
+          ) : null}
 
-        <div className="issue-drawer-surface">
-          <section className="issue-drawer-section">
-            <p className="muted" style={{ marginTop: 0 }}>
-              Tools, docs, and assets for everyone working in this row.
-            </p>
-            <p className="muted" style={{ marginTop: 0 }}>
-              Tools, docs, and assets for everyone working in this row.
-            </p>
+          {attachmentsLoading ? (
+            <p className="muted">Loading files…</p>
+          ) : attachments.length === 0 ? (
+            <p className="muted">No files yet.</p>
+          ) : filteredAttachments.length === 0 ? (
+            <p className="muted">No files match your search.</p>
+          ) : (
+            <ul className="issue-attachment-list">
+              {filteredAttachments.map((attachment) => (
+                <li key={attachment.id} className="issue-attachment">
+                  {isVideoAttachment(attachment) ? (
+                    <AttachmentVideoThumbnail
+                      attachment={attachment}
+                      onOpen={() => setAttachmentVideo(attachment)}
+                    />
+                  ) : isImageAttachment(attachment) ? (
+                    <AttachmentImageThumbnail
+                      attachment={attachment}
+                      blobCache={attachmentBlobCache}
+                      onOpen={(imageUrl) => setAttachmentLightbox({ attachment, imageUrl })}
+                    />
+                  ) : null}
+                  <div className="issue-attachment-main">
+                    <button
+                      type="button"
+                      className="ghost issue-attachment-name"
+                      onClick={() => {
+                        if (isVideoAttachment(attachment)) {
+                          setAttachmentVideo(attachment);
+                          return;
+                        }
+                        if (isImageAttachment(attachment)) {
+                          void openImagePreview(attachment);
+                          return;
+                        }
+                        void downloadAttachment(attachment);
+                      }}
+                    >
+                      {attachment.filename}
+                    </button>
+                    <span className="issue-attachment-meta muted">
+                      {attachment.fileRef} · {formatFileSize(attachment.sizeBytes, 2)} ·{" "}
+                      {attachment.uploaderName} · {formatTimestamp(attachment.createdAt)}
+                    </span>
+                  </div>
+                  <div className="issue-attachment-actions">
+                    <FileRefCopyButton
+                      fileRef={attachment.fileRef}
+                      filename={attachment.filename}
+                    />
+                    <button
+                      type="button"
+                      className="ghost issue-attachment-delete"
+                      disabled={deletingAttachmentId === attachment.id}
+                      onClick={() => void deleteAttachment(attachment)}
+                      aria-label={`Remove ${attachment.filename}`}
+                      title="Remove file"
+                    >
+                      {deletingAttachmentId === attachment.id ? "…" : "Remove"}
+                    </button>
+                  </div>
+                </li>
+              ))}
+            </ul>
+          )}
 
-            {attachments.length > 0 ? (
-              <div className="row-files-search">
-                <input
-                  type="search"
-                  value={fileSearch}
-                  placeholder="Search row files…"
-                  onChange={(e) => setFileSearch(e.target.value)}
+          <LinkFromFileRef
+            teamId={row.teamId}
+            label="Link file from ref (another row or issue)"
+            onLinkFileId={async (fileId) => {
+              if (linkedFileIds.has(fileId)) return;
+              const { attachment } = await client.linkRowAttachment(row.id, fileId);
+              setAttachments((prev) => {
+                if (prev.some((item) => item.fileId === attachment.fileId)) return prev;
+                return [...prev, attachment];
+              });
+            }}
+          />
+
+          <div
+            className={`issue-attachment-drop${attachmentDragOver ? " issue-attachment-drop--active" : ""}`}
+            onDragOver={(event) => {
+              event.preventDefault();
+              setAttachmentDragOver(true);
+            }}
+            onDragLeave={() => setAttachmentDragOver(false)}
+            onDrop={handleAttachmentDrop}
+          >
+            <input
+              ref={attachmentInputRef}
+              type="file"
+              hidden
+              onChange={handleAttachmentInputChange}
+            />
+            <p>
+              {uploadingAttachment
+                ? `Uploading ${attachmentUploadName ?? "file"}…`
+                : "Drop a file here or choose one"}
+            </p>
+            {uploadingAttachment ? (
+              <div className="issue-attachment-progress" aria-hidden>
+                <div
+                  className="issue-attachment-progress-bar"
+                  style={{ width: `${attachmentUploadProgress ?? 0}%` }}
                 />
               </div>
             ) : null}
-
-            {attachmentsLoading ? (
-              <p className="muted">Loading files…</p>
-            ) : attachments.length === 0 ? (
-              <p className="muted">No files yet.</p>
-            ) : filteredAttachments.length === 0 ? (
-              <p className="muted">No files match your search.</p>
-            ) : (
-              <ul className="issue-attachment-list">
-                {filteredAttachments.map((attachment) => (
-                  <li key={attachment.id} className="issue-attachment">
-                    {isVideoAttachment(attachment) ? (
-                      <AttachmentVideoThumbnail
-                        attachment={attachment}
-                        onOpen={() => setAttachmentVideo(attachment)}
-                      />
-                    ) : isImageAttachment(attachment) ? (
-                      <AttachmentImageThumbnail
-                        attachment={attachment}
-                        blobCache={attachmentBlobCache}
-                        onOpen={(imageUrl) => setAttachmentLightbox({ attachment, imageUrl })}
-                      />
-                    ) : null}
-                    <div className="issue-attachment-main">
-                      <button
-                        type="button"
-                        className="ghost issue-attachment-name"
-                        onClick={() => {
-                          if (isVideoAttachment(attachment)) {
-                            setAttachmentVideo(attachment);
-                            return;
-                          }
-                          if (isImageAttachment(attachment)) {
-                            void openImagePreview(attachment);
-                            return;
-                          }
-                          void downloadAttachment(attachment);
-                        }}
-                      >
-                        {attachment.filename}
-                      </button>
-                      <span className="issue-attachment-meta muted">
-                        {attachment.fileRef} · {formatFileSize(attachment.sizeBytes, 2)} ·{" "}
-                        {attachment.uploaderName} · {formatTimestamp(attachment.createdAt)}
-                      </span>
-                    </div>
-                    <div className="issue-attachment-actions">
-                      <FileRefCopyButton
-                        fileRef={attachment.fileRef}
-                        filename={attachment.filename}
-                      />
-                      <button
-                        type="button"
-                        className="ghost issue-attachment-delete"
-                        disabled={deletingAttachmentId === attachment.id}
-                        onClick={() => void deleteAttachment(attachment)}
-                        aria-label={`Remove ${attachment.filename}`}
-                        title="Remove file"
-                      >
-                        {deletingAttachmentId === attachment.id ? "…" : "Remove"}
-                      </button>
-                    </div>
-                  </li>
-                ))}
-              </ul>
-            )}
-
-            <LinkFromFileRef
-              teamId={row.teamId}
-              label="Link file from ref (another row or issue)"
-              onLinkFileId={async (fileId) => {
-                if (linkedFileIds.has(fileId)) return;
-                const { attachment } = await client.linkRowAttachment(row.id, fileId);
-                setAttachments((prev) => {
-                  if (prev.some((item) => item.fileId === attachment.fileId)) return prev;
-                  return [...prev, attachment];
-                });
-              }}
-            />
-
-            <div
-              className={`issue-attachment-drop${attachmentDragOver ? " issue-attachment-drop--active" : ""}`}
-              onDragOver={(event) => {
-                event.preventDefault();
-                setAttachmentDragOver(true);
-              }}
-              onDragLeave={() => setAttachmentDragOver(false)}
-              onDrop={handleAttachmentDrop}
+            <button
+              type="button"
+              className="secondary"
+              disabled={uploadingAttachment}
+              onClick={() => attachmentInputRef.current?.click()}
             >
-              <input
-                ref={attachmentInputRef}
-                type="file"
-                hidden
-                onChange={handleAttachmentInputChange}
-              />
-              <p>
-                {uploadingAttachment
-                  ? `Uploading ${attachmentUploadName ?? "file"}…`
-                  : "Drop a file here or choose one"}
-              </p>
-              {uploadingAttachment ? (
-                <div className="issue-attachment-progress" aria-hidden>
-                  <div
-                    className="issue-attachment-progress-bar"
-                    style={{ width: `${attachmentUploadProgress ?? 0}%` }}
-                  />
-                </div>
-              ) : null}
-              <button
-                type="button"
-                className="secondary"
-                disabled={uploadingAttachment}
-                onClick={() => attachmentInputRef.current?.click()}
-              >
-                Choose file
-              </button>
-              <p className="muted issue-attachment-limits">
-                {describeAttachmentLimits(attachmentLimits, 2)}
-              </p>
-            </div>
-          </section>
-        </div>
-      </aside>
+              Choose file
+            </button>
+            <p className="muted issue-attachment-limits">
+              {describeAttachmentLimits(attachmentLimits, 2)}
+            </p>
+          </div>
+        </section>
+      </div>
 
       {attachmentLightbox ? (
         <AttachmentLightbox
@@ -364,6 +357,6 @@ export function RowFilesDrawer({ row, onClose, onNavigateRef }: RowFilesDrawerPr
           onDownload={() => void downloadAttachment(attachmentVideo)}
         />
       ) : null}
-    </div>
+    </Drawer>
   );
 }

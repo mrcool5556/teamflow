@@ -9,7 +9,8 @@ import { useQueryClient } from "@tanstack/react-query";
 import { client } from "../api";
 import { queryKeys } from "../queries/keys";
 import { useTeamFilesQuery } from "../queries/files";
-import { useBackdropDismiss } from "../hooks/useBackdropDismiss";
+import { Drawer } from "../ui/Dialog";
+import { DialogTitle } from "../ui/DialogTitle";
 import { getSharedTeamFilePreviewCache } from "../lib/teamFilePreviewCache";
 import { AttachmentLightbox } from "./AttachmentImagePreview";
 import { AttachmentVideoLightbox } from "./AttachmentVideoPlayer";
@@ -137,8 +138,6 @@ export function TeamFilesDrawer({ teamId, open, onClose, onNavigateRef }: TeamFi
     onClose();
   }, [onClose]);
 
-  const { markContentPointerDown, backdropProps } = useBackdropDismiss(handleClose);
-
   if (!open) return null;
 
   async function softDelete(file: TeamFilePublic) {
@@ -199,201 +198,191 @@ export function TeamFilesDrawer({ teamId, open, onClose, onNavigateRef }: TeamFi
   }
 
   return (
-    <div className="drawer-backdrop" {...backdropProps}>
-      <aside
-        className="drawer issue-drawer team-files-drawer"
-        onPointerDown={markContentPointerDown}
-        onClick={(e) => e.stopPropagation()}
-      >
-        <header className="issue-drawer-header">
-          <div>
-            <p className="eyebrow">Team files</p>
-            <h2>File directory</h2>
-            <p className="muted team-files-drawer-summary">
-              {files.length} file{files.length === 1 ? "" : "s"} · {formatFileSize(totalBytes)}{" "}
-              total
-              {tab === "trash" ? ` · purged after ${FILE_TRASH_RETENTION_DAYS} days` : ""}
-            </p>
-          </div>
-          <button type="button" className="ghost" onClick={handleClose}>
-            Close
-          </button>
-        </header>
-
-        <div className="team-files-tabs">
-          <button
-            type="button"
-            className={tab === "active" ? "active" : undefined}
-            onClick={() => setTab("active")}
-          >
-            Active
-          </button>
-          <button
-            type="button"
-            className={tab === "trash" ? "active" : undefined}
-            onClick={() => setTab("trash")}
-          >
-            Trash
-          </button>
+    <Drawer onClose={handleClose} className="issue-drawer team-files-drawer">
+      <header className="issue-drawer-header">
+        <div>
+          <p className="eyebrow">Team files</p>
+          <DialogTitle>File directory</DialogTitle>
+          <p className="muted team-files-drawer-summary">
+            {files.length} file{files.length === 1 ? "" : "s"} · {formatFileSize(totalBytes)} total
+            {tab === "trash" ? ` · purged after ${FILE_TRASH_RETENTION_DAYS} days` : ""}
+          </p>
         </div>
+        <button type="button" className="ghost" onClick={handleClose}>
+          Close
+        </button>
+      </header>
 
-        <div className="team-files-drawer-toolbar">
-          <input
-            type="search"
-            value={query}
-            placeholder="Search filename, ref, issue, row…"
-            onChange={(e) => setQuery(e.target.value)}
-            autoFocus
-          />
-          <label className="team-files-sort">
-            <span className="sr-only">Sort files</span>
-            <select value={sort} onChange={(e) => setSort(e.target.value as SortMode)}>
-              <option value="size">Largest first</option>
-              <option value="name">Name</option>
-              <option value="refs">Most linked</option>
-            </select>
-          </label>
-        </div>
+      <div className="team-files-tabs">
+        <button
+          type="button"
+          className={tab === "active" ? "active" : undefined}
+          onClick={() => setTab("active")}
+        >
+          Active
+        </button>
+        <button
+          type="button"
+          className={tab === "trash" ? "active" : undefined}
+          onClick={() => setTab("trash")}
+        >
+          Trash
+        </button>
+      </div>
 
-        <div className="issue-drawer-body team-files-drawer-body">
-          {loading ? (
-            <p className="muted">Loading files…</p>
-          ) : error ? (
-            <p className="issue-link-row-files-error">{error}</p>
-          ) : filtered.length === 0 ? (
-            <p className="muted">
-              {query
-                ? "No files match your search."
-                : tab === "trash"
-                  ? "Trash is empty."
-                  : "No files uploaded yet."}
-            </p>
-          ) : (
-            <ul className="team-files-list">
-              {filtered.map((file) => {
-                const displayName = getTeamFileDisplayName(file);
-                const showDownload =
-                  canDownloadFile(file) &&
-                  (isZipAttachmentFile(file.filename, file.mimeType) || file.kind === "other");
+      <div className="team-files-drawer-toolbar">
+        <input
+          type="search"
+          value={query}
+          placeholder="Search filename, ref, issue, row…"
+          onChange={(e) => setQuery(e.target.value)}
+          autoFocus
+        />
+        <label className="team-files-sort">
+          <span className="sr-only">Sort files</span>
+          <select value={sort} onChange={(e) => setSort(e.target.value as SortMode)}>
+            <option value="size">Largest first</option>
+            <option value="name">Name</option>
+            <option value="refs">Most linked</option>
+          </select>
+        </label>
+      </div>
 
-                return (
-                  <li key={file.fileId} className="team-files-item">
-                    <div className="team-files-item-main">
-                      <div className="team-files-item-preview-wrap">
-                        <TeamFilePreview
-                          file={file}
-                          previewCache={previewCache}
-                          onImageOpen={(attachment, imageUrl) =>
-                            setImageLightbox({ attachment, imageUrl })
-                          }
-                          onVideoOpen={setVideoLightbox}
-                        />
-                      </div>
+      <div className="issue-drawer-body team-files-drawer-body">
+        {loading ? (
+          <p className="muted">Loading files…</p>
+        ) : error ? (
+          <p className="issue-link-row-files-error">{error}</p>
+        ) : filtered.length === 0 ? (
+          <p className="muted">
+            {query
+              ? "No files match your search."
+              : tab === "trash"
+                ? "Trash is empty."
+                : "No files uploaded yet."}
+          </p>
+        ) : (
+          <ul className="team-files-list">
+            {filtered.map((file) => {
+              const displayName = getTeamFileDisplayName(file);
+              const showDownload =
+                canDownloadFile(file) &&
+                (isZipAttachmentFile(file.filename, file.mimeType) || file.kind === "other");
 
-                      <div className="team-files-item-center">
-                        <div className="team-files-item-copy">
-                          <div className="team-files-item-title-row">
-                            <TeamFileEditableName
-                              teamId={teamId}
-                              file={file}
-                              disabled={tab === "trash" || busyFileId === file.fileId}
-                              onRenamed={handleFileRenamed}
-                              onError={setError}
-                            />
-                            <span className="team-files-link-badge">
-                              {file.linkCount} link{file.linkCount === 1 ? "" : "s"}
-                            </span>
-                          </div>
-                          <p
-                            className="team-files-item-description muted"
-                            title={fileDescription(file, tab === "trash")}
-                          >
-                            {fileDescription(file, tab === "trash")}
-                          </p>
-                        </div>
-                        <div className="team-files-item-footer">
-                          <span className="team-files-item-uploader muted">
-                            by {file.uploaderName}
+              return (
+                <li key={file.fileId} className="team-files-item">
+                  <div className="team-files-item-main">
+                    <div className="team-files-item-preview-wrap">
+                      <TeamFilePreview
+                        file={file}
+                        previewCache={previewCache}
+                        onImageOpen={(attachment, imageUrl) =>
+                          setImageLightbox({ attachment, imageUrl })
+                        }
+                        onVideoOpen={setVideoLightbox}
+                      />
+                    </div>
+
+                    <div className="team-files-item-center">
+                      <div className="team-files-item-copy">
+                        <div className="team-files-item-title-row">
+                          <TeamFileEditableName
+                            teamId={teamId}
+                            file={file}
+                            disabled={tab === "trash" || busyFileId === file.fileId}
+                            onRenamed={handleFileRenamed}
+                            onError={setError}
+                          />
+                          <span className="team-files-link-badge">
+                            {file.linkCount} link{file.linkCount === 1 ? "" : "s"}
                           </span>
-                          <code className="team-files-item-fileref" title="Assigned file link name">
-                            {file.fileRef}
-                          </code>
                         </div>
+                        <p
+                          className="team-files-item-description muted"
+                          title={fileDescription(file, tab === "trash")}
+                        >
+                          {fileDescription(file, tab === "trash")}
+                        </p>
                       </div>
-
-                      <div className="team-files-item-actions">
-                        {file.references.length > 0 && onNavigateRef ? (
-                          <label className="team-files-ref-select team-files-action-btn">
-                            <span className="sr-only">
-                              Jump to linked location for {displayName}
-                            </span>
-                            <select
-                              defaultValue=""
-                              onChange={(event) => {
-                                const ref = event.target.value;
-                                if (!ref) return;
-                                onNavigateRef(ref);
-                                event.target.value = "";
-                              }}
-                            >
-                              <option value="">Linked on…</option>
-                              {file.references.map((ref) => (
-                                <option key={`${ref.kind}-${ref.linkId}`} value={ref.ref}>
-                                  {ref.kind === "issue" ? "Issue" : "Row"} {ref.ref} — {ref.name}
-                                </option>
-                              ))}
-                            </select>
-                          </label>
-                        ) : (
-                          <span className="team-files-action-btn team-files-action-btn--placeholder muted">
-                            Not linked
-                          </span>
-                        )}
-                        <FileRefCopyButton
-                          fileRef={file.fileRef}
-                          filename={displayName}
-                          compact={false}
-                          className="team-files-action-btn"
-                        />
-                        {showDownload ? (
-                          <button
-                            type="button"
-                            className="secondary team-files-action-btn"
-                            disabled={downloadingFileId === file.fileId}
-                            onClick={() => void downloadFile(file)}
-                          >
-                            {downloadingFileId === file.fileId ? "…" : "Download"}
-                          </button>
-                        ) : null}
-                        {tab === "active" ? (
-                          <button
-                            type="button"
-                            className="ghost team-files-delete-btn team-files-action-btn"
-                            disabled={busyFileId === file.fileId}
-                            onClick={() => void softDelete(file)}
-                          >
-                            {busyFileId === file.fileId ? "…" : "Delete"}
-                          </button>
-                        ) : (
-                          <button
-                            type="button"
-                            className="secondary team-files-action-btn"
-                            disabled={busyFileId === file.fileId}
-                            onClick={() => void restore(file)}
-                          >
-                            {busyFileId === file.fileId ? "…" : "Restore"}
-                          </button>
-                        )}
+                      <div className="team-files-item-footer">
+                        <span className="team-files-item-uploader muted">
+                          by {file.uploaderName}
+                        </span>
+                        <code className="team-files-item-fileref" title="Assigned file link name">
+                          {file.fileRef}
+                        </code>
                       </div>
                     </div>
-                  </li>
-                );
-              })}
-            </ul>
-          )}
-        </div>
-      </aside>
 
+                    <div className="team-files-item-actions">
+                      {file.references.length > 0 && onNavigateRef ? (
+                        <label className="team-files-ref-select team-files-action-btn">
+                          <span className="sr-only">Jump to linked location for {displayName}</span>
+                          <select
+                            defaultValue=""
+                            onChange={(event) => {
+                              const ref = event.target.value;
+                              if (!ref) return;
+                              onNavigateRef(ref);
+                              event.target.value = "";
+                            }}
+                          >
+                            <option value="">Linked on…</option>
+                            {file.references.map((ref) => (
+                              <option key={`${ref.kind}-${ref.linkId}`} value={ref.ref}>
+                                {ref.kind === "issue" ? "Issue" : "Row"} {ref.ref} — {ref.name}
+                              </option>
+                            ))}
+                          </select>
+                        </label>
+                      ) : (
+                        <span className="team-files-action-btn team-files-action-btn--placeholder muted">
+                          Not linked
+                        </span>
+                      )}
+                      <FileRefCopyButton
+                        fileRef={file.fileRef}
+                        filename={displayName}
+                        compact={false}
+                        className="team-files-action-btn"
+                      />
+                      {showDownload ? (
+                        <button
+                          type="button"
+                          className="secondary team-files-action-btn"
+                          disabled={downloadingFileId === file.fileId}
+                          onClick={() => void downloadFile(file)}
+                        >
+                          {downloadingFileId === file.fileId ? "…" : "Download"}
+                        </button>
+                      ) : null}
+                      {tab === "active" ? (
+                        <button
+                          type="button"
+                          className="ghost team-files-delete-btn team-files-action-btn"
+                          disabled={busyFileId === file.fileId}
+                          onClick={() => void softDelete(file)}
+                        >
+                          {busyFileId === file.fileId ? "…" : "Delete"}
+                        </button>
+                      ) : (
+                        <button
+                          type="button"
+                          className="secondary team-files-action-btn"
+                          disabled={busyFileId === file.fileId}
+                          onClick={() => void restore(file)}
+                        >
+                          {busyFileId === file.fileId ? "…" : "Restore"}
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                </li>
+              );
+            })}
+          </ul>
+        )}
+      </div>
       {imageLightbox ? (
         <AttachmentLightbox
           attachment={imageLightbox.attachment}
@@ -410,6 +399,6 @@ export function TeamFilesDrawer({ teamId, open, onClose, onNavigateRef }: TeamFi
           onDownload={() => void downloadAttachment(videoLightbox)}
         />
       ) : null}
-    </div>
+    </Drawer>
   );
 }

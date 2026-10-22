@@ -23,6 +23,13 @@ export function focusableElements(container: HTMLElement): HTMLElement[] {
   );
 }
 
+/** Popovers portal to <body>; focus may move into one even while a modal traps focus. */
+function inScope(scope: { all: HTMLElement[] }, node: Node) {
+  if (scope.all.some((el) => el.contains(node))) return true;
+  const element = node instanceof Element ? node : node.parentElement;
+  return Boolean(element?.closest("[data-layer='popover']"));
+}
+
 type LayerRecord = {
   onEscape?: () => void;
   modal: boolean;
@@ -32,6 +39,25 @@ type LayerRecord = {
 export class LayerStack {
   private layers: LayerRecord[] = [];
   private listening = false;
+  private tracking = false;
+  /** The element that last lost focus; the trigger when a layer autofocuses on mount. */
+  private lastFocusOrigin: HTMLElement | null = null;
+
+  /** Where focus was before `container` took it, or the current focus. */
+  focusOrigin(container: HTMLElement | null): HTMLElement | null {
+    const active = document.activeElement;
+    if (container && active && container.contains(active)) return this.lastFocusOrigin;
+    return active instanceof HTMLElement ? active : null;
+  }
+
+  trackFocus() {
+    if (this.tracking || typeof document === "undefined") return;
+    this.tracking = true;
+    document.addEventListener("focusin", (event) => {
+      const origin = event.relatedTarget;
+      this.lastFocusOrigin = origin instanceof HTMLElement ? origin : null;
+    });
+  }
 
   push(layer: LayerRecord) {
     this.layers.push(layer);
@@ -89,9 +115,7 @@ export class LayerStack {
     if (!scope) return;
     const active = document.activeElement;
     // Focus inside a popover stacked above the modal tabs normally.
-    if (active && !scope.modal.contains(active) && scope.all.some((el) => el.contains(active))) {
-      return;
-    }
+    if (active && !scope.modal.contains(active) && inScope(scope, active)) return;
     const items = focusableElements(scope.modal);
     if (items.length === 0) {
       event.preventDefault();
@@ -114,7 +138,7 @@ export class LayerStack {
     const scope = this.focusScope();
     const target = event.target;
     if (!scope || !(target instanceof Node)) return;
-    if (scope.all.some((el) => el.contains(target))) return;
+    if (inScope(scope, target)) return;
     const [first] = focusableElements(scope.modal);
     (first ?? scope.modal).focus();
   };
@@ -151,6 +175,7 @@ export function useLayer({
 }: UseLayerOptions) {
   const stack = useLayerStack();
   const recordRef = useRef<LayerRecord | null>(null);
+  stack.trackFocus();
   const escapeRef = useRef(onEscape);
   useLayoutEffect(() => {
     escapeRef.current = onEscape;
@@ -164,10 +189,10 @@ export function useLayer({
       containerRef,
     };
     recordRef.current = record;
-    const trigger = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    const container = containerRef?.current ?? null;
+    const trigger = stack.focusOrigin(container);
     stack.push(record);
 
-    const container = containerRef?.current ?? null;
     if (modal) {
       if (container && !container.contains(document.activeElement)) {
         const target = initialFocusRef?.current ?? focusableElements(container)[0] ?? container;
