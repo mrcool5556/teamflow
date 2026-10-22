@@ -1,5 +1,7 @@
 import { Hono } from "hono";
 import type { AppEnv } from "../types.js";
+import { parseBody } from "../lib/validation.js";
+import { validateParams } from "../middleware/params.js";
 import { createCommentSchema } from "@teamflow/core";
 import { schema } from "@teamflow/db";
 import { eq } from "drizzle-orm";
@@ -10,49 +12,54 @@ import { loadTeam } from "../middleware/team.js";
 /** Issue comments. */
 const routes = new Hono<AppEnv>();
 
-routes.post("/issues/:id/comments", requireAuth, requireWrite, loadTeam("issue"), async (c) => {
-  const auth = c.var.auth;
+routes.post(
+  "/issues/:id/comments",
+  requireAuth,
+  requireWrite,
+  validateParams,
+  loadTeam("issue"),
+  async (c) => {
+    const auth = c.var.auth;
 
-  const issue = c.var.issue;
-  const issueId = issue.id;
-  const body = createCommentSchema.safeParse(await c.req.json());
-  if (!body.success) {
-    return c.json({ error: body.error.issues[0]?.message ?? "Invalid input" }, 400);
-  }
+    const issue = c.var.issue;
+    const issueId = issue.id;
+    const body = await parseBody(c, createCommentSchema);
 
-  const commentId = crypto.randomUUID();
-  await db.insert(schema.comments).values({
-    id: commentId,
-    issueId,
-    authorId: auth.userId,
-    body: body.data.body,
-  });
+    const commentId = crypto.randomUUID();
+    await db.insert(schema.comments).values({
+      id: commentId,
+      issueId,
+      authorId: auth.userId,
+      body: body.body,
+    });
 
-  const [user] = await db
-    .select()
-    .from(schema.users)
-    .where(eq(schema.users.id, auth.userId))
-    .limit(1);
+    const [user] = await db
+      .select()
+      .from(schema.users)
+      .where(eq(schema.users.id, auth.userId))
+      .limit(1);
 
-  return c.json(
-    {
-      comment: {
-        id: commentId,
-        issueId,
-        authorId: auth.userId,
-        authorName: user!.name,
-        body: body.data.body,
-        createdAt: new Date().toISOString(),
+    return c.json(
+      {
+        comment: {
+          id: commentId,
+          issueId,
+          authorId: auth.userId,
+          authorName: user!.name,
+          body: body.body,
+          createdAt: new Date().toISOString(),
+        },
       },
-    },
-    201,
-  );
-});
+      201,
+    );
+  },
+);
 
 routes.delete(
   "/issues/:issueId/comments/:commentId",
   requireAuth,
   requireWrite,
+  validateParams,
   loadTeam("issue"),
   async (c) => {
     const auth = c.var.auth;

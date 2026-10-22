@@ -1,6 +1,7 @@
 import { Hono } from "hono";
 import type { AppEnv } from "../types.js";
-import { createProjectSchema } from "@teamflow/core";
+import { parseBody, parseQuery } from "../lib/validation.js";
+import { createProjectSchema, listProjectsQuerySchema } from "@teamflow/core";
 import { schema } from "@teamflow/db";
 import { eq } from "drizzle-orm";
 import { db } from "../db.js";
@@ -13,7 +14,7 @@ const routes = new Hono<AppEnv>();
 routes.get("/projects", requireAuth, async (c) => {
   const auth = c.var.auth;
 
-  const teamId = c.req.query("teamId");
+  const { teamId } = parseQuery(c, listProjectsQuerySchema);
   const memberships = await db
     .select({ teamId: schema.teamMembers.teamId })
     .from(schema.teamMembers)
@@ -35,19 +36,16 @@ routes.get("/projects", requireAuth, async (c) => {
 routes.post("/projects", requireAuth, requireWrite, async (c) => {
   const auth = c.var.auth;
 
-  const body = createProjectSchema.safeParse(await c.req.json());
-  if (!body.success) {
-    return c.json({ error: body.error.issues[0]?.message ?? "Invalid input" }, 400);
-  }
+  const body = await parseBody(c, createProjectSchema);
 
-  await assertTeamAccess(auth, body.data.teamId);
+  await assertTeamAccess(auth, body.teamId);
 
   const id = crypto.randomUUID();
   await db.insert(schema.projects).values({
     id,
-    teamId: body.data.teamId,
-    name: body.data.name,
-    description: body.data.description,
+    teamId: body.teamId,
+    name: body.name,
+    description: body.description,
   });
 
   const [project] = await db

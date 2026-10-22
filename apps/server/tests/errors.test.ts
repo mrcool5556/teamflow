@@ -10,6 +10,7 @@ import {
   type TestApp,
 } from "./helpers";
 import { ApiError, badRequest, forbidden, notFound } from "../src/lib/errors.js";
+import { createApp } from "../src/app.js";
 
 let app: TestApp;
 let owner: RegisteredUser;
@@ -93,12 +94,12 @@ describe("error responses", () => {
   it("hides unexpected errors behind a generic 500 and logs them with the request id", async () => {
     const spy = vi.spyOn(console, "error").mockImplementation(() => {});
     try {
-      // A body that is not JSON makes c.req.json() throw a SyntaxError inside the handler.
-      const res = await app.request("/auth/login", {
-        method: "POST",
-        headers: { "Content-Type": "application/json", "X-Request-Id": "req-42" },
-        body: "{not json",
+      // A fresh app (same middleware and error handler) with one route that crashes.
+      const crashing = createApp();
+      crashing.get("/boom", () => {
+        throw new Error("database exploded");
       });
+      const res = await crashing.request("/boom", { headers: { "X-Request-Id": "req-42" } });
       expect(res.status).toBe(500);
       expect(await json(res)).toEqual({ error: "Internal Server Error", code: "internal_error" });
       expect(spy).toHaveBeenCalledTimes(1);

@@ -1,5 +1,7 @@
 import { Hono } from "hono";
 import type { AppEnv } from "../types.js";
+import { parseBody } from "../lib/validation.js";
+import { validateParams } from "../middleware/params.js";
 import { updateDiscordBotSecretsSchema, updateTeamDiscordSettingsSchema } from "@teamflow/core";
 import { db } from "../db.js";
 import { requireAuth, requireInstanceAdmin, requireWrite } from "../middleware/auth.js";
@@ -39,6 +41,7 @@ routes.get("/integrations/discord/bot-config", async (c) => {
 routes.get(
   "/teams/:teamId/discord-settings",
   requireAuth,
+  validateParams,
   loadTeam(),
   requirePermission("integrations.discord.view"),
   async (c) => {
@@ -53,18 +56,16 @@ routes.patch(
   "/teams/:teamId/discord-settings",
   requireAuth,
   requireWrite,
+  validateParams,
   loadTeam(),
   async (c) => {
     const auth = c.var.auth;
 
     const teamId = c.var.teamId;
 
-    const body = updateTeamDiscordSettingsSchema.safeParse(await c.req.json().catch(() => ({})));
-    if (!body.success) {
-      return c.json({ error: body.error.issues[0]?.message ?? "Invalid input" }, 400);
-    }
+    const body = await parseBody(c, updateTeamDiscordSettingsSchema);
 
-    const settings = await updateTeamDiscordSettings(db, teamId, auth.userId, body.data);
+    const settings = await updateTeamDiscordSettings(db, teamId, auth.userId, body);
     return c.json({ settings });
   },
 );
@@ -72,6 +73,7 @@ routes.patch(
 routes.get(
   "/teams/:teamId/integrations/discord/secrets",
   requireAuth,
+  validateParams,
   loadTeam(),
   requirePermission("integrations.discord.secrets"),
   requireInstanceAdmin,
@@ -85,6 +87,7 @@ routes.patch(
   "/teams/:teamId/integrations/discord/secrets",
   requireAuth,
   requireWrite,
+  validateParams,
   loadTeam(),
   requireInstanceAdmin,
   async (c) => {
@@ -92,12 +95,9 @@ routes.patch(
 
     const teamId = c.var.teamId;
 
-    const body = updateDiscordBotSecretsSchema.safeParse(await c.req.json().catch(() => ({})));
-    if (!body.success) {
-      return c.json({ error: body.error.issues[0]?.message ?? "Invalid input" }, 400);
-    }
+    const body = await parseBody(c, updateDiscordBotSecretsSchema);
 
-    const secrets = await updateDiscordBotSecrets(db, teamId, auth.userId, body.data);
+    const secrets = await updateDiscordBotSecrets(db, teamId, auth.userId, body);
     return c.json({ secrets });
   },
 );
@@ -105,6 +105,7 @@ routes.patch(
 routes.get(
   "/teams/:teamId/integrations/discord/service",
   requireAuth,
+  validateParams,
   loadTeam(),
   requirePermission("integrations.discord.view"),
   async (c) => {
@@ -117,6 +118,7 @@ routes.post(
   "/teams/:teamId/integrations/discord/service/enable",
   requireAuth,
   requireWrite,
+  validateParams,
   loadTeam(),
   requirePermission("integrations.discord.secrets"),
   requireInstanceAdmin,
@@ -130,6 +132,7 @@ routes.post(
   "/teams/:teamId/integrations/discord/service/restart",
   requireAuth,
   requireWrite,
+  validateParams,
   loadTeam(),
   requirePermission("integrations.discord.secrets"),
   requireInstanceAdmin,
@@ -143,6 +146,7 @@ routes.post(
   "/teams/:teamId/integrations/discord/service/stop",
   requireAuth,
   requireWrite,
+  validateParams,
   loadTeam(),
   requirePermission("integrations.discord.secrets"),
   requireInstanceAdmin,
@@ -152,7 +156,7 @@ routes.post(
   },
 );
 
-routes.get("/discord/guilds/:guildId/config", requireAuth, async (c) => {
+routes.get("/discord/guilds/:guildId/config", requireAuth, validateParams, async (c) => {
   const auth = c.var.auth;
 
   const guildId = c.req.param("guildId");

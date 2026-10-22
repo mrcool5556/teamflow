@@ -1,5 +1,8 @@
 import { Hono } from "hono";
 import type { AppEnv } from "../types.js";
+import { parseBody } from "../lib/validation.js";
+import { validateParams } from "../middleware/params.js";
+import { linkAttachmentSchema, moveAttachmentSchema } from "@teamflow/core";
 import { schema } from "@teamflow/db";
 import { eq } from "drizzle-orm";
 import { db } from "../db.js";
@@ -26,32 +29,25 @@ import { signStreamToken, streamTokenExpiresAt, verifyStreamToken } from "../lib
 /** Issue/row attachments, linking, moving, streaming and downloads. */
 const routes = new Hono<AppEnv>();
 
-function parseMoveAttachment(body: unknown) {
-  if (!body || typeof body !== "object") return null;
-  const targetIssueId = (body as Record<string, unknown>).targetIssueId;
-  if (typeof targetIssueId !== "string" || !targetIssueId) return null;
-  return { targetIssueId };
-}
+routes.get(
+  "/issues/:issueId/attachments",
+  requireAuth,
+  validateParams,
+  loadTeam("issue"),
+  async (c) => {
+    const issue = c.var.issue;
+    const issueId = issue.id;
 
-function parseLinkAttachment(body: unknown) {
-  if (!body || typeof body !== "object") return null;
-  const fileId = (body as Record<string, unknown>).fileId;
-  if (typeof fileId !== "string" || !fileId) return null;
-  return { fileId };
-}
-
-routes.get("/issues/:issueId/attachments", requireAuth, loadTeam("issue"), async (c) => {
-  const issue = c.var.issue;
-  const issueId = issue.id;
-
-  const attachments = await listIssueAttachments(db, issueId);
-  return c.json({ attachments, limits: getAttachmentLimits() });
-});
+    const attachments = await listIssueAttachments(db, issueId);
+    return c.json({ attachments, limits: getAttachmentLimits() });
+  },
+);
 
 routes.post(
   "/issues/:issueId/attachments",
   requireAuth,
   requireWrite,
+  validateParams,
   loadTeam("issue"),
   async (c) => {
     const auth = c.var.auth;
@@ -71,7 +67,7 @@ routes.post(
   },
 );
 
-routes.get("/rows/:rowId/attachments", requireAuth, loadTeam("row"), async (c) => {
+routes.get("/rows/:rowId/attachments", requireAuth, validateParams, loadTeam("row"), async (c) => {
   const row = c.var.row;
   const rowId = row.id;
 
@@ -79,27 +75,35 @@ routes.get("/rows/:rowId/attachments", requireAuth, loadTeam("row"), async (c) =
   return c.json({ attachments, limits: getAttachmentLimits() });
 });
 
-routes.post("/rows/:rowId/attachments", requireAuth, requireWrite, loadTeam("row"), async (c) => {
-  const auth = c.var.auth;
+routes.post(
+  "/rows/:rowId/attachments",
+  requireAuth,
+  requireWrite,
+  validateParams,
+  loadTeam("row"),
+  async (c) => {
+    const auth = c.var.auth;
 
-  const row = c.var.row;
-  const rowId = row.id;
+    const row = c.var.row;
+    const rowId = row.id;
 
-  const body = await c.req.parseBody();
-  const raw = body.file;
-  const file = Array.isArray(raw) ? raw[0] : raw;
-  if (!(file instanceof File)) {
-    return c.json({ error: "Missing file field" }, 400);
-  }
+    const body = await c.req.parseBody();
+    const raw = body.file;
+    const file = Array.isArray(raw) ? raw[0] : raw;
+    if (!(file instanceof File)) {
+      return c.json({ error: "Missing file field" }, 400);
+    }
 
-  const attachment = await saveRowAttachment(db, rowId, auth.userId, file);
-  return c.json({ attachment }, 201);
-});
+    const attachment = await saveRowAttachment(db, rowId, auth.userId, file);
+    return c.json({ attachment }, 201);
+  },
+);
 
 routes.delete(
   "/rows/:rowId/attachments/:id",
   requireAuth,
   requireWrite,
+  validateParams,
   loadTeam("row"),
   async (c) => {
     const row = c.var.row;
@@ -117,14 +121,12 @@ routes.post(
   "/rows/:rowId/attachments/link",
   requireAuth,
   requireWrite,
+  validateParams,
   loadTeam("row"),
   async (c) => {
     const row = c.var.row;
     const rowId = row.id;
-    const body = parseLinkAttachment(await c.req.json());
-    if (!body) {
-      return c.json({ error: "Invalid input" }, 400);
-    }
+    const body = await parseBody(c, linkAttachmentSchema);
 
     const fileTeamId = await getFileTeamId(db, body.fileId);
     if (!fileTeamId || fileTeamId !== row.teamId) {
@@ -136,51 +138,52 @@ routes.post(
   },
 );
 
-routes.post("/issues/:issueId/attachments/:id/move", requireAuth, requireWrite, async (c) => {
-  const auth = c.var.auth;
+routes.post(
+  "/issues/:issueId/attachments/:id/move",
+  requireAuth,
+  requireWrite,
+  validateParams,
+  async (c) => {
+    const auth = c.var.auth;
 
-  const issueId = c.req.param("issueId");
-  const linkId = c.req.param("id");
-  const body = parseMoveAttachment(await c.req.json());
-  if (!body) {
-    return c.json({ error: "Invalid input" }, 400);
-  }
+    const issueId = c.req.param("issueId");
+    const linkId = c.req.param("id");
+    const body = await parseBody(c, moveAttachmentSchema);
 
-  const [sourceIssue] = await db
-    .select()
-    .from(schema.issues)
-    .where(eq(schema.issues.id, issueId))
-    .limit(1);
-  const [targetIssue] = await db
-    .select()
-    .from(schema.issues)
-    .where(eq(schema.issues.id, body.targetIssueId))
-    .limit(1);
+    const [sourceIssue] = await db
+      .select()
+      .from(schema.issues)
+      .where(eq(schema.issues.id, issueId))
+      .limit(1);
+    const [targetIssue] = await db
+      .select()
+      .from(schema.issues)
+      .where(eq(schema.issues.id, body.targetIssueId))
+      .limit(1);
 
-  if (!sourceIssue || !targetIssue) {
-    return c.json({ error: "Issue not found" }, 404);
-  }
-  if (sourceIssue.teamId !== targetIssue.teamId) {
-    return c.json({ error: "Issues must be on the same team" }, 400);
-  }
-  await assertTeamAccess(auth, sourceIssue.teamId);
+    if (!sourceIssue || !targetIssue) {
+      return c.json({ error: "Issue not found" }, 404);
+    }
+    if (sourceIssue.teamId !== targetIssue.teamId) {
+      return c.json({ error: "Issues must be on the same team" }, 400);
+    }
+    await assertTeamAccess(auth, sourceIssue.teamId);
 
-  const attachment = await moveIssueAttachment(db, linkId, issueId, body.targetIssueId);
-  return c.json({ attachment });
-});
+    const attachment = await moveIssueAttachment(db, linkId, issueId, body.targetIssueId);
+    return c.json({ attachment });
+  },
+);
 
 routes.post(
   "/issues/:issueId/attachments/link",
   requireAuth,
   requireWrite,
+  validateParams,
   loadTeam("issue"),
   async (c) => {
     const issue = c.var.issue;
     const issueId = issue.id;
-    const body = parseLinkAttachment(await c.req.json());
-    if (!body) {
-      return c.json({ error: "Invalid input" }, 400);
-    }
+    const body = await parseBody(c, linkAttachmentSchema);
 
     const fileTeamId = await getFileTeamId(db, body.fileId);
     if (!fileTeamId || fileTeamId !== issue.teamId) {
@@ -192,23 +195,29 @@ routes.post(
   },
 );
 
-routes.post("/attachments/:id/stream-token", requireAuth, loadTeam("attachment"), async (c) => {
-  const auth = c.var.auth;
+routes.post(
+  "/attachments/:id/stream-token",
+  requireAuth,
+  validateParams,
+  loadTeam("attachment"),
+  async (c) => {
+    const auth = c.var.auth;
 
-  const linkId = c.req.param("id");
-  const row = c.var.attachment;
-  if (!row.public.canStream) {
-    return c.json({ error: "This file cannot be streamed" }, 400);
-  }
-  const token = await signStreamToken(linkId, auth.userId);
-  return c.json({
-    token,
-    expiresAt: streamTokenExpiresAt(),
-    streamUrl: `/attachments/${linkId}/stream?token=${encodeURIComponent(token)}`,
-  });
-});
+    const linkId = c.req.param("id");
+    const row = c.var.attachment;
+    if (!row.public.canStream) {
+      return c.json({ error: "This file cannot be streamed" }, 400);
+    }
+    const token = await signStreamToken(linkId, auth.userId);
+    return c.json({
+      token,
+      expiresAt: streamTokenExpiresAt(),
+      streamUrl: `/attachments/${linkId}/stream?token=${encodeURIComponent(token)}`,
+    });
+  },
+);
 
-routes.get("/attachments/:id/stream", async (c) => {
+routes.get("/attachments/:id/stream", validateParams, async (c) => {
   const linkId = c.req.param("id");
   const token = c.req.query("token");
   if (!token) return c.json({ error: "Missing stream token" }, 401);
@@ -242,25 +251,32 @@ routes.get("/attachments/:id/stream", async (c) => {
   }
 });
 
-routes.get("/attachments/:id/download", requireAuth, loadTeam("attachment"), async (c) => {
-  const row = c.var.attachment;
+routes.get(
+  "/attachments/:id/download",
+  requireAuth,
+  validateParams,
+  loadTeam("attachment"),
+  async (c) => {
+    const row = c.var.attachment;
 
-  try {
-    return await createFileRangeResponse(row.fullPath, {
-      mimeType: row.mimeType,
-      filename: row.filename,
-      inline: false,
-      rangeHeader: c.req.header("range"),
-    });
-  } catch {
-    return c.json({ error: "File missing on server" }, 404);
-  }
-});
+    try {
+      return await createFileRangeResponse(row.fullPath, {
+        mimeType: row.mimeType,
+        filename: row.filename,
+        inline: false,
+        rangeHeader: c.req.header("range"),
+      });
+    } catch {
+      return c.json({ error: "File missing on server" }, 404);
+    }
+  },
+);
 
 routes.delete(
   "/issues/:issueId/attachments/:id",
   requireAuth,
   requireWrite,
+  validateParams,
   loadTeam("issue"),
   async (c) => {
     const issue = c.var.issue;

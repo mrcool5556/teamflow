@@ -1,7 +1,9 @@
 import { Hono } from "hono";
 import type { AppEnv } from "../types.js";
+import { parseBody, parseQuery } from "../lib/validation.js";
+import { validateParams } from "../middleware/params.js";
 import { rowBelongsToTeam, projectBelongsToTeam, statusBelongsToTeam } from "../lib/ownership.js";
-import { createIssueSchema, updateIssueSchema } from "@teamflow/core";
+import { createIssueSchema, listIssuesSchema, updateIssueSchema } from "@teamflow/core";
 import { schema } from "@teamflow/db";
 import { and, eq } from "drizzle-orm";
 import { db } from "../db.js";
@@ -18,14 +20,7 @@ const routes = new Hono<AppEnv>();
 routes.get("/issues", requireAuth, async (c) => {
   const auth = c.var.auth;
 
-  const filters = {
-    teamId: c.req.query("teamId"),
-    projectId: c.req.query("projectId"),
-    statusId: c.req.query("statusId"),
-    assigneeId: c.req.query("assigneeId"),
-    rowId: c.req.query("rowId"),
-    search: c.req.query("search"),
-  };
+  const filters = parseQuery(c, listIssuesSchema);
 
   if (auth.patTeamId && filters.teamId && filters.teamId !== auth.patTeamId) {
     return c.json({ error: "Token restricted to a different team" }, 403);
@@ -40,7 +35,7 @@ routes.get("/issues", requireAuth, async (c) => {
   return c.json({ issues });
 });
 
-routes.get("/issues/:id", requireAuth, loadTeam("issue"), async (c) => {
+routes.get("/issues/:id", requireAuth, validateParams, loadTeam("issue"), async (c) => {
   const issue = c.var.issue;
   const id = issue.id;
 
@@ -74,21 +69,18 @@ routes.get("/issues/:id", requireAuth, loadTeam("issue"), async (c) => {
 routes.post("/issues", requireAuth, requireWrite, async (c) => {
   const auth = c.var.auth;
 
-  const body = createIssueSchema.safeParse(await c.req.json());
-  if (!body.success) {
-    return c.json({ error: body.error.issues[0]?.message ?? "Invalid input" }, 400);
-  }
+  const body = await parseBody(c, createIssueSchema);
 
-  await assertTeamAccess(auth, body.data.teamId);
+  await assertTeamAccess(auth, body.teamId);
 
-  if (auth.patTeamId && auth.patTeamId !== body.data.teamId) {
+  if (auth.patTeamId && auth.patTeamId !== body.teamId) {
     return c.json({ error: "Token restricted to a different team" }, 403);
   }
 
   const [team] = await db
     .select()
     .from(schema.teams)
-    .where(eq(schema.teams.id, body.data.teamId))
+    .where(eq(schema.teams.id, body.teamId))
     .limit(1);
 
   if (!team) return c.json({ error: "Team not found" }, 404);
@@ -100,21 +92,21 @@ routes.post("/issues", requireAuth, requireWrite, async (c) => {
     .where(eq(schema.teams.id, team.id));
 
   // Every referenced entity must belong to the issue's team (no cross-team references).
-  if (body.data.rowId && !(await rowBelongsToTeam(body.data.rowId, body.data.teamId))) {
+  if (body.rowId && !(await rowBelongsToTeam(body.rowId, body.teamId))) {
     return c.json({ error: "Row does not belong to this team" }, 400);
   }
-  if (body.data.projectId && !(await projectBelongsToTeam(body.data.projectId, body.data.teamId))) {
+  if (body.projectId && !(await projectBelongsToTeam(body.projectId, body.teamId))) {
     return c.json({ error: "Project does not belong to this team" }, 400);
   }
-  if (body.data.assigneeId) {
-    const valid = await filterValidTeamMemberIds(db, body.data.teamId, [body.data.assigneeId]);
+  if (body.assigneeId) {
+    const valid = await filterValidTeamMemberIds(db, body.teamId, [body.assigneeId]);
     if (valid.length === 0) {
       return c.json({ error: "Assignee is not a member of this team" }, 400);
     }
   }
 
-  let statusId = body.data.statusId;
-  const rowId = body.data.rowId ?? (await getDefaultRowId(db, body.data.teamId));
+  let statusId = body.statusId;
+  const rowId = body.rowId ?? (await getDefaultRowId(db, body.teamId));
 
   if (!statusId) {
     const statuses = await db
@@ -126,7 +118,7 @@ routes.post("/issues", requireAuth, requireWrite, async (c) => {
       statuses.find((s) => s.type === "todo")?.id ??
       statuses[0]?.id;
   } else {
-    const status = await statusBelongsToTeam(statusId, body.data.teamId);
+    const status = await statusBelongsToTeam(statusId, body.teamId);
     if (!status || status.rowId !== rowId) {
       return c.json({ error: "Status does not belong to this row" }, 400);
     }
@@ -144,7 +136,7 @@ routes.post("/issues", requireAuth, requireWrite, async (c) => {
     .from(schema.issues)
     .where(
       and(
-        eq(schema.issues.teamId, body.data.teamId),
+        eq(schema.issues.teamId, body.teamId),
         eq(schema.issues.statusId, statusId),
         eq(schema.issues.rowId, rowId),
       ),
@@ -153,17 +145,17 @@ routes.post("/issues", requireAuth, requireWrite, async (c) => {
 
   await db.insert(schema.issues).values({
     id: issueId,
-    teamId: body.data.teamId,
-    projectId: body.data.projectId,
+    teamId: body.teamId,
+    projectId: body.projectId,
     rowId,
     number: nextNumber,
-    title: body.data.title,
-    description: body.data.description,
+    title: body.title,
+    description: body.description,
     statusId,
-    priority: body.data.priority,
-    assigneeId: body.data.assigneeId,
+    priority: body.priority,
+    assigneeId: body.assigneeId,
     creatorId: auth.userId,
-    dueDate: body.data.dueDate,
+    dueDate: body.dueDate,
     boardSort,
     updatedAt: now,
   });
@@ -178,215 +170,236 @@ routes.post("/issues", requireAuth, requireWrite, async (c) => {
     issueId,
     userId: auth.userId,
     action: "issue.created",
-    metadata: { title: body.data.title },
+    metadata: { title: body.title },
     source: auth.source,
   });
 
   return c.json({ issue: await mapIssue(db, issue!, team.key) }, 201);
 });
 
-routes.patch("/issues/:id", requireAuth, requireWrite, loadTeam("issue"), async (c) => {
-  const auth = c.var.auth;
+routes.patch(
+  "/issues/:id",
+  requireAuth,
+  requireWrite,
+  validateParams,
+  loadTeam("issue"),
+  async (c) => {
+    const auth = c.var.auth;
 
-  const existing = c.var.issue;
-  const id = existing.id;
-  const body = updateIssueSchema.safeParse(await c.req.json());
-  if (!body.success) {
-    return c.json({ error: body.error.issues[0]?.message ?? "Invalid input" }, 400);
-  }
+    const existing = c.var.issue;
+    const id = existing.id;
+    const body = await parseBody(c, updateIssueSchema);
 
-  // Referenced entities must belong to the issue's team (no cross-team references).
-  if (body.data.rowId && !(await rowBelongsToTeam(body.data.rowId, existing.teamId))) {
-    return c.json({ error: "Row does not belong to this team" }, 400);
-  }
-  if (body.data.projectId && !(await projectBelongsToTeam(body.data.projectId, existing.teamId))) {
-    return c.json({ error: "Project does not belong to this team" }, 400);
-  }
-
-  const updates: Partial<typeof schema.issues.$inferInsert> = {
-    updatedAt: new Date().toISOString(),
-  };
-
-  if (body.data.title !== undefined) updates.title = body.data.title;
-  if (body.data.description !== undefined) updates.description = body.data.description;
-  if (body.data.projectId !== undefined) updates.projectId = body.data.projectId;
-  if (body.data.priority !== undefined) updates.priority = body.data.priority;
-  if (body.data.assigneeIds !== undefined) {
-    const validIds = await filterValidTeamMemberIds(db, existing.teamId, body.data.assigneeIds);
-    await setIssueAssignees(db, id, validIds);
-  } else if (body.data.assigneeId !== undefined) {
-    const validIds =
-      body.data.assigneeId === null
-        ? []
-        : await filterValidTeamMemberIds(db, existing.teamId, [body.data.assigneeId]);
-    await setIssueAssignees(db, id, validIds);
-  }
-  if (body.data.dueDate !== undefined) updates.dueDate = body.data.dueDate;
-  if (body.data.rowId !== undefined) updates.rowId = body.data.rowId;
-
-  const nextRowId = body.data.rowId ?? existing.rowId;
-  if (body.data.statusId !== undefined) {
-    const status = await statusBelongsToTeam(body.data.statusId, existing.teamId);
-    if (!status) return c.json({ error: "Status not found" }, 404);
-    if (nextRowId && status.rowId !== nextRowId) {
-      return c.json({ error: "Status does not belong to this row" }, 400);
+    // Referenced entities must belong to the issue's team (no cross-team references).
+    if (body.rowId && !(await rowBelongsToTeam(body.rowId, existing.teamId))) {
+      return c.json({ error: "Row does not belong to this team" }, 400);
     }
-    updates.statusId = body.data.statusId;
-    if (status.type === "done") {
-      updates.completedAt = new Date().toISOString();
-    } else {
-      updates.completedAt = null;
-    }
-  } else if (
-    body.data.rowId !== undefined &&
-    body.data.rowId !== existing.rowId &&
-    body.data.rowId
-  ) {
-    const [currentStatus] = await db
-      .select()
-      .from(schema.issueStatuses)
-      .where(eq(schema.issueStatuses.id, existing.statusId))
-      .limit(1);
-
-    const targetStatuses = await db
-      .select()
-      .from(schema.issueStatuses)
-      .where(eq(schema.issueStatuses.rowId, body.data.rowId));
-
-    const mapped =
-      targetStatuses.find((s) => s.type === currentStatus?.type) ??
-      targetStatuses.find((s) => s.position === currentStatus?.position) ??
-      targetStatuses[0];
-
-    if (!mapped) {
-      return c.json({ error: "Target row has no columns configured" }, 400);
+    if (body.projectId && !(await projectBelongsToTeam(body.projectId, existing.teamId))) {
+      return c.json({ error: "Project does not belong to this team" }, 400);
     }
 
-    updates.statusId = mapped.id;
-    if (mapped.type === "done") {
-      updates.completedAt = new Date().toISOString();
-    } else {
-      updates.completedAt = null;
+    const updates: Partial<typeof schema.issues.$inferInsert> = {
+      updatedAt: new Date().toISOString(),
+    };
+
+    if (body.title !== undefined) updates.title = body.title;
+    if (body.description !== undefined) updates.description = body.description;
+    if (body.projectId !== undefined) updates.projectId = body.projectId;
+    if (body.priority !== undefined) updates.priority = body.priority;
+    if (body.assigneeIds !== undefined) {
+      const validIds = await filterValidTeamMemberIds(db, existing.teamId, body.assigneeIds);
+      await setIssueAssignees(db, id, validIds);
+    } else if (body.assigneeId !== undefined) {
+      const validIds =
+        body.assigneeId === null
+          ? []
+          : await filterValidTeamMemberIds(db, existing.teamId, [body.assigneeId]);
+      await setIssueAssignees(db, id, validIds);
     }
-  }
+    if (body.dueDate !== undefined) updates.dueDate = body.dueDate;
+    if (body.rowId !== undefined) updates.rowId = body.rowId;
 
-  if (body.data.boardSort !== undefined) updates.boardSort = body.data.boardSort;
-  if (body.data.timerActiveAt !== undefined) {
-    updates.timerActiveAt = body.data.timerActiveAt;
-  }
-  if (body.data.timerElapsedSec !== undefined) {
-    updates.timerElapsedSec = body.data.timerElapsedSec;
-  }
-  if (body.data.timerTargetSec !== undefined) {
-    updates.timerTargetSec = body.data.timerTargetSec;
-  }
-  if (body.data.color !== undefined) {
-    updates.color = body.data.color;
-  }
+    const nextRowId = body.rowId ?? existing.rowId;
+    if (body.statusId !== undefined) {
+      const status = await statusBelongsToTeam(body.statusId, existing.teamId);
+      if (!status) return c.json({ error: "Status not found" }, 404);
+      if (nextRowId && status.rowId !== nextRowId) {
+        return c.json({ error: "Status does not belong to this row" }, 400);
+      }
+      updates.statusId = body.statusId;
+      if (status.type === "done") {
+        updates.completedAt = new Date().toISOString();
+      } else {
+        updates.completedAt = null;
+      }
+    } else if (body.rowId !== undefined && body.rowId !== existing.rowId && body.rowId) {
+      const [currentStatus] = await db
+        .select()
+        .from(schema.issueStatuses)
+        .where(eq(schema.issueStatuses.id, existing.statusId))
+        .limit(1);
 
-  await db.update(schema.issues).set(updates).where(eq(schema.issues.id, id));
+      const targetStatuses = await db
+        .select()
+        .from(schema.issueStatuses)
+        .where(eq(schema.issueStatuses.rowId, body.rowId));
 
-  const [issue] = await db.select().from(schema.issues).where(eq(schema.issues.id, id)).limit(1);
+      const mapped =
+        targetStatuses.find((s) => s.type === currentStatus?.type) ??
+        targetStatuses.find((s) => s.position === currentStatus?.position) ??
+        targetStatuses[0];
 
-  const teamKey = await getTeamKey(db, issue!.teamId);
+      if (!mapped) {
+        return c.json({ error: "Target row has no columns configured" }, 400);
+      }
 
-  await logActivity(db, {
-    issueId: id,
-    userId: auth.userId,
-    action: "issue.updated",
-    metadata: body.data,
-    source: auth.source,
-  });
+      updates.statusId = mapped.id;
+      if (mapped.type === "done") {
+        updates.completedAt = new Date().toISOString();
+      } else {
+        updates.completedAt = null;
+      }
+    }
 
-  return c.json({ issue: await mapIssue(db, issue!, teamKey) });
-});
+    if (body.boardSort !== undefined) updates.boardSort = body.boardSort;
+    if (body.timerActiveAt !== undefined) {
+      updates.timerActiveAt = body.timerActiveAt;
+    }
+    if (body.timerElapsedSec !== undefined) {
+      updates.timerElapsedSec = body.timerElapsedSec;
+    }
+    if (body.timerTargetSec !== undefined) {
+      updates.timerTargetSec = body.timerTargetSec;
+    }
+    if (body.color !== undefined) {
+      updates.color = body.color;
+    }
 
-routes.post("/issues/:id/complete", requireAuth, requireWrite, loadTeam("issue"), async (c) => {
-  const auth = c.var.auth;
+    await db.update(schema.issues).set(updates).where(eq(schema.issues.id, id));
 
-  const existing = c.var.issue;
-  const id = existing.id;
+    const [issue] = await db.select().from(schema.issues).where(eq(schema.issues.id, id)).limit(1);
 
-  const issueRowId = existing.rowId ?? (await getDefaultRowId(db, existing.teamId));
-  const doneStatusId = await getDoneStatusId(db, issueRowId);
-  if (!doneStatusId) {
-    return c.json({ error: "Done status not configured" }, 400);
-  }
+    const teamKey = await getTeamKey(db, issue!.teamId);
 
-  const now = new Date().toISOString();
-  await db
-    .update(schema.issues)
-    .set({
-      statusId: doneStatusId,
-      completedAt: now,
-      updatedAt: now,
-    })
-    .where(eq(schema.issues.id, id));
+    await logActivity(db, {
+      issueId: id,
+      userId: auth.userId,
+      action: "issue.updated",
+      metadata: body,
+      source: auth.source,
+    });
 
-  const [issue] = await db.select().from(schema.issues).where(eq(schema.issues.id, id)).limit(1);
+    return c.json({ issue: await mapIssue(db, issue!, teamKey) });
+  },
+);
 
-  const teamKey = await getTeamKey(db, issue!.teamId);
+routes.post(
+  "/issues/:id/complete",
+  requireAuth,
+  requireWrite,
+  validateParams,
+  loadTeam("issue"),
+  async (c) => {
+    const auth = c.var.auth;
 
-  await logActivity(db, {
-    issueId: id,
-    userId: auth.userId,
-    action: "issue.completed",
-    source: auth.source,
-  });
+    const existing = c.var.issue;
+    const id = existing.id;
 
-  return c.json({ issue: await mapIssue(db, issue!, teamKey) });
-});
+    const issueRowId = existing.rowId ?? (await getDefaultRowId(db, existing.teamId));
+    const doneStatusId = await getDoneStatusId(db, issueRowId);
+    if (!doneStatusId) {
+      return c.json({ error: "Done status not configured" }, 400);
+    }
 
-routes.delete("/issues/:id", requireAuth, requireWrite, loadTeam("issue"), async (c) => {
-  const auth = c.var.auth;
+    const now = new Date().toISOString();
+    await db
+      .update(schema.issues)
+      .set({
+        statusId: doneStatusId,
+        completedAt: now,
+        updatedAt: now,
+      })
+      .where(eq(schema.issues.id, id));
 
-  const existing = c.var.issue;
-  const id = existing.id;
-  if (existing.deletedAt) return c.body(null, 204);
+    const [issue] = await db.select().from(schema.issues).where(eq(schema.issues.id, id)).limit(1);
 
-  const now = new Date().toISOString();
-  await db
-    .update(schema.issues)
-    .set({ deletedAt: now, updatedAt: now })
-    .where(eq(schema.issues.id, id));
+    const teamKey = await getTeamKey(db, issue!.teamId);
 
-  await logActivity(db, {
-    userId: auth.userId,
-    action: "issue.deleted",
-    metadata: { issueId: id },
-    source: auth.source,
-  });
+    await logActivity(db, {
+      issueId: id,
+      userId: auth.userId,
+      action: "issue.completed",
+      source: auth.source,
+    });
 
-  return c.body(null, 204);
-});
+    return c.json({ issue: await mapIssue(db, issue!, teamKey) });
+  },
+);
 
-routes.post("/issues/:id/restore", requireAuth, requireWrite, loadTeam("issue"), async (c) => {
-  const auth = c.var.auth;
+routes.delete(
+  "/issues/:id",
+  requireAuth,
+  requireWrite,
+  validateParams,
+  loadTeam("issue"),
+  async (c) => {
+    const auth = c.var.auth;
 
-  const existing = c.var.issue;
-  const id = existing.id;
-  if (!existing.deletedAt) {
-    return c.json({ error: "Issue is not in trash" }, 400);
-  }
+    const existing = c.var.issue;
+    const id = existing.id;
+    if (existing.deletedAt) return c.body(null, 204);
 
-  const now = new Date().toISOString();
-  await db
-    .update(schema.issues)
-    .set({ deletedAt: null, updatedAt: now })
-    .where(eq(schema.issues.id, id));
+    const now = new Date().toISOString();
+    await db
+      .update(schema.issues)
+      .set({ deletedAt: now, updatedAt: now })
+      .where(eq(schema.issues.id, id));
 
-  const [issue] = await db.select().from(schema.issues).where(eq(schema.issues.id, id)).limit(1);
+    await logActivity(db, {
+      userId: auth.userId,
+      action: "issue.deleted",
+      metadata: { issueId: id },
+      source: auth.source,
+    });
 
-  const teamKey = await getTeamKey(db, issue!.teamId);
+    return c.body(null, 204);
+  },
+);
 
-  await logActivity(db, {
-    issueId: id,
-    userId: auth.userId,
-    action: "issue.restored",
-    source: auth.source,
-  });
+routes.post(
+  "/issues/:id/restore",
+  requireAuth,
+  requireWrite,
+  validateParams,
+  loadTeam("issue"),
+  async (c) => {
+    const auth = c.var.auth;
 
-  return c.json({ issue: await mapIssue(db, issue!, teamKey) });
-});
+    const existing = c.var.issue;
+    const id = existing.id;
+    if (!existing.deletedAt) {
+      return c.json({ error: "Issue is not in trash" }, 400);
+    }
+
+    const now = new Date().toISOString();
+    await db
+      .update(schema.issues)
+      .set({ deletedAt: null, updatedAt: now })
+      .where(eq(schema.issues.id, id));
+
+    const [issue] = await db.select().from(schema.issues).where(eq(schema.issues.id, id)).limit(1);
+
+    const teamKey = await getTeamKey(db, issue!.teamId);
+
+    await logActivity(db, {
+      issueId: id,
+      userId: auth.userId,
+      action: "issue.restored",
+      source: auth.source,
+    });
+
+    return c.json({ issue: await mapIssue(db, issue!, teamKey) });
+  },
+);
 
 export { routes as issuesRoutes };

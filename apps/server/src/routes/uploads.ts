@@ -1,5 +1,8 @@
 import { Hono } from "hono";
 import type { AppEnv } from "../types.js";
+import { parseBody } from "../lib/validation.js";
+import { validateParams } from "../middleware/params.js";
+import { createUploadSessionSchema } from "@teamflow/core";
 import { db } from "../db.js";
 import { requireAuth, requireWrite } from "../middleware/auth.js";
 import { loadTeam } from "../middleware/team.js";
@@ -13,40 +16,29 @@ import {
 /** Chunked upload sessions for issue and row attachments. */
 const routes = new Hono<AppEnv>();
 
-function parseCreateUploadSession(body: unknown) {
-  if (!body || typeof body !== "object") return null;
-  const record = body as Record<string, unknown>;
-  if (typeof record.filename !== "string" || !record.filename.trim()) return null;
-  if (typeof record.totalBytes !== "number" || record.totalBytes <= 0) return null;
-  return {
-    filename: record.filename.trim(),
-    mimeType:
-      typeof record.mimeType === "string" && record.mimeType
-        ? record.mimeType
-        : "application/octet-stream",
-    totalBytes: Math.floor(record.totalBytes),
-  };
-}
+routes.post(
+  "/issues/:issueId/uploads",
+  requireAuth,
+  requireWrite,
+  validateParams,
+  loadTeam("issue"),
+  async (c) => {
+    const auth = c.var.auth;
 
-routes.post("/issues/:issueId/uploads", requireAuth, requireWrite, loadTeam("issue"), async (c) => {
-  const auth = c.var.auth;
+    const issue = c.var.issue;
+    const issueId = issue.id;
+    const body = await parseBody(c, createUploadSessionSchema);
 
-  const issue = c.var.issue;
-  const issueId = issue.id;
-  const body = parseCreateUploadSession(await c.req.json());
-  if (!body) {
-    return c.json({ error: "Invalid input" }, 400);
-  }
+    const session = await createUploadSession(db, { issueId }, auth.userId, {
+      filename: body.filename,
+      mimeType: body.mimeType,
+      totalBytes: body.totalBytes,
+    });
+    return c.json({ session }, 201);
+  },
+);
 
-  const session = await createUploadSession(db, { issueId }, auth.userId, {
-    filename: body.filename,
-    mimeType: body.mimeType,
-    totalBytes: body.totalBytes,
-  });
-  return c.json({ session }, 201);
-});
-
-routes.get("/uploads/:sessionId", requireAuth, loadTeam("upload"), async (c) => {
+routes.get("/uploads/:sessionId", requireAuth, validateParams, loadTeam("upload"), async (c) => {
   const session = c.var.uploadSession;
 
   return c.json({ session });
@@ -56,6 +48,7 @@ routes.put(
   "/uploads/:sessionId/chunks/:index",
   requireAuth,
   requireWrite,
+  validateParams,
   loadTeam("upload"),
   async (c) => {
     const auth = c.var.auth;
@@ -77,6 +70,7 @@ routes.post(
   "/uploads/:sessionId/complete",
   requireAuth,
   requireWrite,
+  validateParams,
   loadTeam("upload"),
   async (c) => {
     const auth = c.var.auth;
@@ -89,30 +83,41 @@ routes.post(
   },
 );
 
-routes.delete("/uploads/:sessionId", requireAuth, requireWrite, loadTeam("upload"), async (c) => {
-  const existing = c.var.uploadSession;
-  const sessionId = existing.sessionId;
+routes.delete(
+  "/uploads/:sessionId",
+  requireAuth,
+  requireWrite,
+  validateParams,
+  loadTeam("upload"),
+  async (c) => {
+    const existing = c.var.uploadSession;
+    const sessionId = existing.sessionId;
 
-  await abortUploadSession(db, sessionId);
-  return c.body(null, 204);
-});
+    await abortUploadSession(db, sessionId);
+    return c.body(null, 204);
+  },
+);
 
-routes.post("/rows/:rowId/uploads", requireAuth, requireWrite, loadTeam("row"), async (c) => {
-  const auth = c.var.auth;
+routes.post(
+  "/rows/:rowId/uploads",
+  requireAuth,
+  requireWrite,
+  validateParams,
+  loadTeam("row"),
+  async (c) => {
+    const auth = c.var.auth;
 
-  const row = c.var.row;
-  const rowId = row.id;
-  const body = parseCreateUploadSession(await c.req.json());
-  if (!body) {
-    return c.json({ error: "Invalid input" }, 400);
-  }
+    const row = c.var.row;
+    const rowId = row.id;
+    const body = await parseBody(c, createUploadSessionSchema);
 
-  const session = await createUploadSession(db, { rowId }, auth.userId, {
-    filename: body.filename,
-    mimeType: body.mimeType,
-    totalBytes: body.totalBytes,
-  });
-  return c.json({ session }, 201);
-});
+    const session = await createUploadSession(db, { rowId }, auth.userId, {
+      filename: body.filename,
+      mimeType: body.mimeType,
+      totalBytes: body.totalBytes,
+    });
+    return c.json({ session }, 201);
+  },
+);
 
 export { routes as uploadsRoutes };

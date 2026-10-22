@@ -1,5 +1,6 @@
 import { Hono } from "hono";
 import type { AppEnv } from "../types.js";
+import { parseBody, parseWith, readJson } from "../lib/validation.js";
 import {
   forgotPasswordSchema,
   loginSchema,
@@ -51,24 +52,21 @@ routes.get("/auth/config", (c) => {
 });
 
 routes.post("/auth/register", async (c) => {
-  const body = registerSchema.safeParse(await c.req.json());
-  if (!body.success) {
-    return c.json({ error: body.error.issues[0]?.message ?? "Invalid input" }, 400);
-  }
+  const body = await parseBody(c, registerSchema);
 
   const inviteOnly = isInviteOnlyRegistration();
-  if (inviteOnly && !body.data.inviteToken) {
+  if (inviteOnly && !body.inviteToken) {
     return c.json({ error: "Registration requires a valid invite link" }, 403);
   }
 
-  if (body.data.inviteToken) {
-    await assertInviteAcceptable(db, body.data.inviteToken);
+  if (body.inviteToken) {
+    await assertInviteAcceptable(db, body.inviteToken);
   }
 
   const existing = await db
     .select()
     .from(schema.users)
-    .where(eq(schema.users.email, body.data.email))
+    .where(eq(schema.users.email, body.email))
     .limit(1);
 
   if (existing[0]) {
@@ -76,7 +74,7 @@ routes.post("/auth/register", async (c) => {
   }
 
   const userId = crypto.randomUUID();
-  const passwordHash = await hashPassword(body.data.password);
+  const passwordHash = await hashPassword(body.password);
 
   // The first account on a fresh install becomes instance admin (server-wide settings).
   const [userCount] = await db.select({ count: sql<number>`count(*)` }).from(schema.users);
@@ -84,13 +82,13 @@ routes.post("/auth/register", async (c) => {
 
   await db.insert(schema.users).values({
     id: userId,
-    email: body.data.email,
-    name: body.data.name,
+    email: body.email,
+    name: body.name,
     passwordHash,
     isInstanceAdmin: isFirstUser ? 1 : 0,
   });
 
-  const workspaceId = await getOrCreatePersonalWorkspace(db, userId, body.data.name);
+  const workspaceId = await getOrCreatePersonalWorkspace(db, userId, body.name);
 
   const teamId = crypto.randomUUID();
   await db.insert(schema.teams).values({
@@ -115,8 +113,8 @@ routes.post("/auth/register", async (c) => {
 
   await createDefaultBoardRow(db, teamId);
 
-  if (body.data.inviteToken) {
-    await acceptTeamInvite(db, body.data.inviteToken, userId);
+  if (body.inviteToken) {
+    await acceptTeamInvite(db, body.inviteToken, userId);
   }
 
   const [user] = await db.select().from(schema.users).where(eq(schema.users.id, userId)).limit(1);
@@ -127,18 +125,15 @@ routes.post("/auth/register", async (c) => {
 });
 
 routes.post("/auth/login", async (c) => {
-  const body = loginSchema.safeParse(await c.req.json());
-  if (!body.success) {
-    return c.json({ error: "Invalid credentials" }, 400);
-  }
+  const body = await parseBody(c, loginSchema, { message: "Invalid credentials" });
 
   const [user] = await db
     .select()
     .from(schema.users)
-    .where(eq(schema.users.email, body.data.email))
+    .where(eq(schema.users.email, body.email))
     .limit(1);
 
-  if (!user || !(await verifyPassword(body.data.password, user.passwordHash))) {
+  if (!user || !(await verifyPassword(body.password, user.passwordHash))) {
     return c.json({ error: "Invalid credentials" }, 401);
   }
 
@@ -148,22 +143,16 @@ routes.post("/auth/login", async (c) => {
 });
 
 routes.post("/auth/forgot-password", async (c) => {
-  const body = forgotPasswordSchema.safeParse(await c.req.json());
-  if (!body.success) {
-    return c.json({ error: body.error.issues[0]?.message ?? "Invalid email" }, 400);
-  }
+  const body = await parseBody(c, forgotPasswordSchema);
 
-  const result = await requestPasswordReset(db, body.data.email);
+  const result = await requestPasswordReset(db, body.email);
   return c.json(result);
 });
 
 routes.post("/auth/reset-password", async (c) => {
-  const body = resetPasswordSchema.safeParse(await c.req.json());
-  if (!body.success) {
-    return c.json({ error: body.error.issues[0]?.message ?? "Invalid input" }, 400);
-  }
+  const body = await parseBody(c, resetPasswordSchema);
 
-  await resetPasswordWithToken(db, body.data.token, body.data.password);
+  await resetPasswordWithToken(db, body.token, body.password);
   return c.json({ ok: true });
 });
 
@@ -190,24 +179,18 @@ routes.get("/auth/profile", requireAuth, async (c) => {
 routes.put("/auth/profile", requireAuth, requireWrite, async (c) => {
   const auth = c.var.auth;
 
-  const body = userProfileSchema.safeParse(await c.req.json());
-  if (!body.success) {
-    return c.json({ error: body.error.issues[0]?.message ?? "Invalid profile" }, 400);
-  }
+  const body = await parseBody(c, userProfileSchema);
 
-  const profile = await saveUserProfile(db, auth.userId, body.data);
+  const profile = await saveUserProfile(db, auth.userId, body);
   return c.json({ profile });
 });
 
 routes.patch("/auth/profile", requireAuth, requireWrite, async (c) => {
   const auth = c.var.auth;
 
-  const body = userProfilePatchSchema.safeParse(await c.req.json());
-  if (!body.success) {
-    return c.json({ error: body.error.issues[0]?.message ?? "Invalid profile patch" }, 400);
-  }
+  const body = await parseBody(c, userProfilePatchSchema);
 
-  const profile = await patchUserProfile(db, auth.userId, body.data);
+  const profile = await patchUserProfile(db, auth.userId, body);
   return c.json({ profile });
 });
 
@@ -229,14 +212,11 @@ routes.get("/auth/profile/export", requireAuth, async (c) => {
 routes.post("/auth/profile/import", requireAuth, requireWrite, async (c) => {
   const auth = c.var.auth;
 
-  const raw = await c.req.json();
-  const profile = parseUserProfileImport(raw);
-  const validated = userProfileSchema.safeParse(profile);
-  if (!validated.success) {
-    return c.json({ error: "Invalid profile file" }, 400);
-  }
+  const profile = parseWith(userProfileSchema, parseUserProfileImport(await readJson(c)), {
+    message: "Invalid profile file",
+  });
 
-  const saved = await saveUserProfile(db, auth.userId, validated.data);
+  const saved = await saveUserProfile(db, auth.userId, profile);
   return c.json({ profile: saved });
 });
 
