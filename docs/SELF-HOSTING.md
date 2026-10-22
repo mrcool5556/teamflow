@@ -38,7 +38,7 @@ Do these on every production install, and once when upgrading an install from be
 
 Useful but optional: `NODE_ENV=production` (turns off the localhost dev origins in CORS), `TEAMFLOW_INVITE_ONLY=true`.
 
-**The server does not read `.env` by itself.** On Setup B systemd loads it (`EnvironmentFile=/opt/teamflow/.env`). On Setup A you must pass it (see below).
+**How `.env` is read.** At startup the server loads `TEAMFLOW_ENV_FILE` if set, else `.env` in the app folder if it exists. Variables already in the process environment always win over the file. On Setup B systemd also supplies it (`EnvironmentFile=/opt/teamflow/.env`), so nothing changes there; on Setup A `start.ps1` and the NSSM service point the server at it.
 
 ---
 
@@ -90,20 +90,12 @@ Fresh machine (clone + install):
 
 ### Start
 
-`start.ps1` and the NSSM service do **not** load `.env`, and the server refuses to start without `JWT_SECRET`. Until the scripts are fixed, start it with Node's own env-file loader:
-
 ```powershell
 cd D:\teamflow
-$env:SERVE_WEB = "true"
-node --env-file=.env apps/server/dist/index.js
-```
-
-or set the variables in the session first and use `.\deploy\windows\start.ps1`:
-
-```powershell
-$env:JWT_SECRET = "<your secret>"
 .\deploy\windows\start.ps1
 ```
+
+The server loads `.env` (set `JWT_SECRET` there first; it refuses to start without one). Variables set in the session override the file.
 
 Open <http://localhost:3000> and register; the first account becomes the instance admin.
 
@@ -114,17 +106,15 @@ cd D:\teamflow
 .\deploy\windows\update.ps1
 ```
 
-Stops the app, backs up `data\teamflow.db`, `git pull`, `pnpm install`, `pnpm build`, `pnpm db:migrate`. Start it again as above (`-StartAfter` uses `start.ps1`, which needs `JWT_SECRET` in the environment).
+Stops the app, backs up `data\teamflow.db`, `git pull`, `pnpm install`, `pnpm build`, `pnpm db:migrate`. Start it again as above, or pass `-StartAfter`.
 
 ### Optional: Windows service (NSSM)
 
 ```powershell
 .\deploy\windows\install-service.ps1
-nssm set Teamflow AppEnvironmentExtra PORT=3000 DATABASE_URL=file:./data/teamflow.db SERVE_WEB=true JWT_SECRET=<your secret> PUBLIC_URL=http://localhost:3000
-nssm restart Teamflow
 ```
 
-`install-service.ps1` only sets `PORT` and `DATABASE_URL`; the second line replaces that list with everything the server needs.
+The service points `TEAMFLOW_ENV_FILE` at the repo's `.env` and sets `PORT`, `DATABASE_URL` and `SERVE_WEB=true`; the rest comes from `.env`. After editing `.env`, run `nssm restart Teamflow`.
 
 More: [deploy/windows/README.md](../deploy/windows/README.md)
 
@@ -280,10 +270,10 @@ Not for production. See the [README quick start](../README.md#quick-start-develo
 | Action | Windows (A) | LXC (B) |
 |--------|-------------|---------|
 | Install | `install.ps1` | `install.sh` |
-| Start | `node --env-file=.env apps/server/dist/index.js` or NSSM | `systemctl start teamflow` |
+| Start | `start.ps1` or NSSM | `systemctl start teamflow` |
 | Update | `update.ps1` | `sudo update` or Settings → Updates |
 | Logs | terminal / NSSM | `journalctl -u teamflow -f`, `data/maintenance.log` |
-| Config | `.env` in repo root (passed explicitly) | `/opt/teamflow/.env` (systemd) |
+| Config | `.env` in repo root (loaded by the server) | `/opt/teamflow/.env` (systemd) |
 | Backup | `backup.ps1` | `sudo teamflow-backup` |
 | Data upkeep | `pnpm db:maintenance` | `sudo -u teamflow pnpm db:maintenance` in `/opt/teamflow` |
 
