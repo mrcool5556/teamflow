@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import { Navigate, useLocation, useNavigate, type Location } from "react-router";
 import type {
   BoardRowPublic,
   IssuePublic,
@@ -43,24 +44,25 @@ import { useTeamPermissions } from "./hooks/useTeamPermissions";
 import { hasTeamPermission } from "./lib/teamPermissions";
 import {
   normalizeRefInput,
-  readRefFromLocation,
   scrollToColumnRef,
   scrollToIssueRef,
   scrollToRowRef,
-  stashPendingRef,
-  syncRefInLocation,
-  takePendingRef,
 } from "./lib/refLinks";
-import {
-  hasPendingInvite,
-  readInviteFromLocation,
-  stashPendingInvite,
-  syncInviteInLocation,
-  takePendingInvite,
-} from "./lib/inviteLinks";
+import { hasPendingInvite, stashPendingInvite, takePendingInvite } from "./lib/inviteLinks";
 import { clearRefBackStack, peekRefBack, popRefBack, pushRefBack } from "./lib/refBackStack";
+import {
+  boardPath,
+  isSettingsPanel,
+  issuePath,
+  legacyLinkTarget,
+  planPath,
+  settingsPath,
+  useAppRoute,
+  type AuthMode,
+} from "./lib/appRoute";
 
-type View = "login" | "board" | "settings" | "roadmap";
+/** Location state: where to go after login, and a row/column ref for the board to open. */
+type NavState = { from?: Pick<Location, "pathname" | "search" | "state">; ref?: string } | null;
 
 const APP_VERSION = __TEAMFLOW_VERSION__;
 
@@ -70,14 +72,20 @@ type QuickAddTarget =
   | { kind: "issue"; rowId: string; statusId: string };
 
 export function App() {
-  const [view, setView] = useState<View>(() => (getStoredUser() ? "board" : "login"));
+  const location = useLocation();
+  const navigate = useNavigate();
+  const route = useAppRoute();
+  const navState = location.state as NavState;
   const [user, setUser] = useState<UserPublic | null>(getStoredUser);
   const [teams, setTeams] = useState<TeamPublic[]>([]);
+  const [teamsLoaded, setTeamsLoaded] = useState(false);
   const [rows, setRows] = useState<BoardRowPublic[]>([]);
   const [statuses, setStatuses] = useState<IssueStatusPublic[]>([]);
   const [issues, setIssues] = useState<IssuePublic[]>([]);
   const [members, setMembers] = useState<TeamMemberPublic[]>([]);
-  const [teamId, setTeamId] = useState<string | null>(null);
+  const routeTeam = route.teamKey ? (teams.find((team) => team.key === route.teamKey) ?? null) : null;
+  const teamId = routeTeam?.id ?? null;
+  const teamKey = routeTeam?.key ?? null;
   const [selectedIssue, setSelectedIssue] = useState<IssuePublic | null>(null);
   const [rowFilesRow, setRowFilesRow] = useState<BoardRowPublic | null>(null);
   const [teamFilesOpen, setTeamFilesOpen] = useState(false);
@@ -86,6 +94,8 @@ export function App() {
   );
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  /** Team whose board data is currently loaded. */
+  const [boardTeamId, setBoardTeamId] = useState<string | null>(null);
   const [patName, setPatName] = useState("Cursor MCP");
   const [createdPat, setCreatedPat] = useState<string | null>(null);
   const [profile, setProfile] = useState<UserProfile>(createDefaultUserProfile);
@@ -102,8 +112,9 @@ export function App() {
   const [refNavActive, setRefNavActive] = useState(false);
   const refNavTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const boardScrollRef = useRef<HTMLDivElement | null>(null);
-  const pendingRefHandledRef = useRef(false);
-  const pendingInviteHandledRef = useRef(false);
+  const handledRefStateRef = useRef<unknown>(null);
+  const handledInviteRef = useRef<string | null>(null);
+  const lastSettingsPanelRef = useRef<SettingsPanel>("general");
   const {
     history: changeHistory,
     pending: pendingUndo,
@@ -114,9 +125,14 @@ export function App() {
   } = useChangeHistory();
   const [quickAdd, setQuickAdd] = useState<QuickAddTarget | null>(null);
   const [quickAddValue, setQuickAddValue] = useState("");
-  const [settingsPanel, setSettingsPanel] = useState<SettingsPanel>("general");
-  const { permissions: teamPermissions, reload: reloadTeamPermissions } =
-    useTeamPermissions(teamId);
+  const settingsPanel: SettingsPanel = isSettingsPanel(route.settingsPanel ?? undefined)
+    ? (route.settingsPanel as SettingsPanel)
+    : "general";
+  const {
+    permissions: teamPermissions,
+    ready: teamPermissionsReady,
+    reload: reloadTeamPermissions,
+  } = useTeamPermissions(teamId);
   const currentMember = members.find((member) => member.userId === user?.id);
   const effectiveTeamPermissions =
     teamPermissions ??
@@ -219,6 +235,7 @@ export function App() {
       setRows(rowsResult.value.rows);
       setIssues(issuesResult.value.issues);
       setMembers(membersResult.status === "fulfilled" ? membersResult.value.members : []);
+      setBoardTeamId(activeTeamId);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to load board");
     } finally {
@@ -233,11 +250,9 @@ export function App() {
       const { user: me } = await client.me();
       setUser(me);
 
-      let profileState = createDefaultUserProfile();
       try {
         const { profile: serverProfile } = await client.getProfile();
         const { profile: next, migrated } = mergeWithLegacyDefaults(serverProfile);
-        profileState = next;
         profileRef.current = next;
         applyUserProfile(next);
         setProfile(next);
@@ -247,87 +262,67 @@ export function App() {
         }
       } catch {
         const { profile: fallback } = mergeWithLegacyDefaults(createDefaultUserProfile());
-        profileState = fallback;
         profileRef.current = fallback;
         applyUserProfile(fallback);
         setProfile(fallback);
       }
 
-      let joinedTeamId: string | null = null;
-      if (!pendingInviteHandledRef.current) {
-        const pendingInvite = takePendingInvite() ?? readInviteFromLocation();
-        if (pendingInvite) {
-          pendingInviteHandledRef.current = true;
-          try {
-            const { team, alreadyMember } = await client.acceptInvite(pendingInvite);
-            syncInviteInLocation(null);
-            joinedTeamId = team.id;
-            setRefNotice(
-              alreadyMember
-                ? `Already on team ${team.key} — ${team.name}`
-                : `Joined team ${team.key} — ${team.name}`,
-            );
-          } catch (err) {
-            setError(err instanceof Error ? err.message : "Failed to accept invite");
-          }
-        }
-      }
-
       const { teams: nextTeams } = await client.listTeams();
       setTeams(nextTeams);
-
-      const savedTeamId = profileState.ui?.lastTeamId ?? null;
-      const activeTeam =
-        (joinedTeamId && nextTeams.some((team) => team.id === joinedTeamId)
-          ? joinedTeamId
-          : null) ??
-        (savedTeamId && nextTeams.some((team) => team.id === savedTeamId) ? savedTeamId : null) ??
-        nextTeams[0]?.id ??
-        null;
-
-      setTeamId(activeTeam);
-      if (activeTeam && activeTeam !== savedTeamId) {
-        const withTeam = mergeUserProfile(profileState, { ui: { lastTeamId: activeTeam } });
-        profileRef.current = withTeam;
-        setProfile(withTeam);
-        applyUserProfile(withTeam);
-        void client.patchProfile({ ui: { lastTeamId: activeTeam } });
-      }
-      if (activeTeam) await loadBoard(activeTeam);
-      setView("board");
+      setTeamsLoaded(true);
     } catch {
       clearSession();
       setUser(null);
-      setView("login");
     } finally {
       setLoading(false);
     }
-  }, [loadBoard]);
+  }, []);
+
+  /** Team to open when the URL names none: the last one used, else the first. */
+  function defaultTeamKey(list: TeamPublic[] = teams) {
+    const savedTeamId = profileRef.current.ui?.lastTeamId ?? null;
+    return (list.find((team) => team.id === savedTeamId) ?? list[0])?.key ?? null;
+  }
+
+  // Remember the open team so the next visit to / lands on it.
+  useEffect(() => {
+    if (!teamId || profileRef.current.ui?.lastTeamId === teamId) return;
+    updateProfile(mergeUserProfile(profileRef.current, { ui: { lastTeamId: teamId } }));
+  }, [teamId, updateProfile]);
+
+  useEffect(() => {
+    if (!teamId) {
+      setRows([]);
+      setIssues([]);
+      setStatuses([]);
+      setMembers([]);
+      return;
+    }
+    void loadBoard(teamId);
+  }, [teamId, loadBoard]);
 
   const switchTeam = useCallback(
-    async (nextTeamId: string) => {
-      if (!nextTeamId) return;
-      setTeamId(nextTeamId);
-      setSelectedIssue(null);
+    (nextTeamId: string, list: TeamPublic[] = teams) => {
+      const next = list.find((team) => team.id === nextTeamId);
+      if (!next) return;
       clearRefBackStack();
       setRefBackLabel(null);
-      updateProfile(mergeUserProfile(profileRef.current, { ui: { lastTeamId: nextTeamId } }));
-      await loadBoard(nextTeamId);
+      navigate(boardPath(next.key));
     },
-    [loadBoard, updateProfile],
+    [navigate, teams],
   );
 
   async function refreshTeamsAndSwitch(teamIdToSelect: string) {
     const { teams: nextTeams } = await client.listTeams();
     setTeams(nextTeams);
-    await switchTeam(teamIdToSelect);
+    switchTeam(teamIdToSelect, nextTeams);
   }
 
   async function handleTeamCreated(newTeamId: string, switchToNew: boolean) {
     const { teams: nextTeams } = await client.listTeams();
     setTeams(nextTeams);
     if (switchToNew || !teamId) {
-      await refreshTeamsAndSwitch(newTeamId);
+      switchTeam(newTeamId, nextTeams);
     }
   }
 
@@ -335,16 +330,8 @@ export function App() {
     const { teams: nextTeams } = await client.listTeams();
     setTeams(nextTeams);
     if (teamId === leftTeamId) {
-      const fallback = nextTeams[0]?.id ?? null;
-      setTeamId(fallback);
-      setSelectedIssue(null);
-      setRows([]);
-      setIssues([]);
-      setStatuses([]);
-      setMembers([]);
-      if (fallback) {
-        await switchTeam(fallback);
-      }
+      const fallback = nextTeams[0]?.key ?? null;
+      navigate(boardPath(fallback));
     }
   }
 
@@ -352,37 +339,66 @@ export function App() {
     const { teams: nextTeams } = await client.listTeams();
     setTeams(nextTeams);
     if (teamId === deletedTeamId) {
-      const fallback = nextTeams[0]?.id ?? null;
-      setTeamId(fallback);
-      setSelectedIssue(null);
-      setRows([]);
-      setIssues([]);
-      setStatuses([]);
-      setMembers([]);
-      if (fallback) {
-        await switchTeam(fallback);
-      }
+      const fallback = nextTeams[0]?.key ?? null;
+      navigate(boardPath(fallback));
     }
   }
 
+  // /invite/:token: accept once signed in (the logged-out case stashes it for register).
   useEffect(() => {
-    const ref = readRefFromLocation();
-    if (ref && !getStoredUser()) {
-      stashPendingRef(ref);
-    }
-    const invite = readInviteFromLocation();
-    if (invite && !getStoredUser()) {
-      stashPendingInvite(invite);
-    }
-  }, []);
+    const token = route.inviteToken;
+    if (!token || !user || !teamsLoaded || handledInviteRef.current === token) return;
+    handledInviteRef.current = token;
+    takePendingInvite();
+    void (async () => {
+      try {
+        const { team, alreadyMember } = await client.acceptInvite(token);
+        const { teams: nextTeams } = await client.listTeams();
+        setTeams(nextTeams);
+        setRefNotice(
+          alreadyMember
+            ? `Already on team ${team.key} — ${team.name}`
+            : `Joined team ${team.key} — ${team.name}`,
+        );
+        navigate(boardPath(team.key), { replace: true });
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "Failed to accept invite");
+        navigate("/", { replace: true });
+      }
+    })();
+  }, [route.inviteToken, user, teamsLoaded, navigate]);
 
+  // A row/column ref handed over by a legacy ?ref= link or by goToRef across a reload.
   useEffect(() => {
-    if (view !== "board" || !teamId || loading || pendingRefHandledRef.current) return;
-    const ref = takePendingRef() ?? readRefFromLocation();
-    if (!ref) return;
-    pendingRefHandledRef.current = true;
+    const ref = navState?.ref;
+    if (!ref || !teamId || loading || handledRefStateRef.current === navState) return;
+    handledRefStateRef.current = navState;
+    navigate(`${location.pathname}${location.search}`, { replace: true, state: null });
     void goToRef(ref);
-  }, [view, teamId, loading]);
+  }, [navState, teamId, loading]);
+
+  // The selected issue follows /t/:teamKey/issue/:issueRef.
+  useEffect(() => {
+    if (!route.issueRef) {
+      setSelectedIssue(null);
+      return;
+    }
+    const match = issues.find((issue) => issue.identifier === route.issueRef);
+    if (match) {
+      setSelectedIssue((prev) => (prev?.id === match.id ? prev : match));
+    } else if (teamId && boardTeamId === teamId && !loading) {
+      void goToRef(route.issueRef, { skipBackPush: true });
+    }
+  }, [route.issueRef, issues, teamId, boardTeamId, loading]);
+
+  function openIssue(issue: Pick<IssuePublic, "identifier">) {
+    if (!teamKey) return;
+    navigate(issuePath(teamKey, issue.identifier));
+  }
+
+  function closeIssue() {
+    if (route.issueRef) navigate(boardPath(teamKey));
+  }
 
   useEffect(() => {
     if (!refNotice) return;
@@ -441,7 +457,7 @@ export function App() {
     setLoading(true);
     setError(null);
     try {
-      const inviteToken = takePendingInvite() ?? readInviteFromLocation() ?? undefined;
+      const inviteToken = takePendingInvite() ?? undefined;
       const result = await client.register({
         name,
         email,
@@ -725,7 +741,7 @@ export function App() {
     const wasSelected = selectedIssue && ids.has(selectedIssue.id);
 
     setIssues((prev) => prev.filter((issue) => !ids.has(issue.id)));
-    if (wasSelected) setSelectedIssue(null);
+    if (wasSelected) closeIssue();
 
     scheduleUndo({
       label:
@@ -741,7 +757,7 @@ export function App() {
           }
           return next;
         });
-        if (wasSelected) setSelectedIssue(issuesToDelete[0] ?? null);
+        if (wasSelected) openIssue(issuesToDelete[0]!);
       },
       commit: async () => {
         await Promise.all(issuesToDelete.map((issue) => client.deleteIssue(issue.id)));
@@ -751,7 +767,7 @@ export function App() {
           ? async () => {
               const { issue: restored } = await client.restoreIssue(issuesToDelete[0]!.id);
               setIssues((prev) => insertIssueSorted(prev, restored));
-              if (wasSelected) setSelectedIssue(restored);
+              if (wasSelected) openIssue(restored);
             }
           : undefined,
     });
@@ -900,14 +916,14 @@ export function App() {
     const wasSelected = selectedIssue?.id === issue.id;
 
     setIssues((prev) => prev.filter((item) => item.id !== issue.id));
-    if (wasSelected) setSelectedIssue(null);
+    if (wasSelected) closeIssue();
 
     scheduleUndo({
       label: `Deleted ${issue.identifier}`,
       issueId: issue.id,
       restore: () => {
         setIssues((prev) => insertIssueSorted(prev, issue));
-        if (wasSelected) setSelectedIssue(issue);
+        if (wasSelected) openIssue(issue);
       },
       commit: async () => {
         try {
@@ -920,7 +936,7 @@ export function App() {
       restoreFromTrash: async () => {
         const { issue: restored } = await client.restoreIssue(issue.id);
         setIssues((prev) => insertIssueSorted(prev, restored));
-        if (wasSelected) setSelectedIssue(restored);
+        if (wasSelected) openIssue(restored);
       },
     });
   }
@@ -1034,7 +1050,6 @@ export function App() {
     setRefNotice(null);
     try {
       const result = await client.resolveRef(teamId, ref);
-      syncRefInLocation(ref);
       triggerRefNavMotion();
 
       if (result.issue) {
@@ -1043,6 +1058,7 @@ export function App() {
           return [...prev, result.issue!];
         });
         setSelectedIssue(result.issue);
+        if (route.issueRef !== result.issue.identifier) openIssue(result.issue);
         setHighlightedIssueId(result.issue.id);
         setHighlightedColumnKey(null);
         scrollToIssueRef(result.issue.id);
@@ -1078,7 +1094,7 @@ export function App() {
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Reference not found");
-      syncRefInLocation(null);
+      if (route.issueRef) navigate(boardPath(teamKey), { replace: true });
     }
   }
 
@@ -1138,32 +1154,55 @@ export function App() {
 
   function logout() {
     clearSession();
-    pendingRefHandledRef.current = false;
-    pendingInviteHandledRef.current = false;
+    handledRefStateRef.current = null;
+    handledInviteRef.current = null;
     setUser(null);
-    setView("login");
+    setTeams([]);
+    setTeamsLoaded(false);
+    navigate("/login");
   }
 
-  useEffect(() => {
-    if (settingsPanel === "team" && !teamId) {
-      setSettingsPanel("general");
-    }
-    if (settingsPanel === "roles" && !showRoles) {
-      setSettingsPanel("general");
-    }
-    if (settingsPanel === "integrations" && !showIntegrations) {
-      setSettingsPanel("general");
-    }
-  }, [settingsPanel, showIntegrations, showRoles, teamId]);
+  const settingsOpen = route.settingsOpen;
+  const roadmapOpen = route.planOpen;
+  if (settingsOpen) lastSettingsPanelRef.current = settingsPanel;
 
-  const settingsOpen = view === "settings";
-  const roadmapOpen = view === "roadmap";
+  const setSettingsPanel = useCallback(
+    (panel: SettingsPanel, options?: { replace?: boolean }) => {
+      navigate(settingsPath(teamKey, panel), options);
+    },
+    [navigate, teamKey],
+  );
+
+  // Panels the URL names but the user cannot open fall back to General.
+  useEffect(() => {
+    if (!settingsOpen || !teamsLoaded) return;
+    const teamReady = Boolean(teamId) && teamPermissionsReady;
+    const unknownPanel = route.settingsPanel !== settingsPanel;
+    if (
+      unknownPanel ||
+      (settingsPanel === "team" && !teamId) ||
+      (settingsPanel === "roles" && teamReady && !showRoles) ||
+      (settingsPanel === "integrations" && teamReady && !showIntegrations)
+    ) {
+      setSettingsPanel("general", { replace: true });
+    }
+  }, [
+    settingsOpen,
+    teamsLoaded,
+    route.settingsPanel,
+    settingsPanel,
+    showIntegrations,
+    showRoles,
+    teamId,
+    teamPermissionsReady,
+    setSettingsPanel,
+  ]);
   const overlayOpen = settingsOpen || roadmapOpen;
   const useSamplePreview = settingsOpen && rows.length === 0;
 
   const closeSettings = useCallback(() => {
-    setView("board");
-  }, []);
+    navigate(boardPath(teamKey));
+  }, [navigate, teamKey]);
 
   useEffect(() => {
     if (!settingsOpen) return;
@@ -1242,7 +1281,7 @@ export function App() {
               isRowHeadersVisible={isRowHeadersVisible}
               toggleRowHeaders={settingsOpen ? () => {} : toggleRowHeaders}
               issuesForCell={issuesForCell}
-              onSelectIssue={settingsOpen ? () => {} : setSelectedIssue}
+              onSelectIssue={settingsOpen ? () => {} : openIssue}
               onDeleteIssue={settingsOpen ? () => {} : deleteIssue}
               onRenameRow={settingsOpen ? () => {} : (row, name) => void renameRow(row, name)}
               onRenameStatus={
@@ -1306,20 +1345,63 @@ export function App() {
     </div>
   );
 
-  if (view === "login") {
-    return (
-      <>
-        <LoginScreen
-          error={error}
-          loading={loading}
-          onLogin={handleLogin}
-          onRegister={handleRegister}
-          onOpenAbout={() => setAboutOpen(true)}
-        />
-        <AboutDialog open={aboutOpen} version={APP_VERSION} onClose={() => setAboutOpen(false)} />
-      </>
+  // Old query-string links first, so they survive a detour through the login page.
+  if (route.isIndex) {
+    const legacy = legacyLinkTarget(location.search, location.hash);
+    if (legacy) {
+      return <Navigate to={legacy.to} replace state={legacy.ref ? { ref: legacy.ref } : null} />;
+    }
+  }
+
+  const signedIn = Boolean(user) && (teamsLoaded || !route.authMode);
+
+  if (!signedIn) {
+    if (route.authMode) {
+      return (
+        <>
+          <LoginScreen
+            mode={route.authMode}
+            resetToken={new URLSearchParams(location.search).get("token")}
+            error={error}
+            loading={loading}
+            onModeChange={(mode) =>
+              navigate(`/${mode}`, { replace: true, state: navState?.from ? navState : null })
+            }
+            onLogin={handleLogin}
+            onRegister={handleRegister}
+            onOpenAbout={() => setAboutOpen(true)}
+          />
+          <AboutDialog open={aboutOpen} version={APP_VERSION} onClose={() => setAboutOpen(false)} />
+        </>
+      );
+    }
+    if (route.inviteToken) stashPendingInvite(route.inviteToken);
+    const from = { pathname: location.pathname, search: location.search, state: navState };
+    return <Navigate to="/login" replace state={{ from }} />;
+  }
+
+  if (route.authMode) {
+    const from = navState?.from;
+    return from ? (
+      <Navigate to={`${from.pathname}${from.search}`} replace state={from.state} />
+    ) : (
+      <Navigate to="/" replace />
     );
   }
+
+  if (teamsLoaded) {
+    if (route.isIndex && teams.length > 0) {
+      return <Navigate to={boardPath(defaultTeamKey())} replace state={navState} />;
+    }
+    if (route.teamKey && !routeTeam) return <Navigate to="/" replace />;
+  }
+  const knownPath =
+    route.isIndex ||
+    route.teamKey ||
+    route.settingsOpen ||
+    route.planOpen ||
+    route.inviteToken !== null;
+  if (!knownPath) return <Navigate to="/" replace />;
 
   return (
     <div className="app-shell">
@@ -1350,7 +1432,7 @@ export function App() {
                 value={teamId ?? ""}
                 disabled={!teamId || loading}
                 onChange={(e) => {
-                  void switchTeam(e.target.value);
+                  switchTeam(e.target.value);
                 }}
               >
                 {teams.map((team) => (
@@ -1377,14 +1459,20 @@ export function App() {
           <button
             type="button"
             className={roadmapOpen ? "active" : undefined}
-            onClick={() => setView(roadmapOpen ? "board" : "roadmap")}
+            onClick={() => navigate(roadmapOpen ? boardPath(teamKey) : planPath(teamKey))}
           >
             {roadmapOpen ? "Close plan" : "Plan"}
           </button>
           <button
             type="button"
             className={settingsOpen ? "active" : undefined}
-            onClick={() => setView(settingsOpen ? "board" : "settings")}
+            onClick={() =>
+              navigate(
+                settingsOpen
+                  ? boardPath(teamKey)
+                  : settingsPath(teamKey, lastSettingsPanelRef.current),
+              )
+            }
           >
             {settingsOpen ? "Close settings" : "Settings"}
           </button>
@@ -1617,7 +1705,7 @@ export function App() {
           statuses={statuses}
           rows={rows}
           currentUserId={user?.id ?? null}
-          onClose={() => setSelectedIssue(null)}
+          onClose={closeIssue}
           onNavigateRef={(ref) => void goToRef(ref)}
           onUpdate={(updated) => {
             setIssues((prev) => prev.map((item) => (item.id === updated.id ? updated : item)));
@@ -1649,31 +1737,38 @@ export function App() {
 }
 
 function LoginScreen({
+  mode: routeMode,
+  resetToken: routeResetToken,
   error,
   loading,
+  onModeChange,
   onLogin,
   onRegister,
   onOpenAbout,
 }: {
+  mode: AuthMode;
+  resetToken: string | null;
   error: string | null;
   loading: boolean;
+  onModeChange: (mode: AuthMode) => void;
   onLogin: (email: string, password: string) => void;
   onRegister: (name: string, email: string, password: string) => void;
   onOpenAbout: () => void;
 }) {
-  const initialResetToken = (() => {
-    const params = new URLSearchParams(window.location.search);
-    return params.get("reset");
-  })();
+  // "Forgot password" is a step inside /login rather than a URL of its own.
+  const [forgot, setForgot] = useState(false);
+  const mode = routeMode === "login" && forgot ? "forgot" : routeMode;
 
-  const [mode, setMode] = useState<"login" | "register" | "forgot" | "reset">(
-    initialResetToken ? "reset" : "login",
-  );
+  function setMode(next: AuthMode | "forgot") {
+    setForgot(next === "forgot");
+    const target = next === "forgot" ? "login" : next;
+    if (target !== routeMode) onModeChange(target);
+  }
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
-  const [resetToken, setResetToken] = useState(initialResetToken ?? "");
+  const [resetToken, setResetToken] = useState(routeResetToken ?? "");
   const [inviteOnly, setInviteOnly] = useState(false);
   const [passwordResetEmail, setPasswordResetEmail] = useState(false);
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
@@ -1696,12 +1791,6 @@ function LoginScreen({
 
   const registerBlocked = inviteOnly && !pendingInvite;
   const displayError = localError ?? error;
-
-  function clearResetFromUrl() {
-    const url = new URL(window.location.href);
-    url.searchParams.delete("reset");
-    window.history.replaceState({}, "", url.pathname + url.search + url.hash);
-  }
 
   async function handleForgotPassword() {
     setLocalError(null);
@@ -1739,7 +1828,6 @@ function LoginScreen({
     setSubmitting(true);
     try {
       await client.resetPassword({ token: resetToken.trim(), password });
-      clearResetFromUrl();
       setPassword("");
       setConfirmPassword("");
       setResetToken("");
@@ -1909,7 +1997,6 @@ function LoginScreen({
               type="button"
               className="ghost"
               onClick={() => {
-                clearResetFromUrl();
                 setMode("login");
                 setLocalError(null);
               }}
