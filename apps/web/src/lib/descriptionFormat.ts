@@ -4,7 +4,11 @@ export type DescriptionSegment =
   | RichTextSegment
   | { type: "bold"; value: string }
   | { type: "underline"; value: string }
-  | { type: "highlight"; value: string };
+  | { type: "highlight"; value: string }
+  | { type: "image"; alt: string; src: string };
+
+/** `![alt](https://…)`; only http(s) sources become images. */
+const MARKDOWN_IMAGE = /!\[([^\]\n]*)\]\((https?:\/\/[^\s)]+)\)/g;
 
 function parseInlineMarkup(text: string): DescriptionSegment[] {
   if (!text) return [];
@@ -33,9 +37,7 @@ function parseInlineMarkup(text: string): DescriptionSegment[] {
   return segments;
 }
 
-export function parseDescription(text: string): DescriptionSegment[] {
-  if (!text.trim()) return [];
-
+function parseTextAndLinks(text: string): DescriptionSegment[] {
   const segments: DescriptionSegment[] = [];
   for (const part of parseRichText(text)) {
     if (part.type !== "text") {
@@ -44,6 +46,21 @@ export function parseDescription(text: string): DescriptionSegment[] {
     }
     segments.push(...parseInlineMarkup(part.value));
   }
+  return segments;
+}
+
+export function parseDescription(text: string): DescriptionSegment[] {
+  if (!text.trim()) return [];
+
+  const segments: DescriptionSegment[] = [];
+  let offset = 0;
+  for (const match of text.matchAll(MARKDOWN_IMAGE)) {
+    const index = match.index ?? 0;
+    if (index > offset) segments.push(...parseTextAndLinks(text.slice(offset, index)));
+    segments.push({ type: "image", alt: match[1] ?? "", src: match[2]! });
+    offset = index + match[0].length;
+  }
+  if (offset < text.length) segments.push(...parseTextAndLinks(text.slice(offset)));
   return segments;
 }
 

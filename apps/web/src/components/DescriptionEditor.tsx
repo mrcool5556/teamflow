@@ -16,6 +16,33 @@ type DescriptionEditorProps = {
   readOnly?: boolean;
 };
 
+/** Inline image from a description; falls back to a plain link if it cannot load. */
+function DescriptionImage({ alt, src }: { alt: string; src: string }) {
+  const [failed, setFailed] = useState(false);
+  return (
+    <a
+      className={`description-image${failed ? " description-image--failed" : ""}`}
+      href={src}
+      target="_blank"
+      rel="noopener noreferrer"
+      title={alt || src}
+      onClick={(e) => e.stopPropagation()}
+    >
+      {failed ? (
+        `Image: ${alt || src}`
+      ) : (
+        <img
+          src={src}
+          alt={alt}
+          loading="lazy"
+          referrerPolicy="no-referrer"
+          onError={() => setFailed(true)}
+        />
+      )}
+    </a>
+  );
+}
+
 function renderSegment(
   segment: DescriptionSegment,
   index: number,
@@ -72,6 +99,8 @@ function renderSegment(
           {segment.label}
         </a>
       );
+    case "image":
+      return <DescriptionImage key={index} alt={segment.alt} src={segment.src} />;
     case "url":
       return (
         <a
