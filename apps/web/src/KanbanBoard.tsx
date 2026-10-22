@@ -48,6 +48,7 @@ import { RowColorPicker } from "./components/RowColorPicker";
 import { BulkActionBar } from "./components/BulkActionBar";
 import { BoardColorPicker } from "./components/BoardColorPicker";
 import { PriorityPicker } from "./components/PriorityPicker";
+import { RowScroller } from "./components/RowScroller";
 import { issueMatchesBoardSearch, buildRefShareUrl } from "./lib/refLinks";
 import { copyTextToClipboard } from "./lib/clipboard";
 import { useInlineRename } from "./hooks/useInlineRename";
@@ -1220,14 +1221,8 @@ function SortableBoardRow({
 }) {
   // dnd-kit's role/tabIndex attributes are not spread on the wrapper: the labelled handle
   // button (setActivatorNodeRef) is the drag control, not the whole row or column.
-  const {
-    listeners,
-    setNodeRef,
-    setActivatorNodeRef,
-    transform,
-    transition,
-    isDragging,
-  } = useSortable({ id: rowDndId(row.id) });
+  const { listeners, setNodeRef, setActivatorNodeRef, transform, transition, isDragging } =
+    useSortable({ id: rowDndId(row.id) });
   const canEdit = useCanEditBoard();
 
   const style = {
@@ -1322,7 +1317,7 @@ function SortableBoardRow({
         items={visibleStatuses.map((status) => columnDndId(row.id, status.id))}
         strategy={horizontalListSortingStrategy}
       >
-        <div className="board-row-scroll">
+        <RowScroller>
           <div className="board-row-columns">
             {visibleStatuses.map((status) => {
               const cellIssues = filterCellIssues(status.id);
@@ -1445,7 +1440,7 @@ function SortableBoardRow({
               );
             })}
           </div>
-        </div>
+        </RowScroller>
       </SortableContext>
     </div>
   );
@@ -1468,14 +1463,8 @@ function SortableColumn({
 }) {
   // dnd-kit's role/tabIndex attributes are not spread on the wrapper: the labelled handle
   // button (setActivatorNodeRef) is the drag control, not the whole row or column.
-  const {
-    listeners,
-    setNodeRef,
-    setActivatorNodeRef,
-    transform,
-    transition,
-    isDragging,
-  } = useSortable({ id, disabled });
+  const { listeners, setNodeRef, setActivatorNodeRef, transform, transition, isDragging } =
+    useSortable({ id, disabled });
 
   const style = {
     transform: CSS.Transform.toString(transform),
