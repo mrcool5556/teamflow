@@ -561,7 +561,6 @@ export function BoardShell() {
                 type="button"
                 className={`ghost topbar-btn${historyOpen ? " active" : ""}`}
                 aria-pressed={historyOpen}
-                disabled={changeHistory.length === 0}
                 title="Recent changes"
                 onClick={() => setHistoryOpen((open) => !open)}
               >
@@ -608,7 +607,6 @@ export function BoardShell() {
                     icon: "⟲",
                     label: "Recent",
                     badge: changeHistory.length,
-                    disabled: changeHistory.length === 0,
                     onSelect: () => setHistoryOpen(true),
                   },
                   ...(!overlayOpen && teamId

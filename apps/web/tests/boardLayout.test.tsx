@@ -96,4 +96,18 @@ describe("board layout", () => {
     await user.selectOptions(select, "tokens");
     await waitFor(() => expect(path()).toBe("/t/ENG/settings/tokens"));
   });
+
+  it("opens Recent with an empty state before any change", async () => {
+    const user = userEvent.setup();
+    const db = seedDb();
+    installFakeApi(db);
+    signIn(db);
+    renderApp("/t/ENG");
+    const topbar = await screen.findByRole("banner");
+    await user.click(within(topbar).getByRole("button", { name: "Recent" }));
+    const panel = await screen.findByRole("dialog", { name: "Change history" });
+    expect(within(panel).getByText(/No recent changes yet/)).toBeInTheDocument();
+    await user.click(within(panel).getByRole("button", { name: "Close" }));
+    await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+  });
 });

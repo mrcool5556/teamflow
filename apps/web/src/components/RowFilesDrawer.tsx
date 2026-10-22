@@ -59,8 +59,14 @@ export function RowFilesDrawer({ row, onClose, onNavigateRef }: RowFilesDrawerPr
           </div>
           <DialogTitle className="row-files-drawer-title">{row.name} — shared files</DialogTitle>
         </div>
-        <button type="button" className="ghost" onClick={handleClose}>
-          Close
+        <button
+          type="button"
+          className="ghost drawer-close-btn"
+          aria-label="Close"
+          title="Close (Esc)"
+          onClick={handleClose}
+        >
+          ✕
         </button>
       </header>
 

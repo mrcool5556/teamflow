@@ -45,7 +45,7 @@ export function ChangeHistoryPanel({
   onUndo,
   onRestore,
 }: ChangeHistoryPanelProps) {
-  if (!open || entries.length === 0) return null;
+  if (!open) return null;
 
   return (
     <Dialog
@@ -58,11 +58,23 @@ export function ChangeHistoryPanel({
           <p className="eyebrow">Recent edits</p>
           <DialogTitle>Change history</DialogTitle>
         </div>
-        <button type="button" className="ghost" onClick={onClose}>
-          Close
+        <button
+          type="button"
+          className="ghost drawer-close-btn"
+          aria-label="Close"
+          title="Close (Esc)"
+          onClick={onClose}
+        >
+          ✕
         </button>
       </header>
 
+      {entries.length === 0 ? (
+        <p className="muted change-history-empty">
+          No recent changes yet. Deletes, moves and edits you make on the board show up here, with
+          Undo while it is still possible.
+        </p>
+      ) : null}
       <ul className="change-history-list">
         {entries.map((entry) => {
           const isPending = entry.status === "pending";

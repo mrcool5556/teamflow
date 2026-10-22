@@ -214,15 +214,22 @@ export function TeamFilesDrawer({ teamId, open, onClose, onNavigateRef }: TeamFi
             {tab === "trash" ? ` · purged after ${FILE_TRASH_RETENTION_DAYS} days` : ""}
           </p>
         </div>
-        <button type="button" className="ghost" onClick={handleClose}>
-          Close
+        <button
+          type="button"
+          className="ghost drawer-close-btn"
+          aria-label="Close"
+          title="Close (Esc)"
+          onClick={handleClose}
+        >
+          ✕
         </button>
       </header>
 
-      <div className="team-files-tabs">
+      <div className="segmented team-files-tabs" role="group" aria-label="Show">
         <button
           type="button"
           className={tab === "active" ? "active" : undefined}
+          aria-pressed={tab === "active"}
           onClick={() => setTab("active")}
         >
           Active
@@ -230,6 +237,7 @@ export function TeamFilesDrawer({ teamId, open, onClose, onNavigateRef }: TeamFi
         <button
           type="button"
           className={tab === "trash" ? "active" : undefined}
+          aria-pressed={tab === "trash"}
           onClick={() => setTab("trash")}
         >
           Trash
@@ -260,13 +268,21 @@ export function TeamFilesDrawer({ teamId, open, onClose, onNavigateRef }: TeamFi
         ) : error ? (
           <p className="team-files-drawer-error">{error}</p>
         ) : filtered.length === 0 ? (
-          <p className="muted">
-            {query
-              ? "No files match your search."
-              : tab === "trash"
-                ? "Trash is empty."
-                : "No files uploaded yet."}
-          </p>
+          <div className="team-files-empty">
+            <p>
+              {query
+                ? "No files match your search."
+                : tab === "trash"
+                  ? "Trash is empty."
+                  : "No files yet."}
+            </p>
+            {!query && tab === "active" ? (
+              <p className="muted">
+                Files appear here once they are uploaded to an issue&apos;s Attachments or a
+                row&apos;s Files.
+              </p>
+            ) : null}
+          </div>
         ) : (
           <ul className="team-files-list">
             {filtered.map((file) => {

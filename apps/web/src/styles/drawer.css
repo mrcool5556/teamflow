@@ -40,19 +40,18 @@
 }
 
 .team-files-tabs {
-  display: flex;
-  gap: 0.45rem;
-  padding: 0 1rem 0.65rem;
+  margin: 0 1.25rem;
 }
 
-.team-files-tabs button {
-  padding: 0.28rem 0.65rem;
-  font-size: 0.82rem;
+.team-files-empty {
+  padding: var(--space-6) var(--space-4);
+  border: 1px dashed var(--border-strong);
+  border-radius: var(--radius-sm);
+  text-align: center;
 }
 
-.team-files-tabs button.active {
-  border-color: var(--accent);
-  color: var(--accent);
+.team-files-empty p {
+  margin: 0 0 var(--space-1);
 }
 
 .team-files-ref-select select {

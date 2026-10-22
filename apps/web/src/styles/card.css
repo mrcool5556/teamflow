@@ -439,3 +439,21 @@
   border: 2px solid #111;
   z-index: calc(var(--z-base) + 1);
 }
+
+/* Card controls with nothing set (no assignee, colour or timer) wait for hover or focus on
+   devices that can hover; touch screens always show them. The wrapper adds no box. */
+.issue-card-optional {
+  display: contents;
+}
+
+@media (hover: hover) {
+  .issue-card .issue-card-optional[data-unset] {
+    visibility: hidden;
+  }
+
+  .issue-card:hover .issue-card-optional[data-unset],
+  .issue-card:focus-within .issue-card-optional[data-unset],
+  .issue-card-optional[data-unset]:has([aria-expanded="true"]) {
+    visibility: visible;
+  }
+}

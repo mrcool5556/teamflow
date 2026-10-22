@@ -137,10 +137,11 @@ export function LoginScreen({
         ) : null}
 
         {mode === "login" || mode === "register" ? (
-          <div className="tabs">
+          <div className="segmented auth-mode-switch" role="group" aria-label="Account">
             <button
               type="button"
               className={mode === "login" ? "active" : ""}
+              aria-pressed={mode === "login"}
               onClick={() => {
                 setMode("login");
                 setLocalError(null);
@@ -152,6 +153,7 @@ export function LoginScreen({
             <button
               type="button"
               className={mode === "register" ? "active" : ""}
+              aria-pressed={mode === "register"}
               disabled={registerBlocked}
               onClick={() => {
                 setMode("register");

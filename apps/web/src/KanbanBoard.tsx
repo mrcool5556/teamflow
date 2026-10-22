@@ -1639,32 +1639,46 @@ function SortableIssueCard({
           onGo={onGoToRef ? () => onGoToRef(issue.identifier) : undefined}
         />
         <div className="issue-card-header-meta">
-          <MultiAssigneePicker
-            members={members}
-            assigneeIds={assigneeIdsFromEntity(issue)}
-            compact
-            panelPlacement="top"
-            floatingPanel
-            disabled={!canEdit}
-            onChange={(assigneeIds) => onAssignIssue(issue, assigneeIds)}
-          />
-          <IssueTimer
-            issue={issue}
-            compact
-            floatingPanel
-            disabled={!canEdit}
-            onUpdate={(patch) => onUpdateIssueTimer(issue, patch)}
-          />
+          <span
+            className="issue-card-optional"
+            data-unset={assigneeIdsFromEntity(issue).length === 0 || undefined}
+          >
+            <MultiAssigneePicker
+              members={members}
+              assigneeIds={assigneeIdsFromEntity(issue)}
+              compact
+              panelPlacement="top"
+              floatingPanel
+              disabled={!canEdit}
+              onChange={(assigneeIds) => onAssignIssue(issue, assigneeIds)}
+            />
+          </span>
+          <span
+            className="issue-card-optional"
+            data-unset={
+              (!issue.timerActiveAt && !issue.timerElapsedSec && !issue.timerTargetSec) || undefined
+            }
+          >
+            <IssueTimer
+              issue={issue}
+              compact
+              floatingPanel
+              disabled={!canEdit}
+              onUpdate={(patch) => onUpdateIssueTimer(issue, patch)}
+            />
+          </span>
         </div>
         <div className="issue-card-header-actions">
-          <BoardColorPicker
-            color={issue.color}
-            onSelect={(color) => onUpdateIssueColor(issue, color)}
-            compact
-            title={`Card color: ${issue.identifier}`}
-            className="color-picker--card"
-            disabled={!canEdit}
-          />
+          <span className="issue-card-optional" data-unset={!issue.color || undefined}>
+            <BoardColorPicker
+              color={issue.color}
+              onSelect={(color) => onUpdateIssueColor(issue, color)}
+              compact
+              title={`Card color: ${issue.identifier}`}
+              className="color-picker--card"
+              disabled={!canEdit}
+            />
+          </span>
           <PriorityPicker
             priority={issue.priority}
             onSelect={(priority) => onUpdateIssuePriority(issue, priority)}
