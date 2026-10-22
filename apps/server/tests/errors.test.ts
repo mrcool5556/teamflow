@@ -3,6 +3,7 @@ import {
   api,
   bootApp,
   createTeam,
+  joinTeam,
   json,
   registerUser,
   type RegisteredUser,
@@ -37,10 +38,17 @@ describe("ApiError", () => {
 
 describe("error responses", () => {
   it("returns { error, code } for errors thrown in lib code", async () => {
-    // outsider is not a member of owner's team: deleteTeam throws forbidden().
+    // outsider is not a member of owner's team: loadTeam throws forbidden("Team access denied").
     const res = await api(app, "DELETE", `/teams/${owner.teamId}`, { token: outsider.token });
     expect(res.status).toBe(403);
-    expect(await json(res)).toEqual({ error: "Permission denied", code: "forbidden" });
+    expect(await json(res)).toEqual({ error: "Team access denied", code: "forbidden" });
+
+    // A member without team.delete reaches the lib check: forbidden("Permission denied").
+    const teamId = await createTeam(app, owner.token, "Lib", "LIB");
+    await joinTeam(app, owner.token, teamId, outsider.token, "member");
+    const member = await api(app, "DELETE", `/teams/${teamId}`, { token: outsider.token });
+    expect(member.status).toBe(403);
+    expect(await json(member)).toEqual({ error: "Permission denied", code: "forbidden" });
   });
 
   it("maps not-found lib errors to 404", async () => {

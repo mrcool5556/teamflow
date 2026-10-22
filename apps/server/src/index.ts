@@ -33,16 +33,29 @@ import {
   parseUserProfileImport,
   resolveRefSchema,
 } from "@teamflow/core";
-import { createDb, schema } from "@teamflow/db";
+import { schema } from "@teamflow/db";
 import type { TokenScope } from "@teamflow/core";
 import { and, eq, sql } from "drizzle-orm";
 import { Hono } from "hono";
 import type { Context, Next } from "hono";
 import { HTTPException } from "hono/http-exception";
-import { requestId, type RequestIdVariables } from "hono/request-id";
+import { requestId } from "hono/request-id";
 import type { ContentfulStatusCode } from "hono/utils/http-status";
-import type { AuthContext } from "./lib/auth.js";
 import { ApiError, codeForStatus } from "./lib/errors.js";
+import { db } from "./db.js";
+import type { AppEnv } from "./types.js";
+import {
+  optionalAuth,
+  requireAuth,
+  requireInstanceAdmin,
+  requireWrite,
+} from "./middleware/auth.js";
+import {
+  assertTeamAccess,
+  loadTeam,
+  patTeamMismatch,
+  requirePermission,
+} from "./middleware/team.js";
 import { bodyLimit } from "hono/body-limit";
 import { cors } from "hono/cors";
 import { getConnInfo } from "@hono/node-server/conninfo";
@@ -69,13 +82,10 @@ import {
   generatePat,
   hashPassword,
   logActivity,
-  requireWrite,
-  resolveAuth,
   toUserPublic,
   verifyPassword,
   signSessionToken,
   syncInstanceAdminFromEnv,
-  userIsInstanceAdmin,
 } from "./lib/auth.js";
 import {
   getPasswordResetAuthConfig,
@@ -139,7 +149,6 @@ import {
   abortUploadSession,
   completeUploadSession,
   createUploadSession,
-  getUploadSession,
   purgeExpiredUploadSessions,
   saveUploadChunk,
 } from "./lib/chunkedUpload.js";
@@ -170,13 +179,12 @@ import {
   runMaintenanceUpdate,
 } from "./lib/maintenance.js";
 import { exportTeamBundle, importTeamBundle } from "./lib/teamBundle.js";
-import { getTeamPermissionsForUser, userHasTeamPermission } from "./lib/permissions.js";
+import { getTeamPermissionsForUser } from "./lib/permissions.js";
 
 // config.ts validated every env var (and refused a placeholder JWT_SECRET) when it was imported.
-const db = createDb(config.databaseUrl);
 void purgeExpiredUploadSessions(db);
 void purgeExpiredDeletedFiles(db);
-const app = new Hono<{ Variables: RequestIdVariables }>();
+const app = new Hono<AppEnv>();
 
 // Every response carries X-Request-Id (an incoming header is echoed) so 5xx log lines can be
 // matched to a client report.
@@ -272,28 +280,6 @@ app.use("/auth/register", authRateLimit);
 app.use("/auth/forgot-password", authRateLimit);
 
 app.get("/health", (c) => c.json({ ok: true }));
-
-async function requireAuth(c: Context) {
-  const auth = await resolveAuth(db, c.req.header("Authorization"));
-  if (!auth) {
-    return { error: c.json({ error: "Unauthorized" }, 401) };
-  }
-  return { auth };
-}
-
-/** A team-scoped PAT may only touch the team it was issued for. */
-function patTeamMismatch(auth: AuthContext, teamId: string) {
-  return Boolean(auth.patTeamId) && auth.patTeamId !== teamId;
-}
-
-/**
- * Single access check used by every route that resolves a team (directly or via a row,
- * issue, status, file or upload session): membership plus PAT team scope.
- */
-async function canAccessTeam(auth: AuthContext, teamId: string) {
-  if (patTeamMismatch(auth, teamId)) return false;
-  return userHasTeamAccess(db, auth.userId, teamId);
-}
 
 app.get("/auth/config", (c) => {
   return c.json({
@@ -419,76 +405,67 @@ app.post("/auth/reset-password", async (c) => {
   return c.json({ ok: true });
 });
 
-app.get("/auth/me", async (c) => {
-  const result = await requireAuth(c);
-  if ("error" in result) return result.error;
+app.get("/auth/me", requireAuth, async (c) => {
+  const auth = c.var.auth;
 
   const [user] = await db
     .select()
     .from(schema.users)
-    .where(eq(schema.users.id, result.auth.userId))
+    .where(eq(schema.users.id, auth.userId))
     .limit(1);
 
   if (!user) return c.json({ error: "User not found" }, 404);
   return c.json({ user: toUserPublic(user) });
 });
 
-app.get("/auth/profile", async (c) => {
-  const result = await requireAuth(c);
-  if ("error" in result) return result.error;
+app.get("/auth/profile", requireAuth, async (c) => {
+  const auth = c.var.auth;
 
-  const profile = await getUserProfile(db, result.auth.userId);
+  const profile = await getUserProfile(db, auth.userId);
   return c.json({ profile });
 });
 
-app.put("/auth/profile", async (c) => {
-  const result = await requireAuth(c);
-  if ("error" in result) return result.error;
-  requireWrite(result.auth);
+app.put("/auth/profile", requireAuth, requireWrite, async (c) => {
+  const auth = c.var.auth;
 
   const body = userProfileSchema.safeParse(await c.req.json());
   if (!body.success) {
     return c.json({ error: body.error.issues[0]?.message ?? "Invalid profile" }, 400);
   }
 
-  const profile = await saveUserProfile(db, result.auth.userId, body.data);
+  const profile = await saveUserProfile(db, auth.userId, body.data);
   return c.json({ profile });
 });
 
-app.patch("/auth/profile", async (c) => {
-  const result = await requireAuth(c);
-  if ("error" in result) return result.error;
-  requireWrite(result.auth);
+app.patch("/auth/profile", requireAuth, requireWrite, async (c) => {
+  const auth = c.var.auth;
 
   const body = userProfilePatchSchema.safeParse(await c.req.json());
   if (!body.success) {
     return c.json({ error: body.error.issues[0]?.message ?? "Invalid profile patch" }, 400);
   }
 
-  const profile = await patchUserProfile(db, result.auth.userId, body.data);
+  const profile = await patchUserProfile(db, auth.userId, body.data);
   return c.json({ profile });
 });
 
-app.get("/auth/profile/export", async (c) => {
-  const result = await requireAuth(c);
-  if ("error" in result) return result.error;
+app.get("/auth/profile/export", requireAuth, async (c) => {
+  const auth = c.var.auth;
 
   const [user] = await db
     .select()
     .from(schema.users)
-    .where(eq(schema.users.id, result.auth.userId))
+    .where(eq(schema.users.id, auth.userId))
     .limit(1);
 
   if (!user) return c.json({ error: "User not found" }, 404);
 
-  const profile = await getUserProfile(db, result.auth.userId);
+  const profile = await getUserProfile(db, auth.userId);
   return c.json(buildProfileExport(profile, { name: user.name, email: user.email }));
 });
 
-app.post("/auth/profile/import", async (c) => {
-  const result = await requireAuth(c);
-  if ("error" in result) return result.error;
-  requireWrite(result.auth);
+app.post("/auth/profile/import", requireAuth, requireWrite, async (c) => {
+  const auth = c.var.auth;
 
   const raw = await c.req.json();
   const profile = parseUserProfileImport(raw);
@@ -497,7 +474,7 @@ app.post("/auth/profile/import", async (c) => {
     return c.json({ error: "Invalid profile file" }, 400);
   }
 
-  const saved = await saveUserProfile(db, result.auth.userId, validated.data);
+  const saved = await saveUserProfile(db, auth.userId, validated.data);
   return c.json({ profile: saved });
 });
 
@@ -513,28 +490,25 @@ function toApiTokenPublic(row: typeof schema.apiTokens.$inferSelect) {
   };
 }
 
-app.get("/auth/tokens", async (c) => {
-  const result = await requireAuth(c);
-  if ("error" in result) return result.error;
+app.get("/auth/tokens", requireAuth, async (c) => {
+  const auth = c.var.auth;
 
   const rows = await db
     .select()
     .from(schema.apiTokens)
-    .where(eq(schema.apiTokens.userId, result.auth.userId));
+    .where(eq(schema.apiTokens.userId, auth.userId));
   rows.sort((a, b) => b.createdAt.localeCompare(a.createdAt));
   return c.json({ tokens: rows.map(toApiTokenPublic) });
 });
 
-app.delete("/auth/tokens/:id", async (c) => {
-  const result = await requireAuth(c);
-  if ("error" in result) return result.error;
-  requireWrite(result.auth);
+app.delete("/auth/tokens/:id", requireAuth, requireWrite, async (c) => {
+  const auth = c.var.auth;
 
   const id = c.req.param("id");
   const [row] = await db
     .select()
     .from(schema.apiTokens)
-    .where(and(eq(schema.apiTokens.id, id), eq(schema.apiTokens.userId, result.auth.userId)))
+    .where(and(eq(schema.apiTokens.id, id), eq(schema.apiTokens.userId, auth.userId)))
     .limit(1);
   if (!row) return c.json({ error: "Token not found" }, 404);
 
@@ -542,10 +516,8 @@ app.delete("/auth/tokens/:id", async (c) => {
   return c.body(null, 204);
 });
 
-app.post("/auth/tokens", async (c) => {
-  const result = await requireAuth(c);
-  if ("error" in result) return result.error;
-  requireWrite(result.auth);
+app.post("/auth/tokens", requireAuth, requireWrite, async (c) => {
+  const auth = c.var.auth;
 
   const body = createTokenSchema.safeParse(await c.req.json());
   if (!body.success) {
@@ -553,20 +525,17 @@ app.post("/auth/tokens", async (c) => {
   }
 
   // A PAT can only mint tokens no broader than itself: same team scope, no new scopes.
-  if (result.auth.authType === "pat") {
-    if (result.auth.patTeamId && body.data.teamId !== result.auth.patTeamId) {
+  if (auth.authType === "pat") {
+    if (auth.patTeamId && body.data.teamId !== auth.patTeamId) {
       return c.json({ error: "Token restricted to a different team" }, 403);
     }
-    if (body.data.scopes.some((scope) => !result.auth.scopes.includes(scope))) {
+    if (body.data.scopes.some((scope) => !auth.scopes.includes(scope))) {
       return c.json({ error: "Token cannot grant scopes it does not have" }, 403);
     }
   }
 
   if (body.data.teamId) {
-    const hasAccess = await canAccessTeam(result.auth, body.data.teamId);
-    if (!hasAccess) {
-      return c.json({ error: "Team access denied" }, 403);
-    }
+    await assertTeamAccess(auth, body.data.teamId);
   }
 
   const { raw, prefix, hash } = generatePat();
@@ -574,7 +543,7 @@ app.post("/auth/tokens", async (c) => {
 
   await db.insert(schema.apiTokens).values({
     id,
-    userId: result.auth.userId,
+    userId: auth.userId,
     name: body.data.name,
     tokenHash: hash,
     prefix,
@@ -596,9 +565,8 @@ app.post("/auth/tokens", async (c) => {
   );
 });
 
-app.get("/teams", async (c) => {
-  const result = await requireAuth(c);
-  if ("error" in result) return result.error;
+app.get("/teams", requireAuth, async (c) => {
+  const auth = c.var.auth;
 
   const rows = await db
     .select({
@@ -610,15 +578,13 @@ app.get("/teams", async (c) => {
     })
     .from(schema.teams)
     .innerJoin(schema.teamMembers, eq(schema.teamMembers.teamId, schema.teams.id))
-    .where(eq(schema.teamMembers.userId, result.auth.userId));
+    .where(eq(schema.teamMembers.userId, auth.userId));
 
   return c.json({ teams: rows });
 });
 
-app.post("/teams", async (c) => {
-  const result = await requireAuth(c);
-  if ("error" in result) return result.error;
-  requireWrite(result.auth);
+app.post("/teams", requireAuth, requireWrite, async (c) => {
+  const auth = c.var.auth;
 
   const body = createTeamSchema.safeParse(await c.req.json());
   if (!body.success) {
@@ -628,11 +594,11 @@ app.post("/teams", async (c) => {
   const [user] = await db
     .select({ name: schema.users.name })
     .from(schema.users)
-    .where(eq(schema.users.id, result.auth.userId))
+    .where(eq(schema.users.id, auth.userId))
     .limit(1);
 
   const team = await createTeamForUser(db, {
-    userId: result.auth.userId,
+    userId: auth.userId,
     userName: user?.name ?? "User",
     name: body.data.name,
     key: body.data.key,
@@ -643,92 +609,75 @@ app.post("/teams", async (c) => {
   return c.json({ team }, 201);
 });
 
-app.delete("/teams/:teamId", async (c) => {
-  const result = await requireAuth(c);
-  if ("error" in result) return result.error;
-  requireWrite(result.auth);
+app.delete("/teams/:teamId", requireAuth, requireWrite, loadTeam(), async (c) => {
+  const auth = c.var.auth;
 
-  const teamId = c.req.param("teamId");
-  if (patTeamMismatch(result.auth, teamId)) {
-    return c.json({ error: "Team access denied" }, 403);
-  }
+  const teamId = c.var.teamId;
 
-  await deleteTeam(db, teamId, result.auth.userId);
+  await deleteTeam(db, teamId, auth.userId);
   return c.body(null, 204);
 });
 
-app.get("/teams/:teamId/export", async (c) => {
-  const result = await requireAuth(c);
-  if ("error" in result) return result.error;
+app.get(
+  "/teams/:teamId/export",
+  requireAuth,
+  loadTeam(),
+  requirePermission("team.data.transfer"),
+  async (c) => {
+    const teamId = c.var.teamId;
 
-  const teamId = c.req.param("teamId");
-  if (!(await canAccessTeam(result.auth, teamId))) {
-    return c.json({ error: "Team access denied" }, 403);
-  }
-  if (!(await userHasTeamPermission(db, result.auth.userId, teamId, "team.data.transfer"))) {
-    return c.json({ error: "Permission denied" }, 403);
-  }
+    const query = teamBundleExportQuerySchema.safeParse(c.req.query());
+    if (!query.success) {
+      return c.json({ error: query.error.issues[0]?.message ?? "Invalid query" }, 400);
+    }
 
-  const query = teamBundleExportQuerySchema.safeParse(c.req.query());
-  if (!query.success) {
-    return c.json({ error: query.error.issues[0]?.message ?? "Invalid query" }, 400);
-  }
+    const { filename, buffer } = await exportTeamBundle(
+      db,
+      teamId,
+      query.data.includeFiles ?? false,
+    );
+    return new Response(buffer, {
+      headers: {
+        "Content-Type": "application/zip",
+        "Content-Disposition": `attachment; filename="${filename}"`,
+      },
+    });
+  },
+);
 
-  const { filename, buffer } = await exportTeamBundle(db, teamId, query.data.includeFiles ?? false);
-  return new Response(buffer, {
-    headers: {
-      "Content-Type": "application/zip",
-      "Content-Disposition": `attachment; filename="${filename}"`,
-    },
-  });
-});
+app.post(
+  "/teams/:teamId/import",
+  requireAuth,
+  requireWrite,
+  loadTeam(),
+  requirePermission("team.data.transfer"),
+  async (c) => {
+    const auth = c.var.auth;
 
-app.post("/teams/:teamId/import", async (c) => {
-  const result = await requireAuth(c);
-  if ("error" in result) return result.error;
-  requireWrite(result.auth);
+    const teamId = c.var.teamId;
 
-  const teamId = c.req.param("teamId");
-  if (!(await canAccessTeam(result.auth, teamId))) {
-    return c.json({ error: "Team access denied" }, 403);
-  }
-  if (!(await userHasTeamPermission(db, result.auth.userId, teamId, "team.data.transfer"))) {
-    return c.json({ error: "Permission denied" }, 403);
-  }
+    const optionsInput = teamBundleImportOptionsSchema.safeParse({
+      force: c.req.query("force") === "true",
+    });
+    if (!optionsInput.success) {
+      return c.json({ error: optionsInput.error.issues[0]?.message ?? "Invalid options" }, 400);
+    }
 
-  const optionsInput = teamBundleImportOptionsSchema.safeParse({
-    force: c.req.query("force") === "true",
-  });
-  if (!optionsInput.success) {
-    return c.json({ error: optionsInput.error.issues[0]?.message ?? "Invalid options" }, 400);
-  }
+    const body = await c.req.parseBody();
+    const bundlePart = body.bundle;
+    if (!bundlePart || typeof bundlePart === "string") {
+      return c.json({ error: "Missing bundle zip file (field: bundle)" }, 400);
+    }
 
-  const body = await c.req.parseBody();
-  const bundlePart = body.bundle;
-  if (!bundlePart || typeof bundlePart === "string") {
-    return c.json({ error: "Missing bundle zip file (field: bundle)" }, 400);
-  }
+    const buffer = Buffer.from(await bundlePart.arrayBuffer());
 
-  const buffer = Buffer.from(await bundlePart.arrayBuffer());
+    const importResult = await importTeamBundle(db, teamId, auth.userId, buffer, optionsInput.data);
+    return c.json({ result: importResult });
+  },
+);
 
-  const importResult = await importTeamBundle(
-    db,
-    teamId,
-    result.auth.userId,
-    buffer,
-    optionsInput.data,
-  );
-  return c.json({ result: importResult });
-});
-
-app.get("/teams/:teamId/statuses", async (c) => {
-  const result = await requireAuth(c);
-  if ("error" in result) return result.error;
-
-  const teamId = c.req.param("teamId");
-  if (!(await canAccessTeam(result.auth, teamId))) {
-    return c.json({ error: "Team access denied" }, 403);
-  }
+app.get("/teams/:teamId/statuses", requireAuth, loadTeam(), async (c) => {
+  const teamId = c.var.teamId;
 
   const statuses = await db
     .select()
@@ -742,21 +691,9 @@ app.get("/teams/:teamId/statuses", async (c) => {
   return c.json({ statuses: statuses.map(mapIssueStatus) });
 });
 
-app.get("/rows/:rowId/statuses", async (c) => {
-  const result = await requireAuth(c);
-  if ("error" in result) return result.error;
-
-  const rowId = c.req.param("rowId");
-  const [row] = await db
-    .select()
-    .from(schema.boardRows)
-    .where(eq(schema.boardRows.id, rowId))
-    .limit(1);
-
-  if (!row) return c.json({ error: "Row not found" }, 404);
-  if (!(await canAccessTeam(result.auth, row.teamId))) {
-    return c.json({ error: "Team access denied" }, 403);
-  }
+app.get("/rows/:rowId/statuses", requireAuth, loadTeam("row"), async (c) => {
+  const row = c.var.row;
+  const rowId = row.id;
 
   const statuses = await db
     .select()
@@ -767,22 +704,9 @@ app.get("/rows/:rowId/statuses", async (c) => {
   return c.json({ statuses: statuses.map(mapIssueStatus) });
 });
 
-app.post("/rows/:rowId/statuses", async (c) => {
-  const result = await requireAuth(c);
-  if ("error" in result) return result.error;
-  requireWrite(result.auth);
-
-  const rowId = c.req.param("rowId");
-  const [row] = await db
-    .select()
-    .from(schema.boardRows)
-    .where(eq(schema.boardRows.id, rowId))
-    .limit(1);
-
-  if (!row) return c.json({ error: "Row not found" }, 404);
-  if (!(await canAccessTeam(result.auth, row.teamId))) {
-    return c.json({ error: "Team access denied" }, 403);
-  }
+app.post("/rows/:rowId/statuses", requireAuth, requireWrite, loadTeam("row"), async (c) => {
+  const row = c.var.row;
+  const rowId = row.id;
 
   const body = createStatusSchema.safeParse(await c.req.json());
   if (!body.success) {
@@ -822,22 +746,9 @@ app.post("/teams/:teamId/statuses", async (c) => {
   );
 });
 
-app.patch("/statuses/:statusId", async (c) => {
-  const result = await requireAuth(c);
-  if ("error" in result) return result.error;
-  requireWrite(result.auth);
-
-  const statusId = c.req.param("statusId");
-  const [existing] = await db
-    .select()
-    .from(schema.issueStatuses)
-    .where(eq(schema.issueStatuses.id, statusId))
-    .limit(1);
-
-  if (!existing) return c.json({ error: "Status not found" }, 404);
-  if (!(await canAccessTeam(result.auth, existing.teamId))) {
-    return c.json({ error: "Team access denied" }, 403);
-  }
+app.patch("/statuses/:statusId", requireAuth, requireWrite, loadTeam("status"), async (c) => {
+  const existing = c.var.status;
+  const statusId = existing.id;
 
   const body = updateStatusSchema.safeParse(await c.req.json());
   if (!body.success) {
@@ -891,22 +802,9 @@ app.patch("/statuses/:statusId", async (c) => {
   return c.json({ status: mapIssueStatus(status!) });
 });
 
-app.delete("/statuses/:statusId", async (c) => {
-  const result = await requireAuth(c);
-  if ("error" in result) return result.error;
-  requireWrite(result.auth);
-
-  const statusId = c.req.param("statusId");
-  const [existing] = await db
-    .select()
-    .from(schema.issueStatuses)
-    .where(eq(schema.issueStatuses.id, statusId))
-    .limit(1);
-
-  if (!existing) return c.json({ error: "Status not found" }, 404);
-  if (!(await canAccessTeam(result.auth, existing.teamId))) {
-    return c.json({ error: "Team access denied" }, 403);
-  }
+app.delete("/statuses/:statusId", requireAuth, requireWrite, loadTeam("status"), async (c) => {
+  const existing = c.var.status;
+  const statusId = existing.id;
 
   const issueCount = await countStatusIssues(db, statusId);
   if (issueCount > 0) {
@@ -920,14 +818,8 @@ app.delete("/statuses/:statusId", async (c) => {
   return c.body(null, 204);
 });
 
-app.get("/teams/:teamId/rows", async (c) => {
-  const result = await requireAuth(c);
-  if ("error" in result) return result.error;
-
-  const teamId = c.req.param("teamId");
-  if (!(await canAccessTeam(result.auth, teamId))) {
-    return c.json({ error: "Team access denied" }, 403);
-  }
+app.get("/teams/:teamId/rows", requireAuth, loadTeam(), async (c) => {
+  const teamId = c.var.teamId;
 
   let rows = await db.select().from(schema.boardRows).where(eq(schema.boardRows.teamId, teamId));
 
@@ -968,156 +860,126 @@ async function statusBelongsToTeam(statusId: string, teamId: string) {
   return status && status.teamId === teamId ? status : null;
 }
 
-app.get("/teams/:teamId/members", async (c) => {
-  const result = await requireAuth(c);
-  if ("error" in result) return result.error;
+app.get(
+  "/teams/:teamId/members",
+  requireAuth,
+  loadTeam(),
+  requirePermission("team.members.view"),
+  async (c) => {
+    const teamId = c.var.teamId;
 
-  const teamId = c.req.param("teamId");
-  if (!(await canAccessTeam(result.auth, teamId))) {
-    return c.json({ error: "Team access denied" }, 403);
-  }
-  if (!(await userHasTeamPermission(db, result.auth.userId, teamId, "team.members.view"))) {
-    return c.json({ error: "Permission denied" }, 403);
-  }
+    const members = await db
+      .select({
+        id: schema.teamMembers.id,
+        userId: schema.users.id,
+        name: schema.users.name,
+        email: schema.users.email,
+        roleId: schema.teamRoles.id,
+        roleName: schema.teamRoles.name,
+        roleSlug: schema.teamRoles.slug,
+        role: schema.teamRoles.slug,
+      })
+      .from(schema.teamMembers)
+      .innerJoin(schema.users, eq(schema.teamMembers.userId, schema.users.id))
+      .innerJoin(schema.teamRoles, eq(schema.teamMembers.roleId, schema.teamRoles.id))
+      .where(eq(schema.teamMembers.teamId, teamId));
 
-  const members = await db
-    .select({
-      id: schema.teamMembers.id,
-      userId: schema.users.id,
-      name: schema.users.name,
-      email: schema.users.email,
-      roleId: schema.teamRoles.id,
-      roleName: schema.teamRoles.name,
-      roleSlug: schema.teamRoles.slug,
-      role: schema.teamRoles.slug,
-    })
-    .from(schema.teamMembers)
-    .innerJoin(schema.users, eq(schema.teamMembers.userId, schema.users.id))
-    .innerJoin(schema.teamRoles, eq(schema.teamMembers.roleId, schema.teamRoles.id))
-    .where(eq(schema.teamMembers.teamId, teamId));
+    return c.json({ members });
+  },
+);
 
-  return c.json({ members });
-});
+app.patch("/teams/:teamId/members/:memberId", requireAuth, requireWrite, loadTeam(), async (c) => {
+  const auth = c.var.auth;
 
-app.patch("/teams/:teamId/members/:memberId", async (c) => {
-  const result = await requireAuth(c);
-  if ("error" in result) return result.error;
-  requireWrite(result.auth);
-
-  const teamId = c.req.param("teamId");
+  const teamId = c.var.teamId;
   const memberId = c.req.param("memberId");
-  if (patTeamMismatch(result.auth, teamId)) {
-    return c.json({ error: "Team access denied" }, 403);
-  }
   const body = updateTeamMemberRoleSchema.safeParse(await c.req.json().catch(() => ({})));
   if (!body.success) {
     return c.json({ error: body.error.issues[0]?.message ?? "Invalid input" }, 400);
   }
 
-  const role = await updateTeamMemberRole(
-    db,
-    teamId,
-    memberId,
-    body.data.roleId,
-    result.auth.userId,
-  );
+  const role = await updateTeamMemberRole(db, teamId, memberId, body.data.roleId, auth.userId);
   return c.json({ role });
 });
 
-app.delete("/teams/:teamId/members/:memberId", async (c) => {
-  const result = await requireAuth(c);
-  if ("error" in result) return result.error;
-  requireWrite(result.auth);
+app.delete("/teams/:teamId/members/:memberId", requireAuth, requireWrite, loadTeam(), async (c) => {
+  const auth = c.var.auth;
 
-  const teamId = c.req.param("teamId");
+  const teamId = c.var.teamId;
   const memberId = c.req.param("memberId");
-  if (patTeamMismatch(result.auth, teamId)) {
-    return c.json({ error: "Team access denied" }, 403);
-  }
 
   if (memberId === "me") {
-    await leaveTeam(db, teamId, result.auth.userId);
+    await leaveTeam(db, teamId, auth.userId);
   } else {
-    await removeTeamMember(db, teamId, memberId, result.auth.userId);
+    await removeTeamMember(db, teamId, memberId, auth.userId);
   }
   return c.body(null, 204);
 });
 
-app.get("/teams/:teamId/invites", async (c) => {
-  const result = await requireAuth(c);
-  if ("error" in result) return result.error;
+app.get(
+  "/teams/:teamId/invites",
+  requireAuth,
+  loadTeam(),
+  requirePermission("team.invites.manage"),
+  async (c) => {
+    const teamId = c.var.teamId;
 
-  const teamId = c.req.param("teamId");
-  if (!(await canAccessTeam(result.auth, teamId))) {
-    return c.json({ error: "Team access denied" }, 403);
-  }
-  if (!(await userHasTeamPermission(db, result.auth.userId, teamId, "team.invites.manage"))) {
-    return c.json({ error: "Permission denied" }, 403);
-  }
+    const invites = await listTeamInvites(db, teamId);
+    return c.json({ invites });
+  },
+);
 
-  const invites = await listTeamInvites(db, teamId);
-  return c.json({ invites });
-});
+app.post(
+  "/teams/:teamId/invites",
+  requireAuth,
+  requireWrite,
+  loadTeam(),
+  requirePermission("team.invites.manage"),
+  async (c) => {
+    const auth = c.var.auth;
 
-app.post("/teams/:teamId/invites", async (c) => {
-  const result = await requireAuth(c);
-  if ("error" in result) return result.error;
-  requireWrite(result.auth);
+    const teamId = c.var.teamId;
 
-  const teamId = c.req.param("teamId");
-  if (!(await canAccessTeam(result.auth, teamId))) {
-    return c.json({ error: "Team access denied" }, 403);
-  }
-  if (!(await userHasTeamPermission(db, result.auth.userId, teamId, "team.invites.manage"))) {
-    return c.json({ error: "Permission denied" }, 403);
-  }
+    const body = createTeamInviteSchema.safeParse(await c.req.json().catch(() => ({})));
+    if (!body.success) {
+      return c.json({ error: body.error.issues[0]?.message ?? "Invalid input" }, 400);
+    }
 
-  const body = createTeamInviteSchema.safeParse(await c.req.json().catch(() => ({})));
-  if (!body.success) {
-    return c.json({ error: body.error.issues[0]?.message ?? "Invalid input" }, 400);
-  }
+    const invite = await createTeamInvite(db, {
+      teamId,
+      createdByUserId: auth.userId,
+      roleId: body.data.roleId,
+      role: body.data.role,
+      expiresInDays: body.data.expiresInDays,
+      maxUses: body.data.maxUses,
+    });
+    return c.json({ invite }, 201);
+  },
+);
 
-  const invite = await createTeamInvite(db, {
-    teamId,
-    createdByUserId: result.auth.userId,
-    roleId: body.data.roleId,
-    role: body.data.role,
-    expiresInDays: body.data.expiresInDays,
-    maxUses: body.data.maxUses,
-  });
-  return c.json({ invite }, 201);
-});
+app.delete(
+  "/teams/:teamId/invites/:inviteId",
+  requireAuth,
+  requireWrite,
+  loadTeam(),
+  requirePermission("team.invites.manage"),
+  async (c) => {
+    const teamId = c.var.teamId;
+    const inviteId = c.req.param("inviteId");
 
-app.delete("/teams/:teamId/invites/:inviteId", async (c) => {
-  const result = await requireAuth(c);
-  if ("error" in result) return result.error;
-  requireWrite(result.auth);
+    const invite = await revokeTeamInvite(db, teamId, inviteId);
+    if (!invite) return c.json({ error: "Invite not found" }, 404);
 
-  const teamId = c.req.param("teamId");
-  const inviteId = c.req.param("inviteId");
-  if (!(await canAccessTeam(result.auth, teamId))) {
-    return c.json({ error: "Team access denied" }, 403);
-  }
-  if (!(await userHasTeamPermission(db, result.auth.userId, teamId, "team.invites.manage"))) {
-    return c.json({ error: "Permission denied" }, 403);
-  }
+    return c.body(null, 204);
+  },
+);
 
-  const invite = await revokeTeamInvite(db, teamId, inviteId);
-  if (!invite) return c.json({ error: "Invite not found" }, 404);
+app.get("/teams/:teamId/permissions/me", requireAuth, loadTeam(), async (c) => {
+  const auth = c.var.auth;
 
-  return c.body(null, 204);
-});
+  const teamId = c.var.teamId;
 
-app.get("/teams/:teamId/permissions/me", async (c) => {
-  const result = await requireAuth(c);
-  if ("error" in result) return result.error;
-
-  const teamId = c.req.param("teamId");
-  if (!(await canAccessTeam(result.auth, teamId))) {
-    return c.json({ error: "Team access denied" }, 403);
-  }
-
-  const permissions = await getTeamPermissionsForUser(db, result.auth.userId, teamId);
+  const permissions = await getTeamPermissionsForUser(db, auth.userId, teamId);
   if (!permissions) {
     return c.json({ error: "Team access denied" }, 403);
   }
@@ -1125,87 +987,56 @@ app.get("/teams/:teamId/permissions/me", async (c) => {
   return c.json({ permissions });
 });
 
-app.get("/teams/:teamId/roles", async (c) => {
-  const result = await requireAuth(c);
-  if ("error" in result) return result.error;
+app.get(
+  "/teams/:teamId/roles",
+  requireAuth,
+  loadTeam(),
+  // Anyone who can assign roles or invite needs the role list too.
+  requirePermission(["team.roles.view", "team.members.manage", "team.invites.manage"]),
+  async (c) => {
+    const teamId = c.var.teamId;
 
-  const teamId = c.req.param("teamId");
-  if (!(await canAccessTeam(result.auth, teamId))) {
-    return c.json({ error: "Team access denied" }, 403);
-  }
-  if (!(await userHasTeamPermission(db, result.auth.userId, teamId, "team.roles.view"))) {
-    const canAssignRoles = await userHasTeamPermission(
-      db,
-      result.auth.userId,
-      teamId,
-      "team.members.manage",
-    );
-    const canInvite = await userHasTeamPermission(
-      db,
-      result.auth.userId,
-      teamId,
-      "team.invites.manage",
-    );
-    if (!canAssignRoles && !canInvite) {
-      return c.json({ error: "Permission denied" }, 403);
-    }
-  }
+    const roles = await listTeamRoles(db, teamId);
+    return c.json({ roles });
+  },
+);
 
-  const roles = await listTeamRoles(db, teamId);
-  return c.json({ roles });
-});
+app.post("/teams/:teamId/roles", requireAuth, requireWrite, loadTeam(), async (c) => {
+  const auth = c.var.auth;
 
-app.post("/teams/:teamId/roles", async (c) => {
-  const result = await requireAuth(c);
-  if ("error" in result) return result.error;
-  requireWrite(result.auth);
-
-  const teamId = c.req.param("teamId");
-  if (!(await canAccessTeam(result.auth, teamId))) {
-    return c.json({ error: "Team access denied" }, 403);
-  }
+  const teamId = c.var.teamId;
 
   const body = createTeamRoleSchema.safeParse(await c.req.json().catch(() => ({})));
   if (!body.success) {
     return c.json({ error: body.error.issues[0]?.message ?? "Invalid input" }, 400);
   }
 
-  const role = await createTeamRole(db, teamId, result.auth.userId, body.data);
+  const role = await createTeamRole(db, teamId, auth.userId, body.data);
   return c.json({ role }, 201);
 });
 
-app.patch("/teams/:teamId/roles/:roleId", async (c) => {
-  const result = await requireAuth(c);
-  if ("error" in result) return result.error;
-  requireWrite(result.auth);
+app.patch("/teams/:teamId/roles/:roleId", requireAuth, requireWrite, loadTeam(), async (c) => {
+  const auth = c.var.auth;
 
-  const teamId = c.req.param("teamId");
+  const teamId = c.var.teamId;
   const roleId = c.req.param("roleId");
-  if (!(await canAccessTeam(result.auth, teamId))) {
-    return c.json({ error: "Team access denied" }, 403);
-  }
 
   const body = updateTeamRoleSchema.safeParse(await c.req.json().catch(() => ({})));
   if (!body.success) {
     return c.json({ error: body.error.issues[0]?.message ?? "Invalid input" }, 400);
   }
 
-  const role = await updateTeamRole(db, teamId, roleId, result.auth.userId, body.data);
+  const role = await updateTeamRole(db, teamId, roleId, auth.userId, body.data);
   return c.json({ role });
 });
 
-app.delete("/teams/:teamId/roles/:roleId", async (c) => {
-  const result = await requireAuth(c);
-  if ("error" in result) return result.error;
-  requireWrite(result.auth);
+app.delete("/teams/:teamId/roles/:roleId", requireAuth, requireWrite, loadTeam(), async (c) => {
+  const auth = c.var.auth;
 
-  const teamId = c.req.param("teamId");
+  const teamId = c.var.teamId;
   const roleId = c.req.param("roleId");
-  if (!(await canAccessTeam(result.auth, teamId))) {
-    return c.json({ error: "Team access denied" }, 403);
-  }
 
-  await deleteTeamRole(db, teamId, roleId, result.auth.userId);
+  await deleteTeamRole(db, teamId, roleId, auth.userId);
   return c.body(null, 204);
 });
 
@@ -1220,317 +1051,216 @@ app.get("/integrations/discord/bot-config", async (c) => {
   return c.json({ config });
 });
 
-app.get("/teams/:teamId/discord-settings", async (c) => {
-  const result = await requireAuth(c);
-  if ("error" in result) return result.error;
+app.get(
+  "/teams/:teamId/discord-settings",
+  requireAuth,
+  loadTeam(),
+  requirePermission("integrations.discord.view"),
+  async (c) => {
+    const teamId = c.var.teamId;
 
-  const teamId = c.req.param("teamId");
-  if (!(await canAccessTeam(result.auth, teamId))) {
-    return c.json({ error: "Team access denied" }, 403);
-  }
-  if (!(await userHasTeamPermission(db, result.auth.userId, teamId, "integrations.discord.view"))) {
-    return c.json({ error: "Permission denied" }, 403);
-  }
+    const settings = await getTeamDiscordSettings(db, teamId);
+    return c.json({ settings });
+  },
+);
 
-  const settings = await getTeamDiscordSettings(db, teamId);
-  return c.json({ settings });
-});
+app.patch("/teams/:teamId/discord-settings", requireAuth, requireWrite, loadTeam(), async (c) => {
+  const auth = c.var.auth;
 
-app.patch("/teams/:teamId/discord-settings", async (c) => {
-  const result = await requireAuth(c);
-  if ("error" in result) return result.error;
-  requireWrite(result.auth);
-
-  const teamId = c.req.param("teamId");
-  if (!(await canAccessTeam(result.auth, teamId))) {
-    return c.json({ error: "Team access denied" }, 403);
-  }
+  const teamId = c.var.teamId;
 
   const body = updateTeamDiscordSettingsSchema.safeParse(await c.req.json().catch(() => ({})));
   if (!body.success) {
     return c.json({ error: body.error.issues[0]?.message ?? "Invalid input" }, 400);
   }
 
-  const settings = await updateTeamDiscordSettings(db, teamId, result.auth.userId, body.data);
+  const settings = await updateTeamDiscordSettings(db, teamId, auth.userId, body.data);
   return c.json({ settings });
 });
 
-app.get("/teams/:teamId/integrations/discord/secrets", async (c) => {
-  const result = await requireAuth(c);
-  if ("error" in result) return result.error;
+app.get(
+  "/teams/:teamId/integrations/discord/secrets",
+  requireAuth,
+  loadTeam(),
+  requirePermission("integrations.discord.secrets"),
+  requireInstanceAdmin,
+  async (c) => {
+    const secrets = await getDiscordBotSecretsPublic(db);
+    return c.json({ secrets });
+  },
+);
 
-  const teamId = c.req.param("teamId");
-  if (!(await canAccessTeam(result.auth, teamId))) {
-    return c.json({ error: "Team access denied" }, 403);
-  }
-  if (
-    !(await userHasTeamPermission(db, result.auth.userId, teamId, "integrations.discord.secrets"))
-  ) {
-    return c.json({ error: "Permission denied" }, 403);
-  }
-  if (!(await userIsInstanceAdmin(db, result.auth.userId))) {
-    return c.json({ error: "Instance admin required" }, 403);
-  }
+app.patch(
+  "/teams/:teamId/integrations/discord/secrets",
+  requireAuth,
+  requireWrite,
+  loadTeam(),
+  requireInstanceAdmin,
+  async (c) => {
+    const auth = c.var.auth;
 
-  const secrets = await getDiscordBotSecretsPublic(db);
-  return c.json({ secrets });
-});
+    const teamId = c.var.teamId;
 
-app.patch("/teams/:teamId/integrations/discord/secrets", async (c) => {
-  const result = await requireAuth(c);
-  if ("error" in result) return result.error;
-  requireWrite(result.auth);
+    const body = updateDiscordBotSecretsSchema.safeParse(await c.req.json().catch(() => ({})));
+    if (!body.success) {
+      return c.json({ error: body.error.issues[0]?.message ?? "Invalid input" }, 400);
+    }
 
-  const teamId = c.req.param("teamId");
-  if (!(await canAccessTeam(result.auth, teamId))) {
-    return c.json({ error: "Team access denied" }, 403);
-  }
-  if (!(await userIsInstanceAdmin(db, result.auth.userId))) {
-    return c.json({ error: "Instance admin required" }, 403);
-  }
+    const secrets = await updateDiscordBotSecrets(db, teamId, auth.userId, body.data);
+    return c.json({ secrets });
+  },
+);
 
-  const body = updateDiscordBotSecretsSchema.safeParse(await c.req.json().catch(() => ({})));
-  if (!body.success) {
-    return c.json({ error: body.error.issues[0]?.message ?? "Invalid input" }, 400);
-  }
+app.get(
+  "/teams/:teamId/integrations/discord/service",
+  requireAuth,
+  loadTeam(),
+  requirePermission("integrations.discord.view"),
+  async (c) => {
+    const status = await getDiscordBotServiceStatus(db);
+    return c.json({ status });
+  },
+);
 
-  const secrets = await updateDiscordBotSecrets(db, teamId, result.auth.userId, body.data);
-  return c.json({ secrets });
-});
+app.post(
+  "/teams/:teamId/integrations/discord/service/enable",
+  requireAuth,
+  requireWrite,
+  loadTeam(),
+  requirePermission("integrations.discord.secrets"),
+  requireInstanceAdmin,
+  async (c) => {
+    const status = await enableDiscordBotService(db);
+    return c.json({ status });
+  },
+);
 
-app.get("/teams/:teamId/integrations/discord/service", async (c) => {
-  const result = await requireAuth(c);
-  if ("error" in result) return result.error;
+app.post(
+  "/teams/:teamId/integrations/discord/service/restart",
+  requireAuth,
+  requireWrite,
+  loadTeam(),
+  requirePermission("integrations.discord.secrets"),
+  requireInstanceAdmin,
+  async (c) => {
+    const status = await restartDiscordBotService(db);
+    return c.json({ status });
+  },
+);
 
-  const teamId = c.req.param("teamId");
-  if (!(await canAccessTeam(result.auth, teamId))) {
-    return c.json({ error: "Team access denied" }, 403);
-  }
-  if (!(await userHasTeamPermission(db, result.auth.userId, teamId, "integrations.discord.view"))) {
-    return c.json({ error: "Permission denied" }, 403);
-  }
+app.post(
+  "/teams/:teamId/integrations/discord/service/stop",
+  requireAuth,
+  requireWrite,
+  loadTeam(),
+  requirePermission("integrations.discord.secrets"),
+  requireInstanceAdmin,
+  async (c) => {
+    const status = await stopDiscordBotService(db);
+    return c.json({ status });
+  },
+);
 
-  const status = await getDiscordBotServiceStatus(db);
-  return c.json({ status });
-});
+app.get(
+  "/teams/:teamId/server/maintenance",
+  requireAuth,
+  loadTeam(),
+  requirePermission("server.maintenance.view"),
+  requireInstanceAdmin,
+  async (c) => {
+    const status = await getMaintenanceStatus();
+    return c.json({ status });
+  },
+);
 
-app.post("/teams/:teamId/integrations/discord/service/enable", async (c) => {
-  const result = await requireAuth(c);
-  if ("error" in result) return result.error;
-  requireWrite(result.auth);
+app.get(
+  "/teams/:teamId/server/maintenance/job",
+  requireAuth,
+  loadTeam(),
+  requirePermission("server.maintenance.view"),
+  requireInstanceAdmin,
+  async (c) => {
+    const job = await getMaintenanceJob();
+    return c.json({ job });
+  },
+);
 
-  const teamId = c.req.param("teamId");
-  if (!(await canAccessTeam(result.auth, teamId))) {
-    return c.json({ error: "Team access denied" }, 403);
-  }
-  if (
-    !(await userHasTeamPermission(db, result.auth.userId, teamId, "integrations.discord.secrets"))
-  ) {
-    return c.json({ error: "Permission denied" }, 403);
-  }
-  if (!(await userIsInstanceAdmin(db, result.auth.userId))) {
-    return c.json({ error: "Instance admin required" }, 403);
-  }
+app.post(
+  "/teams/:teamId/server/maintenance/backup",
+  requireAuth,
+  requireWrite,
+  loadTeam(),
+  requirePermission("server.maintenance.run"),
+  requireInstanceAdmin,
+  async (c) => {
+    const body = runMaintenanceBackupSchema.safeParse(await c.req.json().catch(() => ({})));
+    if (!body.success) {
+      return c.json({ error: body.error.issues[0]?.message ?? "Invalid input" }, 400);
+    }
 
-  const status = await enableDiscordBotService(db);
-  return c.json({ status });
-});
+    const job = await runMaintenanceBackup(body.data);
+    return c.json({ job }, 202);
+  },
+);
 
-app.post("/teams/:teamId/integrations/discord/service/restart", async (c) => {
-  const result = await requireAuth(c);
-  if ("error" in result) return result.error;
-  requireWrite(result.auth);
+app.post(
+  "/teams/:teamId/server/maintenance/update",
+  requireAuth,
+  requireWrite,
+  loadTeam(),
+  requirePermission("server.maintenance.run"),
+  requireInstanceAdmin,
+  async (c) => {
+    const body = runMaintenanceUpdateSchema.safeParse(await c.req.json().catch(() => ({})));
+    if (!body.success) {
+      return c.json({ error: body.error.issues[0]?.message ?? "Invalid input" }, 400);
+    }
 
-  const teamId = c.req.param("teamId");
-  if (!(await canAccessTeam(result.auth, teamId))) {
-    return c.json({ error: "Team access denied" }, 403);
-  }
-  if (
-    !(await userHasTeamPermission(db, result.auth.userId, teamId, "integrations.discord.secrets"))
-  ) {
-    return c.json({ error: "Permission denied" }, 403);
-  }
-  if (!(await userIsInstanceAdmin(db, result.auth.userId))) {
-    return c.json({ error: "Instance admin required" }, 403);
-  }
+    const job = await runMaintenanceUpdate(body.data);
+    return c.json({ job }, 202);
+  },
+);
 
-  const status = await restartDiscordBotService(db);
-  return c.json({ status });
-});
+app.post(
+  "/teams/:teamId/server/maintenance/job/dismiss",
+  requireAuth,
+  requireWrite,
+  loadTeam(),
+  requirePermission("server.maintenance.run"),
+  requireInstanceAdmin,
+  async (c) => {
+    const job = await dismissMaintenanceJob();
+    return c.json({ job });
+  },
+);
 
-app.post("/teams/:teamId/integrations/discord/service/stop", async (c) => {
-  const result = await requireAuth(c);
-  if ("error" in result) return result.error;
-  requireWrite(result.auth);
-
-  const teamId = c.req.param("teamId");
-  if (!(await canAccessTeam(result.auth, teamId))) {
-    return c.json({ error: "Team access denied" }, 403);
-  }
-  if (
-    !(await userHasTeamPermission(db, result.auth.userId, teamId, "integrations.discord.secrets"))
-  ) {
-    return c.json({ error: "Permission denied" }, 403);
-  }
-  if (!(await userIsInstanceAdmin(db, result.auth.userId))) {
-    return c.json({ error: "Instance admin required" }, 403);
-  }
-
-  const status = await stopDiscordBotService(db);
-  return c.json({ status });
-});
-
-app.get("/teams/:teamId/server/maintenance", async (c) => {
-  const result = await requireAuth(c);
-  if ("error" in result) return result.error;
-
-  const teamId = c.req.param("teamId");
-  if (!(await canAccessTeam(result.auth, teamId))) {
-    return c.json({ error: "Team access denied" }, 403);
-  }
-  if (!(await userHasTeamPermission(db, result.auth.userId, teamId, "server.maintenance.view"))) {
-    return c.json({ error: "Permission denied" }, 403);
-  }
-  if (!(await userIsInstanceAdmin(db, result.auth.userId))) {
-    return c.json({ error: "Instance admin required" }, 403);
-  }
-
-  const status = await getMaintenanceStatus();
-  return c.json({ status });
-});
-
-app.get("/teams/:teamId/server/maintenance/job", async (c) => {
-  const result = await requireAuth(c);
-  if ("error" in result) return result.error;
-
-  const teamId = c.req.param("teamId");
-  if (!(await canAccessTeam(result.auth, teamId))) {
-    return c.json({ error: "Team access denied" }, 403);
-  }
-  if (!(await userHasTeamPermission(db, result.auth.userId, teamId, "server.maintenance.view"))) {
-    return c.json({ error: "Permission denied" }, 403);
-  }
-  if (!(await userIsInstanceAdmin(db, result.auth.userId))) {
-    return c.json({ error: "Instance admin required" }, 403);
-  }
-
-  const job = await getMaintenanceJob();
-  return c.json({ job });
-});
-
-app.post("/teams/:teamId/server/maintenance/backup", async (c) => {
-  const result = await requireAuth(c);
-  if ("error" in result) return result.error;
-  requireWrite(result.auth);
-
-  const teamId = c.req.param("teamId");
-  if (!(await canAccessTeam(result.auth, teamId))) {
-    return c.json({ error: "Team access denied" }, 403);
-  }
-  if (!(await userHasTeamPermission(db, result.auth.userId, teamId, "server.maintenance.run"))) {
-    return c.json({ error: "Permission denied" }, 403);
-  }
-  if (!(await userIsInstanceAdmin(db, result.auth.userId))) {
-    return c.json({ error: "Instance admin required" }, 403);
-  }
-
-  const body = runMaintenanceBackupSchema.safeParse(await c.req.json().catch(() => ({})));
-  if (!body.success) {
-    return c.json({ error: body.error.issues[0]?.message ?? "Invalid input" }, 400);
-  }
-
-  const job = await runMaintenanceBackup(body.data);
-  return c.json({ job }, 202);
-});
-
-app.post("/teams/:teamId/server/maintenance/update", async (c) => {
-  const result = await requireAuth(c);
-  if ("error" in result) return result.error;
-  requireWrite(result.auth);
-
-  const teamId = c.req.param("teamId");
-  if (!(await canAccessTeam(result.auth, teamId))) {
-    return c.json({ error: "Team access denied" }, 403);
-  }
-  if (!(await userHasTeamPermission(db, result.auth.userId, teamId, "server.maintenance.run"))) {
-    return c.json({ error: "Permission denied" }, 403);
-  }
-  if (!(await userIsInstanceAdmin(db, result.auth.userId))) {
-    return c.json({ error: "Instance admin required" }, 403);
-  }
-
-  const body = runMaintenanceUpdateSchema.safeParse(await c.req.json().catch(() => ({})));
-  if (!body.success) {
-    return c.json({ error: body.error.issues[0]?.message ?? "Invalid input" }, 400);
-  }
-
-  const job = await runMaintenanceUpdate(body.data);
-  return c.json({ job }, 202);
-});
-
-app.post("/teams/:teamId/server/maintenance/job/dismiss", async (c) => {
-  const result = await requireAuth(c);
-  if ("error" in result) return result.error;
-  requireWrite(result.auth);
-
-  const teamId = c.req.param("teamId");
-  if (!(await canAccessTeam(result.auth, teamId))) {
-    return c.json({ error: "Team access denied" }, 403);
-  }
-  if (!(await userHasTeamPermission(db, result.auth.userId, teamId, "server.maintenance.run"))) {
-    return c.json({ error: "Permission denied" }, 403);
-  }
-  if (!(await userIsInstanceAdmin(db, result.auth.userId))) {
-    return c.json({ error: "Instance admin required" }, 403);
-  }
-
-  const job = await dismissMaintenanceJob();
-  return c.json({ job });
-});
-
-app.get("/discord/guilds/:guildId/config", async (c) => {
-  const result = await requireAuth(c);
-  if ("error" in result) return result.error;
+app.get("/discord/guilds/:guildId/config", requireAuth, async (c) => {
+  const auth = c.var.auth;
 
   const guildId = c.req.param("guildId");
-  const config = await getDiscordGuildConfig(db, guildId, result.auth.userId);
+  const config = await getDiscordGuildConfig(db, guildId, auth.userId);
   if (!config) return c.json({ error: "Discord server not linked to a team" }, 404);
   return c.json({ config });
 });
 
-app.get("/invites/:token", async (c) => {
+app.get("/invites/:token", optionalAuth, async (c) => {
   const token = c.req.param("token");
-  const authHeader = c.req.header("Authorization");
-  let userId: string | undefined;
-  if (authHeader?.startsWith("Bearer ")) {
-    const auth = await resolveAuth(db, authHeader);
-    userId = auth?.userId;
-  }
-
-  const preview = await getInvitePreview(db, token, userId);
+  const preview = await getInvitePreview(db, token, c.var.auth?.userId);
   if (!preview) return c.json({ error: "Invite not found" }, 404);
 
   return c.json({ preview });
 });
 
-app.post("/invites/:token/accept", async (c) => {
-  const result = await requireAuth(c);
-  if ("error" in result) return result.error;
-  requireWrite(result.auth);
+app.post("/invites/:token/accept", requireAuth, requireWrite, async (c) => {
+  const auth = c.var.auth;
 
   const token = c.req.param("token");
-  const outcome = await acceptTeamInvite(db, token, result.auth.userId);
+  const outcome = await acceptTeamInvite(db, token, auth.userId);
   return c.json(outcome);
 });
 
-app.get("/teams/:teamId/resolve", async (c) => {
-  const result = await requireAuth(c);
-  if ("error" in result) return result.error;
-
-  const teamId = c.req.param("teamId");
-  if (!(await canAccessTeam(result.auth, teamId))) {
-    return c.json({ error: "Team access denied" }, 403);
-  }
+app.get("/teams/:teamId/resolve", requireAuth, loadTeam(), async (c) => {
+  const teamId = c.var.teamId;
 
   const ref = c.req.query("ref") ?? "";
   const parsed = resolveRefSchema.safeParse({ ref });
@@ -1546,14 +1276,8 @@ app.get("/teams/:teamId/resolve", async (c) => {
   return c.json(match);
 });
 
-app.get("/teams/:teamId/files", async (c) => {
-  const result = await requireAuth(c);
-  if ("error" in result) return result.error;
-
-  const teamId = c.req.param("teamId");
-  if (!(await canAccessTeam(result.auth, teamId))) {
-    return c.json({ error: "Team access denied" }, 403);
-  }
+app.get("/teams/:teamId/files", requireAuth, loadTeam(), async (c) => {
+  const teamId = c.var.teamId;
 
   const trash = c.req.query("trash") === "1";
   const files = await listTeamFiles(db, teamId, { trash });
@@ -1561,16 +1285,9 @@ app.get("/teams/:teamId/files", async (c) => {
   return c.json({ files, totalBytes, fileCount: files.length, trash });
 });
 
-app.patch("/teams/:teamId/files/:fileId", async (c) => {
-  const result = await requireAuth(c);
-  if ("error" in result) return result.error;
-  requireWrite(result.auth);
-
-  const teamId = c.req.param("teamId");
+app.patch("/teams/:teamId/files/:fileId", requireAuth, requireWrite, loadTeam(), async (c) => {
+  const teamId = c.var.teamId;
   const fileId = c.req.param("fileId");
-  if (!(await canAccessTeam(result.auth, teamId))) {
-    return c.json({ error: "Team access denied" }, 403);
-  }
 
   const body = renameTeamFileSchema.safeParse(await c.req.json().catch(() => ({})));
   if (!body.success) {
@@ -1581,45 +1298,30 @@ app.patch("/teams/:teamId/files/:fileId", async (c) => {
   return c.json(renamed);
 });
 
-app.delete("/teams/:teamId/files/:fileId", async (c) => {
-  const result = await requireAuth(c);
-  if ("error" in result) return result.error;
-  requireWrite(result.auth);
-
-  const teamId = c.req.param("teamId");
+app.delete("/teams/:teamId/files/:fileId", requireAuth, requireWrite, loadTeam(), async (c) => {
+  const teamId = c.var.teamId;
   const fileId = c.req.param("fileId");
-  if (!(await canAccessTeam(result.auth, teamId))) {
-    return c.json({ error: "Team access denied" }, 403);
-  }
 
   const deleted = await softDeleteTeamFile(db, teamId, fileId);
   return c.json(deleted);
 });
 
-app.post("/teams/:teamId/files/:fileId/restore", async (c) => {
-  const result = await requireAuth(c);
-  if ("error" in result) return result.error;
-  requireWrite(result.auth);
+app.post(
+  "/teams/:teamId/files/:fileId/restore",
+  requireAuth,
+  requireWrite,
+  loadTeam(),
+  async (c) => {
+    const teamId = c.var.teamId;
+    const fileId = c.req.param("fileId");
 
-  const teamId = c.req.param("teamId");
-  const fileId = c.req.param("fileId");
-  if (!(await canAccessTeam(result.auth, teamId))) {
-    return c.json({ error: "Team access denied" }, 403);
-  }
+    const restored = await restoreTeamFile(db, teamId, fileId);
+    return c.json(restored);
+  },
+);
 
-  const restored = await restoreTeamFile(db, teamId, fileId);
-  return c.json(restored);
-});
-
-app.post("/teams/:teamId/rows", async (c) => {
-  const result = await requireAuth(c);
-  if ("error" in result) return result.error;
-  requireWrite(result.auth);
-
-  const teamId = c.req.param("teamId");
-  if (!(await canAccessTeam(result.auth, teamId))) {
-    return c.json({ error: "Team access denied" }, 403);
-  }
+app.post("/teams/:teamId/rows", requireAuth, requireWrite, loadTeam(), async (c) => {
+  const teamId = c.var.teamId;
 
   const body = createBoardRowSchema.safeParse(await c.req.json());
   if (!body.success) {
@@ -1643,22 +1345,9 @@ app.post("/teams/:teamId/rows", async (c) => {
   return c.json({ row: await mapBoardRow(db, row!) }, 201);
 });
 
-app.patch("/rows/:rowId", async (c) => {
-  const result = await requireAuth(c);
-  if ("error" in result) return result.error;
-  requireWrite(result.auth);
-
-  const rowId = c.req.param("rowId");
-  const [existing] = await db
-    .select()
-    .from(schema.boardRows)
-    .where(eq(schema.boardRows.id, rowId))
-    .limit(1);
-
-  if (!existing) return c.json({ error: "Row not found" }, 404);
-  if (!(await canAccessTeam(result.auth, existing.teamId))) {
-    return c.json({ error: "Team access denied" }, 403);
-  }
+app.patch("/rows/:rowId", requireAuth, requireWrite, loadTeam("row"), async (c) => {
+  const existing = c.var.row;
+  const rowId = existing.id;
 
   const body = updateBoardRowSchema.safeParse(await c.req.json());
   if (!body.success) {
@@ -1733,22 +1422,9 @@ app.patch("/rows/:rowId", async (c) => {
   return c.json({ row: await mapBoardRow(db, row!) });
 });
 
-app.delete("/rows/:rowId", async (c) => {
-  const result = await requireAuth(c);
-  if ("error" in result) return result.error;
-  requireWrite(result.auth);
-
-  const rowId = c.req.param("rowId");
-  const [existing] = await db
-    .select()
-    .from(schema.boardRows)
-    .where(eq(schema.boardRows.id, rowId))
-    .limit(1);
-
-  if (!existing) return c.json({ error: "Row not found" }, 404);
-  if (!(await canAccessTeam(result.auth, existing.teamId))) {
-    return c.json({ error: "Team access denied" }, 403);
-  }
+app.delete("/rows/:rowId", requireAuth, requireWrite, loadTeam("row"), async (c) => {
+  const existing = c.var.row;
+  const rowId = existing.id;
 
   const teamRows = await db
     .select()
@@ -1782,22 +1458,21 @@ app.delete("/rows/:rowId", async (c) => {
   return c.body(null, 204);
 });
 
-app.get("/projects", async (c) => {
-  const result = await requireAuth(c);
-  if ("error" in result) return result.error;
+app.get("/projects", requireAuth, async (c) => {
+  const auth = c.var.auth;
 
   const teamId = c.req.query("teamId");
   const memberships = await db
     .select({ teamId: schema.teamMembers.teamId })
     .from(schema.teamMembers)
-    .where(eq(schema.teamMembers.userId, result.auth.userId));
+    .where(eq(schema.teamMembers.userId, auth.userId));
 
   const allowedTeamIds = new Set(memberships.map((m) => m.teamId));
   let projects = await db.select().from(schema.projects);
 
   projects = projects.filter((p) => {
     if (!allowedTeamIds.has(p.teamId)) return false;
-    if (patTeamMismatch(result.auth, p.teamId)) return false;
+    if (patTeamMismatch(auth, p.teamId)) return false;
     if (teamId && p.teamId !== teamId) return false;
     return true;
   });
@@ -1805,19 +1480,15 @@ app.get("/projects", async (c) => {
   return c.json({ projects });
 });
 
-app.post("/projects", async (c) => {
-  const result = await requireAuth(c);
-  if ("error" in result) return result.error;
-  requireWrite(result.auth);
+app.post("/projects", requireAuth, requireWrite, async (c) => {
+  const auth = c.var.auth;
 
   const body = createProjectSchema.safeParse(await c.req.json());
   if (!body.success) {
     return c.json({ error: body.error.issues[0]?.message ?? "Invalid input" }, 400);
   }
 
-  if (!(await canAccessTeam(result.auth, body.data.teamId))) {
-    return c.json({ error: "Team access denied" }, 403);
-  }
+  await assertTeamAccess(auth, body.data.teamId);
 
   const id = crypto.randomUUID();
   await db.insert(schema.projects).values({
@@ -1836,9 +1507,8 @@ app.post("/projects", async (c) => {
   return c.json({ project }, 201);
 });
 
-app.get("/issues", async (c) => {
-  const result = await requireAuth(c);
-  if ("error" in result) return result.error;
+app.get("/issues", requireAuth, async (c) => {
+  const auth = c.var.auth;
 
   const filters = {
     teamId: c.req.query("teamId"),
@@ -1849,12 +1519,12 @@ app.get("/issues", async (c) => {
     search: c.req.query("search"),
   };
 
-  if (result.auth.patTeamId && filters.teamId && filters.teamId !== result.auth.patTeamId) {
+  if (auth.patTeamId && filters.teamId && filters.teamId !== auth.patTeamId) {
     return c.json({ error: "Token restricted to a different team" }, 403);
   }
 
-  const effectiveTeamId = result.auth.patTeamId ?? filters.teamId;
-  const issues = await listIssuesForUser(db, result.auth.userId, {
+  const effectiveTeamId = auth.patTeamId ?? filters.teamId;
+  const issues = await listIssuesForUser(db, auth.userId, {
     ...filters,
     teamId: effectiveTeamId,
   });
@@ -1862,17 +1532,9 @@ app.get("/issues", async (c) => {
   return c.json({ issues });
 });
 
-app.get("/issues/:id", async (c) => {
-  const result = await requireAuth(c);
-  if ("error" in result) return result.error;
-
-  const id = c.req.param("id");
-  const [issue] = await db.select().from(schema.issues).where(eq(schema.issues.id, id)).limit(1);
-
-  if (!issue) return c.json({ error: "Issue not found" }, 404);
-  if (!(await canAccessTeam(result.auth, issue.teamId))) {
-    return c.json({ error: "Team access denied" }, 403);
-  }
+app.get("/issues/:id", requireAuth, loadTeam("issue"), async (c) => {
+  const issue = c.var.issue;
+  const id = issue.id;
 
   const teamKey = await getTeamKey(db, issue.teamId);
   const comments = await db
@@ -1901,21 +1563,17 @@ app.get("/issues/:id", async (c) => {
   });
 });
 
-app.post("/issues", async (c) => {
-  const result = await requireAuth(c);
-  if ("error" in result) return result.error;
-  requireWrite(result.auth);
+app.post("/issues", requireAuth, requireWrite, async (c) => {
+  const auth = c.var.auth;
 
   const body = createIssueSchema.safeParse(await c.req.json());
   if (!body.success) {
     return c.json({ error: body.error.issues[0]?.message ?? "Invalid input" }, 400);
   }
 
-  if (!(await canAccessTeam(result.auth, body.data.teamId))) {
-    return c.json({ error: "Team access denied" }, 403);
-  }
+  await assertTeamAccess(auth, body.data.teamId);
 
-  if (result.auth.patTeamId && result.auth.patTeamId !== body.data.teamId) {
+  if (auth.patTeamId && auth.patTeamId !== body.data.teamId) {
     return c.json({ error: "Token restricted to a different team" }, 403);
   }
 
@@ -1996,7 +1654,7 @@ app.post("/issues", async (c) => {
     statusId,
     priority: body.data.priority,
     assigneeId: body.data.assigneeId,
-    creatorId: result.auth.userId,
+    creatorId: auth.userId,
     dueDate: body.data.dueDate,
     boardSort,
     updatedAt: now,
@@ -2010,31 +1668,23 @@ app.post("/issues", async (c) => {
 
   await logActivity(db, {
     issueId,
-    userId: result.auth.userId,
+    userId: auth.userId,
     action: "issue.created",
     metadata: { title: body.data.title },
-    source: result.auth.source,
+    source: auth.source,
   });
 
   return c.json({ issue: await mapIssue(db, issue!, team.key) }, 201);
 });
 
-app.patch("/issues/:id", async (c) => {
-  const result = await requireAuth(c);
-  if ("error" in result) return result.error;
-  requireWrite(result.auth);
+app.patch("/issues/:id", requireAuth, requireWrite, loadTeam("issue"), async (c) => {
+  const auth = c.var.auth;
 
-  const id = c.req.param("id");
+  const existing = c.var.issue;
+  const id = existing.id;
   const body = updateIssueSchema.safeParse(await c.req.json());
   if (!body.success) {
     return c.json({ error: body.error.issues[0]?.message ?? "Invalid input" }, 400);
-  }
-
-  const [existing] = await db.select().from(schema.issues).where(eq(schema.issues.id, id)).limit(1);
-
-  if (!existing) return c.json({ error: "Issue not found" }, 404);
-  if (!(await canAccessTeam(result.auth, existing.teamId))) {
-    return c.json({ error: "Team access denied" }, 403);
   }
 
   // Referenced entities must belong to the issue's team (no cross-team references).
@@ -2134,27 +1784,20 @@ app.patch("/issues/:id", async (c) => {
 
   await logActivity(db, {
     issueId: id,
-    userId: result.auth.userId,
+    userId: auth.userId,
     action: "issue.updated",
     metadata: body.data,
-    source: result.auth.source,
+    source: auth.source,
   });
 
   return c.json({ issue: await mapIssue(db, issue!, teamKey) });
 });
 
-app.post("/issues/:id/complete", async (c) => {
-  const result = await requireAuth(c);
-  if ("error" in result) return result.error;
-  requireWrite(result.auth);
+app.post("/issues/:id/complete", requireAuth, requireWrite, loadTeam("issue"), async (c) => {
+  const auth = c.var.auth;
 
-  const id = c.req.param("id");
-  const [existing] = await db.select().from(schema.issues).where(eq(schema.issues.id, id)).limit(1);
-
-  if (!existing) return c.json({ error: "Issue not found" }, 404);
-  if (!(await canAccessTeam(result.auth, existing.teamId))) {
-    return c.json({ error: "Team access denied" }, 403);
-  }
+  const existing = c.var.issue;
+  const id = existing.id;
 
   const issueRowId = existing.rowId ?? (await getDefaultRowId(db, existing.teamId));
   const doneStatusId = await getDoneStatusId(db, issueRowId);
@@ -2178,27 +1821,20 @@ app.post("/issues/:id/complete", async (c) => {
 
   await logActivity(db, {
     issueId: id,
-    userId: result.auth.userId,
+    userId: auth.userId,
     action: "issue.completed",
-    source: result.auth.source,
+    source: auth.source,
   });
 
   return c.json({ issue: await mapIssue(db, issue!, teamKey) });
 });
 
-app.delete("/issues/:id", async (c) => {
-  const result = await requireAuth(c);
-  if ("error" in result) return result.error;
-  requireWrite(result.auth);
+app.delete("/issues/:id", requireAuth, requireWrite, loadTeam("issue"), async (c) => {
+  const auth = c.var.auth;
 
-  const id = c.req.param("id");
-  const [existing] = await db.select().from(schema.issues).where(eq(schema.issues.id, id)).limit(1);
-
-  if (!existing) return c.json({ error: "Issue not found" }, 404);
+  const existing = c.var.issue;
+  const id = existing.id;
   if (existing.deletedAt) return c.body(null, 204);
-  if (!(await canAccessTeam(result.auth, existing.teamId))) {
-    return c.json({ error: "Team access denied" }, 403);
-  }
 
   const now = new Date().toISOString();
   await db
@@ -2207,29 +1843,22 @@ app.delete("/issues/:id", async (c) => {
     .where(eq(schema.issues.id, id));
 
   await logActivity(db, {
-    userId: result.auth.userId,
+    userId: auth.userId,
     action: "issue.deleted",
     metadata: { issueId: id },
-    source: result.auth.source,
+    source: auth.source,
   });
 
   return c.body(null, 204);
 });
 
-app.post("/issues/:id/restore", async (c) => {
-  const result = await requireAuth(c);
-  if ("error" in result) return result.error;
-  requireWrite(result.auth);
+app.post("/issues/:id/restore", requireAuth, requireWrite, loadTeam("issue"), async (c) => {
+  const auth = c.var.auth;
 
-  const id = c.req.param("id");
-  const [existing] = await db.select().from(schema.issues).where(eq(schema.issues.id, id)).limit(1);
-
-  if (!existing) return c.json({ error: "Issue not found" }, 404);
+  const existing = c.var.issue;
+  const id = existing.id;
   if (!existing.deletedAt) {
     return c.json({ error: "Issue is not in trash" }, 400);
-  }
-  if (!(await canAccessTeam(result.auth, existing.teamId))) {
-    return c.json({ error: "Team access denied" }, 403);
   }
 
   const now = new Date().toISOString();
@@ -2244,48 +1873,36 @@ app.post("/issues/:id/restore", async (c) => {
 
   await logActivity(db, {
     issueId: id,
-    userId: result.auth.userId,
+    userId: auth.userId,
     action: "issue.restored",
-    source: result.auth.source,
+    source: auth.source,
   });
 
   return c.json({ issue: await mapIssue(db, issue!, teamKey) });
 });
 
-app.post("/issues/:id/comments", async (c) => {
-  const result = await requireAuth(c);
-  if ("error" in result) return result.error;
-  requireWrite(result.auth);
+app.post("/issues/:id/comments", requireAuth, requireWrite, loadTeam("issue"), async (c) => {
+  const auth = c.var.auth;
 
-  const issueId = c.req.param("id");
+  const issue = c.var.issue;
+  const issueId = issue.id;
   const body = createCommentSchema.safeParse(await c.req.json());
   if (!body.success) {
     return c.json({ error: body.error.issues[0]?.message ?? "Invalid input" }, 400);
-  }
-
-  const [issue] = await db
-    .select()
-    .from(schema.issues)
-    .where(eq(schema.issues.id, issueId))
-    .limit(1);
-
-  if (!issue) return c.json({ error: "Issue not found" }, 404);
-  if (!(await canAccessTeam(result.auth, issue.teamId))) {
-    return c.json({ error: "Team access denied" }, 403);
   }
 
   const commentId = crypto.randomUUID();
   await db.insert(schema.comments).values({
     id: commentId,
     issueId,
-    authorId: result.auth.userId,
+    authorId: auth.userId,
     body: body.data.body,
   });
 
   const [user] = await db
     .select()
     .from(schema.users)
-    .where(eq(schema.users.id, result.auth.userId))
+    .where(eq(schema.users.id, auth.userId))
     .limit(1);
 
   return c.json(
@@ -2293,7 +1910,7 @@ app.post("/issues/:id/comments", async (c) => {
       comment: {
         id: commentId,
         issueId,
-        authorId: result.auth.userId,
+        authorId: auth.userId,
         authorName: user!.name,
         body: body.data.body,
         createdAt: new Date().toISOString(),
@@ -2303,43 +1920,37 @@ app.post("/issues/:id/comments", async (c) => {
   );
 });
 
-app.delete("/issues/:issueId/comments/:commentId", async (c) => {
-  const result = await requireAuth(c);
-  if ("error" in result) return result.error;
-  requireWrite(result.auth);
+app.delete(
+  "/issues/:issueId/comments/:commentId",
+  requireAuth,
+  requireWrite,
+  loadTeam("issue"),
+  async (c) => {
+    const auth = c.var.auth;
 
-  const issueId = c.req.param("issueId");
-  const commentId = c.req.param("commentId");
+    const issue = c.var.issue;
+    const issueId = issue.id;
+    const commentId = c.req.param("commentId");
 
-  const [issue] = await db
-    .select()
-    .from(schema.issues)
-    .where(eq(schema.issues.id, issueId))
-    .limit(1);
+    const [comment] = await db
+      .select()
+      .from(schema.comments)
+      .where(eq(schema.comments.id, commentId))
+      .limit(1);
 
-  if (!issue) return c.json({ error: "Issue not found" }, 404);
-  if (!(await canAccessTeam(result.auth, issue.teamId))) {
-    return c.json({ error: "Team access denied" }, 403);
-  }
+    if (!comment || comment.issueId !== issueId) {
+      return c.json({ error: "Comment not found" }, 404);
+    }
 
-  const [comment] = await db
-    .select()
-    .from(schema.comments)
-    .where(eq(schema.comments.id, commentId))
-    .limit(1);
+    if (comment.authorId !== auth.userId) {
+      return c.json({ error: "You can only delete your own comments" }, 403);
+    }
 
-  if (!comment || comment.issueId !== issueId) {
-    return c.json({ error: "Comment not found" }, 404);
-  }
+    await db.delete(schema.comments).where(eq(schema.comments.id, commentId));
 
-  if (comment.authorId !== result.auth.userId) {
-    return c.json({ error: "You can only delete your own comments" }, 403);
-  }
-
-  await db.delete(schema.comments).where(eq(schema.comments.id, commentId));
-
-  return c.body(null, 204);
-});
+    return c.body(null, 204);
+  },
+);
 
 function parseCreateUploadSession(body: unknown) {
   if (!body || typeof body !== "object") return null;
@@ -2370,102 +1981,48 @@ function parseLinkAttachment(body: unknown) {
   return { fileId };
 }
 
-async function userCanAccessUploadSession(
-  auth: AuthContext,
-  session: { issueId: string | null; rowId: string | null },
-) {
-  if (session.issueId) {
-    const [issue] = await db
-      .select()
-      .from(schema.issues)
-      .where(eq(schema.issues.id, session.issueId))
-      .limit(1);
-    if (!issue) return false;
-    return canAccessTeam(auth, issue.teamId);
-  }
-  if (session.rowId) {
-    const [row] = await db
-      .select()
-      .from(schema.boardRows)
-      .where(eq(schema.boardRows.id, session.rowId))
-      .limit(1);
-    if (!row) return false;
-    return canAccessTeam(auth, row.teamId);
-  }
-  return false;
-}
-
-app.get("/issues/:issueId/attachments", async (c) => {
-  const result = await requireAuth(c);
-  if ("error" in result) return result.error;
-
-  const issueId = c.req.param("issueId");
-  const [issue] = await db
-    .select()
-    .from(schema.issues)
-    .where(eq(schema.issues.id, issueId))
-    .limit(1);
-
-  if (!issue) return c.json({ error: "Issue not found" }, 404);
-  if (!(await canAccessTeam(result.auth, issue.teamId))) {
-    return c.json({ error: "Team access denied" }, 403);
-  }
+app.get("/issues/:issueId/attachments", requireAuth, loadTeam("issue"), async (c) => {
+  const issue = c.var.issue;
+  const issueId = issue.id;
 
   const attachments = await listIssueAttachments(db, issueId);
   return c.json({ attachments, limits: getAttachmentLimits() });
 });
 
-app.post("/issues/:issueId/attachments", async (c) => {
-  const result = await requireAuth(c);
-  if ("error" in result) return result.error;
-  requireWrite(result.auth);
+app.post(
+  "/issues/:issueId/attachments",
+  requireAuth,
+  requireWrite,
+  loadTeam("issue"),
+  async (c) => {
+    const auth = c.var.auth;
 
-  const issueId = c.req.param("issueId");
-  const [issue] = await db
-    .select()
-    .from(schema.issues)
-    .where(eq(schema.issues.id, issueId))
-    .limit(1);
+    const issue = c.var.issue;
+    const issueId = issue.id;
 
-  if (!issue) return c.json({ error: "Issue not found" }, 404);
-  if (!(await canAccessTeam(result.auth, issue.teamId))) {
-    return c.json({ error: "Team access denied" }, 403);
-  }
+    const body = await c.req.parseBody();
+    const raw = body.file;
+    const file = Array.isArray(raw) ? raw[0] : raw;
+    if (!(file instanceof File)) {
+      return c.json({ error: "Missing file field" }, 400);
+    }
 
-  const body = await c.req.parseBody();
-  const raw = body.file;
-  const file = Array.isArray(raw) ? raw[0] : raw;
-  if (!(file instanceof File)) {
-    return c.json({ error: "Missing file field" }, 400);
-  }
+    const attachment = await saveIssueAttachment(db, issueId, auth.userId, file);
+    return c.json({ attachment }, 201);
+  },
+);
 
-  const attachment = await saveIssueAttachment(db, issueId, result.auth.userId, file);
-  return c.json({ attachment }, 201);
-});
+app.post("/issues/:issueId/uploads", requireAuth, requireWrite, loadTeam("issue"), async (c) => {
+  const auth = c.var.auth;
 
-app.post("/issues/:issueId/uploads", async (c) => {
-  const result = await requireAuth(c);
-  if ("error" in result) return result.error;
-  requireWrite(result.auth);
-
-  const issueId = c.req.param("issueId");
+  const issue = c.var.issue;
+  const issueId = issue.id;
   const body = parseCreateUploadSession(await c.req.json());
   if (!body) {
     return c.json({ error: "Invalid input" }, 400);
   }
 
-  const [issue] = await db
-    .select()
-    .from(schema.issues)
-    .where(eq(schema.issues.id, issueId))
-    .limit(1);
-
-  if (!issue) return c.json({ error: "Issue not found" }, 404);
-  if (!(await canAccessTeam(result.auth, issue.teamId))) {
-    return c.json({ error: "Team access denied" }, 403);
-  }
-
-  const session = await createUploadSession(db, { issueId }, result.auth.userId, {
+  const session = await createUploadSession(db, { issueId }, auth.userId, {
     filename: body.filename,
     mimeType: body.mimeType,
     totalBytes: body.totalBytes,
@@ -2473,114 +2030,70 @@ app.post("/issues/:issueId/uploads", async (c) => {
   return c.json({ session }, 201);
 });
 
-app.get("/uploads/:sessionId", async (c) => {
-  const result = await requireAuth(c);
-  if ("error" in result) return result.error;
-
-  const sessionId = c.req.param("sessionId");
-  const session = await getUploadSession(db, sessionId);
-  if (!session) return c.json({ error: "Upload session not found" }, 404);
-
-  if (!(await userCanAccessUploadSession(result.auth, session))) {
-    return c.json({ error: "Team access denied" }, 403);
-  }
+app.get("/uploads/:sessionId", requireAuth, loadTeam("upload"), async (c) => {
+  const session = c.var.uploadSession;
 
   return c.json({ session });
 });
 
-app.put("/uploads/:sessionId/chunks/:index", async (c) => {
-  const result = await requireAuth(c);
-  if ("error" in result) return result.error;
-  requireWrite(result.auth);
+app.put(
+  "/uploads/:sessionId/chunks/:index",
+  requireAuth,
+  requireWrite,
+  loadTeam("upload"),
+  async (c) => {
+    const auth = c.var.auth;
 
-  const sessionId = c.req.param("sessionId");
-  const chunkIndex = Number.parseInt(c.req.param("index"), 10);
-  if (Number.isNaN(chunkIndex)) {
-    return c.json({ error: "Invalid chunk index" }, 400);
-  }
+    const existing = c.var.uploadSession;
+    const sessionId = existing.sessionId;
+    const chunkIndex = Number.parseInt(c.req.param("index"), 10);
+    if (Number.isNaN(chunkIndex)) {
+      return c.json({ error: "Invalid chunk index" }, 400);
+    }
 
-  const existing = await getUploadSession(db, sessionId);
-  if (!existing) return c.json({ error: "Upload session not found" }, 404);
+    const buffer = Buffer.from(await c.req.arrayBuffer());
+    const session = await saveUploadChunk(db, sessionId, chunkIndex, buffer, auth.userId);
+    return c.json({ session });
+  },
+);
 
-  if (!(await userCanAccessUploadSession(result.auth, existing))) {
-    return c.json({ error: "Team access denied" }, 403);
-  }
+app.post(
+  "/uploads/:sessionId/complete",
+  requireAuth,
+  requireWrite,
+  loadTeam("upload"),
+  async (c) => {
+    const auth = c.var.auth;
 
-  const buffer = Buffer.from(await c.req.arrayBuffer());
-  const session = await saveUploadChunk(db, sessionId, chunkIndex, buffer, result.auth.userId);
-  return c.json({ session });
-});
+    const existing = c.var.uploadSession;
+    const sessionId = existing.sessionId;
 
-app.post("/uploads/:sessionId/complete", async (c) => {
-  const result = await requireAuth(c);
-  if ("error" in result) return result.error;
-  requireWrite(result.auth);
+    const attachment = await completeUploadSession(db, sessionId, auth.userId);
+    return c.json({ attachment }, 201);
+  },
+);
 
-  const sessionId = c.req.param("sessionId");
-  const existing = await getUploadSession(db, sessionId);
-  if (!existing) return c.json({ error: "Upload session not found" }, 404);
-
-  if (!(await userCanAccessUploadSession(result.auth, existing))) {
-    return c.json({ error: "Team access denied" }, 403);
-  }
-
-  const attachment = await completeUploadSession(db, sessionId, result.auth.userId);
-  return c.json({ attachment }, 201);
-});
-
-app.delete("/uploads/:sessionId", async (c) => {
-  const result = await requireAuth(c);
-  if ("error" in result) return result.error;
-  requireWrite(result.auth);
-
-  const sessionId = c.req.param("sessionId");
-  const existing = await getUploadSession(db, sessionId);
-  if (!existing) return c.json({ error: "Upload session not found" }, 404);
-
-  if (!(await userCanAccessUploadSession(result.auth, existing))) {
-    return c.json({ error: "Team access denied" }, 403);
-  }
+app.delete("/uploads/:sessionId", requireAuth, requireWrite, loadTeam("upload"), async (c) => {
+  const existing = c.var.uploadSession;
+  const sessionId = existing.sessionId;
 
   await abortUploadSession(db, sessionId);
   return c.body(null, 204);
 });
 
-app.get("/rows/:rowId/attachments", async (c) => {
-  const result = await requireAuth(c);
-  if ("error" in result) return result.error;
-
-  const rowId = c.req.param("rowId");
-  const [row] = await db
-    .select()
-    .from(schema.boardRows)
-    .where(eq(schema.boardRows.id, rowId))
-    .limit(1);
-
-  if (!row) return c.json({ error: "Row not found" }, 404);
-  if (!(await canAccessTeam(result.auth, row.teamId))) {
-    return c.json({ error: "Team access denied" }, 403);
-  }
+app.get("/rows/:rowId/attachments", requireAuth, loadTeam("row"), async (c) => {
+  const row = c.var.row;
+  const rowId = row.id;
 
   const attachments = await listRowAttachments(db, rowId);
   return c.json({ attachments, limits: getAttachmentLimits() });
 });
 
-app.post("/rows/:rowId/attachments", async (c) => {
-  const result = await requireAuth(c);
-  if ("error" in result) return result.error;
-  requireWrite(result.auth);
+app.post("/rows/:rowId/attachments", requireAuth, requireWrite, loadTeam("row"), async (c) => {
+  const auth = c.var.auth;
 
-  const rowId = c.req.param("rowId");
-  const [row] = await db
-    .select()
-    .from(schema.boardRows)
-    .where(eq(schema.boardRows.id, rowId))
-    .limit(1);
-
-  if (!row) return c.json({ error: "Row not found" }, 404);
-  if (!(await canAccessTeam(result.auth, row.teamId))) {
-    return c.json({ error: "Team access denied" }, 403);
-  }
+  const row = c.var.row;
+  const rowId = row.id;
 
   const body = await c.req.parseBody();
   const raw = body.file;
@@ -2589,33 +2102,21 @@ app.post("/rows/:rowId/attachments", async (c) => {
     return c.json({ error: "Missing file field" }, 400);
   }
 
-  const attachment = await saveRowAttachment(db, rowId, result.auth.userId, file);
+  const attachment = await saveRowAttachment(db, rowId, auth.userId, file);
   return c.json({ attachment }, 201);
 });
 
-app.post("/rows/:rowId/uploads", async (c) => {
-  const result = await requireAuth(c);
-  if ("error" in result) return result.error;
-  requireWrite(result.auth);
+app.post("/rows/:rowId/uploads", requireAuth, requireWrite, loadTeam("row"), async (c) => {
+  const auth = c.var.auth;
 
-  const rowId = c.req.param("rowId");
+  const row = c.var.row;
+  const rowId = row.id;
   const body = parseCreateUploadSession(await c.req.json());
   if (!body) {
     return c.json({ error: "Invalid input" }, 400);
   }
 
-  const [row] = await db
-    .select()
-    .from(schema.boardRows)
-    .where(eq(schema.boardRows.id, rowId))
-    .limit(1);
-
-  if (!row) return c.json({ error: "Row not found" }, 404);
-  if (!(await canAccessTeam(result.auth, row.teamId))) {
-    return c.json({ error: "Team access denied" }, 403);
-  }
-
-  const session = await createUploadSession(db, { rowId }, result.auth.userId, {
+  const session = await createUploadSession(db, { rowId }, auth.userId, {
     filename: body.filename,
     mimeType: body.mimeType,
     totalBytes: body.totalBytes,
@@ -2623,51 +2124,29 @@ app.post("/rows/:rowId/uploads", async (c) => {
   return c.json({ session }, 201);
 });
 
-app.delete("/rows/:rowId/attachments/:id", async (c) => {
-  const result = await requireAuth(c);
-  if ("error" in result) return result.error;
-  requireWrite(result.auth);
+app.delete(
+  "/rows/:rowId/attachments/:id",
+  requireAuth,
+  requireWrite,
+  loadTeam("row"),
+  async (c) => {
+    const row = c.var.row;
+    const rowId = row.id;
+    const attachmentId = c.req.param("id");
 
-  const rowId = c.req.param("rowId");
-  const attachmentId = c.req.param("id");
+    const deleted = await deleteRowAttachment(db, rowId, attachmentId);
+    if (!deleted) return c.json({ error: "Attachment not found" }, 404);
 
-  const [row] = await db
-    .select()
-    .from(schema.boardRows)
-    .where(eq(schema.boardRows.id, rowId))
-    .limit(1);
+    return c.body(null, 204);
+  },
+);
 
-  if (!row) return c.json({ error: "Row not found" }, 404);
-  if (!(await canAccessTeam(result.auth, row.teamId))) {
-    return c.json({ error: "Team access denied" }, 403);
-  }
-
-  const deleted = await deleteRowAttachment(db, rowId, attachmentId);
-  if (!deleted) return c.json({ error: "Attachment not found" }, 404);
-
-  return c.body(null, 204);
-});
-
-app.post("/rows/:rowId/attachments/link", async (c) => {
-  const result = await requireAuth(c);
-  if ("error" in result) return result.error;
-  requireWrite(result.auth);
-
-  const rowId = c.req.param("rowId");
+app.post("/rows/:rowId/attachments/link", requireAuth, requireWrite, loadTeam("row"), async (c) => {
+  const row = c.var.row;
+  const rowId = row.id;
   const body = parseLinkAttachment(await c.req.json());
   if (!body) {
     return c.json({ error: "Invalid input" }, 400);
-  }
-
-  const [row] = await db
-    .select()
-    .from(schema.boardRows)
-    .where(eq(schema.boardRows.id, rowId))
-    .limit(1);
-
-  if (!row) return c.json({ error: "Row not found" }, 404);
-  if (!(await canAccessTeam(result.auth, row.teamId))) {
-    return c.json({ error: "Team access denied" }, 403);
   }
 
   const fileTeamId = await getFileTeamId(db, body.fileId);
@@ -2679,10 +2158,8 @@ app.post("/rows/:rowId/attachments/link", async (c) => {
   return c.json({ attachment }, 201);
 });
 
-app.post("/issues/:issueId/attachments/:id/move", async (c) => {
-  const result = await requireAuth(c);
-  if ("error" in result) return result.error;
-  requireWrite(result.auth);
+app.post("/issues/:issueId/attachments/:id/move", requireAuth, requireWrite, async (c) => {
+  const auth = c.var.auth;
 
   const issueId = c.req.param("issueId");
   const linkId = c.req.param("id");
@@ -2708,60 +2185,44 @@ app.post("/issues/:issueId/attachments/:id/move", async (c) => {
   if (sourceIssue.teamId !== targetIssue.teamId) {
     return c.json({ error: "Issues must be on the same team" }, 400);
   }
-  if (!(await canAccessTeam(result.auth, sourceIssue.teamId))) {
-    return c.json({ error: "Team access denied" }, 403);
-  }
+  await assertTeamAccess(auth, sourceIssue.teamId);
 
   const attachment = await moveIssueAttachment(db, linkId, issueId, body.targetIssueId);
   return c.json({ attachment });
 });
 
-app.post("/issues/:issueId/attachments/link", async (c) => {
-  const result = await requireAuth(c);
-  if ("error" in result) return result.error;
-  requireWrite(result.auth);
+app.post(
+  "/issues/:issueId/attachments/link",
+  requireAuth,
+  requireWrite,
+  loadTeam("issue"),
+  async (c) => {
+    const issue = c.var.issue;
+    const issueId = issue.id;
+    const body = parseLinkAttachment(await c.req.json());
+    if (!body) {
+      return c.json({ error: "Invalid input" }, 400);
+    }
 
-  const issueId = c.req.param("issueId");
-  const body = parseLinkAttachment(await c.req.json());
-  if (!body) {
-    return c.json({ error: "Invalid input" }, 400);
-  }
+    const fileTeamId = await getFileTeamId(db, body.fileId);
+    if (!fileTeamId || fileTeamId !== issue.teamId) {
+      return c.json({ error: "File not found on this team" }, 404);
+    }
 
-  const [issue] = await db
-    .select()
-    .from(schema.issues)
-    .where(eq(schema.issues.id, issueId))
-    .limit(1);
+    const attachment = await linkFileToIssue(db, issueId, body.fileId);
+    return c.json({ attachment }, 201);
+  },
+);
 
-  if (!issue) return c.json({ error: "Issue not found" }, 404);
-  if (!(await canAccessTeam(result.auth, issue.teamId))) {
-    return c.json({ error: "Team access denied" }, 403);
-  }
-
-  const fileTeamId = await getFileTeamId(db, body.fileId);
-  if (!fileTeamId || fileTeamId !== issue.teamId) {
-    return c.json({ error: "File not found on this team" }, 404);
-  }
-
-  const attachment = await linkFileToIssue(db, issueId, body.fileId);
-  return c.json({ attachment }, 201);
-});
-
-app.post("/attachments/:id/stream-token", async (c) => {
-  const result = await requireAuth(c);
-  if ("error" in result) return result.error;
+app.post("/attachments/:id/stream-token", requireAuth, loadTeam("attachment"), async (c) => {
+  const auth = c.var.auth;
 
   const linkId = c.req.param("id");
-  const row = await getAttachmentForDownload(db, linkId);
-  if (!row) return c.json({ error: "Attachment not found" }, 404);
+  const row = c.var.attachment;
   if (!row.public.canStream) {
     return c.json({ error: "This file cannot be streamed" }, 400);
   }
-  if (!(await canAccessTeam(result.auth, row.teamId))) {
-    return c.json({ error: "Team access denied" }, 403);
-  }
-
-  const token = await signStreamToken(linkId, result.auth.userId);
+  const token = await signStreamToken(linkId, auth.userId);
   return c.json({
     token,
     expiresAt: streamTokenExpiresAt(),
@@ -2803,17 +2264,8 @@ app.get("/attachments/:id/stream", async (c) => {
   }
 });
 
-app.get("/attachments/:id/download", async (c) => {
-  const result = await requireAuth(c);
-  if ("error" in result) return result.error;
-
-  const linkId = c.req.param("id");
-  const row = await getAttachmentForDownload(db, linkId);
-  if (!row) return c.json({ error: "Attachment not found" }, 404);
-
-  if (!(await canAccessTeam(result.auth, row.teamId))) {
-    return c.json({ error: "Team access denied" }, 403);
-  }
+app.get("/attachments/:id/download", requireAuth, loadTeam("attachment"), async (c) => {
+  const row = c.var.attachment;
 
   try {
     return await createFileRangeResponse(row.fullPath, {
@@ -2827,30 +2279,22 @@ app.get("/attachments/:id/download", async (c) => {
   }
 });
 
-app.delete("/issues/:issueId/attachments/:id", async (c) => {
-  const result = await requireAuth(c);
-  if ("error" in result) return result.error;
-  requireWrite(result.auth);
+app.delete(
+  "/issues/:issueId/attachments/:id",
+  requireAuth,
+  requireWrite,
+  loadTeam("issue"),
+  async (c) => {
+    const issue = c.var.issue;
+    const issueId = issue.id;
+    const attachmentId = c.req.param("id");
 
-  const issueId = c.req.param("issueId");
-  const attachmentId = c.req.param("id");
+    const deleted = await deleteIssueAttachment(db, issueId, attachmentId);
+    if (!deleted) return c.json({ error: "Attachment not found" }, 404);
 
-  const [issue] = await db
-    .select()
-    .from(schema.issues)
-    .where(eq(schema.issues.id, issueId))
-    .limit(1);
-
-  if (!issue) return c.json({ error: "Issue not found" }, 404);
-  if (!(await canAccessTeam(result.auth, issue.teamId))) {
-    return c.json({ error: "Team access denied" }, 403);
-  }
-
-  const deleted = await deleteIssueAttachment(db, issueId, attachmentId);
-  if (!deleted) return c.json({ error: "Attachment not found" }, 404);
-
-  return c.body(null, 204);
-});
+    return c.body(null, 204);
+  },
+);
 
 const webDist = config.webDist;
 const serveWeb = config.serveWeb || (config.isProduction && fs.existsSync(webDist));
