@@ -204,8 +204,8 @@ export function TeamFilesDrawer({ teamId, open, onClose, onNavigateRef }: TeamFi
   }
 
   return (
-    <Drawer onClose={handleClose} className="issue-drawer team-files-drawer">
-      <header className="issue-drawer-header">
+    <Drawer onClose={handleClose} className="team-files-drawer">
+      <header className="team-files-drawer-header">
         <div>
           <p className="eyebrow">Team files</p>
           <DialogTitle>File directory</DialogTitle>
@@ -254,11 +254,11 @@ export function TeamFilesDrawer({ teamId, open, onClose, onNavigateRef }: TeamFi
         </label>
       </div>
 
-      <div className="issue-drawer-body team-files-drawer-body">
+      <div className="team-files-drawer-body">
         {loading ? (
           <p className="muted">Loading files…</p>
         ) : error ? (
-          <p className="issue-link-row-files-error">{error}</p>
+          <p className="team-files-drawer-error">{error}</p>
         ) : filtered.length === 0 ? (
           <p className="muted">
             {query

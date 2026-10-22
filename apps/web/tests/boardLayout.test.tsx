@@ -1,4 +1,4 @@
-import { screen, waitFor } from "@testing-library/react";
+import { screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it } from "vitest";
 import { installFakeApi, seedDb, signIn } from "./fakeApi";
@@ -49,5 +49,19 @@ describe("board layout", () => {
     expect(screen.getByText("Preview row")).toBeInTheDocument();
     await waitFor(() => expect(screen.getByLabelText("Workspace")).toBeEnabled());
     expect(screen.queryByText("ENG issue 1")).not.toBeInTheDocument();
+  });
+
+  it("gives the team Files drawer its own classes", async () => {
+    const user = userEvent.setup();
+    const db = seedDb();
+    installFakeApi(db);
+    signIn(db);
+    renderApp("/t/ENG");
+    const topbar = await screen.findByRole("banner");
+    await user.click(await within(topbar).findByRole("button", { name: "Files" }));
+    const drawer = await screen.findByRole("dialog", { name: "File directory" });
+    expect(drawer).toHaveClass("team-files-drawer");
+    expect(drawer.className).not.toContain("issue-drawer");
+    expect(drawer.querySelector("[class*='issue-drawer']")).toBeNull();
   });
 });
