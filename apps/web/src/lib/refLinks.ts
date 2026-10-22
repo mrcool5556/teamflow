@@ -1,47 +1,14 @@
 import type { IssuePublic } from "@teamflow/core";
 import { parseRefFromShareUrl } from "@teamflow/core";
 
-export const PENDING_REF_STORAGE_KEY = "teamflow_pending_ref";
-
+/**
+ * Share links keep the `/?ref=` form: descriptions and comments detect refs in that shape, and
+ * the router redirects it to the issue route (or hands row/column refs to the board).
+ */
 export function buildRefShareUrl(ref: string) {
-  const url = new URL(window.location.href);
-  url.search = "";
-  url.hash = "";
+  const url = new URL("/", window.location.origin);
   url.searchParams.set("ref", ref.trim());
   return url.toString();
-}
-
-export function readRefFromLocation() {
-  const params = new URLSearchParams(window.location.search);
-  const ref = params.get("ref")?.trim();
-  if (ref) return ref;
-
-  const hash = window.location.hash.replace(/^#/, "");
-  if (hash.startsWith("ref=")) {
-    return decodeURIComponent(hash.slice(4)).trim() || null;
-  }
-
-  return null;
-}
-
-export function stashPendingRef(ref: string) {
-  sessionStorage.setItem(PENDING_REF_STORAGE_KEY, ref.trim());
-}
-
-export function takePendingRef() {
-  const ref = sessionStorage.getItem(PENDING_REF_STORAGE_KEY)?.trim();
-  if (ref) sessionStorage.removeItem(PENDING_REF_STORAGE_KEY);
-  return ref ?? null;
-}
-
-export function syncRefInLocation(ref: string | null) {
-  const url = new URL(window.location.href);
-  if (ref) {
-    url.searchParams.set("ref", ref);
-  } else {
-    url.searchParams.delete("ref");
-  }
-  window.history.replaceState({}, "", url);
 }
 
 export function normalizeRefInput(raw: string) {
