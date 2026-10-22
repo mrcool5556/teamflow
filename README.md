@@ -21,7 +21,7 @@ Self-hosted issue tracker for small teams: kanban boards with rows (swimlanes) a
 
 ## Quick start (development)
 
-The server does **not** read `.env` by itself; set variables in your shell. In development it needs `NODE_ENV=development` (or `TEAMFLOW_ALLOW_DEV_SECRET=1`), otherwise it refuses to start without a real `JWT_SECRET`.
+The server loads `.env` from the repo root if it exists (variables in your shell win). In development it needs `NODE_ENV=development` (or `TEAMFLOW_ALLOW_DEV_SECRET=1`), otherwise it refuses to start without a real `JWT_SECRET`.
 
 PowerShell:
 

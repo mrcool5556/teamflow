@@ -22,19 +22,11 @@ notepad .env                        # set JWT_SECRET to a long random value
 
 ## Start
 
-The server does **not** read `.env` itself, and it refuses to start without a real `JWT_SECRET`. `start.ps1` only sets `PORT` and `SERVE_WEB`, so either let Node load the file:
-
 ```powershell
-$env:SERVE_WEB = "true"
-node --env-file=.env apps/server/dist/index.js
-```
-
-or put the secret in the session first:
-
-```powershell
-$env:JWT_SECRET = "<your secret>"
 .\deploy\windows\start.ps1
 ```
+
+At startup the server loads `TEAMFLOW_ENV_FILE` if set, else `.env` in the app folder if it exists. Variables already in the process environment always win over the file. `start.ps1` points `TEAMFLOW_ENV_FILE` at the repo's `.env` and sets `SERVE_WEB=true`; anything you set in the session first (for example `$env:PORT`) overrides the file. The server refuses to start while `JWT_SECRET` is unset or a placeholder.
 
 Open <http://localhost:3000>.
 
@@ -55,17 +47,15 @@ cd D:\teamflow
 .\deploy\windows\update.ps1
 ```
 
-Stops the app, backs up the DB, `git pull`, `pnpm install`, `pnpm build`, `pnpm db:migrate` (no seed). `-StartAfter` then runs `start.ps1`, which needs `JWT_SECRET` in the environment.
+Stops the app, backs up the DB, `git pull`, `pnpm install`, `pnpm build`, `pnpm db:migrate` (no seed). `-StartAfter` then runs `start.ps1`.
 
 ## Windows service (NSSM)
 
 ```powershell
 .\deploy\windows\install-service.ps1
-nssm set Teamflow AppEnvironmentExtra PORT=3000 DATABASE_URL=file:./data/teamflow.db SERVE_WEB=true JWT_SECRET=<your secret> PUBLIC_URL=http://localhost:3000
-nssm restart Teamflow
 ```
 
-`install-service.ps1` sets only `PORT` and `DATABASE_URL`; the `nssm set` line replaces that list with everything the server needs. Add other variables from `.env` the same way.
+The service gets `TEAMFLOW_ENV_FILE=<repo>\.env`, `PORT`, `DATABASE_URL` and `SERVE_WEB=true`; everything else (`JWT_SECRET`, `PUBLIC_URL`, SMTP...) comes from `.env`. After editing `.env`, run `nssm restart Teamflow`.
 
 ## Not available on Windows
 
@@ -78,7 +68,7 @@ nssm restart Teamflow
 | `clone-install.ps1` | `git clone` + first-time `install.ps1` |
 | `install.ps1` | Install deps, build, migrate (no seed) |
 | `update.ps1` | `git pull` + rebuild + migrate (keeps `data/` and `.env`) |
-| `start.ps1` | Run the server in the foreground (sets `PORT`, `SERVE_WEB`; not `.env`) |
+| `start.ps1` | Run the server in the foreground (loads `.env`, sets `SERVE_WEB`) |
 | `stop.ps1` | Stop node processes whose command line contains "teamflow" (dev and MCP included) |
 | `install-service.ps1` | Register the NSSM service |
 | `backup.ps1` | Copy the SQLite DB to a backups folder |

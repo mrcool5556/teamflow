@@ -110,7 +110,7 @@ On Proxmox LXC:
 sudo teamflow-smtp
 ```
 
-See [SELF-HOSTING.md](SELF-HOSTING.md#smtp-password-reset-emails) for provider examples. The server reads these from its environment (systemd `EnvironmentFile`, NSSM or your shell); it does not load `.env` by itself.
+See [SELF-HOSTING.md](SELF-HOSTING.md#smtp-password-reset-emails) for provider examples. The server reads these from `.env` or its environment (systemd `EnvironmentFile`, NSSM or your shell); the environment wins.
 
 **Gmail:** use an [App password](https://support.google.com/accounts/answer/185833), not your normal Gmail password. Host is `smtp.gmail.com`, not your email address.
 

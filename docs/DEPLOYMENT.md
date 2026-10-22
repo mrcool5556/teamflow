@@ -30,10 +30,10 @@ Build web and server; the server serves `apps/web/dist` when `SERVE_WEB=true` (o
 pnpm install
 pnpm build
 pnpm db:migrate
-node --env-file=.env apps/server/dist/index.js     # .env must set JWT_SECRET and SERVE_WEB=true
+node apps/server/dist/index.js     # loads .env; it must set JWT_SECRET and SERVE_WEB=true
 ```
 
-Open <http://localhost:3000>. The server never reads `.env` on its own; `--env-file` (Node 20.6+), systemd `EnvironmentFile`, NSSM or your shell must supply it.
+Open <http://localhost:3000>. At startup the server loads `TEAMFLOW_ENV_FILE` if set, else `.env` in the app folder if it exists. Variables already in the process environment always win over the file. Set `TEAMFLOW_ENV_FILE` to use another file.
 
 ## Schema patches and data maintenance
 
