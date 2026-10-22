@@ -43,7 +43,11 @@ function getBackupDir() {
   return "/var/backups/teamflow";
 }
 
-function resolveScriptPath(configured: string | undefined, installedPath: string, repoRelative: string) {
+function resolveScriptPath(
+  configured: string | undefined,
+  installedPath: string,
+  repoRelative: string,
+) {
   if (configured?.trim()) {
     const value = configured.trim();
     return path.isAbsolute(value) ? value : path.resolve(getAppDir(), value);
@@ -229,7 +233,9 @@ function buildSpawnArgs(script: string, args: string[]) {
   return { command: BASH_PATH, args: [script, ...args] };
 }
 
-async function probeSudo(script: string): Promise<{ ready: boolean; command: string; detail: string }> {
+async function probeSudo(
+  script: string,
+): Promise<{ ready: boolean; command: string; detail: string }> {
   if (!useSudo() || process.platform === "win32") {
     return { ready: true, command: "", detail: "sudo not required" };
   }
@@ -377,7 +383,9 @@ export async function getMaintenanceStatus(): Promise<MaintenanceStatusPublic> {
   const enabled = reason === null;
   const backups = enabled ? await listBackups() : [];
   const job = await mapJob(await readStoredJob());
-  const sudoProbe = enabled ? await probeSudo(backupScript) : { ready: false, command: "", detail: reason };
+  const sudoProbe = enabled
+    ? await probeSudo(backupScript)
+    : { ready: false, command: "", detail: reason };
   const version = await getMaintenanceVersionInfo({
     skipOriginCheck: job?.status === "running",
   });

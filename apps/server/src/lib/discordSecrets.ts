@@ -6,11 +6,7 @@ import type {
 } from "@teamflow/core";
 import type { Db } from "@teamflow/db";
 import { schema } from "@teamflow/db";
-import {
-  botConfigKeyConfigured,
-  decryptSecret,
-  encryptSecret,
-} from "./secretsCrypto.js";
+import { botConfigKeyConfigured, decryptSecret, encryptSecret } from "./secretsCrypto.js";
 import { userHasTeamPermission } from "./permissions.js";
 import { defaultPublicUrl, syncDiscordBotEnv } from "./botConfigKey.js";
 import { findRepoRoot } from "@teamflow/db";
@@ -87,9 +83,8 @@ export async function updateDiscordBotSecrets(
   const current = await getSecretsRow(db);
   const now = new Date().toISOString();
   const nextBotTokenEnc =
-    input.botToken !== undefined ? encryptSecret(input.botToken) : current?.botTokenEnc ?? null;
-  const nextPatEnc =
-    input.pat !== undefined ? encryptSecret(input.pat) : current?.patEnc ?? null;
+    input.botToken !== undefined ? encryptSecret(input.botToken) : (current?.botTokenEnc ?? null);
+  const nextPatEnc = input.pat !== undefined ? encryptSecret(input.pat) : (current?.patEnc ?? null);
   const nextClientId = input.clientId ?? current?.clientId ?? null;
 
   if (input.botToken !== undefined && !input.botToken.trim()) {

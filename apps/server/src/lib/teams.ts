@@ -8,11 +8,7 @@ export function personalWorkspaceSlug(userId: string) {
   return `ws-${userId.slice(0, 8)}`;
 }
 
-export async function getOrCreatePersonalWorkspace(
-  db: Db,
-  userId: string,
-  userName = "User",
-) {
+export async function getOrCreatePersonalWorkspace(db: Db, userId: string, userName = "User") {
   const slug = personalWorkspaceSlug(userId);
   const [existing] = await db
     .select()
@@ -47,11 +43,7 @@ export async function deleteTeam(db: Db, teamId: string, actorUserId: string) {
     throw new Error("Permission denied");
   }
 
-  const [team] = await db
-    .select()
-    .from(schema.teams)
-    .where(eq(schema.teams.id, teamId))
-    .limit(1);
+  const [team] = await db.select().from(schema.teams).where(eq(schema.teams.id, teamId)).limit(1);
 
   if (!team) {
     throw new Error("Team not found");
@@ -94,11 +86,7 @@ export async function createTeamForUser(
     role: adminRole.slug,
   });
 
-  const [team] = await db
-    .select()
-    .from(schema.teams)
-    .where(eq(schema.teams.id, teamId))
-    .limit(1);
+  const [team] = await db.select().from(schema.teams).where(eq(schema.teams.id, teamId)).limit(1);
 
   return team!;
 }

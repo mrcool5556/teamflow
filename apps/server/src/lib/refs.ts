@@ -28,9 +28,7 @@ export async function resolveTeamRef(
     const [issue] = await db
       .select()
       .from(schema.issues)
-      .where(
-        and(eq(schema.issues.teamId, teamId), eq(schema.issues.number, issueMatch.number)),
-      )
+      .where(and(eq(schema.issues.teamId, teamId), eq(schema.issues.number, issueMatch.number)))
       .limit(1);
 
     if (!issue) return null;
@@ -65,9 +63,7 @@ export async function resolveTeamRef(
     const [status] = await db
       .select()
       .from(schema.issueStatuses)
-      .where(
-        and(eq(schema.issueStatuses.teamId, teamId), eq(schema.issueStatuses.key, ref)),
-      )
+      .where(and(eq(schema.issueStatuses.teamId, teamId), eq(schema.issueStatuses.key, ref)))
       .limit(1);
 
     if (!status) return null;
@@ -108,11 +104,7 @@ export async function resolveTeamRef(
   return null;
 }
 
-export async function resolveTeamRefDetailed(
-  db: Db,
-  teamId: string,
-  rawRef: string,
-) {
+export async function resolveTeamRefDetailed(db: Db, teamId: string, rawRef: string) {
   const resolved = await resolveTeamRef(db, teamId, rawRef);
   if (!resolved) return null;
 

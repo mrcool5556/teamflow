@@ -116,9 +116,7 @@ export function BulkActionBar({
                 <button
                   type="button"
                   disabled={!effectiveMoveRowId || !effectiveMoveStatusId}
-                  onClick={() =>
-                    onMove(issueIds, effectiveMoveRowId, effectiveMoveStatusId)
-                  }
+                  onClick={() => onMove(issueIds, effectiveMoveRowId, effectiveMoveStatusId)}
                 >
                   Move
                 </button>
@@ -173,9 +171,7 @@ export function BulkActionBar({
                 <select
                   value={timerAction}
                   aria-label="Timer action"
-                  onChange={(e) =>
-                    setTimerAction(e.target.value as TimerBulkAction | "")
-                  }
+                  onChange={(e) => setTimerAction(e.target.value as TimerBulkAction | "")}
                 >
                   <option value="">Choose…</option>
                   <option value="pause">Pause timers</option>

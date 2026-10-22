@@ -194,9 +194,7 @@ board
     const defaultRowId = rows[0]?.id ?? null;
     console.log(`Team ${opts.team} — ${issues.length} issues\n`);
     for (const row of rows) {
-      const rowIssues = issues.filter(
-        (issue) => (issue.rowId ?? defaultRowId) === row.id,
-      );
+      const rowIssues = issues.filter((issue) => (issue.rowId ?? defaultRowId) === row.id);
       const rowStatuses = statuses
         .filter((status) => status.rowId === row.id)
         .sort((a, b) => a.position - b.position);

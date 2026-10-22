@@ -10,10 +10,7 @@ const ALGO = "aes-256-gcm";
 const IV_BYTES = 12;
 
 function getEncryptionKey() {
-  const raw =
-    process.env.TEAMFLOW_SECRETS_KEY ??
-    process.env.JWT_SECRET ??
-    "dev-secret";
+  const raw = process.env.TEAMFLOW_SECRETS_KEY ?? process.env.JWT_SECRET ?? "dev-secret";
   if (!process.env.TEAMFLOW_SECRETS_KEY) {
     console.warn(
       "[teamflow] TEAMFLOW_SECRETS_KEY not set; using JWT_SECRET for integration secret encryption.",

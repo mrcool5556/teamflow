@@ -53,26 +53,11 @@ function parseEnvBytes(key: string, fallback: number) {
 
 export function getAttachmentLimits(): AttachmentLimitsPublic {
   return {
-    imageBytes: parseEnvBytes(
-      "ATTACHMENT_MAX_IMAGE_BYTES",
-      DEFAULT_ATTACHMENT_LIMITS.imageBytes,
-    ),
-    videoBytes: parseEnvBytes(
-      "ATTACHMENT_MAX_VIDEO_BYTES",
-      DEFAULT_ATTACHMENT_LIMITS.videoBytes,
-    ),
-    zipBytes: parseEnvBytes(
-      "ATTACHMENT_MAX_ZIP_BYTES",
-      DEFAULT_ATTACHMENT_LIMITS.zipBytes,
-    ),
-    defaultBytes: parseEnvBytes(
-      "ATTACHMENT_MAX_BYTES",
-      DEFAULT_ATTACHMENT_LIMITS.defaultBytes,
-    ),
-    chunkBytes: parseEnvBytes(
-      "UPLOAD_CHUNK_BYTES",
-      DEFAULT_ATTACHMENT_LIMITS.chunkBytes,
-    ),
+    imageBytes: parseEnvBytes("ATTACHMENT_MAX_IMAGE_BYTES", DEFAULT_ATTACHMENT_LIMITS.imageBytes),
+    videoBytes: parseEnvBytes("ATTACHMENT_MAX_VIDEO_BYTES", DEFAULT_ATTACHMENT_LIMITS.videoBytes),
+    zipBytes: parseEnvBytes("ATTACHMENT_MAX_ZIP_BYTES", DEFAULT_ATTACHMENT_LIMITS.zipBytes),
+    defaultBytes: parseEnvBytes("ATTACHMENT_MAX_BYTES", DEFAULT_ATTACHMENT_LIMITS.defaultBytes),
+    chunkBytes: parseEnvBytes("UPLOAD_CHUNK_BYTES", DEFAULT_ATTACHMENT_LIMITS.chunkBytes),
     chunkThresholdBytes: parseEnvBytes(
       "UPLOAD_CHUNK_THRESHOLD_BYTES",
       DEFAULT_ATTACHMENT_LIMITS.chunkThresholdBytes,
@@ -83,9 +68,7 @@ export function getAttachmentLimits(): AttachmentLimitsPublic {
 export function getUploadDir() {
   const configured = process.env.UPLOAD_DIR?.trim();
   if (configured) {
-    return path.isAbsolute(configured)
-      ? configured
-      : path.resolve(findRepoRoot(), configured);
+    return path.isAbsolute(configured) ? configured : path.resolve(findRepoRoot(), configured);
   }
   return path.join(findRepoRoot(), "data", "uploads");
 }
@@ -251,10 +234,7 @@ async function attachmentRowsForIssue(db: Db, issueId: string) {
       storagePath: schema.storedFiles.storagePath,
     })
     .from(schema.issueFileLinks)
-    .innerJoin(
-      schema.storedFiles,
-      eq(schema.storedFiles.id, schema.issueFileLinks.fileId),
-    )
+    .innerJoin(schema.storedFiles, eq(schema.storedFiles.id, schema.issueFileLinks.fileId))
     .innerJoin(schema.users, eq(schema.users.id, schema.storedFiles.uploaderId))
     .where(and(eq(schema.issueFileLinks.issueId, issueId), activeStoredFileFilter()));
 }
@@ -281,10 +261,7 @@ export async function getAttachmentLinkContext(db: Db, linkId: string) {
       teamId: schema.issues.teamId,
     })
     .from(schema.issueFileLinks)
-    .innerJoin(
-      schema.storedFiles,
-      eq(schema.storedFiles.id, schema.issueFileLinks.fileId),
-    )
+    .innerJoin(schema.storedFiles, eq(schema.storedFiles.id, schema.issueFileLinks.fileId))
     .innerJoin(schema.users, eq(schema.users.id, schema.storedFiles.uploaderId))
     .innerJoin(schema.issues, eq(schema.issues.id, schema.issueFileLinks.issueId))
     .where(and(eq(schema.issueFileLinks.id, linkId), activeStoredFileFilter()))
@@ -314,10 +291,7 @@ export async function getAttachmentLinkContext(db: Db, linkId: string) {
       teamId: schema.boardRows.teamId,
     })
     .from(schema.rowFileLinks)
-    .innerJoin(
-      schema.storedFiles,
-      eq(schema.storedFiles.id, schema.rowFileLinks.fileId),
-    )
+    .innerJoin(schema.storedFiles, eq(schema.storedFiles.id, schema.rowFileLinks.fileId))
     .innerJoin(schema.users, eq(schema.users.id, schema.storedFiles.uploaderId))
     .innerJoin(schema.boardRows, eq(schema.boardRows.id, schema.rowFileLinks.rowId))
     .where(and(eq(schema.rowFileLinks.id, linkId), activeStoredFileFilter()))
@@ -363,8 +337,7 @@ async function deleteStoredFileIfOrphaned(db: Db, fileId: string) {
     .from(schema.rowFileLinks)
     .where(eq(schema.rowFileLinks.fileId, fileId));
 
-  const remaining =
-    Number(issueCountRow?.count ?? 0) + Number(rowCountRow?.count ?? 0);
+  const remaining = Number(issueCountRow?.count ?? 0) + Number(rowCountRow?.count ?? 0);
   if (remaining > 0) return;
 
   const [file] = await db
@@ -378,11 +351,7 @@ async function deleteStoredFileIfOrphaned(db: Db, fileId: string) {
   await hardDeleteStoredFile(db, fileId);
 }
 
-export async function deleteIssueAttachment(
-  db: Db,
-  issueId: string,
-  linkId: string,
-) {
+export async function deleteIssueAttachment(db: Db, issueId: string, linkId: string) {
   const [link] = await db
     .select()
     .from(schema.issueFileLinks)
@@ -423,11 +392,7 @@ export async function moveIssueAttachment(
   return ctx.public;
 }
 
-export async function linkFileToIssue(
-  db: Db,
-  issueId: string,
-  fileId: string,
-) {
+export async function linkFileToIssue(db: Db, issueId: string, fileId: string) {
   const [existing] = await db
     .select({
       linkId: schema.issueFileLinks.id,
@@ -442,16 +407,10 @@ export async function linkFileToIssue(
       uploaderName: schema.users.name,
     })
     .from(schema.issueFileLinks)
-    .innerJoin(
-      schema.storedFiles,
-      eq(schema.storedFiles.id, schema.issueFileLinks.fileId),
-    )
+    .innerJoin(schema.storedFiles, eq(schema.storedFiles.id, schema.issueFileLinks.fileId))
     .innerJoin(schema.users, eq(schema.users.id, schema.storedFiles.uploaderId))
     .where(
-      and(
-        eq(schema.issueFileLinks.issueId, issueId),
-        eq(schema.issueFileLinks.fileId, fileId),
-      ),
+      and(eq(schema.issueFileLinks.issueId, issueId), eq(schema.issueFileLinks.fileId, fileId)),
     )
     .limit(1);
 
@@ -512,14 +471,9 @@ export async function linkFileToRow(db: Db, rowId: string, fileId: string) {
       uploaderName: schema.users.name,
     })
     .from(schema.rowFileLinks)
-    .innerJoin(
-      schema.storedFiles,
-      eq(schema.storedFiles.id, schema.rowFileLinks.fileId),
-    )
+    .innerJoin(schema.storedFiles, eq(schema.storedFiles.id, schema.rowFileLinks.fileId))
     .innerJoin(schema.users, eq(schema.users.id, schema.storedFiles.uploaderId))
-    .where(
-      and(eq(schema.rowFileLinks.rowId, rowId), eq(schema.rowFileLinks.fileId, fileId)),
-    )
+    .where(and(eq(schema.rowFileLinks.rowId, rowId), eq(schema.rowFileLinks.fileId, fileId)))
     .limit(1);
 
   if (existing) {
@@ -591,8 +545,7 @@ export async function createStoredFileFromPath(
   const fileId = randomUUID();
   const linkId = randomUUID();
   const safeName = await resolveFriendlyUploadFilename(db, filename, target);
-  const relativeDir =
-    "issueId" in target ? target.issueId : path.join("rows", target.rowId);
+  const relativeDir = "issueId" in target ? target.issueId : path.join("rows", target.rowId);
   const storageName = `${fileId}_${safeName}`;
   const relativePath = path.join(relativeDir, storageName);
   const finalDir = path.join(getUploadDir(), relativeDir);
@@ -745,16 +698,11 @@ export async function listRowAttachments(db: Db, rowId: string) {
       uploaderName: schema.users.name,
     })
     .from(schema.rowFileLinks)
-    .innerJoin(
-      schema.storedFiles,
-      eq(schema.storedFiles.id, schema.rowFileLinks.fileId),
-    )
+    .innerJoin(schema.storedFiles, eq(schema.storedFiles.id, schema.rowFileLinks.fileId))
     .innerJoin(schema.users, eq(schema.users.id, schema.storedFiles.uploaderId))
     .where(and(eq(schema.rowFileLinks.rowId, rowId), activeStoredFileFilter()));
 
-  return rows.map((row) =>
-    mapAttachmentPublic({ ...row, issueId: null }),
-  );
+  return rows.map((row) => mapAttachmentPublic({ ...row, issueId: null }));
 }
 
 export async function saveRowAttachment(
@@ -924,10 +872,7 @@ export async function listTeamFiles(
     })
     .from(schema.issueFileLinks)
     .innerJoin(schema.issues, eq(schema.issues.id, schema.issueFileLinks.issueId))
-    .innerJoin(
-      schema.storedFiles,
-      eq(schema.storedFiles.id, schema.issueFileLinks.fileId),
-    )
+    .innerJoin(schema.storedFiles, eq(schema.storedFiles.id, schema.issueFileLinks.fileId))
     .innerJoin(schema.users, eq(schema.users.id, schema.storedFiles.uploaderId))
     .where(and(eq(schema.issues.teamId, teamId), deletedFilter));
 
@@ -948,10 +893,7 @@ export async function listTeamFiles(
     })
     .from(schema.rowFileLinks)
     .innerJoin(schema.boardRows, eq(schema.boardRows.id, schema.rowFileLinks.rowId))
-    .innerJoin(
-      schema.storedFiles,
-      eq(schema.storedFiles.id, schema.rowFileLinks.fileId),
-    )
+    .innerJoin(schema.storedFiles, eq(schema.storedFiles.id, schema.rowFileLinks.fileId))
     .innerJoin(schema.users, eq(schema.users.id, schema.storedFiles.uploaderId))
     .where(and(eq(schema.boardRows.teamId, teamId), deletedFilter));
 
@@ -1068,12 +1010,7 @@ export async function softDeleteTeamFile(db: Db, teamId: string, fileId: string)
   return { fileId, deletedAt: now, purgeAt: purgeAtFromDeletedAt(now) };
 }
 
-export async function renameTeamFile(
-  db: Db,
-  teamId: string,
-  fileId: string,
-  filename: string,
-) {
+export async function renameTeamFile(db: Db, teamId: string, fileId: string, filename: string) {
   const fileTeamId = await getFileTeamId(db, fileId);
   if (!fileTeamId || fileTeamId !== teamId) {
     throw new AttachmentError("File not found", 404);
@@ -1149,9 +1086,7 @@ export async function purgeExpiredDeletedFiles(db: Db) {
   const expired = await db
     .select({ id: schema.storedFiles.id })
     .from(schema.storedFiles)
-    .where(
-      and(isNotNull(schema.storedFiles.deletedAt), lte(schema.storedFiles.deletedAt, cutoff)),
-    );
+    .where(and(isNotNull(schema.storedFiles.deletedAt), lte(schema.storedFiles.deletedAt, cutoff)));
 
   for (const row of expired) {
     await hardDeleteStoredFile(db, row.id);

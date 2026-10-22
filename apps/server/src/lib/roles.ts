@@ -194,7 +194,10 @@ export async function createTeamRole(
   return created;
 }
 
-function validateRolePermissions(role: typeof schema.teamRoles.$inferSelect, permissions: TeamPermission[]) {
+function validateRolePermissions(
+  role: typeof schema.teamRoles.$inferSelect,
+  permissions: TeamPermission[],
+) {
   if (role.slug === "admin" && !permissions.includes("team.delete")) {
     throw new Error("The Admin role must keep team.delete permission");
   }
@@ -251,12 +254,7 @@ export async function updateTeamRole(
   return updated;
 }
 
-export async function deleteTeamRole(
-  db: Db,
-  teamId: string,
-  roleId: string,
-  actorUserId: string,
-) {
+export async function deleteTeamRole(db: Db, teamId: string, roleId: string, actorUserId: string) {
   if (!(await userHasTeamPermission(db, actorUserId, teamId, "team.roles.manage"))) {
     throw new Error("Permission denied");
   }

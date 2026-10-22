@@ -61,8 +61,8 @@ export function AboutDialog({ open, version, onClose }: AboutDialogProps) {
         </dl>
 
         <p className="about-license-note muted">
-          Free to use and modify. If you run a modified version for others, you must
-          share the source under the same license.
+          Free to use and modify. If you run a modified version for others, you must share the
+          source under the same license.
         </p>
 
         <div className="about-actions">
@@ -77,9 +77,7 @@ export function AboutDialog({ open, version, onClose }: AboutDialogProps) {
           {supportLinks.map((link) => (
             <a
               key={link.label}
-              className={
-                link.accent ? "about-link-btn about-link-btn--accent" : "about-link-btn"
-              }
+              className={link.accent ? "about-link-btn about-link-btn--accent" : "about-link-btn"}
               href={link.url}
               target="_blank"
               rel="noreferrer"

@@ -26,9 +26,7 @@ function useSudo() {
 function getDiscordBotScript() {
   const configured = process.env.TEAMFLOW_DISCORD_BOT_SCRIPT?.trim();
   if (configured) {
-    return path.isAbsolute(configured)
-      ? configured
-      : path.resolve(getAppDir(), configured);
+    return path.isAbsolute(configured) ? configured : path.resolve(getAppDir(), configured);
   }
   const installed = "/usr/local/bin/teamflow-discord";
   if (existsSync(installed)) return installed;
@@ -139,9 +137,10 @@ export async function getDiscordBotServiceStatus(db: Db): Promise<DiscordBotServ
   const scriptReady = existsSync(script);
   const secrets = await getDiscordBotSecretsPublic(db);
   const managementAvailable = reason === null && scriptReady;
-  const sudoProbe = managementAvailable ? await probeSudo(script) : { ready: false, detail: reason };
-  const scriptStatus =
-    reason === null && scriptReady ? await readScriptStatus() : null;
+  const sudoProbe = managementAvailable
+    ? await probeSudo(script)
+    : { ready: false, detail: reason };
+  const scriptStatus = reason === null && scriptReady ? await readScriptStatus() : null;
   const botEnvPath = path.join(getAppDir(), "data", "discord-bot.env");
 
   return {

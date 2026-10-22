@@ -116,9 +116,7 @@ export function MultiAssigneePicker({
             </button>
           );
         })}
-        {filtered.length === 0 && (
-          <p className="assignee-picker-empty">No matching members.</p>
-        )}
+        {filtered.length === 0 && <p className="assignee-picker-empty">No matching members.</p>}
       </div>
     </div>
   ) : null;

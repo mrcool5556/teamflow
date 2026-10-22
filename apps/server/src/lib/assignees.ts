@@ -3,10 +3,7 @@ import type { Db } from "@teamflow/db";
 import { schema } from "@teamflow/db";
 import type { AssigneePublic } from "@teamflow/core";
 
-export async function loadIssueAssignees(
-  db: Db,
-  issueId: string,
-): Promise<AssigneePublic[]> {
+export async function loadIssueAssignees(db: Db, issueId: string): Promise<AssigneePublic[]> {
   const rows = await db
     .select({
       userId: schema.issueAssignees.userId,
@@ -19,10 +16,7 @@ export async function loadIssueAssignees(
   return rows.map((row) => ({ userId: row.userId, name: row.name }));
 }
 
-export async function loadBoardRowAssignees(
-  db: Db,
-  rowId: string,
-): Promise<AssigneePublic[]> {
+export async function loadBoardRowAssignees(db: Db, rowId: string): Promise<AssigneePublic[]> {
   const rows = await db
     .select({
       userId: schema.boardRowAssignees.userId,
@@ -51,9 +45,7 @@ export async function setIssueAssignees(db: Db, issueId: string, userIds: string
 
 export async function setBoardRowAssignees(db: Db, rowId: string, userIds: string[]) {
   const uniqueIds = [...new Set(userIds)];
-  await db
-    .delete(schema.boardRowAssignees)
-    .where(eq(schema.boardRowAssignees.rowId, rowId));
+  await db.delete(schema.boardRowAssignees).where(eq(schema.boardRowAssignees.rowId, rowId));
 
   for (const userId of uniqueIds) {
     await db.insert(schema.boardRowAssignees).values({ rowId, userId });
@@ -65,19 +57,13 @@ export async function setBoardRowAssignees(db: Db, rowId: string, userIds: strin
     .where(eq(schema.boardRows.id, rowId));
 }
 
-export async function filterValidTeamMemberIds(
-  db: Db,
-  teamId: string,
-  userIds: string[],
-) {
+export async function filterValidTeamMemberIds(db: Db, teamId: string, userIds: string[]) {
   if (userIds.length === 0) return [];
 
   const members = await db
     .select({ userId: schema.teamMembers.userId })
     .from(schema.teamMembers)
-    .where(
-      and(eq(schema.teamMembers.teamId, teamId), inArray(schema.teamMembers.userId, userIds)),
-    );
+    .where(and(eq(schema.teamMembers.teamId, teamId), inArray(schema.teamMembers.userId, userIds)));
 
   const allowed = new Set(members.map((member) => member.userId));
   return userIds.filter((userId) => allowed.has(userId));

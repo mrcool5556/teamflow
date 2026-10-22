@@ -1,11 +1,5 @@
 export type SettingsPanel =
-  | "general"
-  | "appearance"
-  | "team"
-  | "roles"
-  | "integrations"
-  | "updates"
-  | "tokens";
+  "general" | "appearance" | "team" | "roles" | "integrations" | "updates" | "tokens";
 
 type SettingsNavProps = {
   panel: SettingsPanel;

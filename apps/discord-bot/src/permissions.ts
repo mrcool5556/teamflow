@@ -24,9 +24,7 @@ export function memberCanUseCommands(
   }
 
   const guildId = interaction.guildId;
-  const effectiveAllowed = guildId
-    ? allowedRoleIds.filter((id) => id !== guildId)
-    : allowedRoleIds;
+  const effectiveAllowed = guildId ? allowedRoleIds.filter((id) => id !== guildId) : allowedRoleIds;
 
   if (effectiveAllowed.length === 0) {
     return false;

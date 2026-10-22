@@ -1,6 +1,10 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type { IssueAttachmentPublic, TeamFilePublic } from "@teamflow/core";
-import { FILE_TRASH_RETENTION_DAYS, getTeamFileDisplayName, isZipAttachmentFile } from "@teamflow/core";
+import {
+  FILE_TRASH_RETENTION_DAYS,
+  getTeamFileDisplayName,
+  isZipAttachmentFile,
+} from "@teamflow/core";
 import { client } from "../api";
 import { useBackdropDismiss } from "../hooks/useBackdropDismiss";
 import { getSharedTeamFilePreviewCache } from "../lib/teamFilePreviewCache";
@@ -62,12 +66,7 @@ type TeamFilesDrawerProps = {
 type SortMode = "size" | "name" | "refs";
 type FilesTab = "active" | "trash";
 
-export function TeamFilesDrawer({
-  teamId,
-  open,
-  onClose,
-  onNavigateRef,
-}: TeamFilesDrawerProps) {
+export function TeamFilesDrawer({ teamId, open, onClose, onNavigateRef }: TeamFilesDrawerProps) {
   const [tab, setTab] = useState<FilesTab>("active");
   const [files, setFiles] = useState<TeamFilePublic[]>([]);
   const [totalBytes, setTotalBytes] = useState(0);
@@ -225,7 +224,8 @@ export function TeamFilesDrawer({
             <p className="eyebrow">Team files</p>
             <h2>File directory</h2>
             <p className="muted team-files-drawer-summary">
-              {files.length} file{files.length === 1 ? "" : "s"} · {formatFileSize(totalBytes)} total
+              {files.length} file{files.length === 1 ? "" : "s"} · {formatFileSize(totalBytes)}{" "}
+              total
               {tab === "trash" ? ` · purged after ${FILE_TRASH_RETENTION_DAYS} days` : ""}
             </p>
           </div>
@@ -326,7 +326,9 @@ export function TeamFilesDrawer({
                           </p>
                         </div>
                         <div className="team-files-item-footer">
-                          <span className="team-files-item-uploader muted">by {file.uploaderName}</span>
+                          <span className="team-files-item-uploader muted">
+                            by {file.uploaderName}
+                          </span>
                           <code className="team-files-item-fileref" title="Assigned file link name">
                             {file.fileRef}
                           </code>
@@ -336,7 +338,9 @@ export function TeamFilesDrawer({
                       <div className="team-files-item-actions">
                         {file.references.length > 0 && onNavigateRef ? (
                           <label className="team-files-ref-select team-files-action-btn">
-                            <span className="sr-only">Jump to linked location for {displayName}</span>
+                            <span className="sr-only">
+                              Jump to linked location for {displayName}
+                            </span>
                             <select
                               defaultValue=""
                               onChange={(event) => {

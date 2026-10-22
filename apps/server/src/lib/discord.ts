@@ -25,9 +25,7 @@ function mapSettings(
 ): TeamDiscordSettingsPublic {
   const guildId = row.guildId ?? null;
   const allowedRoleIds = parseIdJson(row.allowedRoleIds);
-  const effectiveRoles = guildId
-    ? allowedRoleIds.filter((id) => id !== guildId)
-    : allowedRoleIds;
+  const effectiveRoles = guildId ? allowedRoleIds.filter((id) => id !== guildId) : allowedRoleIds;
 
   return {
     teamId: row.teamId,
@@ -76,9 +74,7 @@ export async function updateTeamDiscordSettings(
     input.allowedRoleIds !== undefined ? input.allowedRoleIds : current.allowedRoleIds;
   const allowedRoleIds = sanitizeAllowedRoleIds(guildId, rawAllowedRoleIds);
   const ticketChannelIds =
-    input.ticketChannelIds !== undefined
-      ? input.ticketChannelIds
-      : current.ticketChannelIds;
+    input.ticketChannelIds !== undefined ? input.ticketChannelIds : current.ticketChannelIds;
   const allowDiscordAdministrators =
     input.allowDiscordAdministrators !== undefined
       ? input.allowDiscordAdministrators

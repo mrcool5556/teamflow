@@ -63,10 +63,7 @@ export function RefCopyButton({
         <button
           type="button"
           className={`ref-action-btn ref-copy-btn icon ${copied ? "copied" : ""}`}
-          title={
-            title ??
-            (share ? `Copy share link for ${value}` : `Copy reference ${value}`)
-          }
+          title={title ?? (share ? `Copy share link for ${value}` : `Copy reference ${value}`)}
           aria-label={share ? `Copy share link for ${value}` : `Copy ${value}`}
           onClick={copyRef}
         >
@@ -80,14 +77,11 @@ export function RefCopyButton({
     <button
       type="button"
       className={`ref-copy-btn ${compact ? "compact" : ""} ${copied ? "copied" : ""} ref-copy-btn--${variant}`}
-      title={
-        title ??
-        (share ? `Copy share link for ${value}` : `Copy reference ${value}`)
-      }
+      title={title ?? (share ? `Copy share link for ${value}` : `Copy reference ${value}`)}
       onPointerDown={(event) => event.stopPropagation()}
       onClick={copyRef}
     >
-      <span className="ref-copy-label">{copied ? "Copied" : buttonLabel ?? value}</span>
+      <span className="ref-copy-label">{copied ? "Copied" : (buttonLabel ?? value)}</span>
     </button>
   );
 }

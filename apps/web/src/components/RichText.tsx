@@ -6,11 +6,7 @@ type RichTextProps = {
   className?: string;
 };
 
-function renderSegment(
-  segment: RichTextSegment,
-  index: number,
-  onRef?: (ref: string) => void,
-) {
+function renderSegment(segment: RichTextSegment, index: number, onRef?: (ref: string) => void) {
   switch (segment.type) {
     case "ref":
       return onRef ? (

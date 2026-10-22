@@ -38,13 +38,7 @@ type ContextMenuProps = {
   ariaLabel?: string;
 };
 
-export function ContextMenu({
-  x,
-  y,
-  entries,
-  onClose,
-  ariaLabel = "Actions",
-}: ContextMenuProps) {
+export function ContextMenu({ x, y, entries, onClose, ariaLabel = "Actions" }: ContextMenuProps) {
   const shellRef = useRef<HTMLDivElement>(null);
   const submenuTriggerRef = useRef<HTMLButtonElement | null>(null);
   const [position, setPosition] = useState({ left: x, top: y });

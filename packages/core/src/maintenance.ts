@@ -82,11 +82,7 @@ export function inferUpdatePhase(
   if (log.includes("Health check failed")) return "health";
   if (log.includes("Update complete.")) return "restart";
   if (log.includes("db:migrate") || log.includes("Applying migration")) return "migrate";
-  if (
-    log.includes("apps/server build") ||
-    log.includes("vite build") ||
-    log.includes("Done in")
-  ) {
+  if (log.includes("apps/server build") || log.includes("vite build") || log.includes("Done in")) {
     return "build";
   }
   if (log.includes("pnpm install") || log.includes("Lockfile")) return "install";

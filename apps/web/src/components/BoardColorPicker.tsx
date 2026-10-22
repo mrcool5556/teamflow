@@ -98,10 +98,7 @@ export function BoardColorPicker({
         aria-label={title}
         aria-expanded={open}
       >
-        <span
-          className="color-swatch"
-          style={{ background: color ?? "var(--border)" }}
-        />
+        <span className="color-swatch" style={{ background: color ?? "var(--border)" }} />
         {!compact ? (
           <>
             <span className="color-picker-label">{label}</span>

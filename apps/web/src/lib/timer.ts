@@ -186,8 +186,7 @@ export function timerDurationToSeconds(amount: number, unit: TimerDurationUnit) 
 
 export function formatTimerDurationLabel(amount: number, unit: TimerDurationUnit) {
   const value = Math.max(1, Math.floor(amount));
-  const short =
-    unit === "days" ? "d" : unit === "weeks" ? "w" : "mo";
+  const short = unit === "days" ? "d" : unit === "weeks" ? "w" : "mo";
   return `${value}${short}`;
 }
 

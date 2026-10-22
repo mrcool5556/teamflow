@@ -16,17 +16,8 @@ import {
   permissionsForSystemSlug,
   type SystemRoleSlug,
 } from "@teamflow/core";
-import {
-  clearSession,
-  client,
-  getStoredUser,
-  setSession,
-} from "./api";
-import {
-  applyUserProfile,
-  clearLegacyLocalProfile,
-  mergeWithLegacyDefaults,
-} from "./profile";
+import { clearSession, client, getStoredUser, setSession } from "./api";
+import { applyUserProfile, clearLegacyLocalProfile, mergeWithLegacyDefaults } from "./profile";
 import { KanbanBoard } from "./KanbanBoard";
 import { usePanScroll } from "./lib/usePanScroll";
 import { QuickAddModal } from "./components/QuickAddModal";
@@ -67,12 +58,7 @@ import {
   syncInviteInLocation,
   takePendingInvite,
 } from "./lib/inviteLinks";
-import {
-  clearRefBackStack,
-  peekRefBack,
-  popRefBack,
-  pushRefBack,
-} from "./lib/refBackStack";
+import { clearRefBackStack, peekRefBack, popRefBack, pushRefBack } from "./lib/refBackStack";
 
 type View = "login" | "board" | "settings" | "roadmap";
 
@@ -84,9 +70,7 @@ type QuickAddTarget =
   | { kind: "issue"; rowId: string; statusId: string };
 
 export function App() {
-  const [view, setView] = useState<View>(() =>
-    getStoredUser() ? "board" : "login",
-  );
+  const [view, setView] = useState<View>(() => (getStoredUser() ? "board" : "login"));
   const [user, setUser] = useState<UserPublic | null>(getStoredUser);
   const [teams, setTeams] = useState<TeamPublic[]>([]);
   const [rows, setRows] = useState<BoardRowPublic[]>([]);
@@ -97,7 +81,9 @@ export function App() {
   const [selectedIssue, setSelectedIssue] = useState<IssuePublic | null>(null);
   const [rowFilesRow, setRowFilesRow] = useState<BoardRowPublic | null>(null);
   const [teamFilesOpen, setTeamFilesOpen] = useState(false);
-  const [refBackLabel, setRefBackLabel] = useState<string | null>(() => peekRefBack()?.label ?? null);
+  const [refBackLabel, setRefBackLabel] = useState<string | null>(
+    () => peekRefBack()?.label ?? null,
+  );
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [patName, setPatName] = useState("Cursor MCP");
@@ -134,8 +120,7 @@ export function App() {
   const currentMember = members.find((member) => member.userId === user?.id);
   const effectiveTeamPermissions =
     teamPermissions ??
-    (currentMember &&
-    ["owner", "admin", "member", "viewer"].includes(currentMember.roleSlug)
+    (currentMember && ["owner", "admin", "member", "viewer"].includes(currentMember.roleSlug)
       ? {
           roleId: currentMember.roleId,
           roleName: currentMember.roleName,
@@ -145,10 +130,7 @@ export function App() {
       : null);
   const showRoles = hasTeamPermission(effectiveTeamPermissions, "team.roles.view");
   const canManageRoles = hasTeamPermission(effectiveTeamPermissions, "team.roles.manage");
-  const showIntegrations = hasTeamPermission(
-    effectiveTeamPermissions,
-    "integrations.discord.view",
-  );
+  const showIntegrations = hasTeamPermission(effectiveTeamPermissions, "integrations.discord.view");
   const canManageDiscord = hasTeamPermission(
     effectiveTeamPermissions,
     "integrations.discord.manage",
@@ -157,14 +139,8 @@ export function App() {
     effectiveTeamPermissions,
     "integrations.discord.secrets",
   );
-  const showMaintenance = hasTeamPermission(
-    effectiveTeamPermissions,
-    "server.maintenance.view",
-  );
-  const canRunMaintenance = hasTeamPermission(
-    effectiveTeamPermissions,
-    "server.maintenance.run",
-  );
+  const showMaintenance = hasTeamPermission(effectiveTeamPermissions, "server.maintenance.view");
+  const canRunMaintenance = hasTeamPermission(effectiveTeamPermissions, "server.maintenance.run");
   const currentTeam = teams.find((team) => team.id === teamId) ?? null;
 
   const persistProfile = useCallback(async (next: UserProfile) => {
@@ -226,12 +202,7 @@ export function App() {
     setLoading(true);
     setError(null);
     try {
-      const [
-        statusesResult,
-        rowsResult,
-        issuesResult,
-        membersResult,
-      ] = await Promise.allSettled([
+      const [statusesResult, rowsResult, issuesResult, membersResult] = await Promise.allSettled([
         client.listStatuses(activeTeamId),
         client.listRows(activeTeamId),
         client.listIssues({ teamId: activeTeamId }),
@@ -245,11 +216,7 @@ export function App() {
       setStatuses(statusesResult.value.statuses);
       setRows(rowsResult.value.rows);
       setIssues(issuesResult.value.issues);
-      setMembers(
-        membersResult.status === "fulfilled"
-          ? membersResult.value.members
-          : [],
-      );
+      setMembers(membersResult.status === "fulfilled" ? membersResult.value.members : []);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to load board");
     } finally {
@@ -312,9 +279,7 @@ export function App() {
         (joinedTeamId && nextTeams.some((team) => team.id === joinedTeamId)
           ? joinedTeamId
           : null) ??
-        (savedTeamId && nextTeams.some((team) => team.id === savedTeamId)
-          ? savedTeamId
-          : null) ??
+        (savedTeamId && nextTeams.some((team) => team.id === savedTeamId) ? savedTeamId : null) ??
         nextTeams[0]?.id ??
         null;
 
@@ -344,9 +309,7 @@ export function App() {
       setSelectedIssue(null);
       clearRefBackStack();
       setRefBackLabel(null);
-      updateProfile(
-        mergeUserProfile(profileRef.current, { ui: { lastTeamId: nextTeamId } }),
-      );
+      updateProfile(mergeUserProfile(profileRef.current, { ui: { lastTeamId: nextTeamId } }));
       await loadBoard(nextTeamId);
     },
     [loadBoard, updateProfile],
@@ -511,11 +474,7 @@ export function App() {
     }
   }
 
-  async function reorderColumns(
-    rowId: string,
-    activeStatusId: string,
-    overStatusId: string,
-  ) {
+  async function reorderColumns(rowId: string, activeStatusId: string, overStatusId: string) {
     const rowStatuses = statuses
       .filter((status) => status.rowId === rowId)
       .sort((a, b) => a.position - b.position);
@@ -608,9 +567,7 @@ export function App() {
       setIssues((prev) => prev.map((item) => (item.id === updated.id ? updated : item)));
       if (selectedIssue?.id === updated.id) setSelectedIssue(updated);
     } catch (err) {
-      setIssues((prev) =>
-        prev.map((item) => (item.id === issue.id ? issue : item)),
-      );
+      setIssues((prev) => prev.map((item) => (item.id === issue.id ? issue : item)));
       if (selectedIssue?.id === issue.id) setSelectedIssue(issue);
       setError(err instanceof Error ? err.message : "Failed to assign issue");
     }
@@ -660,14 +617,10 @@ export function App() {
   async function bulkPatchIssues(issueIds: string[], patch: UpdateIssueInput) {
     if (issueIds.length === 0) return;
     setIssues((prev) =>
-      prev.map((issue) =>
-        issueIds.includes(issue.id) ? applyIssuePatch(issue, patch) : issue,
-      ),
+      prev.map((issue) => (issueIds.includes(issue.id) ? applyIssuePatch(issue, patch) : issue)),
     );
     try {
-      const results = await Promise.all(
-        issueIds.map((id) => client.updateIssue(id, patch)),
-      );
+      const results = await Promise.all(issueIds.map((id) => client.updateIssue(id, patch)));
       setIssues((prev) => {
         const updatedById = new Map(results.map(({ issue }) => [issue.id, issue]));
         return prev.map((issue) => updatedById.get(issue.id) ?? issue);
@@ -853,20 +806,21 @@ export function App() {
       timerTargetSec: number | null;
     },
   ) {
-    setIssues((prev) =>
-      prev.map((item) => (item.id === issue.id ? { ...item, ...patch } : item)),
-    );
+    setIssues((prev) => prev.map((item) => (item.id === issue.id ? { ...item, ...patch } : item)));
     if (selectedIssue?.id === issue.id) {
       setSelectedIssue((prev) => (prev ? { ...prev, ...patch } : prev));
     }
 
-    void client.updateIssue(issue.id, patch).then(({ issue: updated }) => {
-      setIssues((prev) => prev.map((item) => (item.id === updated.id ? updated : item)));
-      setSelectedIssue((prev) => (prev?.id === updated.id ? updated : prev));
-    }).catch((err) => {
-      setError(err instanceof Error ? err.message : "Failed to update timer");
-      if (teamId) void loadBoard(teamId);
-    });
+    void client
+      .updateIssue(issue.id, patch)
+      .then(({ issue: updated }) => {
+        setIssues((prev) => prev.map((item) => (item.id === updated.id ? updated : item)));
+        setSelectedIssue((prev) => (prev?.id === updated.id ? updated : prev));
+      })
+      .catch((err) => {
+        setError(err instanceof Error ? err.message : "Failed to update timer");
+        if (teamId) void loadBoard(teamId);
+      });
   }
 
   async function renameStatus(status: IssueStatusPublic, name: string) {
@@ -1111,9 +1065,7 @@ export function App() {
           setHighlightedColumnKey(result.status.key);
           scrollToColumnRef(result.status.key, headersWereHidden ? 160 : 80);
           window.setTimeout(() => setHighlightedColumnKey(null), 4000);
-          setRefNotice(
-            `${result.status.name} · ${result.row.name}`,
-          );
+          setRefNotice(`${result.status.name} · ${result.row.name}`);
           return;
         }
 
@@ -1290,9 +1242,7 @@ export function App() {
               issuesForCell={issuesForCell}
               onSelectIssue={settingsOpen ? () => {} : setSelectedIssue}
               onDeleteIssue={settingsOpen ? () => {} : deleteIssue}
-              onRenameRow={
-                settingsOpen ? () => {} : (row, name) => void renameRow(row, name)
-              }
+              onRenameRow={settingsOpen ? () => {} : (row, name) => void renameRow(row, name)}
               onRenameStatus={
                 settingsOpen ? () => {} : (status, name) => void renameStatus(status, name)
               }
@@ -1319,7 +1269,9 @@ export function App() {
               onReorderIssuesInCell={settingsOpen ? () => {} : reorderIssuesInCell}
               members={members}
               onAssignIssue={
-                settingsOpen ? () => {} : (issue, assigneeIds) => void assignIssue(issue, assigneeIds)
+                settingsOpen
+                  ? () => {}
+                  : (issue, assigneeIds) => void assignIssue(issue, assigneeIds)
               }
               onAssignRow={
                 settingsOpen ? () => {} : (row, assigneeIds) => void assignRow(row, assigneeIds)
@@ -1331,7 +1283,9 @@ export function App() {
                 settingsOpen ? () => {} : (issue, color) => void updateIssueColor(issue, color)
               }
               onUpdateIssuePriority={
-                settingsOpen ? () => {} : (issue, priority) => void updateIssuePriority(issue, priority)
+                settingsOpen
+                  ? () => {}
+                  : (issue, priority) => void updateIssuePriority(issue, priority)
               }
               onUpdateIssueTimer={settingsOpen ? () => {} : updateIssueTimer}
               highlightedIssueId={settingsOpen ? null : highlightedIssueId}
@@ -1360,11 +1314,7 @@ export function App() {
           onRegister={handleRegister}
           onOpenAbout={() => setAboutOpen(true)}
         />
-        <AboutDialog
-          open={aboutOpen}
-          version={APP_VERSION}
-          onClose={() => setAboutOpen(false)}
-        />
+        <AboutDialog open={aboutOpen} version={APP_VERSION} onClose={() => setAboutOpen(false)} />
       </>
     );
   }
@@ -1515,10 +1465,7 @@ export function App() {
                       </p>
                     </header>
 
-                    <AppearanceSettingsSection
-                      profile={profile}
-                      onProfileChange={updateProfile}
-                    />
+                    <AppearanceSettingsSection profile={profile} onProfileChange={updateProfile} />
                   </div>
                 ) : null}
 
@@ -1527,8 +1474,8 @@ export function App() {
                     <header className="settings-panel-header">
                       <h2>Team</h2>
                       <p className="settings-copy settings-lead">
-                        Members, invites, and team lifecycle for{" "}
-                        <strong>{currentTeam.name}</strong>.
+                        Members, invites, and team lifecycle for <strong>{currentTeam.name}</strong>
+                        .
                       </p>
                     </header>
 
@@ -1635,9 +1582,7 @@ export function App() {
               ? "Row name"
               : "Column name"
         }
-        placeholder={
-          quickAdd?.kind === "issue" ? "What needs to be done?" : "Name"
-        }
+        placeholder={quickAdd?.kind === "issue" ? "What needs to be done?" : "Name"}
         value={quickAddValue}
         onChange={setQuickAddValue}
         onSubmit={() => void submitQuickAdd()}
@@ -1673,9 +1618,7 @@ export function App() {
           onClose={() => setSelectedIssue(null)}
           onNavigateRef={(ref) => void goToRef(ref)}
           onUpdate={(updated) => {
-            setIssues((prev) =>
-              prev.map((item) => (item.id === updated.id ? updated : item)),
-            );
+            setIssues((prev) => prev.map((item) => (item.id === updated.id ? updated : item)));
             setSelectedIssue(updated);
           }}
           onDelete={deleteIssue}
@@ -1698,11 +1641,7 @@ export function App() {
         onUndo={undoEntry}
         onRestore={restoreEntry}
       />
-      <AboutDialog
-        open={aboutOpen}
-        version={APP_VERSION}
-        onClose={() => setAboutOpen(false)}
-      />
+      <AboutDialog open={aboutOpen} version={APP_VERSION} onClose={() => setAboutOpen(false)} />
     </div>
   );
 }
@@ -1932,11 +1871,15 @@ function LoginScreen({
           <>
             {!passwordResetEmail ? (
               <p className="hint">
-                Email is not configured on this server. After you submit, the reset link is
-                written to the server logs for your administrator.
+                Email is not configured on this server. After you submit, the reset link is written
+                to the server logs for your administrator.
               </p>
             ) : null}
-            <button type="button" disabled={loading || submitting} onClick={() => void handleForgotPassword()}>
+            <button
+              type="button"
+              disabled={loading || submitting}
+              onClick={() => void handleForgotPassword()}
+            >
               {loading || submitting ? "Working…" : "Send reset link"}
             </button>
             <button
@@ -1953,7 +1896,11 @@ function LoginScreen({
           </>
         ) : mode === "reset" ? (
           <>
-            <button type="button" disabled={loading || submitting} onClick={() => void handleResetPassword()}>
+            <button
+              type="button"
+              disabled={loading || submitting}
+              onClick={() => void handleResetPassword()}
+            >
               {loading || submitting ? "Working…" : "Update password"}
             </button>
             <button
@@ -1973,9 +1920,7 @@ function LoginScreen({
             type="button"
             disabled={loading || (mode === "register" && registerBlocked)}
             onClick={() =>
-              mode === "login"
-                ? onLogin(email, password)
-                : onRegister(name, email, password)
+              mode === "login" ? onLogin(email, password) : onRegister(name, email, password)
             }
           >
             {loading ? "Working…" : mode === "login" ? "Log in" : "Create account"}

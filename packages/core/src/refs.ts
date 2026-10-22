@@ -5,10 +5,7 @@ const KEY_CHARS = "abcdefghijklmnopqrstuvwxyz0123456789";
 /** Matches team keys from createTeamSchema (2–8 uppercase letters/digits). */
 export const TEAM_KEY_IN_REF = "[A-Z0-9]{2,8}";
 
-export const ISSUE_REF_PATTERN = new RegExp(
-  `^(${TEAM_KEY_IN_REF})-(\\d+)$`,
-  "i",
-);
+export const ISSUE_REF_PATTERN = new RegExp(`^(${TEAM_KEY_IN_REF})-(\\d+)$`, "i");
 export const ROW_REF_PATTERN = /^row_[a-z0-9]{8}$/;
 export const COLUMN_REF_PATTERN = /^col_[a-z0-9]{8}$/;
 export const FILE_REF_PATTERN = /^file_[a-z0-9]{8}$/;
@@ -44,9 +41,7 @@ export function parseRefFromShareUrl(raw: string) {
   return isTeamflowRef(ref) ? ref : null;
 }
 
-export type RefTextSegment =
-  | { type: "text"; value: string }
-  | { type: "ref"; value: string };
+export type RefTextSegment = { type: "text"; value: string } | { type: "ref"; value: string };
 
 export function splitRefText(text: string): RefTextSegment[] {
   if (!text) return [];
@@ -130,8 +125,4 @@ export type ResolvedFileRef = {
   filename: string;
 };
 
-export type ResolvedRef =
-  | ResolvedIssueRef
-  | ResolvedRowRef
-  | ResolvedColumnRef
-  | ResolvedFileRef;
+export type ResolvedRef = ResolvedIssueRef | ResolvedRowRef | ResolvedColumnRef | ResolvedFileRef;

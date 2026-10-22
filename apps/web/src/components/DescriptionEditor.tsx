@@ -98,14 +98,8 @@ export function DescriptionEditor({
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const segments = parseDescription(value);
   const isEmpty = !value.trim();
-  const {
-    linkOffer,
-    handlePaste,
-    keepLink,
-    shortenFromOffer,
-    openShortenOffer,
-    clearOfferOnEdit,
-  } = useLinkPasteOffer(value, onChange, textareaRef);
+  const { linkOffer, handlePaste, keepLink, shortenFromOffer, openShortenOffer, clearOfferOnEdit } =
+    useLinkPasteOffer(value, onChange, textareaRef);
 
   useEffect(() => {
     if (editing) {
@@ -196,11 +190,7 @@ export function DescriptionEditor({
             placeholder="Add a description… Pasted links are clickable automatically."
             rows={8}
           />
-          <LinkPasteOffer
-            target={linkOffer}
-            onKeep={keepLink}
-            onShorten={shortenFromOffer}
-          />
+          <LinkPasteOffer target={linkOffer} onKeep={keepLink} onShorten={shortenFromOffer} />
         </>
       ) : (
         <div
@@ -223,9 +213,7 @@ export function DescriptionEditor({
             <p className="muted description-empty">Click to add a description…</p>
           ) : (
             <div className="description-rendered">
-              {segments.map((segment, index) =>
-                renderSegment(segment, index, onNavigateRef),
-              )}
+              {segments.map((segment, index) => renderSegment(segment, index, onNavigateRef))}
             </div>
           )}
         </div>

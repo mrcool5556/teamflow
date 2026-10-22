@@ -22,7 +22,16 @@ import {
   verticalListSortingStrategy,
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import { useCallback, useEffect, useMemo, useRef, useState, Fragment, type CSSProperties, type ReactNode } from "react";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  Fragment,
+  type CSSProperties,
+  type ReactNode,
+} from "react";
 import type {
   BoardRowPublic,
   IssuePublic,
@@ -46,10 +55,8 @@ import type { Priority } from "@teamflow/core";
 
 export const issueDndId = (issueId: string) => `issue:${issueId}`;
 export const rowDndId = (rowId: string) => `row:${rowId}`;
-export const columnDndId = (rowId: string, statusId: string) =>
-  `column:${rowId}:${statusId}`;
-export const cellDndId = (rowId: string, statusId: string) =>
-  `cell:${rowId}:${statusId}`;
+export const columnDndId = (rowId: string, statusId: string) => `column:${rowId}:${statusId}`;
+export const cellDndId = (rowId: string, statusId: string) => `cell:${rowId}:${statusId}`;
 
 type BoardContextMenu =
   | { kind: "issue"; issue: IssuePublic; x: number; y: number }
@@ -61,8 +68,7 @@ type BoardContextMenu =
       canRemoveRow: boolean;
       headersVisible: boolean;
     };
-export const cellTailDndId = (rowId: string, statusId: string) =>
-  `cell-tail:${rowId}:${statusId}`;
+export const cellTailDndId = (rowId: string, statusId: string) => `cell-tail:${rowId}:${statusId}`;
 
 type ParsedDndId =
   | { kind: "issue"; issueId: string }
@@ -95,10 +101,7 @@ type IssueInsertHint = {
   insertAfter: boolean;
 };
 
-function shouldInsertAfter(
-  active: DragEndEvent["active"],
-  over: Over,
-): boolean {
+function shouldInsertAfter(active: DragEndEvent["active"], over: Over): boolean {
   const activeRect = active.rect.current.translated;
   const overRect = over.rect;
   if (!activeRect || !overRect) return false;
@@ -262,11 +265,7 @@ type KanbanBoardProps = {
   onAddColumn: (rowId: string) => void;
   onAddIssue: (rowId: string, statusId: string) => void;
   onReorderRows: (activeRowId: string, overRowId: string) => void;
-  onReorderColumns: (
-    rowId: string,
-    activeStatusId: string,
-    overStatusId: string,
-  ) => void;
+  onReorderColumns: (rowId: string, activeStatusId: string, overStatusId: string) => void;
   onReorderIssuesInCell: (
     rowId: string,
     statusId: string,
@@ -337,9 +336,7 @@ export function KanbanBoard({
   onOpenRowFiles,
 }: KanbanBoardProps) {
   const [activeId, setActiveId] = useState<string | null>(null);
-  const [issueInsertHint, setIssueInsertHint] = useState<IssueInsertHint | null>(
-    null,
-  );
+  const [issueInsertHint, setIssueInsertHint] = useState<IssueInsertHint | null>(null);
   const [rowSearchQueries, setRowSearchQueries] = useState<Record<string, string>>({});
   const [columnSearchQueries, setColumnSearchQueries] = useState<Record<string, string>>({});
   const [selectedIssueIds, setSelectedIssueIds] = useState<Set<string>>(() => new Set());
@@ -588,9 +585,7 @@ export function KanbanBoard({
 
   const activeDragIssueIds = useMemo(() => {
     if (!activeIssue) return new Set<string>();
-    return new Set(
-      draggingIssueIds(activeIssue.id, selectedIssueIds, issues, defaultRowId),
-    );
+    return new Set(draggingIssueIds(activeIssue.id, selectedIssueIds, issues, defaultRowId));
   }, [activeIssue, selectedIssueIds, issues, defaultRowId]);
 
   const activeDragCount = activeDragIssueIds.size;
@@ -618,9 +613,7 @@ export function KanbanBoard({
   }
 
   function handleDragOver(event: DragOverEvent) {
-    setIssueInsertHint(
-      resolveIssueInsertHint(event.active, event.over, issues, defaultRowId),
-    );
+    setIssueInsertHint(resolveIssueInsertHint(event.active, event.over, issues, defaultRowId));
 
     const activeParsed = parseDndId(String(event.active.id));
     if (activeParsed.kind !== "column") {
@@ -628,11 +621,11 @@ export function KanbanBoard({
       return;
     }
 
-    const overParsed = event.over ? parseDndId(String(event.over.id)) : { kind: "unknown" as const };
+    const overParsed = event.over
+      ? parseDndId(String(event.over.id))
+      : { kind: "unknown" as const };
     const target = resolveColumnDropTarget(overParsed, issues, defaultRowId);
-    setColumnDropTargetId(
-      target ? columnDndId(target.rowId, target.statusId) : null,
-    );
+    setColumnDropTargetId(target ? columnDndId(target.rowId, target.statusId) : null);
   }
 
   function handleDragCancel() {
@@ -644,9 +637,7 @@ export function KanbanBoard({
 
   const statusesForRow = useCallback(
     (rowId: string) =>
-      statuses
-        .filter((status) => status.rowId === rowId)
-        .sort((a, b) => a.position - b.position),
+      statuses.filter((status) => status.rowId === rowId).sort((a, b) => a.position - b.position),
     [statuses],
   );
 
@@ -677,11 +668,7 @@ export function KanbanBoard({
       if (!target) return;
       if (activeParsed.rowId !== target.rowId) return;
       if (activeParsed.statusId !== target.statusId) {
-        onReorderColumns(
-          activeParsed.rowId,
-          activeParsed.statusId,
-          target.statusId,
-        );
+        onReorderColumns(activeParsed.rowId, activeParsed.statusId, target.statusId);
       }
       return;
     }
@@ -691,12 +678,7 @@ export function KanbanBoard({
     const issue = issues.find((item) => item.id === activeParsed.issueId);
     if (!issue) return;
 
-    const movingIds = draggingIssueIds(
-      issue.id,
-      selectedIssueIds,
-      issues,
-      defaultRowId,
-    );
+    const movingIds = draggingIssueIds(issue.id, selectedIssueIds, issues, defaultRowId);
 
     const dropTarget = resolveIssueInsertHint(active, over, issues, defaultRowId);
     if (!dropTarget) return;
@@ -716,17 +698,11 @@ export function KanbanBoard({
       targetStatusId = mappedStatusId;
     }
 
-    const sameCell =
-      sourceRowId === targetRowId && sourceStatusId === targetStatusId;
+    const sameCell = sourceRowId === targetRowId && sourceStatusId === targetStatusId;
 
     if (sameCell) {
       const sourceCell = issuesForCell(sourceRowId, sourceStatusId).map((item) => item.id);
-      const nextCell = reorderMultipleIssueIds(
-        sourceCell,
-        movingIds,
-        overIssueId,
-        insertAfter,
-      );
+      const nextCell = reorderMultipleIssueIds(sourceCell, movingIds, overIssueId, insertAfter);
       if (nextCell.join("|") === sourceCell.join("|")) return;
       onReorderIssuesInCell(targetRowId, targetStatusId, nextCell);
       return;
@@ -736,12 +712,7 @@ export function KanbanBoard({
       .filter((item) => !movingIds.includes(item.id))
       .map((item) => item.id);
 
-    const nextTargetCell = reorderMultipleIssueIds(
-      targetCell,
-      movingIds,
-      overIssueId,
-      insertAfter,
-    );
+    const nextTargetCell = reorderMultipleIssueIds(targetCell, movingIds, overIssueId, insertAfter);
 
     onReorderIssuesInCell(targetRowId, targetStatusId, nextTargetCell, {
       rowId: targetRowId,
@@ -800,54 +771,54 @@ export function KanbanBoard({
             ).length;
 
             return (
-            <SortableBoardRow
-              key={row.id}
-              row={row}
-              statuses={statusesForRow(row.id)}
-              canRemoveRow={rows.length > 1 && rowIssueCount === 0}
-              headersVisible={isRowHeadersVisible(row.id)}
-              onToggleHeaders={() => toggleRowHeaders(row.id)}
-              onRenameRow={onRenameRow}
-              onRenameStatus={onRenameStatus}
-              onUpdateStatusColor={onUpdateStatusColor}
-              onRemoveRow={onRemoveRow}
-              onRemoveColumn={onRemoveColumn}
-              onAddColumn={onAddColumn}
-              issuesForCell={issuesForCell}
-              onSelectIssue={onSelectIssue}
-              onDeleteIssue={onDeleteIssue}
-              onAddIssue={onAddIssue}
-              suppressClickRef={suppressClickRef}
-              isDraggingRow={activeId === rowDndId(row.id)}
-              members={members}
-              onAssignRow={onAssignRow}
-              onUpdateRowColor={onUpdateRowColor}
-              onAssignIssue={onAssignIssue}
-              onUpdateIssueColor={onUpdateIssueColor}
-              onUpdateIssuePriority={onUpdateIssuePriority}
-              onUpdateIssueTimer={onUpdateIssueTimer}
-              highlightedIssueId={highlightedIssueId}
-              highlightedColumnKey={highlightedColumnKey}
-              rowSearch={rowSearchQueries[row.id] ?? ""}
-              onRowSearchChange={(value) =>
-                setRowSearchQueries((prev) => ({ ...prev, [row.id]: value }))
-              }
-              columnSearchQueries={columnSearchQueries}
-              onColumnSearchChange={(statusId, value) =>
-                setColumnSearchQueries((prev) => ({ ...prev, [statusId]: value }))
-              }
-              onGoToRef={onGoToRef}
-              selectedIssueIds={selectedIssueIds}
-              onIssueCardClick={handleIssueCardClick}
-              onIssueContextMenu={openIssueContextMenu}
-              onRowContextMenu={openRowContextMenu}
-              activeDragIssueIds={activeDragIssueIds}
-              activeId={activeId}
-              columnDropTargetId={columnDropTargetId}
-              previewMode={previewMode}
-              issueInsertHint={issueInsertHint}
-              onOpenRowFiles={onOpenRowFiles}
-            />
+              <SortableBoardRow
+                key={row.id}
+                row={row}
+                statuses={statusesForRow(row.id)}
+                canRemoveRow={rows.length > 1 && rowIssueCount === 0}
+                headersVisible={isRowHeadersVisible(row.id)}
+                onToggleHeaders={() => toggleRowHeaders(row.id)}
+                onRenameRow={onRenameRow}
+                onRenameStatus={onRenameStatus}
+                onUpdateStatusColor={onUpdateStatusColor}
+                onRemoveRow={onRemoveRow}
+                onRemoveColumn={onRemoveColumn}
+                onAddColumn={onAddColumn}
+                issuesForCell={issuesForCell}
+                onSelectIssue={onSelectIssue}
+                onDeleteIssue={onDeleteIssue}
+                onAddIssue={onAddIssue}
+                suppressClickRef={suppressClickRef}
+                isDraggingRow={activeId === rowDndId(row.id)}
+                members={members}
+                onAssignRow={onAssignRow}
+                onUpdateRowColor={onUpdateRowColor}
+                onAssignIssue={onAssignIssue}
+                onUpdateIssueColor={onUpdateIssueColor}
+                onUpdateIssuePriority={onUpdateIssuePriority}
+                onUpdateIssueTimer={onUpdateIssueTimer}
+                highlightedIssueId={highlightedIssueId}
+                highlightedColumnKey={highlightedColumnKey}
+                rowSearch={rowSearchQueries[row.id] ?? ""}
+                onRowSearchChange={(value) =>
+                  setRowSearchQueries((prev) => ({ ...prev, [row.id]: value }))
+                }
+                columnSearchQueries={columnSearchQueries}
+                onColumnSearchChange={(statusId, value) =>
+                  setColumnSearchQueries((prev) => ({ ...prev, [statusId]: value }))
+                }
+                onGoToRef={onGoToRef}
+                selectedIssueIds={selectedIssueIds}
+                onIssueCardClick={handleIssueCardClick}
+                onIssueContextMenu={openIssueContextMenu}
+                onRowContextMenu={openRowContextMenu}
+                activeDragIssueIds={activeDragIssueIds}
+                activeId={activeId}
+                columnDropTargetId={columnDropTargetId}
+                previewMode={previewMode}
+                issueInsertHint={issueInsertHint}
+                onOpenRowFiles={onOpenRowFiles}
+              />
             );
           })}
         </SortableContext>
@@ -891,7 +862,12 @@ export function KanbanBoard({
         ) : null}
       </DragOverlay>
 
-      {!previewMode && onBulkMove && onBulkAssign && onBulkPriority && onBulkTimer && onBulkDelete ? (
+      {!previewMode &&
+      onBulkMove &&
+      onBulkAssign &&
+      onBulkPriority &&
+      onBulkTimer &&
+      onBulkDelete ? (
         <BulkActionBar
           selectedIssues={selectedIssues}
           rows={rows}
@@ -926,7 +902,11 @@ export function KanbanBoard({
           y={contextMenu.y}
           entries={contextMenuEntries}
           onClose={closeContextMenu}
-          ariaLabel={contextMenu.kind === "issue" ? `Issue ${contextMenu.issue.identifier}` : `Row ${contextMenu.row.name}`}
+          ariaLabel={
+            contextMenu.kind === "issue"
+              ? `Issue ${contextMenu.issue.identifier}`
+              : `Row ${contextMenu.row.name}`
+          }
         />
       ) : null}
     </DndContext>
@@ -1051,11 +1031,7 @@ function RowSeparatorBar({
             />
           </div>
           {onOpenRowFiles ? (
-            <button
-              type="button"
-              className="row-bar-action"
-              onClick={() => onOpenRowFiles(row)}
-            >
+            <button type="button" className="row-bar-action" onClick={() => onOpenRowFiles(row)}>
               Files
             </button>
           ) : null}
@@ -1069,7 +1045,10 @@ function RowSeparatorBar({
           </button>
           <RowEditMenu>
             <RowEditMenuSection title="Row color">
-              <RowColorPicker color={row.color} onSelect={(color) => onUpdateRowColor(row, color)} />
+              <RowColorPicker
+                color={row.color}
+                onSelect={(color) => onUpdateRowColor(row, color)}
+              />
             </RowEditMenuSection>
             <RowEditMenuItem onClick={onToggleHeaders}>
               {headersVisible ? "Hide column headers" : "Show column headers"}
@@ -1210,16 +1189,12 @@ function SortableBoardRow({
     opacity: isDragging ? 0.45 : 1,
   };
 
-  const rowStyle = row.color
-    ? ({ "--row-accent": row.color } as CSSProperties)
-    : undefined;
+  const rowStyle = row.color ? ({ "--row-accent": row.color } as CSSProperties) : undefined;
 
   const rowQuery = rowSearch.trim();
   const visibleStatuses = rowQuery
     ? statuses.filter((status) =>
-        issuesForCell(row.id, status.id).some((issue) =>
-          issueMatchesBoardSearch(issue, rowQuery),
-        ),
+        issuesForCell(row.id, status.id).some((issue) => issueMatchesBoardSearch(issue, rowQuery)),
       )
     : statuses;
 
@@ -1227,8 +1202,7 @@ function SortableBoardRow({
     const columnQuery = (columnSearchQueries[statusId] ?? "").trim();
     return issuesForCell(row.id, statusId).filter(
       (issue) =>
-        issueMatchesBoardSearch(issue, rowQuery) &&
-        issueMatchesBoardSearch(issue, columnQuery),
+        issueMatchesBoardSearch(issue, rowQuery) && issueMatchesBoardSearch(issue, columnQuery),
     );
   }
 
@@ -1305,125 +1279,120 @@ function SortableBoardRow({
       >
         <div className="board-row-scroll">
           <div className="board-row-columns">
-          {visibleStatuses.map((status) => {
-            const cellIssues = filterCellIssues(status.id);
-            const issueIds = cellIssues.map((issue) => issueDndId(issue.id));
-            const columnSortable = headersVisible && !previewMode;
-            const columnHint =
-              issueInsertHint?.rowId === row.id &&
-              issueInsertHint?.statusId === status.id
-                ? issueInsertHint
-                : null;
+            {visibleStatuses.map((status) => {
+              const cellIssues = filterCellIssues(status.id);
+              const issueIds = cellIssues.map((issue) => issueDndId(issue.id));
+              const columnSortable = headersVisible && !previewMode;
+              const columnHint =
+                issueInsertHint?.rowId === row.id && issueInsertHint?.statusId === status.id
+                  ? issueInsertHint
+                  : null;
 
-            const columnId = columnDndId(row.id, status.id);
-            const isColumnDropTarget = columnDropTargetId === columnId;
+              const columnId = columnDndId(row.id, status.id);
+              const isColumnDropTarget = columnDropTargetId === columnId;
 
-            return (
-              <SortableColumn
-                key={`${row.id}-${status.id}`}
-                id={columnId}
-                disabled={!columnSortable}
-                isDropTarget={isColumnDropTarget}
-              >
-                {({ setActivatorNodeRef, listeners, isDragging }) => (
-                  <>
-                    {headersVisible ? (
-                      <ColumnHeader
-                        label={status.name}
-                        count={cellIssues.length}
-                        statusType={status.type}
-                        refKey={status.key}
-                        statusId={status.id}
-                        highlighted={highlightedColumnKey === status.key}
-                        columnSearch={columnSearchQueries[status.id] ?? ""}
-                        onColumnSearchChange={(value) =>
-                          onColumnSearchChange?.(status.id, value)
-                        }
-                        members={members}
-                        columnAssigneeIds={uniqueAssigneeIdsFromIssues(cellIssues)}
-                        onAssignColumn={(assigneeIds) => {
-                          for (const issue of cellIssues) {
-                            onAssignIssue(issue, assigneeIds);
-                          }
-                        }}
-                        previewMode={previewMode}
-                        className={`column-label column-label-row${isDragging ? " column-label--dragging" : ""}`}
-                        onSave={(name) => onRenameStatus(status, name)}
-                        onRemove={
-                          cellIssues.length === 0
-                            ? () => onRemoveColumn(status)
-                            : undefined
-                        }
-                        onGoToRef={onGoToRef}
-                        color={status.color}
-                        onColorChange={(color) => onUpdateStatusColor(status, color)}
-                        dragHandleRef={columnSortable ? setActivatorNodeRef : undefined}
-                        dragHandleListeners={columnSortable ? listeners : undefined}
-                      />
-                    ) : null}
-                    <BoardCell
-                      rowId={row.id}
-                      statusId={status.id}
-                      columnKey={status.key}
-                      highlighted={highlightedColumnKey === status.key}
-                      issueIds={issueIds}
-                      footer={
-                        <button
-                          type="button"
-                          className="ghost add-card-btn"
-                          onPointerDown={(e) => e.stopPropagation()}
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            onAddIssue(row.id, status.id);
+              return (
+                <SortableColumn
+                  key={`${row.id}-${status.id}`}
+                  id={columnId}
+                  disabled={!columnSortable}
+                  isDropTarget={isColumnDropTarget}
+                >
+                  {({ setActivatorNodeRef, listeners, isDragging }) => (
+                    <>
+                      {headersVisible ? (
+                        <ColumnHeader
+                          label={status.name}
+                          count={cellIssues.length}
+                          statusType={status.type}
+                          refKey={status.key}
+                          statusId={status.id}
+                          highlighted={highlightedColumnKey === status.key}
+                          columnSearch={columnSearchQueries[status.id] ?? ""}
+                          onColumnSearchChange={(value) => onColumnSearchChange?.(status.id, value)}
+                          members={members}
+                          columnAssigneeIds={uniqueAssigneeIdsFromIssues(cellIssues)}
+                          onAssignColumn={(assigneeIds) => {
+                            for (const issue of cellIssues) {
+                              onAssignIssue(issue, assigneeIds);
+                            }
                           }}
-                        >
-                          + Add issue
-                        </button>
-                      }
-                    >
-                      {columnHint &&
-                        columnHint.anchorIssueId === null &&
-                        cellIssues.length === 0 && <IssueDropIndicator />}
-                      {cellIssues.map((issue) => (
-                        <Fragment key={issue.id}>
-                          {columnHint?.anchorIssueId === issue.id &&
-                            !columnHint.insertAfter && <IssueDropIndicator />}
-                          <SortableIssueCard
-                            issue={issue}
-                            members={members}
-                            selected={selectedIssueIds.has(issue.id)}
-                            draggingCompanion={
-                              activeDragIssueIds.has(issue.id) &&
-                              activeDragIssueIds.size > 1 &&
-                              activeId !== issueDndId(issue.id)
-                            }
-                            highlighted={highlightedIssueId === issue.id}
-                            suppressClickRef={suppressClickRef}
-                            layoutAnimationDisabled={Boolean(issueInsertHint)}
-                            onCardClick={(event) =>
-                              onIssueCardClick?.(issue, event, cellIssues)
-                            }
-                            onDelete={() => onDeleteIssue(issue)}
-                            onAssignIssue={onAssignIssue}
-                            onUpdateIssueColor={onUpdateIssueColor}
-                            onUpdateIssuePriority={onUpdateIssuePriority}
-                            onUpdateIssueTimer={onUpdateIssueTimer}
-                            onGoToRef={onGoToRef}
-                            onContextMenu={(event) => onIssueContextMenu?.(issue, event)}
-                          />
-                          {columnHint?.anchorIssueId === issue.id &&
-                            columnHint.insertAfter && <IssueDropIndicator />}
-                        </Fragment>
-                      ))}
-                      {columnHint &&
-                        columnHint.anchorIssueId === null &&
-                        cellIssues.length > 0 && <IssueDropIndicator />}
-                    </BoardCell>
-                  </>
-                )}
-              </SortableColumn>
-            );
-          })}
+                          previewMode={previewMode}
+                          className={`column-label column-label-row${isDragging ? " column-label--dragging" : ""}`}
+                          onSave={(name) => onRenameStatus(status, name)}
+                          onRemove={
+                            cellIssues.length === 0 ? () => onRemoveColumn(status) : undefined
+                          }
+                          onGoToRef={onGoToRef}
+                          color={status.color}
+                          onColorChange={(color) => onUpdateStatusColor(status, color)}
+                          dragHandleRef={columnSortable ? setActivatorNodeRef : undefined}
+                          dragHandleListeners={columnSortable ? listeners : undefined}
+                        />
+                      ) : null}
+                      <BoardCell
+                        rowId={row.id}
+                        statusId={status.id}
+                        columnKey={status.key}
+                        highlighted={highlightedColumnKey === status.key}
+                        issueIds={issueIds}
+                        footer={
+                          <button
+                            type="button"
+                            className="ghost add-card-btn"
+                            onPointerDown={(e) => e.stopPropagation()}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              onAddIssue(row.id, status.id);
+                            }}
+                          >
+                            + Add issue
+                          </button>
+                        }
+                      >
+                        {columnHint &&
+                          columnHint.anchorIssueId === null &&
+                          cellIssues.length === 0 && <IssueDropIndicator />}
+                        {cellIssues.map((issue) => (
+                          <Fragment key={issue.id}>
+                            {columnHint?.anchorIssueId === issue.id && !columnHint.insertAfter && (
+                              <IssueDropIndicator />
+                            )}
+                            <SortableIssueCard
+                              issue={issue}
+                              members={members}
+                              selected={selectedIssueIds.has(issue.id)}
+                              draggingCompanion={
+                                activeDragIssueIds.has(issue.id) &&
+                                activeDragIssueIds.size > 1 &&
+                                activeId !== issueDndId(issue.id)
+                              }
+                              highlighted={highlightedIssueId === issue.id}
+                              suppressClickRef={suppressClickRef}
+                              layoutAnimationDisabled={Boolean(issueInsertHint)}
+                              onCardClick={(event) => onIssueCardClick?.(issue, event, cellIssues)}
+                              onDelete={() => onDeleteIssue(issue)}
+                              onAssignIssue={onAssignIssue}
+                              onUpdateIssueColor={onUpdateIssueColor}
+                              onUpdateIssuePriority={onUpdateIssuePriority}
+                              onUpdateIssueTimer={onUpdateIssueTimer}
+                              onGoToRef={onGoToRef}
+                              onContextMenu={(event) => onIssueContextMenu?.(issue, event)}
+                            />
+                            {columnHint?.anchorIssueId === issue.id && columnHint.insertAfter && (
+                              <IssueDropIndicator />
+                            )}
+                          </Fragment>
+                        ))}
+                        {columnHint &&
+                          columnHint.anchorIssueId === null &&
+                          cellIssues.length > 0 && <IssueDropIndicator />}
+                      </BoardCell>
+                    </>
+                  )}
+                </SortableColumn>
+              );
+            })}
           </div>
         </div>
       </SortableContext>
@@ -1513,20 +1482,12 @@ function BoardCell({
   );
 }
 
-function ColumnDropTail({
-  rowId,
-  statusId,
-}: {
-  rowId: string;
-  statusId: string;
-}) {
+function ColumnDropTail({ rowId, statusId }: { rowId: string; statusId: string }) {
   const { setNodeRef } = useDroppable({
     id: cellTailDndId(rowId, statusId),
   });
 
-  return (
-    <div ref={setNodeRef} className="column-body-drop-tail" aria-hidden />
-  );
+  return <div ref={setNodeRef} className="column-body-drop-tail" aria-hidden />;
 }
 
 function IssueDropIndicator() {
@@ -1573,18 +1534,9 @@ function SortableIssueCard({
   onGoToRef?: (ref: string) => void;
   onContextMenu?: (event: React.MouseEvent) => void;
 }) {
-  const {
-    attributes,
-    listeners,
-    setNodeRef,
-    transform,
-    transition,
-    isDragging,
-  } = useSortable({
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: issueDndId(issue.id),
-    ...(layoutAnimationDisabled
-      ? { animateLayoutChanges: () => false }
-      : {}),
+    ...(layoutAnimationDisabled ? { animateLayoutChanges: () => false } : {}),
   });
 
   const style = {
@@ -1616,7 +1568,11 @@ function SortableIssueCard({
         onContextMenu?.(event);
       }}
     >
-      {selected ? <span className="issue-card-select-chip" aria-hidden>✓</span> : null}
+      {selected ? (
+        <span className="issue-card-select-chip" aria-hidden>
+          ✓
+        </span>
+      ) : null}
       <div className="issue-card-header">
         <RefCopyButton
           value={issue.identifier}
@@ -1727,9 +1683,7 @@ function ColumnHeader({
     setValue(label);
   }, [label]);
 
-  const columnStyle = color
-    ? ({ "--column-accent": color } as CSSProperties)
-    : undefined;
+  const columnStyle = color ? ({ "--column-accent": color } as CSSProperties) : undefined;
 
   if (editing) {
     return (
@@ -1824,7 +1778,7 @@ function ColumnHeader({
               onGo={onGoToRef ? () => onGoToRef(refKey) : undefined}
             />
           ) : null}
-          {(onColorChange || onRemove) ? (
+          {onColorChange || onRemove ? (
             <RowEditMenu>
               {onColorChange ? (
                 <RowEditMenuSection title="Column color">

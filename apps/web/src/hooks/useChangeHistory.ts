@@ -4,12 +4,7 @@ export const UNDO_DELAY_MS = 15000;
 export const RESTORE_RETENTION_MS = 7 * 24 * 60 * 60 * 1000;
 export const MAX_CHANGE_HISTORY = 30;
 
-export type ChangeHistoryStatus =
-  | "pending"
-  | "committed"
-  | "undone"
-  | "failed"
-  | "restored";
+export type ChangeHistoryStatus = "pending" | "committed" | "undone" | "failed" | "restored";
 
 export type ChangeHistoryEntry = {
   id: string;
@@ -47,9 +42,7 @@ export function useChangeHistory() {
       extra?: Pick<ChangeHistoryEntry, "issueId" | "restorableUntil">,
     ) => {
       setHistory((prev) =>
-        prev.map((entry) =>
-          entry.id === id ? { ...entry, status, ...extra } : entry,
-        ),
+        prev.map((entry) => (entry.id === id ? { ...entry, status, ...extra } : entry)),
       );
     },
     [],
@@ -65,9 +58,7 @@ export function useChangeHistory() {
   const finalizePending = useCallback(
     (id: string, payload: UndoPayload) => {
       const restorableUntil =
-        payload.issueId && payload.restoreFromTrash
-          ? Date.now() + RESTORE_RETENTION_MS
-          : undefined;
+        payload.issueId && payload.restoreFromTrash ? Date.now() + RESTORE_RETENTION_MS : undefined;
       patchEntry(id, "committed", {
         issueId: payload.issueId,
         restorableUntil,
@@ -177,4 +168,4 @@ export function useChangeHistory() {
   }, []);
 
   return { history, pending, schedule, undo, undoEntry, restoreEntry };
-};
+}

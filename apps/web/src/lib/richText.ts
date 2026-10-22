@@ -25,10 +25,7 @@ function parseLinksInPlainText(text: string): RichTextSegment[] {
 
   const segments: RichTextSegment[] = [];
   let offset = 0;
-  const pattern = new RegExp(
-    `${MARKDOWN_LINK.source}|(${RAW_URL.source})`,
-    "g",
-  );
+  const pattern = new RegExp(`${MARKDOWN_LINK.source}|(${RAW_URL.source})`, "g");
 
   for (const match of text.matchAll(pattern)) {
     const index = match.index ?? 0;

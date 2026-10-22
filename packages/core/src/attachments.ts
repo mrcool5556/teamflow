@@ -1,11 +1,7 @@
 const IMAGE_EXT = /\.(png|jpe?g|gif|webp|bmp|avif|svg)$/i;
 const VIDEO_EXT = /\.(mp4|webm|mov|m4v|mkv|avi|ogv)$/i;
 const ZIP_EXT = /\.(zip|7z|rar|tar|tgz|gz)$/i;
-const ZIP_MIMES = new Set([
-  "application/zip",
-  "application/x-zip-compressed",
-  "multipart/x-zip",
-]);
+const ZIP_MIMES = new Set(["application/zip", "application/x-zip-compressed", "multipart/x-zip"]);
 const VIDEO_MIMES = new Set([
   "video/mp4",
   "video/webm",
@@ -77,8 +73,7 @@ export const DEFAULT_ATTACHMENT_LIMITS: AttachmentLimitsPublic = {
   chunkThresholdBytes: 8 * MB,
 };
 
-const OPAQUE_BASENAME =
-  /^(?:[A-Za-z0-9]{6,24}|[a-f0-9]{8,})(?: \(\d+\))?$/i;
+const OPAQUE_BASENAME = /^(?:[A-Za-z0-9]{6,24}|[a-f0-9]{8,})(?: \(\d+\))?$/i;
 
 export function fileExtension(filename: string) {
   const dot = filename.lastIndexOf(".");

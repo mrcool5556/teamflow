@@ -62,9 +62,7 @@ export function AssigneePicker({
         </span>
         {!compact && (
           <>
-            <span className="assignee-picker-label">
-              {assigneeName ?? label}
-            </span>
+            <span className="assignee-picker-label">{assigneeName ?? label}</span>
             <span className="assignee-picker-caret">{open ? "▴" : "▾"}</span>
           </>
         )}
@@ -120,9 +118,7 @@ export function AssigneePicker({
                 </span>
               </button>
             ))}
-            {filtered.length === 0 && (
-              <p className="assignee-picker-empty">No matching members.</p>
-            )}
+            {filtered.length === 0 && <p className="assignee-picker-empty">No matching members.</p>}
           </div>
         </div>
       )}

@@ -1,5 +1,10 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import type { TeamInvitePublic, TeamMemberPublic, TeamPermissionsPublic, TeamRolePublic } from "@teamflow/core";
+import type {
+  TeamInvitePublic,
+  TeamMemberPublic,
+  TeamPermissionsPublic,
+  TeamRolePublic,
+} from "@teamflow/core";
 import { client } from "../api";
 import { useTeamRoles } from "../hooks/useTeamRoles";
 import { buildInviteShareUrl, extractInviteToken } from "../lib/inviteLinks";
@@ -249,8 +254,8 @@ export function TeamSettingsSection({
         <section className="settings-section team-access-summary">
           <h3>Your access</h3>
           <p className="settings-copy">
-            Your role is <strong>{permissions.roleName}</strong>. Edit roles under Settings →
-            Roles, then assign them to members below.
+            Your role is <strong>{permissions.roleName}</strong>. Edit roles under Settings → Roles,
+            then assign them to members below.
           </p>
           <ul className="team-access-list">
             {permissions.permissions.includes("team.members.manage") ? (
@@ -434,8 +439,11 @@ export function TeamSettingsSection({
         <section className="settings-section settings-danger-zone">
           <h3>Delete team</h3>
           <p className="settings-copy">
-            Permanently remove <strong>{teamKey} — {teamName}</strong> and all board data. Members
-            lose access immediately.
+            Permanently remove{" "}
+            <strong>
+              {teamKey} — {teamName}
+            </strong>{" "}
+            and all board data. Members lose access immediately.
           </p>
           <button
             type="button"
@@ -462,7 +470,11 @@ export function TeamSettingsSection({
             placeholder="https://…/?invite=… or token"
           />
         </label>
-        <button type="button" disabled={joining || !joinToken.trim()} onClick={() => void joinWithToken()}>
+        <button
+          type="button"
+          disabled={joining || !joinToken.trim()}
+          onClick={() => void joinWithToken()}
+        >
           {joining ? "Joining…" : "Join team"}
         </button>
       </section>

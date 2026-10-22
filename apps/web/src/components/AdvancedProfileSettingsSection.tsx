@@ -40,8 +40,8 @@ export function AdvancedProfileSettingsSection({
           <div className="settings-subsection">
             <h4>Board</h4>
             <p className="settings-copy">
-              Column width and card height apply to every row on your board. Changes preview live
-              on the right.
+              Column width and card height apply to every row on your board. Changes preview live on
+              the right.
             </p>
             <label className="settings-range">
               Column width
@@ -108,8 +108,8 @@ export function AdvancedProfileSettingsSection({
           <div className="settings-subsection">
             <h4>Profile backup &amp; sharing</h4>
             <p className="settings-copy">
-              Download your profile JSON or paste one from another user. Import replaces
-              your saved appearance and board preferences.
+              Download your profile JSON or paste one from another user. Import replaces your saved
+              appearance and board preferences.
             </p>
             <div className="row settings-actions">
               <button type="button" onClick={() => void onExportProfile()}>

@@ -74,19 +74,14 @@ export class TeamflowClient {
   constructor(options: TeamflowClientOptions) {
     this.baseUrl = options.baseUrl.replace(/\/$/, "");
     this.token = options.token;
-    this.fetchImpl =
-      options.fetchImpl ??
-      ((input, init) => fetch(input, init));
+    this.fetchImpl = options.fetchImpl ?? ((input, init) => fetch(input, init));
   }
 
   setToken(token?: string) {
     this.token = token;
   }
 
-  private async request<T>(
-    path: string,
-    init: RequestInit = {},
-  ): Promise<T> {
+  private async request<T>(path: string, init: RequestInit = {}): Promise<T> {
     const headers = new Headers(init.headers);
     if (!(init.body instanceof FormData)) {
       headers.set("Content-Type", "application/json");
@@ -224,25 +219,18 @@ export class TeamflowClient {
   }
 
   listStatuses(teamId: string) {
-    return this.request<{ statuses: IssueStatusPublic[] }>(
-      `/teams/${teamId}/statuses`,
-    );
+    return this.request<{ statuses: IssueStatusPublic[] }>(`/teams/${teamId}/statuses`);
   }
 
   listRowStatuses(rowId: string) {
-    return this.request<{ statuses: IssueStatusPublic[] }>(
-      `/rows/${rowId}/statuses`,
-    );
+    return this.request<{ statuses: IssueStatusPublic[] }>(`/rows/${rowId}/statuses`);
   }
 
   createStatus(rowId: string, input: { name: string; type?: string }) {
-    return this.request<{ status: IssueStatusPublic }>(
-      `/rows/${rowId}/statuses`,
-      {
-        method: "POST",
-        body: JSON.stringify(input),
-      },
-    );
+    return this.request<{ status: IssueStatusPublic }>(`/rows/${rowId}/statuses`, {
+      method: "POST",
+      body: JSON.stringify(input),
+    });
   }
 
   updateStatus(
@@ -264,9 +252,7 @@ export class TeamflowClient {
   }
 
   listTeamMembers(teamId: string) {
-    return this.request<{ members: TeamMemberPublic[] }>(
-      `/teams/${teamId}/members`,
-    );
+    return this.request<{ members: TeamMemberPublic[] }>(`/teams/${teamId}/members`);
   }
 
   removeTeamMember(teamId: string, memberId: string) {
@@ -282,9 +268,7 @@ export class TeamflowClient {
   }
 
   listTeamInvites(teamId: string) {
-    return this.request<{ invites: TeamInvitePublic[] }>(
-      `/teams/${teamId}/invites`,
-    );
+    return this.request<{ invites: TeamInvitePublic[] }>(`/teams/${teamId}/invites`);
   }
 
   createTeamInvite(teamId: string, input: Partial<CreateTeamInviteInput> = {}) {
@@ -301,9 +285,7 @@ export class TeamflowClient {
   }
 
   getTeamPermissions(teamId: string) {
-    return this.request<{ permissions: TeamPermissionsPublic }>(
-      `/teams/${teamId}/permissions/me`,
-    );
+    return this.request<{ permissions: TeamPermissionsPublic }>(`/teams/${teamId}/permissions/me`);
   }
 
   listTeamRoles(teamId: string) {
@@ -397,9 +379,7 @@ export class TeamflowClient {
   }
 
   getServerMaintenanceStatus(teamId: string) {
-    return this.request<{ status: MaintenanceStatusPublic }>(
-      `/teams/${teamId}/server/maintenance`,
-    );
+    return this.request<{ status: MaintenanceStatusPublic }>(`/teams/${teamId}/server/maintenance`);
   }
 
   getServerMaintenanceJob(teamId: string) {
@@ -435,10 +415,9 @@ export class TeamflowClient {
     }
 
     const query = includeFiles ? "?includeFiles=true" : "";
-    const response = await this.fetchImpl(
-      `${this.baseUrl}/teams/${teamId}/export${query}`,
-      { headers },
-    );
+    const response = await this.fetchImpl(`${this.baseUrl}/teams/${teamId}/export${query}`, {
+      headers,
+    });
 
     if (!response.ok) {
       let payload: ApiError = { error: response.statusText };
@@ -468,19 +447,14 @@ export class TeamflowClient {
     const form = new FormData();
     form.append("bundle", file);
     const force = options?.force ? "?force=true" : "";
-    return this.request<{ result: TeamBundleImportResult }>(
-      `/teams/${teamId}/import${force}`,
-      {
-        method: "POST",
-        body: form,
-      },
-    );
+    return this.request<{ result: TeamBundleImportResult }>(`/teams/${teamId}/import${force}`, {
+      method: "POST",
+      body: form,
+    });
   }
 
   getDiscordGuildConfig(guildId: string) {
-    return this.request<{ config: DiscordGuildConfigPublic }>(
-      `/discord/guilds/${guildId}/config`,
-    );
+    return this.request<{ config: DiscordGuildConfigPublic }>(`/discord/guilds/${guildId}/config`);
   }
 
   previewInvite(token: string) {
@@ -518,15 +492,11 @@ export class TeamflowClient {
       if (value) params.set(key, value);
     }
     const query = params.toString();
-    return this.request<{ issues: IssuePublic[] }>(
-      `/issues${query ? `?${query}` : ""}`,
-    );
+    return this.request<{ issues: IssuePublic[] }>(`/issues${query ? `?${query}` : ""}`);
   }
 
   getIssue(id: string) {
-    return this.request<{ issue: IssuePublic; comments: CommentPublic[] }>(
-      `/issues/${id}`,
-    );
+    return this.request<{ issue: IssuePublic; comments: CommentPublic[] }>(`/issues/${id}`);
   }
 
   createIssue(input: CreateIssueInput) {
@@ -560,13 +530,10 @@ export class TeamflowClient {
   }
 
   addComment(issueId: string, input: CreateCommentInput) {
-    return this.request<{ comment: CommentPublic }>(
-      `/issues/${issueId}/comments`,
-      {
-        method: "POST",
-        body: JSON.stringify(input),
-      },
-    );
+    return this.request<{ comment: CommentPublic }>(`/issues/${issueId}/comments`, {
+      method: "POST",
+      body: JSON.stringify(input),
+    });
   }
 
   deleteComment(issueId: string, commentId: string) {
@@ -624,13 +591,7 @@ export class TeamflowClient {
           return;
         }
 
-        reject(
-          new TeamflowApiError(
-            payload.error ?? xhr.statusText,
-            xhr.status,
-            payload.code,
-          ),
-        );
+        reject(new TeamflowApiError(payload.error ?? xhr.statusText, xhr.status, payload.code));
       });
 
       xhr.addEventListener("error", () => {
@@ -649,13 +610,10 @@ export class TeamflowClient {
     issueId: string,
     input: { filename: string; mimeType: string; totalBytes: number },
   ) {
-    return this.request<{ session: UploadSessionPublic }>(
-      `/issues/${issueId}/uploads`,
-      {
-        method: "POST",
-        body: JSON.stringify(input),
-      },
-    );
+    return this.request<{ session: UploadSessionPublic }>(`/issues/${issueId}/uploads`, {
+      method: "POST",
+      body: JSON.stringify(input),
+    });
   }
 
   getUploadSession(sessionId: string) {
@@ -697,13 +655,7 @@ export class TeamflowClient {
           return;
         }
 
-        reject(
-          new TeamflowApiError(
-            payload.error ?? xhr.statusText,
-            xhr.status,
-            payload.code,
-          ),
-        );
+        reject(new TeamflowApiError(payload.error ?? xhr.statusText, xhr.status, payload.code));
       });
 
       xhr.addEventListener("error", () => reject(new TeamflowApiError("Upload failed", 0)));
@@ -712,10 +664,9 @@ export class TeamflowClient {
   }
 
   completeUpload(sessionId: string) {
-    return this.request<{ attachment: IssueAttachmentPublic }>(
-      `/uploads/${sessionId}/complete`,
-      { method: "POST" },
-    );
+    return this.request<{ attachment: IssueAttachmentPublic }>(`/uploads/${sessionId}/complete`, {
+      method: "POST",
+    });
   }
 
   abortUpload(sessionId: string) {
@@ -731,8 +682,7 @@ export class TeamflowClient {
       resumeSessionId?: string;
     },
   ) {
-    const limits =
-      options?.limits ?? (await this.listAttachments(issueId)).limits;
+    const limits = options?.limits ?? (await this.listAttachments(issueId)).limits;
 
     if (file.size <= limits.chunkThresholdBytes) {
       return this.uploadAttachment(issueId, file, {
@@ -767,9 +717,7 @@ export class TeamflowClient {
           const uploadedBefore = index * session.chunkSize;
           const current = (chunk.size * chunkPercent) / 100;
           const total = Math.max(file.size, 1);
-          options.onProgress(
-            Math.min(100, Math.round(((uploadedBefore + current) / total) * 100)),
-          );
+          options.onProgress(Math.min(100, Math.round(((uploadedBefore + current) / total) * 100)));
         },
       });
       session = result.session;
@@ -801,10 +749,9 @@ export class TeamflowClient {
       headers.set("Authorization", `Bearer ${this.token}`);
     }
 
-    const response = await this.fetchImpl(
-      `${this.baseUrl}/attachments/${attachmentId}/download`,
-      { headers },
-    );
+    const response = await this.fetchImpl(`${this.baseUrl}/attachments/${attachmentId}/download`, {
+      headers,
+    });
 
     if (!response.ok) {
       let payload: ApiError = { error: response.statusText };
@@ -827,10 +774,9 @@ export class TeamflowClient {
   }
 
   deleteAttachment(issueId: string, attachmentId: string) {
-    return this.request<void>(
-      `/issues/${issueId}/attachments/${attachmentId}`,
-      { method: "DELETE" },
-    );
+    return this.request<void>(`/issues/${issueId}/attachments/${attachmentId}`, {
+      method: "DELETE",
+    });
   }
 
   linkIssueAttachment(issueId: string, fileId: string) {
@@ -844,13 +790,10 @@ export class TeamflowClient {
   }
 
   linkRowAttachment(rowId: string, fileId: string) {
-    return this.request<{ attachment: IssueAttachmentPublic }>(
-      `/rows/${rowId}/attachments/link`,
-      {
-        method: "POST",
-        body: JSON.stringify({ fileId }),
-      },
-    );
+    return this.request<{ attachment: IssueAttachmentPublic }>(`/rows/${rowId}/attachments/link`, {
+      method: "POST",
+      body: JSON.stringify({ fileId }),
+    });
   }
 
   listRowAttachments(rowId: string) {
@@ -935,13 +878,7 @@ export class TeamflowClient {
           return;
         }
 
-        reject(
-          new TeamflowApiError(
-            payload.error ?? xhr.statusText,
-            xhr.status,
-            payload.code,
-          ),
-        );
+        reject(new TeamflowApiError(payload.error ?? xhr.statusText, xhr.status, payload.code));
       });
 
       xhr.addEventListener("error", () => {
@@ -975,8 +912,7 @@ export class TeamflowClient {
       resumeSessionId?: string;
     },
   ) {
-    const limits =
-      options?.limits ?? (await this.listRowAttachments(rowId)).limits;
+    const limits = options?.limits ?? (await this.listRowAttachments(rowId)).limits;
 
     if (file.size <= limits.chunkThresholdBytes) {
       return this.uploadRowAttachment(rowId, file, {
@@ -1011,9 +947,7 @@ export class TeamflowClient {
           const uploadedBefore = index * session.chunkSize;
           const current = (chunk.size * chunkPercent) / 100;
           const total = Math.max(file.size, 1);
-          options.onProgress(
-            Math.min(100, Math.round(((uploadedBefore + current) / total) * 100)),
-          );
+          options.onProgress(Math.min(100, Math.round(((uploadedBefore + current) / total) * 100)));
         },
       });
       session = result.session;

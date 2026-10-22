@@ -230,7 +230,9 @@ export function RolesSettingsSection({
                   ) : null}
                 </div>
               ) : (
-                <p className="settings-hint">You can view roles but need manage permission to edit.</p>
+                <p className="settings-hint">
+                  You can view roles but need manage permission to edit.
+                </p>
               )}
             </section>
           ) : null}

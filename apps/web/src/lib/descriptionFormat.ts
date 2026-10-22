@@ -20,11 +20,8 @@ function parseInlineMarkup(text: string): DescriptionSegment[] {
     }
 
     const inner = match[1] ?? match[2] ?? match[3] ?? "";
-    const type = match[1] !== undefined
-      ? "bold"
-      : match[2] !== undefined
-        ? "underline"
-        : "highlight";
+    const type =
+      match[1] !== undefined ? "bold" : match[2] !== undefined ? "underline" : "highlight";
     segments.push({ type, value: inner });
     offset = index + match[0].length;
   }

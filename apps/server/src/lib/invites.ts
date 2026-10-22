@@ -16,10 +16,7 @@ export function defaultInviteExpiry(days = DEFAULT_INVITE_DAYS) {
   return new Date(Date.now() + days * 24 * 60 * 60 * 1000).toISOString();
 }
 
-export function isInviteExhausted(invite: {
-  maxUses: number | null;
-  useCount: number;
-}) {
+export function isInviteExhausted(invite: { maxUses: number | null; useCount: number }) {
   return invite.maxUses != null && invite.useCount >= invite.maxUses;
 }
 
@@ -121,11 +118,11 @@ export async function createTeamInvite(
     .where(eq(schema.users.id, input.createdByUserId))
     .limit(1);
 
-  return mapInvitePublic(
-    invite!,
-    creator?.name ?? "Unknown",
-    { id: role.id, name: role.name, slug: role.slug },
-  );
+  return mapInvitePublic(invite!, creator?.name ?? "Unknown", {
+    id: role.id,
+    name: role.name,
+    slug: role.slug,
+  });
 }
 
 export async function revokeTeamInvite(db: Db, teamId: string, inviteId: string) {

@@ -117,8 +117,8 @@ export function DiscordBotSettingsSection({
     <section className="settings-section">
       <h3>Discord bot</h3>
       <p className="settings-copy">
-        One bot can serve every Teamflow team. Configure this team&apos;s Discord server, roles,
-        and tickets below. Bot token and PAT are saved above under Bot credentials (admin only).
+        One bot can serve every Teamflow team. Configure this team&apos;s Discord server, roles, and
+        tickets below. Bot token and PAT are saved above under Bot credentials (admin only).
       </p>
 
       {!loading && commandsReady ? (
@@ -219,9 +219,9 @@ export function DiscordBotSettingsSection({
             />
           </label>
           <p className="settings-hint">
-            Optional auto-create when a thread opens. Leave empty and run{" "}
-            <code>/create</code> in the thread when the ticket is ready — thread messages are copied
-            into the issue (title defaults to the thread name).
+            Optional auto-create when a thread opens. Leave empty and run <code>/create</code> in
+            the thread when the ticket is ready — thread messages are copied into the issue (title
+            defaults to the thread name).
           </p>
 
           {canManage ? (

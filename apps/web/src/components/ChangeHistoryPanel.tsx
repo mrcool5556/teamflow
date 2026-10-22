@@ -80,14 +80,10 @@ export function ChangeHistoryPanel({
               >
                 <div className="change-history-item-main">
                   <span className="change-history-label">{entry.label}</span>
-                  <span className="change-history-time">
-                    {formatRelativeTime(entry.createdAt)}
-                  </span>
+                  <span className="change-history-time">{formatRelativeTime(entry.createdAt)}</span>
                 </div>
                 <div className="change-history-item-meta">
-                  <span
-                    className={`change-history-status change-history-status--${entry.status}`}
-                  >
+                  <span className={`change-history-status change-history-status--${entry.status}`}>
                     {canRestore && entry.restorableUntil
                       ? `Restore · ${formatRestoreDeadline(entry.restorableUntil)}`
                       : STATUS_LABEL[entry.status]}

@@ -20,9 +20,7 @@ export function applySchemaPatches(sqlite: Database.Database) {
     );
   `);
 
-  const issueCols = sqlite
-    .prepare("PRAGMA table_info(issues)")
-    .all() as { name: string }[];
+  const issueCols = sqlite.prepare("PRAGMA table_info(issues)").all() as { name: string }[];
 
   if (!issueCols.some((col) => col.name === "row_id")) {
     sqlite.exec(
@@ -38,16 +36,12 @@ export function applySchemaPatches(sqlite: Database.Database) {
 
   if (!issueCols.some((col) => col.name === "timer_active_at")) {
     sqlite.exec(`ALTER TABLE issues ADD COLUMN timer_active_at TEXT`);
-    sqlite.exec(
-      `ALTER TABLE issues ADD COLUMN timer_elapsed_sec INTEGER NOT NULL DEFAULT 0`,
-    );
+    sqlite.exec(`ALTER TABLE issues ADD COLUMN timer_elapsed_sec INTEGER NOT NULL DEFAULT 0`);
     sqlite.exec(`ALTER TABLE issues ADD COLUMN timer_target_sec INTEGER`);
     console.log("Added issues timer columns");
   }
 
-  const rowCols = sqlite
-    .prepare("PRAGMA table_info(board_rows)")
-    .all() as { name: string }[];
+  const rowCols = sqlite.prepare("PRAGMA table_info(board_rows)").all() as { name: string }[];
 
   if (!rowCols.some((col) => col.name === "assignee_id")) {
     sqlite.exec(
@@ -68,9 +62,7 @@ export function applySchemaPatches(sqlite: Database.Database) {
     if (!rowId) {
       rowId = randomUUID();
       sqlite
-        .prepare(
-          "INSERT INTO board_rows (id, team_id, name, position) VALUES (?, ?, ?, ?)",
-        )
+        .prepare("INSERT INTO board_rows (id, team_id, name, position) VALUES (?, ?, ?, ?)")
         .run(rowId, team.id, "Row 1", 0);
       console.log(`Created default board row for team ${team.id}`);
     }
@@ -168,9 +160,7 @@ function randomFileRefKey() {
 }
 
 function ensureStoredFileRefKeys(sqlite: Database.Database) {
-  const cols = sqlite
-    .prepare("PRAGMA table_info(stored_files)")
-    .all() as { name: string }[];
+  const cols = sqlite.prepare("PRAGMA table_info(stored_files)").all() as { name: string }[];
 
   if (!cols.some((col) => col.name === "key")) {
     sqlite.exec(`ALTER TABLE stored_files ADD COLUMN key TEXT`);
@@ -200,9 +190,7 @@ function ensureStoredFileRefKeys(sqlite: Database.Database) {
 }
 
 function ensureStoredFileDeletedAt(sqlite: Database.Database) {
-  const cols = sqlite
-    .prepare("PRAGMA table_info(stored_files)")
-    .all() as { name: string }[];
+  const cols = sqlite.prepare("PRAGMA table_info(stored_files)").all() as { name: string }[];
 
   if (!cols.some((col) => col.name === "deleted_at")) {
     sqlite.exec(`ALTER TABLE stored_files ADD COLUMN deleted_at TEXT`);
@@ -265,14 +253,12 @@ function ensureStoredFilesTables(sqlite: Database.Database) {
     );
   `);
 
-  const linkCount = sqlite
-    .prepare("SELECT COUNT(*) as count FROM issue_file_links")
-    .get() as { count: number };
+  const linkCount = sqlite.prepare("SELECT COUNT(*) as count FROM issue_file_links").get() as {
+    count: number;
+  };
   if (linkCount.count > 0) return;
 
-  const legacy = sqlite
-    .prepare("SELECT * FROM issue_attachments")
-    .all() as {
+  const legacy = sqlite.prepare("SELECT * FROM issue_attachments").all() as {
     id: string;
     issue_id: string;
     uploader_id: string;
@@ -320,13 +306,11 @@ function ensureRowFileLinksTable(sqlite: Database.Database) {
       created_at TEXT NOT NULL DEFAULT (datetime('now'))
     );
   `);
-  sqlite.exec(
-    `CREATE INDEX IF NOT EXISTS row_file_links_row_id_idx ON row_file_links(row_id)`,
-  );
+  sqlite.exec(`CREATE INDEX IF NOT EXISTS row_file_links_row_id_idx ON row_file_links(row_id)`);
 
-  const uploadCols = sqlite
-    .prepare("PRAGMA table_info(upload_sessions)")
-    .all() as { name: string }[];
+  const uploadCols = sqlite.prepare("PRAGMA table_info(upload_sessions)").all() as {
+    name: string;
+  }[];
 
   if (uploadCols.length > 0 && !uploadCols.some((col) => col.name === "row_id")) {
     sqlite.exec(`
@@ -391,21 +375,15 @@ function ensureTeamInvitesTable(sqlite: Database.Database) {
       created_at TEXT NOT NULL DEFAULT (datetime('now'))
     );
   `);
-  sqlite.exec(
-    `CREATE UNIQUE INDEX IF NOT EXISTS team_invites_token_unique ON team_invites(token)`,
-  );
+  sqlite.exec(`CREATE UNIQUE INDEX IF NOT EXISTS team_invites_token_unique ON team_invites(token)`);
 
-  const cols = sqlite
-    .prepare("PRAGMA table_info(team_invites)")
-    .all() as { name: string }[];
+  const cols = sqlite.prepare("PRAGMA table_info(team_invites)").all() as { name: string }[];
   if (!cols.some((col) => col.name === "max_uses")) {
     sqlite.exec(`ALTER TABLE team_invites ADD COLUMN max_uses INTEGER`);
     console.log("Added team_invites.max_uses column");
   }
   if (!cols.some((col) => col.name === "use_count")) {
-    sqlite.exec(
-      `ALTER TABLE team_invites ADD COLUMN use_count INTEGER NOT NULL DEFAULT 0`,
-    );
+    sqlite.exec(`ALTER TABLE team_invites ADD COLUMN use_count INTEGER NOT NULL DEFAULT 0`);
     console.log("Added team_invites.use_count column");
   }
 }
@@ -429,9 +407,7 @@ function ensureTeamRolesTable(sqlite: Database.Database) {
     ON team_roles(team_id, slug)
   `);
 
-  const memberCols = sqlite
-    .prepare("PRAGMA table_info(team_members)")
-    .all() as { name: string }[];
+  const memberCols = sqlite.prepare("PRAGMA table_info(team_members)").all() as { name: string }[];
   if (!memberCols.some((col) => col.name === "role_id")) {
     sqlite.exec(
       `ALTER TABLE team_members ADD COLUMN role_id TEXT REFERENCES team_roles(id) ON DELETE RESTRICT`,
@@ -439,9 +415,7 @@ function ensureTeamRolesTable(sqlite: Database.Database) {
     console.log("Added team_members.role_id column");
   }
 
-  const inviteCols = sqlite
-    .prepare("PRAGMA table_info(team_invites)")
-    .all() as { name: string }[];
+  const inviteCols = sqlite.prepare("PRAGMA table_info(team_invites)").all() as { name: string }[];
   if (!inviteCols.some((col) => col.name === "role_id")) {
     sqlite.exec(
       `ALTER TABLE team_invites ADD COLUMN role_id TEXT REFERENCES team_roles(id) ON DELETE RESTRICT`,
@@ -605,9 +579,9 @@ function ensureTeamDiscordSettingsTable(sqlite: Database.Database) {
     WHERE guild_id IS NOT NULL AND guild_id != ''
   `);
 
-  const cols = sqlite
-    .prepare("PRAGMA table_info(team_discord_settings)")
-    .all() as { name: string }[];
+  const cols = sqlite.prepare("PRAGMA table_info(team_discord_settings)").all() as {
+    name: string;
+  }[];
   if (!cols.some((col) => col.name === "allow_discord_administrators")) {
     sqlite.exec(
       `ALTER TABLE team_discord_settings ADD COLUMN allow_discord_administrators INTEGER NOT NULL DEFAULT 0`,
@@ -617,17 +591,15 @@ function ensureTeamDiscordSettingsTable(sqlite: Database.Database) {
 }
 
 function ensureColorColumns(sqlite: Database.Database) {
-  const statusCols = sqlite
-    .prepare("PRAGMA table_info(issue_statuses)")
-    .all() as { name: string }[];
+  const statusCols = sqlite.prepare("PRAGMA table_info(issue_statuses)").all() as {
+    name: string;
+  }[];
   if (!statusCols.some((col) => col.name === "color")) {
     sqlite.exec(`ALTER TABLE issue_statuses ADD COLUMN color TEXT`);
     console.log("Added issue_statuses.color column");
   }
 
-  const issueCols = sqlite
-    .prepare("PRAGMA table_info(issues)")
-    .all() as { name: string }[];
+  const issueCols = sqlite.prepare("PRAGMA table_info(issues)").all() as { name: string }[];
   if (!issueCols.some((col) => col.name === "color")) {
     sqlite.exec(`ALTER TABLE issues ADD COLUMN color TEXT`);
     console.log("Added issues.color column");
@@ -637,9 +609,7 @@ function ensureColorColumns(sqlite: Database.Database) {
 const DELETED_ISSUE_RETENTION_DAYS = 7;
 
 function purgeExpiredDeletedIssues(sqlite: Database.Database) {
-  const issueCols = sqlite
-    .prepare("PRAGMA table_info(issues)")
-    .all() as { name: string }[];
+  const issueCols = sqlite.prepare("PRAGMA table_info(issues)").all() as { name: string }[];
   if (!issueCols.some((col) => col.name === "deleted_at")) return;
 
   const cutoff = new Date(
@@ -659,9 +629,7 @@ function purgeExpiredDeletedIssues(sqlite: Database.Database) {
 }
 
 function ensureExtendedTables(sqlite: Database.Database) {
-  const issueCols = sqlite
-    .prepare("PRAGMA table_info(issues)")
-    .all() as { name: string }[];
+  const issueCols = sqlite.prepare("PRAGMA table_info(issues)").all() as { name: string }[];
 
   if (!issueCols.some((col) => col.name === "deleted_at")) {
     sqlite.exec(`ALTER TABLE issues ADD COLUMN deleted_at TEXT`);
@@ -740,18 +708,16 @@ function generateEntityKeyNode(prefix: "row" | "col") {
 }
 
 function migrateEntityKeys(sqlite: Database.Database) {
-  const rowCols = sqlite
-    .prepare("PRAGMA table_info(board_rows)")
-    .all() as { name: string }[];
+  const rowCols = sqlite.prepare("PRAGMA table_info(board_rows)").all() as { name: string }[];
 
   if (!rowCols.some((col) => col.name === "key")) {
     sqlite.exec(`ALTER TABLE board_rows ADD COLUMN key TEXT`);
     console.log("Added board_rows.key column");
   }
 
-  const statusCols = sqlite
-    .prepare("PRAGMA table_info(issue_statuses)")
-    .all() as { name: string }[];
+  const statusCols = sqlite.prepare("PRAGMA table_info(issue_statuses)").all() as {
+    name: string;
+  }[];
 
   if (!statusCols.some((col) => col.name === "key")) {
     sqlite.exec(`ALTER TABLE issue_statuses ADD COLUMN key TEXT`);
@@ -823,9 +789,9 @@ function migrateEntityKeys(sqlite: Database.Database) {
 }
 
 function migrateStatusesToRows(sqlite: Database.Database) {
-  const statusCols = sqlite
-    .prepare("PRAGMA table_info(issue_statuses)")
-    .all() as { name: string }[];
+  const statusCols = sqlite.prepare("PRAGMA table_info(issue_statuses)").all() as {
+    name: string;
+  }[];
 
   if (!statusCols.some((col) => col.name === "row_id")) {
     sqlite.exec(
@@ -854,9 +820,7 @@ function migrateStatusesToRows(sqlite: Database.Database) {
       .sort((a, b) => a.position - b.position);
 
     const rows = sqlite
-      .prepare(
-        "SELECT id FROM board_rows WHERE team_id = ? ORDER BY position",
-      )
+      .prepare("SELECT id FROM board_rows WHERE team_id = ? ORDER BY position")
       .all(teamId) as { id: string }[];
 
     for (const row of rows) {
@@ -879,16 +843,12 @@ function migrateStatusesToRows(sqlite: Database.Database) {
 
       for (const [oldId, newId] of idMap) {
         sqlite
-          .prepare(
-            "UPDATE issues SET status_id = ? WHERE row_id = ? AND status_id = ?",
-          )
+          .prepare("UPDATE issues SET status_id = ? WHERE row_id = ? AND status_id = ?")
           .run(newId, row.id, oldId);
       }
     }
 
-    sqlite
-      .prepare("DELETE FROM issue_statuses WHERE team_id = ? AND row_id IS NULL")
-      .run(teamId);
+    sqlite.prepare("DELETE FROM issue_statuses WHERE team_id = ? AND row_id IS NULL").run(teamId);
     console.log(`Migrated team ${teamId} statuses to per-row columns`);
   }
 
@@ -908,14 +868,7 @@ function migrateStatusesToRows(sqlite: Database.Database) {
         .prepare(
           "INSERT INTO issue_statuses (id, team_id, row_id, name, type, position) VALUES (?, ?, ?, ?, ?, ?)",
         )
-        .run(
-          randomUUID(),
-          row.team_id,
-          row.id,
-          status.name,
-          status.type,
-          status.position,
-        );
+        .run(randomUUID(), row.team_id, row.id, status.name, status.type, status.position);
     }
     console.log(`Seeded default columns for row ${row.id}`);
   }

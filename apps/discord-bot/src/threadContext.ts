@@ -10,9 +10,7 @@ export async function buildThreadContext(
 
   try {
     const messages = await channel.messages.fetch({ limit: 50 });
-    const sorted = [...messages.values()].sort(
-      (a, b) => a.createdTimestamp - b.createdTimestamp,
-    );
+    const sorted = [...messages.values()].sort((a, b) => a.createdTimestamp - b.createdTimestamp);
 
     const lines: string[] = [];
     const urls = new Set<string>();

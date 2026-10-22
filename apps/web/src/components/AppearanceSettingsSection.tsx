@@ -82,10 +82,7 @@ const SEMANTIC_CONTRAST_LABELS: Record<SemanticContrastMode, string> = {
   preserve: "Keep team colors literal",
 };
 
-function patchAppearance(
-  profile: UserProfile,
-  appearance: Partial<UserProfile["appearance"]>,
-) {
+function patchAppearance(profile: UserProfile, appearance: Partial<UserProfile["appearance"]>) {
   return mergeUserProfile(profile, { appearance });
 }
 
@@ -168,9 +165,7 @@ export function AppearanceSettingsSection({
                 role="radio"
                 aria-checked={appearance.colorPreset === preset}
                 className={`appearance-preset-btn ${appearance.colorPreset === preset ? "active" : ""}`}
-                onClick={() =>
-                  onProfileChange(patchAppearance(profile, { colorPreset: preset }))
-                }
+                onClick={() => onProfileChange(patchAppearance(profile, { colorPreset: preset }))}
               >
                 {swatch ? (
                   <span
@@ -258,9 +253,7 @@ export function AppearanceSettingsSection({
           ))}
         </select>
       </label>
-      <p className="muted appearance-style-hint">
-        {CHROME_STYLE_HINTS[appearance.chromeStyle]}
-      </p>
+      <p className="muted appearance-style-hint">{CHROME_STYLE_HINTS[appearance.chromeStyle]}</p>
 
       <fieldset className="appearance-fieldset">
         <legend>Corner style</legend>
