@@ -38,6 +38,8 @@ export default defineConfig({
           include: ["apps/web/tests/**/*.test.{ts,tsx}"],
           setupFiles: ["./apps/web/tests/setup.ts"],
           environment: "jsdom",
+          // Process CSS so tests can read stylesheets with `?raw` (tests/layers.test.ts).
+          css: true,
           server,
         },
       },
