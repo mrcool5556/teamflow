@@ -24,6 +24,8 @@ Self-hosted issue tracker for teams — kanban boards, roles, Discord integratio
 
 ## Quick start (development)
 
+Requires Node 20 (see `.nvmrc`; `nvm use` picks it up) and pnpm 9.
+
 ```powershell
 git clone https://github.com/mrcool5556/teamflow.git
 cd teamflow
