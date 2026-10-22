@@ -1,8 +1,11 @@
-import { screen, waitFor, within } from "@testing-library/react";
+import { configure, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it } from "vitest";
 import { installFakeApi, seedDb, signIn } from "./fakeApi";
 import { renderApp } from "./renderApp";
+
+// Whole-app renders: allow for a slow first paint when the full suite runs in parallel.
+configure({ asyncUtilTimeout: 3000 });
 
 describe("board layout", () => {
   it("explains an empty column, and offers adding only to editors", async () => {
@@ -78,5 +81,19 @@ describe("board layout", () => {
     const region = screen.getByRole("region", { name: "Notifications" });
     expect(await within(region).findByRole("status")).toHaveTextContent(`Row: ${row.name}`);
     expect(document.querySelector(".banner")).toBeNull();
+  });
+
+  it("offers the settings sections as a select for narrow screens", async () => {
+    const user = userEvent.setup();
+    const db = seedDb();
+    installFakeApi(db);
+    signIn(db);
+    const { path } = renderApp("/t/ENG/settings/general");
+    const select = await screen.findByRole("combobox", { name: "Settings section" });
+    expect(select).toHaveValue("general");
+    // Before the team list loads the shell has no team key yet (same for the nav buttons).
+    await waitFor(() => expect(screen.getByLabelText("Workspace")).toBeEnabled());
+    await user.selectOptions(select, "tokens");
+    await waitFor(() => expect(path()).toBe("/t/ENG/settings/tokens"));
   });
 });

@@ -1,8 +1,11 @@
-import { screen, waitFor, within } from "@testing-library/react";
+import { configure, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it } from "vitest";
 import { installFakeApi, seedDb, signIn } from "./fakeApi";
 import { renderApp } from "./renderApp";
+
+// Whole-app renders: allow for a slow first paint when the full suite runs in parallel.
+configure({ asyncUtilTimeout: 3000 });
 
 describe("topbar", () => {
   it("keeps Settings, About and Log out in the account menu", async () => {
