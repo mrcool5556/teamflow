@@ -11,7 +11,11 @@ import {
 } from "@teamflow/core";
 import type { Db } from "@teamflow/db";
 import { schema } from "@teamflow/db";
-import { userHasTeamPermission } from "./permissions.js";
+import {
+  getTeamMemberRoleSlug,
+  getTeamPermissionsForUser,
+  userHasTeamPermission,
+} from "./permissions.js";
 
 export function parseRolePermissions(raw: string): TeamPermission[] {
   try {
@@ -26,6 +30,21 @@ export function parseRolePermissions(raw: string): TeamPermission[] {
 export function serializeRolePermissions(permissions: TeamPermission[]) {
   const unique = [...new Set(permissions)];
   return JSON.stringify(unique);
+}
+
+/** A role may only grant permissions the acting user already holds (no self-escalation). */
+async function assertCanGrantPermissions(
+  db: Db,
+  actorUserId: string,
+  teamId: string,
+  permissions: TeamPermission[],
+) {
+  const actor = await getTeamPermissionsForUser(db, actorUserId, teamId);
+  const held = new Set(actor?.permissions ?? []);
+  const missing = permissions.filter((permission) => !held.has(permission));
+  if (missing.length > 0) {
+    throw new Error(`Cannot grant permissions you do not hold: ${missing.join(", ")}`);
+  }
 }
 
 function slugifyRoleName(name: string) {
@@ -169,6 +188,7 @@ export async function createTeamRole(
   if (!(await userHasTeamPermission(db, actorUserId, teamId, "team.roles.manage"))) {
     throw new Error("Permission denied");
   }
+  await assertCanGrantPermissions(db, actorUserId, teamId, input.permissions);
 
   const slug = await uniqueCustomSlug(db, teamId, input.name);
   const [maxPosition] = await db
@@ -236,6 +256,11 @@ export async function updateTeamRole(
   const nextPermissions =
     input.permissions !== undefined ? input.permissions : parseRolePermissions(role.permissions);
   validateRolePermissions(role, nextPermissions);
+  if (input.permissions !== undefined) {
+    const current = new Set(parseRolePermissions(role.permissions));
+    const added = input.permissions.filter((permission) => !current.has(permission));
+    await assertCanGrantPermissions(db, actorUserId, teamId, added);
+  }
 
   await db
     .update(schema.teamRoles)
@@ -319,6 +344,12 @@ export async function updateTeamMemberRole(
 
   const nextRole = await getTeamRole(db, teamId, roleId);
   if (!nextRole) throw new Error("Role not found");
+
+  // Only an Owner may hand out or take away the Owner role.
+  const actorIsOwner = (await getTeamMemberRoleSlug(db, actorUserId, teamId)) === "owner";
+  if (!actorIsOwner && (nextRole.slug === "owner" || member.roleSlug === "owner")) {
+    throw new Error("Only an Owner can change Owner membership");
+  }
 
   if (member.roleSlug === "admin" && nextRole.slug !== "admin") {
     const adminCount = await countTeamAdmins(db, teamId);

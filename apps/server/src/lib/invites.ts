@@ -4,6 +4,7 @@ import type { TeamInvitePublic, TeamInvitePreview, TeamPublic, TeamRole } from "
 import type { Db } from "@teamflow/db";
 import { schema } from "@teamflow/db";
 import { userHasTeamAccess } from "./issues.js";
+import { getTeamMemberWithRole } from "./permissions.js";
 import { resolveInviteRoleId } from "./roles.js";
 
 const DEFAULT_INVITE_DAYS = 30;
@@ -95,6 +96,16 @@ export async function createTeamInvite(
     roleId: input.roleId,
     role: input.role,
   });
+
+  // An invite may not carry a role ranked above the inviter's (lower position = higher rank).
+  const inviter = await getTeamMemberWithRole(db, input.createdByUserId, input.teamId);
+  if (!inviter) throw new Error("Team access denied");
+  const outranksInviter =
+    role.position < inviter.role.position ||
+    (role.slug === "owner" && inviter.role.slug !== "owner");
+  if (outranksInviter) {
+    throw new Error("Cannot invite with a role above your own");
+  }
 
   await db.insert(schema.teamInvites).values({
     teamId: input.teamId,

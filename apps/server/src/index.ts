@@ -884,7 +884,8 @@ app.patch("/teams/:teamId/members/:memberId", async (c) => {
       message === "Member not found" ||
       message === "Role not found" ||
       message === "Cannot remove the last admin" ||
-      message === "Cannot remove the last owner"
+      message === "Cannot remove the last owner" ||
+      message === "Only an Owner can change Owner membership"
         ? 403
         : 400;
     return c.json({ error: message }, status);
@@ -911,7 +912,8 @@ app.delete("/teams/:teamId/members/:memberId", async (c) => {
     const status =
       message === "Team access denied" ||
       message === "Admin access required" ||
-      message === "Permission denied"
+      message === "Permission denied" ||
+      message === "Only an Owner can remove an Owner"
         ? 403
         : 400;
     return c.json({ error: message }, status);
@@ -952,16 +954,26 @@ app.post("/teams/:teamId/invites", async (c) => {
     return c.json({ error: body.error.issues[0]?.message ?? "Invalid input" }, 400);
   }
 
-  const invite = await createTeamInvite(db, {
-    teamId,
-    createdByUserId: result.auth.userId,
-    roleId: body.data.roleId,
-    role: body.data.role,
-    expiresInDays: body.data.expiresInDays,
-    maxUses: body.data.maxUses,
-  });
-
-  return c.json({ invite }, 201);
+  try {
+    const invite = await createTeamInvite(db, {
+      teamId,
+      createdByUserId: result.auth.userId,
+      roleId: body.data.roleId,
+      role: body.data.role,
+      expiresInDays: body.data.expiresInDays,
+      maxUses: body.data.maxUses,
+    });
+    return c.json({ invite }, 201);
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "Failed to create invite";
+    const status =
+      message === "Cannot invite with a role above your own" || message === "Team access denied"
+        ? 403
+        : message === "Role not found"
+          ? 404
+          : 400;
+    return c.json({ error: message }, status);
+  }
 });
 
 app.delete("/teams/:teamId/invites/:inviteId", async (c) => {
@@ -1051,7 +1063,8 @@ app.post("/teams/:teamId/roles", async (c) => {
     return c.json({ role }, 201);
   } catch (err) {
     const message = err instanceof Error ? err.message : "Failed to create role";
-    const status = message === "Permission denied" ? 403 : 400;
+    const status =
+      message === "Permission denied" || message.startsWith("Cannot grant permissions") ? 403 : 400;
     return c.json({ error: message }, status);
   }
 });
@@ -1077,7 +1090,12 @@ app.patch("/teams/:teamId/roles/:roleId", async (c) => {
     return c.json({ role });
   } catch (err) {
     const message = err instanceof Error ? err.message : "Failed to update role";
-    const status = message === "Permission denied" || message === "Role not found" ? 403 : 400;
+    const status =
+      message === "Permission denied" ||
+      message === "Role not found" ||
+      message.startsWith("Cannot grant permissions")
+        ? 403
+        : 400;
     return c.json({ error: message }, status);
   }
 });

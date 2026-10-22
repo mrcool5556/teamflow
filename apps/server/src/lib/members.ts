@@ -2,7 +2,7 @@ import { and, eq } from "drizzle-orm";
 import type { Db } from "@teamflow/db";
 import { schema } from "@teamflow/db";
 import { userHasTeamAccess } from "./issues.js";
-import { userHasTeamPermission } from "./permissions.js";
+import { getTeamMemberRoleSlug, userHasTeamPermission } from "./permissions.js";
 import { countTeamAdmins, countTeamOwners } from "./roles.js";
 
 async function getTeamMemberRowWithRole(db: Db, teamId: string, memberId: string) {
@@ -44,6 +44,14 @@ async function assertCanRemoveMember(
   const isSelf = targetMember.member.userId === actorUserId;
   if (!isSelf && !(await userHasTeamPermission(db, actorUserId, teamId, "team.members.manage"))) {
     throw new Error("Permission denied");
+  }
+
+  // team.members.manage alone cannot remove an Owner; only another Owner can.
+  if (!isSelf && targetMember.roleSlug === "owner") {
+    const actorSlug = await getTeamMemberRoleSlug(db, actorUserId, teamId);
+    if (actorSlug !== "owner") {
+      throw new Error("Only an Owner can remove an Owner");
+    }
   }
 
   if (targetMember.roleSlug === "admin") {
