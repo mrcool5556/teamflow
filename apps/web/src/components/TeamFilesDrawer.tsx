@@ -6,6 +6,7 @@ import {
   isZipAttachmentFile,
 } from "@teamflow/core";
 import { useQueryClient } from "@tanstack/react-query";
+import { useConfirm } from "../ui/confirmContext";
 import { client } from "../api";
 import { queryKeys } from "../queries/keys";
 import { useTeamFilesQuery } from "../queries/files";
@@ -70,6 +71,7 @@ type FilesTab = "active" | "trash";
 export function TeamFilesDrawer({ teamId, open, onClose, onNavigateRef }: TeamFilesDrawerProps) {
   const [tab, setTab] = useState<FilesTab>("active");
   const queryClient = useQueryClient();
+  const confirm = useConfirm();
   const filesQuery = useTeamFilesQuery(teamId, tab === "trash", open);
   const files = filesQuery.data?.files ?? NO_FILES;
   const totalBytes = filesQuery.data?.totalBytes ?? 0;
@@ -142,9 +144,13 @@ export function TeamFilesDrawer({ teamId, open, onClose, onNavigateRef }: TeamFi
 
   async function softDelete(file: TeamFilePublic) {
     const displayName = getTeamFileDisplayName(file);
-    if (!window.confirm(`Move ${displayName} to trash for ${FILE_TRASH_RETENTION_DAYS} days?`)) {
-      return;
-    }
+    const ok = await confirm({
+      title: `Move ${displayName} to trash?`,
+      message: `It stays in trash for ${FILE_TRASH_RETENTION_DAYS} days.`,
+      confirmLabel: "Move to trash",
+      danger: true,
+    });
+    if (!ok) return;
     setBusyFileId(file.fileId);
     try {
       await client.softDeleteTeamFile(teamId, file.fileId);

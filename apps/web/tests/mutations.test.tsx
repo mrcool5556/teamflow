@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { act, renderHook, screen, waitFor } from "@testing-library/react";
+import { act, renderHook, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { ReactNode } from "react";
 import { describe, expect, it } from "vitest";
@@ -83,7 +83,7 @@ describe("board mutations", () => {
 });
 
 describe("board errors", () => {
-  it("rolls back a failed rename and shows the server's message in the banner", async () => {
+  it("rolls back a failed rename and shows the server's message as a dismissible toast", async () => {
     const db = seedDb();
     installFakeApi(db, {
       fail: (method, path) =>
@@ -96,10 +96,15 @@ describe("board errors", () => {
     await userEvent.clear(input);
     await userEvent.type(input, "Renamed{Enter}");
 
-    expect(await screen.findByText("Read-only")).toHaveClass("banner", "error");
+    const toast = await screen.findByRole("alert");
+    expect(toast).toHaveTextContent("Read-only");
+    expect(screen.getByRole("region", { name: "Notifications" })).toContainElement(toast);
     await waitFor(() =>
       expect(screen.getByRole("button", { name: "ENG row 1" })).toBeInTheDocument(),
     );
     expect(screen.queryByText("Renamed")).not.toBeInTheDocument();
+
+    await userEvent.click(within(toast).getByRole("button", { name: "Dismiss" }));
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
   });
 });

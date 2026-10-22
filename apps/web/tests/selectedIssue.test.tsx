@@ -1,6 +1,6 @@
 import { act, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it } from "vitest";
 import { queryKeys } from "../src/queries/keys";
 import { installFakeApi, seedDb, signIn } from "./fakeApi";
 import { renderApp } from "./renderApp";
@@ -49,7 +49,6 @@ describe("selected issue", () => {
     signIn(db);
     const { path } = renderApp("/t/ENG/issue/ENG-3");
     await screen.findByLabelText("Issue title");
-    vi.spyOn(window, "confirm").mockReturnValue(true);
     await userEvent.click(screen.getByRole("button", { name: "Delete" }));
     await waitFor(() => expect(path()).toBe("/t/ENG"));
     expect(screen.queryByLabelText("Issue title")).not.toBeInTheDocument();

@@ -26,6 +26,8 @@ import {
 } from "@teamflow/core";
 import type { AttachmentLimitsPublic } from "@teamflow/core";
 import { useQueryClient } from "@tanstack/react-query";
+import { useConfirm } from "../ui/confirmContext";
+import { useErrorSink } from "../lib/errorSink";
 import { client } from "../api";
 import { queryKeys } from "../queries/keys";
 import { useIssueQuery } from "../queries/issue";
@@ -103,6 +105,8 @@ export function IssueDrawer({
   const [title, setTitle] = useState(issue.title);
   const [description, setDescription] = useState(issue.description ?? "");
   const queryClient = useQueryClient();
+  const confirm = useConfirm();
+  const { report, show } = useErrorSink();
   const issueQuery = useIssueQuery(issue.id);
   const comments = issueQuery.data?.comments ?? NO_COMMENTS;
   const commentsLoading = issueQuery.isPending;
@@ -237,7 +241,7 @@ export function IssueDrawer({
       const imageUrl = await attachmentBlobCache.get(attachment.id);
       setAttachmentLightbox({ attachment, imageUrl });
     } catch {
-      window.alert("Could not load image preview.");
+      show("Could not load image preview.");
     }
   }
 
@@ -249,7 +253,7 @@ export function IssueDrawer({
       attachmentLimits,
     );
     if (file.size > maxBytes) {
-      window.alert(
+      show(
         `File is too large (${formatFileSize(file.size)}). Max for this type is ${formatFileSize(maxBytes)}.`,
       );
       return;
@@ -267,8 +271,7 @@ export function IssueDrawer({
         attachmentBlobCache.set(attachment.id, URL.createObjectURL(file));
       }
     } catch (error) {
-      const message = error instanceof Error ? error.message : "Upload failed";
-      window.alert(message);
+      report(error, "Upload failed");
     } finally {
       setUploadingAttachment(false);
       setAttachmentUploadProgress(null);
@@ -293,13 +296,17 @@ export function IssueDrawer({
     try {
       await downloadAttachmentFile(attachment.id, attachment.filename);
     } catch (error) {
-      const message = error instanceof Error ? error.message : "Download failed";
-      window.alert(message);
+      report(error, "Download failed");
     }
   }
 
   async function deleteAttachment(attachment: IssueAttachmentPublic) {
-    if (!window.confirm(`Remove ${attachment.filename}?`)) return;
+    const ok = await confirm({
+      title: `Remove ${attachment.filename}?`,
+      confirmLabel: "Remove",
+      danger: true,
+    });
+    if (!ok) return;
     setDeletingAttachmentId(attachment.id);
     try {
       await client.deleteAttachment(issue.id, attachment.id);
@@ -326,7 +333,8 @@ export function IssueDrawer({
 
   async function deleteComment(comment: CommentPublic) {
     if (deletingCommentId) return;
-    if (!window.confirm("Delete this comment?")) return;
+    if (!(await confirm({ title: "Delete this comment?", confirmLabel: "Delete", danger: true })))
+      return;
 
     setDeletingCommentId(comment.id);
     try {

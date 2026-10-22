@@ -5659,12 +5659,75 @@ button.secondary.compact {
   color: var(--muted);
 }
 
-.undo-toast {
+/* Bottom dock: the bulk bar slot stacks above the toast region; nothing overlaps. */
+.bottom-dock {
   position: fixed;
   left: 50%;
   bottom: 1.25rem;
   z-index: var(--z-toast);
   transform: translateX(-50%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.75rem;
+  max-width: calc(100vw - 2rem);
+  pointer-events: none;
+}
+
+.bottom-dock-bar:empty,
+.toast-region:empty {
+  display: none;
+}
+
+.toast-region {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.bottom-dock-bar > *,
+.toast-region > * {
+  pointer-events: auto;
+}
+
+.toast {
+  display: flex;
+  align-items: center;
+  gap: 0.85rem;
+  min-width: min(420px, calc(100vw - 2rem));
+  max-width: min(640px, calc(100vw - 2rem));
+  padding: 0.75rem 1rem;
+  background: var(--surface);
+  border: 3px solid var(--border-strong);
+  box-shadow: 6px 6px 0 #000;
+  color: var(--text);
+}
+
+.toast--error {
+  border-color: var(--danger);
+}
+
+.toast-message {
+  flex: 1;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.toast-dismiss {
+  flex-shrink: 0;
+  padding: 0.15rem 0.5rem;
+  font-size: 1.1rem;
+  line-height: 1;
+}
+
+.confirm-dialog-message {
+  color: var(--text-soft);
+  overflow-wrap: anywhere;
+}
+
+.undo-toast {
+  position: relative;
   display: flex;
   align-items: center;
   gap: 0.85rem;
@@ -5892,11 +5955,7 @@ button.secondary.compact {
 }
 
 .bulk-action-bar {
-  position: fixed;
-  left: 50%;
-  bottom: 1.25rem;
-  transform: translateX(-50%);
-  z-index: var(--z-sticky);
+  position: relative;
   display: flex;
   flex-direction: column;
   align-items: stretch;
