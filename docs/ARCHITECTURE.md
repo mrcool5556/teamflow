@@ -104,7 +104,7 @@ ui/             primitives: Dialog/Drawer, Popover (@floating-ui/react), Confirm
 components/     feature components (KanbanBoard parts, IssueDrawer, pickers, settings sections, RoadmapPanel)
 hooks/ lib/     shared hooks and helpers (useAttachmentList, useInlineRename, errorSink, teamPermissions, format)
 styles/         tokens, base, topbar, board, card, drawer, dialog, popover, settings, plan, auth (order matters)
-data/roadmap.ts hand-maintained content of the Plan view
+data/roadmap.ts hand-maintained content of the Plan view (instance admins only; others are redirected to the board)
 ```
 
 Rules for UI work:
