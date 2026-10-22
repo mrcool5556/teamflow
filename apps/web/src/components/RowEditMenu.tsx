@@ -1,7 +1,5 @@
 import { useRef, useState, type ReactNode } from "react";
-import { createPortal } from "react-dom";
-import { useFloatingPanelStyle } from "../hooks/useFloatingPanelStyle";
-import { useDismissOnClickOutside } from "../hooks/useDismissOnClickOutside";
+import { Popover } from "../ui/Popover";
 
 type RowEditMenuProps = {
   children: ReactNode;
@@ -9,29 +7,10 @@ type RowEditMenuProps = {
 
 export function RowEditMenu({ children }: RowEditMenuProps) {
   const [open, setOpen] = useState(false);
-  const rootRef = useRef<HTMLDivElement>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
-  const panelRef = useRef<HTMLDivElement>(null);
-  const panelStyle = useFloatingPanelStyle(open, triggerRef, "bottom", "left", 224);
-  const panelPositioned = Boolean(panelStyle.position);
-
-  useDismissOnClickOutside(open, [rootRef, panelRef], () => setOpen(false));
-
-  const panel = open ? (
-    <div
-      ref={panelRef}
-      className={`row-edit-menu-panel row-edit-menu-panel--floating ${panelPositioned ? "row-edit-menu-panel--positioned" : ""}`}
-      style={panelStyle}
-      onPointerDown={(event) => event.stopPropagation()}
-      onClick={(event) => event.stopPropagation()}
-    >
-      {children}
-    </div>
-  ) : null;
 
   return (
     <div
-      ref={rootRef}
       className={`row-edit-menu ${open ? "open" : ""}`}
       onPointerDown={(e) => e.stopPropagation()}
       onClick={(e) => e.stopPropagation()}
@@ -46,7 +25,18 @@ export function RowEditMenu({ children }: RowEditMenuProps) {
         Edit
         <span className="assignee-picker-caret">{open ? "▴" : "▾"}</span>
       </button>
-      {panelPositioned && panel ? createPortal(panel, document.body) : null}
+      <Popover
+        open={open}
+        onClose={() => setOpen(false)}
+        anchorRef={triggerRef}
+        placement="bottom-start"
+        width={224}
+        className="row-edit-menu-panel row-edit-menu-panel--floating"
+        positionedClassName="row-edit-menu-panel--positioned"
+        label="Edit"
+      >
+        {children}
+      </Popover>
     </div>
   );
 }

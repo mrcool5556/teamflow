@@ -1,8 +1,6 @@
 import { useCallback, useRef, useState } from "react";
-import { createPortal } from "react-dom";
 import type { TeamMemberPublic } from "@teamflow/core";
-import { useFloatingPanelStyle } from "../hooks/useFloatingPanelStyle";
-import { useDismissOnClickOutside } from "../hooks/useDismissOnClickOutside";
+import { Popover } from "../ui/Popover";
 import { initials } from "../lib/timer";
 
 type MultiAssigneePickerProps = {
@@ -28,15 +26,7 @@ export function MultiAssigneePicker({
 }: MultiAssigneePickerProps) {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
-  const rootRef = useRef<HTMLDivElement>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
-  const panelRef = useRef<HTMLDivElement>(null);
-  const panelStyle = useFloatingPanelStyle(
-    open && floatingPanel,
-    triggerRef,
-    panelPlacement === "top" ? "top" : panelPlacement === "bottom" ? "bottom" : "auto",
-  );
-  const panelPositioned = Boolean(panelStyle.position);
 
   const closePanel = useCallback(() => {
     setOpen(false);
@@ -51,8 +41,6 @@ export function MultiAssigneePicker({
         ? selected[0]!.name
         : `${selected[0]!.name} +${selected.length - 1}`;
 
-  useDismissOnClickOutside(open, [rootRef, panelRef], closePanel);
-
   const filtered = members.filter((member) => {
     const hay = `${member.name} ${member.email}`.toLowerCase();
     return hay.includes(query.trim().toLowerCase());
@@ -66,13 +54,17 @@ export function MultiAssigneePicker({
     onChange([...assigneeIds, userId]);
   }
 
-  const panel = open ? (
-    <div
-      ref={panelRef}
-      className={`assignee-picker-panel ${floatingPanel ? "assignee-picker-panel--floating" : ""} ${panelPositioned ? "assignee-picker-panel--positioned" : ""}`}
-      style={floatingPanel ? panelStyle : undefined}
-      onPointerDown={(event) => event.stopPropagation()}
-      onClick={(event) => event.stopPropagation()}
+  const panel = (
+    <Popover
+      open={open}
+      onClose={closePanel}
+      anchorRef={triggerRef}
+      placement={panelPlacement === "top" ? "top-start" : "bottom-start"}
+      width={floatingPanel ? 280 : undefined}
+      maxWidth={380}
+      className={`assignee-picker-panel ${floatingPanel ? "assignee-picker-panel--floating" : ""}`}
+      positionedClassName="assignee-picker-panel--positioned"
+      label="Assign people"
     >
       <div className="assignee-picker-head">
         <strong>Assign people</strong>
@@ -118,12 +110,11 @@ export function MultiAssigneePicker({
         })}
         {filtered.length === 0 && <p className="assignee-picker-empty">No matching members.</p>}
       </div>
-    </div>
-  ) : null;
+    </Popover>
+  );
 
   return (
     <div
-      ref={rootRef}
       className={`assignee-picker multi ${open ? "open" : ""} ${panelPlacement === "top" ? "assignee-picker--panel-top" : ""}`}
       onPointerDown={(e) => e.stopPropagation()}
       onClick={(e) => e.stopPropagation()}
@@ -164,11 +155,7 @@ export function MultiAssigneePicker({
         )}
       </button>
 
-      {floatingPanel && panel && panelPositioned
-        ? createPortal(panel, document.body)
-        : !floatingPanel
-          ? panel
-          : null}
+      {panel}
     </div>
   );
 }
