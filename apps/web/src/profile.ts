@@ -12,9 +12,9 @@ import {
 
 /**
  * Four columns per row width (`cqw` of `.board-row-scroll`, 0.65rem gaps), never narrower than
- * 260px or wider than the 420px default; past that the row scrolls sideways.
+ * 300px or wider than the 420px default; past that the row scrolls sideways.
  */
-const AUTO_BOARD_COLUMN_WIDTH = "clamp(260px, calc((100cqw - 3 * 0.65rem) / 4), 420px)";
+const AUTO_BOARD_COLUMN_WIDTH = "clamp(300px, calc((100cqw - 3 * 0.65rem) / 4), 420px)";
 
 const LEGACY_COLUMN_WIDTH_KEY = "teamflow_board_column_width";
 
