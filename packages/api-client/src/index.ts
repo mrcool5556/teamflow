@@ -71,6 +71,7 @@ export class TeamflowClient {
   private baseUrl: string;
   private token?: string;
   private fetchImpl: typeof fetch;
+  private signal?: AbortSignal;
 
   constructor(options: TeamflowClientOptions) {
     this.baseUrl = options.baseUrl.replace(/\/$/, "");
@@ -80,6 +81,17 @@ export class TeamflowClient {
 
   setToken(token?: string) {
     this.token = token;
+  }
+
+  /**
+   * A view of this client whose requests are aborted when `signal` fires (for example TanStack
+   * Query's per-query signal). It shares the token and settings with this client.
+   */
+  withSignal(signal?: AbortSignal): TeamflowClient {
+    if (!signal) return this;
+    const bound = Object.create(this) as TeamflowClient;
+    bound.signal = signal;
+    return bound;
   }
 
   private async request<T>(path: string, init: RequestInit = {}): Promise<T> {
@@ -94,6 +106,7 @@ export class TeamflowClient {
     const response = await this.fetchImpl(`${this.baseUrl}${path}`, {
       ...init,
       headers,
+      signal: init.signal ?? this.signal,
     });
 
     if (!response.ok) {

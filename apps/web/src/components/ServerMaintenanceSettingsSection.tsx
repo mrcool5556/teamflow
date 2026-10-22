@@ -1,7 +1,10 @@
 import { useCallback, useEffect, useState } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import type { MaintenanceJobPublic, MaintenanceStatusPublic } from "@teamflow/core";
 import { MAINTENANCE_UPDATE_STEPS, inferUpdatePhase, updatePhaseIndex } from "@teamflow/core";
 import { client } from "../api";
+import { queryKeys } from "../queries/keys";
+import { useMaintenanceStatusQuery } from "../queries/maintenance";
 
 type ServerMaintenanceSettingsSectionProps = {
   teamId: string;
@@ -180,53 +183,51 @@ export function ServerMaintenanceSettingsSection({
   canRun,
   onMessage,
 }: ServerMaintenanceSettingsSectionProps) {
-  const [status, setStatus] = useState<MaintenanceStatusPublic | null>(null);
-  const [loading, setLoading] = useState(true);
+  const queryClient = useQueryClient();
+  const statusQuery = useMaintenanceStatusQuery(teamId);
+  const status = statusQuery.data ?? null;
+  const loading = statusQuery.isPending;
   const [refreshing, setRefreshing] = useState(false);
-  const [serverUnreachable, setServerUnreachable] = useState(false);
+  // While a job runs the app may restart; failed polls then mean "unreachable", not an error.
+  const serverUnreachable = statusQuery.isError && status?.job?.status === "running";
   const [runningAction, setRunningAction] = useState<string | null>(null);
   const [updateBranch, setUpdateBranch] = useState("");
 
-  const loadStatus = useCallback(
-    async (options?: { silent?: boolean; check?: boolean }) => {
-      if (!options?.silent) setRefreshing(true);
-      try {
-        // "Refresh status" re-runs the host check (sudo + origin); everything else just reads.
-        const { status: next } = options?.check
-          ? await client.checkServerMaintenance(teamId)
-          : await client.getServerMaintenanceStatus(teamId);
-        setStatus(next);
-        setServerUnreachable(false);
-        return next;
-      } catch (err) {
-        setStatus((current) => {
-          if (current?.job?.status === "running") {
-            setServerUnreachable(true);
-            return current;
-          }
-          onMessage(err instanceof Error ? err.message : "Failed to load maintenance status");
-          return current;
-        });
-        return null;
-      } finally {
-        setLoading(false);
-        if (!options?.silent) setRefreshing(false);
-      }
-    },
-    [onMessage, teamId],
+  const setStatus = useCallback(
+    (update: (current: MaintenanceStatusPublic | undefined) => MaintenanceStatusPublic | undefined) =>
+      queryClient.setQueryData<MaintenanceStatusPublic>(queryKeys.maintenance(teamId), update),
+    [queryClient, teamId],
   );
 
   useEffect(() => {
-    void loadStatus();
-  }, [loadStatus]);
+    if (statusQuery.error && !serverUnreachable) {
+      onMessage(
+        statusQuery.error instanceof Error
+          ? statusQuery.error.message
+          : "Failed to load maintenance status",
+      );
+    }
+  }, [statusQuery.error, serverUnreachable, onMessage]);
 
-  useEffect(() => {
-    if (status?.job?.status !== "running" && !serverUnreachable) return;
-    const timer = window.setInterval(() => {
-      void loadStatus({ silent: true });
-    }, 2000);
-    return () => window.clearInterval(timer);
-  }, [loadStatus, serverUnreachable, status?.job?.status]);
+  const loadStatus = useCallback(
+    async (options?: { check?: boolean }) => {
+      if (!options?.check) {
+        await queryClient.invalidateQueries({ queryKey: queryKeys.maintenance(teamId) });
+        return;
+      }
+      // "Refresh status" re-runs the host check (sudo + origin); everything else just reads.
+      setRefreshing(true);
+      try {
+        const { status: next } = await client.checkServerMaintenance(teamId);
+        setStatus(() => next);
+      } catch (err) {
+        onMessage(err instanceof Error ? err.message : "Failed to load maintenance status");
+      } finally {
+        setRefreshing(false);
+      }
+    },
+    [onMessage, queryClient, setStatus, teamId],
+  );
 
   async function runAction(label: string, action: () => Promise<{ job: MaintenanceJobPublic }>) {
     if (!canRun) return;
@@ -239,16 +240,9 @@ export function ServerMaintenanceSettingsSection({
     onMessage(null);
     try {
       const { job } = await action();
-      setStatus((current) =>
-        current
-          ? {
-              ...current,
-              job,
-            }
-          : current,
-      );
+      setStatus((current) => (current ? { ...current, job } : current));
       onMessage(`${label} started.`);
-      void loadStatus({ silent: true });
+      void loadStatus();
     } catch (err) {
       onMessage(err instanceof Error ? err.message : `Failed to start ${label.toLowerCase()}`);
     } finally {

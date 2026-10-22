@@ -14,7 +14,10 @@ import {
   maxBytesForAttachmentFile,
 } from "@teamflow/core";
 import type { AttachmentLimitsPublic } from "@teamflow/core";
+import { useQueryClient } from "@tanstack/react-query";
 import { client } from "../api";
+import { queryKeys } from "../queries/keys";
+import { useRowAttachmentsQuery } from "../queries/attachments";
 import { useBackdropDismiss } from "../hooks/useBackdropDismiss";
 import { FileRefCopyButton } from "./FileRefCopyButton";
 import { LinkFromFileRef } from "./LinkFromFileRef";
@@ -49,6 +52,8 @@ function describeAttachmentLimits(limits: AttachmentLimitsPublic) {
   return `Images ${formatFileSize(limits.imageBytes)}, videos ${formatFileSize(limits.videoBytes)}, ZIPs ${formatFileSize(limits.zipBytes)}`;
 }
 
+const NO_ATTACHMENTS: IssueAttachmentPublic[] = [];
+
 type RowFilesDrawerProps = {
   row: BoardRowPublic;
   onClose: () => void;
@@ -56,15 +61,16 @@ type RowFilesDrawerProps = {
 };
 
 export function RowFilesDrawer({ row, onClose, onNavigateRef }: RowFilesDrawerProps) {
-  const [attachments, setAttachments] = useState<IssueAttachmentPublic[]>([]);
-  const [attachmentsLoading, setAttachmentsLoading] = useState(true);
+  const queryClient = useQueryClient();
+  const attachmentsQuery = useRowAttachmentsQuery(row.id);
+  const attachments = attachmentsQuery.data?.attachments ?? NO_ATTACHMENTS;
+  const attachmentsLoading = attachmentsQuery.isPending;
+  const attachmentLimits = attachmentsQuery.data?.limits ?? DEFAULT_ATTACHMENT_LIMITS;
   const [uploadingAttachment, setUploadingAttachment] = useState(false);
   const [attachmentUploadProgress, setAttachmentUploadProgress] = useState<number | null>(null);
   const [attachmentUploadName, setAttachmentUploadName] = useState<string | null>(null);
   const [deletingAttachmentId, setDeletingAttachmentId] = useState<string | null>(null);
   const [attachmentDragOver, setAttachmentDragOver] = useState(false);
-  const [attachmentLimits, setAttachmentLimits] =
-    useState<AttachmentLimitsPublic>(DEFAULT_ATTACHMENT_LIMITS);
   const [attachmentLightbox, setAttachmentLightbox] = useState<{
     attachment: IssueAttachmentPublic;
     imageUrl: string;
@@ -83,29 +89,12 @@ export function RowFilesDrawer({ row, onClose, onNavigateRef }: RowFilesDrawerPr
 
   const { markContentPointerDown, backdropProps } = useBackdropDismiss(handleClose);
 
-  useEffect(() => {
-    let cancelled = false;
-    setAttachmentsLoading(true);
-
-    void client
-      .listRowAttachments(row.id)
-      .then(({ attachments: loaded, limits }) => {
-        if (!cancelled) {
-          setAttachments(loaded);
-          setAttachmentLimits(limits);
-        }
-      })
-      .catch(() => {
-        if (!cancelled) setAttachments([]);
-      })
-      .finally(() => {
-        if (!cancelled) setAttachmentsLoading(false);
-      });
-
-    return () => {
-      cancelled = true;
-    };
-  }, [row.id]);
+  function setAttachments(update: (prev: IssueAttachmentPublic[]) => IssueAttachmentPublic[]) {
+    queryClient.setQueryData<{ attachments: IssueAttachmentPublic[]; limits: AttachmentLimitsPublic }>(
+      queryKeys.rowAttachments(row.id),
+      (data) => (data ? { ...data, attachments: update(data.attachments) } : data),
+    );
+  }
 
   useEffect(() => {
     return () => attachmentBlobCache.revokeAll();

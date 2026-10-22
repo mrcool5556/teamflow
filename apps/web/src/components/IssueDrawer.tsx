@@ -25,7 +25,11 @@ import {
   isImageAttachmentFile,
 } from "@teamflow/core";
 import type { AttachmentLimitsPublic } from "@teamflow/core";
+import { useQueryClient } from "@tanstack/react-query";
 import { client } from "../api";
+import { queryKeys } from "../queries/keys";
+import { useIssueQuery } from "../queries/issue";
+import { useIssueAttachmentsQuery } from "../queries/attachments";
 import { IssueTimer } from "./IssueTimer";
 import { DescriptionEditor } from "./DescriptionEditor";
 import { MultiAssigneePicker } from "./MultiAssigneePicker";
@@ -49,6 +53,9 @@ import {
   isVideoAttachment,
 } from "./AttachmentVideoPlayer";
 import { LinkRowFilePanel } from "./LinkRowFilePanel";
+
+const NO_COMMENTS: CommentPublic[] = [];
+const NO_ATTACHMENTS: IssueAttachmentPublic[] = [];
 
 function describeAttachmentLimits(limits: AttachmentLimitsPublic) {
   return `Images ${formatFileSize(limits.imageBytes)}, videos ${formatFileSize(limits.videoBytes)}, ZIPs ${formatFileSize(limits.zipBytes)}`;
@@ -117,20 +124,22 @@ export function IssueDrawer({
 }: IssueDrawerProps) {
   const [title, setTitle] = useState(issue.title);
   const [description, setDescription] = useState(issue.description ?? "");
-  const [comments, setComments] = useState<CommentPublic[]>([]);
-  const [commentsLoading, setCommentsLoading] = useState(true);
+  const queryClient = useQueryClient();
+  const issueQuery = useIssueQuery(issue.id);
+  const comments = issueQuery.data?.comments ?? NO_COMMENTS;
+  const commentsLoading = issueQuery.isPending;
+  const attachmentsQuery = useIssueAttachmentsQuery(issue.id);
+  const attachments = attachmentsQuery.data?.attachments ?? NO_ATTACHMENTS;
+  const attachmentsLoading = attachmentsQuery.isPending;
+  const attachmentLimits = attachmentsQuery.data?.limits ?? DEFAULT_ATTACHMENT_LIMITS;
   const [commentDraft, setCommentDraft] = useState("");
   const [commentSubmitting, setCommentSubmitting] = useState(false);
   const [deletingCommentId, setDeletingCommentId] = useState<string | null>(null);
-  const [attachments, setAttachments] = useState<IssueAttachmentPublic[]>([]);
-  const [attachmentsLoading, setAttachmentsLoading] = useState(true);
   const [uploadingAttachment, setUploadingAttachment] = useState(false);
   const [attachmentUploadProgress, setAttachmentUploadProgress] = useState<number | null>(null);
   const [attachmentUploadName, setAttachmentUploadName] = useState<string | null>(null);
   const [deletingAttachmentId, setDeletingAttachmentId] = useState<string | null>(null);
   const [attachmentDragOver, setAttachmentDragOver] = useState(false);
-  const [attachmentLimits, setAttachmentLimits] =
-    useState<AttachmentLimitsPublic>(DEFAULT_ATTACHMENT_LIMITS);
   const [attachmentLightbox, setAttachmentLightbox] = useState<{
     attachment: IssueAttachmentPublic;
     imageUrl: string;
@@ -188,29 +197,19 @@ export function IssueDrawer({
     setDescription(issue.description ?? "");
   }, [issue.id, issue.title, issue.description]);
 
-  useEffect(() => {
-    let cancelled = false;
-    setAttachmentsLoading(true);
+  function setAttachments(update: (prev: IssueAttachmentPublic[]) => IssueAttachmentPublic[]) {
+    queryClient.setQueryData<{ attachments: IssueAttachmentPublic[]; limits: AttachmentLimitsPublic }>(
+      queryKeys.issueAttachments(issue.id),
+      (data) => (data ? { ...data, attachments: update(data.attachments) } : data),
+    );
+  }
 
-    void client
-      .listAttachments(issue.id)
-      .then(({ attachments: loaded, limits }) => {
-        if (!cancelled) {
-          setAttachments(loaded);
-          setAttachmentLimits(limits);
-        }
-      })
-      .catch(() => {
-        if (!cancelled) setAttachments([]);
-      })
-      .finally(() => {
-        if (!cancelled) setAttachmentsLoading(false);
-      });
-
-    return () => {
-      cancelled = true;
-    };
-  }, [issue.id]);
+  function setComments(update: (prev: CommentPublic[]) => CommentPublic[]) {
+    queryClient.setQueryData<{ issue: IssuePublic; comments: CommentPublic[] }>(
+      queryKeys.issue(issue.id),
+      (data) => (data ? { ...data, comments: update(data.comments) } : data),
+    );
+  }
 
   useEffect(() => {
     attachmentBlobCache.revokeAll();
@@ -218,27 +217,6 @@ export function IssueDrawer({
     setAttachmentVideo(null);
     return () => attachmentBlobCache.revokeAll();
   }, [issue.id, attachmentBlobCache]);
-
-  useEffect(() => {
-    let cancelled = false;
-    setCommentsLoading(true);
-
-    void client
-      .getIssue(issue.id)
-      .then(({ comments: loaded }) => {
-        if (!cancelled) setComments(loaded);
-      })
-      .catch(() => {
-        if (!cancelled) setComments([]);
-      })
-      .finally(() => {
-        if (!cancelled) setCommentsLoading(false);
-      });
-
-    return () => {
-      cancelled = true;
-    };
-  }, [issue.id]);
 
   useEffect(
     () => () => {

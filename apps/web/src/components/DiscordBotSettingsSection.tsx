@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { TeamDiscordSettingsPublic } from "@teamflow/core";
 import { client } from "../api";
+import { useDiscordSettingsQuery } from "../queries/integrations";
 
 type DiscordBotSettingsSectionProps = {
   teamId: string;
@@ -41,7 +42,8 @@ export function DiscordBotSettingsSection({
   canManage,
   onMessage,
 }: DiscordBotSettingsSectionProps) {
-  const [loading, setLoading] = useState(true);
+  const settingsQuery = useDiscordSettingsQuery(teamId);
+  const loading = settingsQuery.isPending;
   const [saving, setSaving] = useState(false);
   const [guildId, setGuildId] = useState("");
   const [allowedRolesText, setAllowedRolesText] = useState("");
@@ -59,21 +61,16 @@ export function DiscordBotSettingsSection({
     setCommandsReady(settings.commandsReady);
   }, []);
 
-  const loadSettings = useCallback(async () => {
-    setLoading(true);
-    try {
-      const { settings } = await client.getTeamDiscordSettings(teamId);
-      applySettings(settings);
-    } catch (err) {
-      onMessage(err instanceof Error ? err.message : "Failed to load Discord settings");
-    } finally {
-      setLoading(false);
-    }
-  }, [applySettings, onMessage, teamId]);
+  // Copy the loaded settings into the form whenever the server copy changes.
+  useEffect(() => {
+    if (settingsQuery.data) applySettings(settingsQuery.data);
+  }, [settingsQuery.data, applySettings]);
 
   useEffect(() => {
-    void loadSettings();
-  }, [loadSettings]);
+    if (settingsQuery.error) {
+      onMessage(settingsQuery.error instanceof Error ? settingsQuery.error.message : "Failed to load Discord settings");
+    }
+  }, [settingsQuery.error, onMessage]);
 
   useEffect(() => {
     return () => {

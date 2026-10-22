@@ -1,6 +1,9 @@
-import { useCallback, useEffect, useState } from "react";
+import { useEffect, useState } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import type { DiscordBotServiceStatusPublic } from "@teamflow/core";
 import { client } from "../api";
+import { queryKeys } from "../queries/keys";
+import { useDiscordServiceQuery } from "../queries/integrations";
 
 type DiscordBotServiceSectionProps = {
   teamId: string;
@@ -30,25 +33,25 @@ export function DiscordBotServiceSection({
   onMessage,
   onSecretsRefresh,
 }: DiscordBotServiceSectionProps) {
-  const [loading, setLoading] = useState(true);
+  const queryClient = useQueryClient();
+  const statusQuery = useDiscordServiceQuery(teamId);
+  const status = statusQuery.data ?? null;
+  const loading = statusQuery.isFetching;
   const [busy, setBusy] = useState(false);
-  const [status, setStatus] = useState<DiscordBotServiceStatusPublic | null>(null);
 
-  const loadStatus = useCallback(async () => {
-    setLoading(true);
-    try {
-      const { status: next } = await client.getDiscordBotServiceStatus(teamId);
-      setStatus(next);
-    } catch (err) {
-      onMessage(err instanceof Error ? err.message : "Failed to load Discord bot service status");
-    } finally {
-      setLoading(false);
-    }
-  }, [onMessage, teamId]);
+  function setStatus(next: DiscordBotServiceStatusPublic) {
+    queryClient.setQueryData(queryKeys.discordService(teamId), next);
+  }
+
+  function loadStatus() {
+    return statusQuery.refetch();
+  }
 
   useEffect(() => {
-    void loadStatus();
-  }, [loadStatus]);
+    if (statusQuery.error) {
+      onMessage(statusQuery.error instanceof Error ? statusQuery.error.message : "Failed to load Discord bot service status");
+    }
+  }, [statusQuery.error, onMessage]);
 
   async function runAction(
     action: "enable" | "restart" | "stop",
