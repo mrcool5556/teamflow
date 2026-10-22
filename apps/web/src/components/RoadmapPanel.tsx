@@ -131,7 +131,7 @@ export function RoadmapPanel() {
         <section className="roadmap-section roadmap-section--panel">
           <h3>Deploy path</h3>
           <p className="roadmap-section-copy muted">
-            How to go from this laptop to a URL anyone can log into.
+            How to go from a local install to a URL anyone can log into.
           </p>
           <ol className="roadmap-steps">
             {ROADMAP_DEPLOY_STEPS.map((step) => (
