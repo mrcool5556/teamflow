@@ -1017,10 +1017,18 @@ body.board-pan-active {
   overflow: hidden;
 }
 
-/* Row scroll affordance: fade the edge that has more columns, and a button to step one column. */
+/* Row scroll affordance: when columns run past an edge, that edge fades and a slim step button
+   sits in its own gutter beside the scroller, so it never covers a card. */
 .board-row-scroll-frame {
+  --row-scroll-gutter: 1.75rem;
   position: relative;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
   min-width: 0;
+}
+
+.board-row-scroll-frame > .board-row-scroll {
+  grid-column: 2;
 }
 
 .board-row-scroll-frame::before,
@@ -1029,7 +1037,7 @@ body.board-pan-active {
   position: absolute;
   top: 0;
   bottom: 12px;
-  width: 64px;
+  width: 48px;
   pointer-events: none;
   opacity: 0;
   transition: opacity 0.15s ease;
@@ -1037,12 +1045,12 @@ body.board-pan-active {
 }
 
 .board-row-scroll-frame::before {
-  left: 0;
+  left: calc(var(--row-scroll-gutter) + var(--space-2));
   background: linear-gradient(to left, transparent, var(--bg));
 }
 
 .board-row-scroll-frame::after {
-  right: 0;
+  right: calc(var(--row-scroll-gutter) + var(--space-2));
   background: linear-gradient(to right, transparent, var(--bg));
 }
 
@@ -1052,16 +1060,25 @@ body.board-pan-active {
 }
 
 .board-row-scroll-btn {
-  position: absolute;
-  top: 5.5rem;
-  z-index: var(--z-sticky);
-  padding: 0.35rem 0.7rem;
-  font-size: var(--font-size-sm);
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-start;
+  align-items: center;
+  gap: var(--space-2);
+  width: var(--row-scroll-gutter);
+  margin-bottom: 12px;
+  padding: var(--space-4) 0;
+  font-size: var(--font-size-xs);
   background: var(--panel);
-  color: var(--text);
+  color: var(--text-soft);
   border: 1px solid var(--border-strong);
-  border-radius: 999px;
-  box-shadow: var(--chrome-modal-shadow);
+  border-radius: var(--radius-sm);
+  box-shadow: none;
+}
+
+.board-row-scroll-btn-label {
+  writing-mode: vertical-rl;
+  white-space: nowrap;
 }
 
 .board-row-scroll-btn:hover {
@@ -1070,11 +1087,13 @@ body.board-pan-active {
 }
 
 .board-row-scroll-btn--before {
-  left: var(--space-2);
+  grid-column: 1;
+  margin-right: var(--space-2);
 }
 
 .board-row-scroll-btn--after {
-  right: var(--space-2);
+  grid-column: 3;
+  margin-left: var(--space-2);
 }
 
 .column-empty {
