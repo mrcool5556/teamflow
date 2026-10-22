@@ -511,3 +511,9 @@
   color: var(--accent);
   border-color: var(--accent);
 }
+
+.change-history-empty {
+  margin: 0;
+  padding: var(--space-3) var(--space-4) var(--space-4);
+  font-size: var(--font-size-sm);
+}

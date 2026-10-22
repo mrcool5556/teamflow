@@ -282,14 +282,41 @@ select {
   margin-bottom: 0.85rem;
 }
 
-.tabs {
-  display: flex;
-  gap: 0.5rem;
-  margin: 1rem 0;
+/* Segmented control: a row of mutually exclusive choices (not primary actions). */
+.segmented {
+  display: inline-flex;
+  width: fit-content;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-sm);
+  overflow: hidden;
 }
 
-.tabs button.active {
-  outline: 2px solid var(--accent);
+.segmented button {
+  padding: 0.3rem 0.85rem;
+  border: none;
+  border-radius: 0;
+  background: transparent;
+  color: var(--text-soft);
+  box-shadow: none;
+  font-size: var(--font-size-sm);
+}
+
+.segmented button + button {
+  border-left: 1px solid var(--border-strong);
+}
+
+.segmented button:hover:not(:disabled):not(.active) {
+  color: var(--text);
+  background: color-mix(in srgb, var(--text) 6%, transparent);
+}
+
+.segmented button.active {
+  background: var(--accent);
+  color: #111;
+}
+
+.auth-mode-switch {
+  margin: 1rem 0;
 }
 
 .hint {

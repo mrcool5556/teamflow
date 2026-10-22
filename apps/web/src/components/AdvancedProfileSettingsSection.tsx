@@ -49,7 +49,7 @@ export function AdvancedProfileSettingsSection({
             <div className="settings-range">
               <span id="column-width-mode-label">Column width</span>
               <div
-                className="settings-segmented"
+                className="segmented"
                 role="radiogroup"
                 aria-labelledby="column-width-mode-label"
               >

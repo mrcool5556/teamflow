@@ -23,8 +23,14 @@ export function AboutDialog({ open, version, onClose }: AboutDialogProps) {
           <p className="eyebrow">{TEAMFLOW_ABOUT.name.toUpperCase()}</p>
           <DialogTitle>About</DialogTitle>
         </div>
-        <button type="button" className="ghost" onClick={onClose}>
-          Close
+        <button
+          type="button"
+          className="ghost drawer-close-btn"
+          aria-label="Close"
+          title="Close (Esc)"
+          onClick={onClose}
+        >
+          ✕
         </button>
       </header>
 
