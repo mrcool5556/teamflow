@@ -13,6 +13,8 @@ import { useTeamRolesQuery } from "../queries/roles";
 import { buildInviteShareUrl, extractInviteToken } from "../lib/inviteLinks";
 import { hasTeamPermission } from "../lib/teamPermissions";
 import { TeamDataTransferSection } from "./TeamDataTransferSection";
+import { errorMessage } from "../lib/errorSink";
+import type { PanelMessage } from "../lib/panelStatus";
 
 type TeamSettingsSectionProps = {
   teamId: string;
@@ -21,7 +23,7 @@ type TeamSettingsSectionProps = {
   members: TeamMemberPublic[];
   currentUserId: string | null;
   permissions: TeamPermissionsPublic | null;
-  onMessage: (message: string | null) => void;
+  onMessage: PanelMessage;
   onTeamJoined?: (teamId: string) => void;
   onTeamLeft?: (teamId: string) => void;
   onTeamDeleted?: (teamId: string) => void;
@@ -77,9 +79,7 @@ export function TeamSettingsSection({
 
   useEffect(() => {
     if (invitesQuery.error) {
-      onMessage(
-        invitesQuery.error instanceof Error ? invitesQuery.error.message : "Failed to load invites",
-      );
+      onMessage(errorMessage(invitesQuery.error, "Failed to load invites"), "error");
     }
   }, [invitesQuery.error, onMessage]);
 
@@ -111,7 +111,7 @@ export function TeamSettingsSection({
       onMessage(`Invite link created for ${teamName}.`);
       await loadInvites();
     } catch (err) {
-      onMessage(err instanceof Error ? err.message : "Failed to create invite");
+      onMessage(errorMessage(err, "Failed to create invite"), "error");
     } finally {
       setCreatingInvite(false);
     }
@@ -130,7 +130,7 @@ export function TeamSettingsSection({
       setCopiedKey(key);
       copyTimeoutRef.current = window.setTimeout(() => setCopiedKey(null), 1500);
     } catch {
-      onMessage("Could not copy — select and copy the link manually.");
+      onMessage("Could not copy — select and copy the link manually.", "error");
     }
   }
 
@@ -142,7 +142,7 @@ export function TeamSettingsSection({
       if (latestInviteUrl) setLatestInviteUrl(null);
       await loadInvites();
     } catch (err) {
-      onMessage(err instanceof Error ? err.message : "Failed to revoke invite");
+      onMessage(errorMessage(err, "Failed to revoke invite"), "error");
     }
   }
 
@@ -155,7 +155,7 @@ export function TeamSettingsSection({
       await refreshMembers(teamId);
       onMessage(`Updated role for ${member.name}.`);
     } catch (err) {
-      onMessage(err instanceof Error ? err.message : "Failed to update member role");
+      onMessage(errorMessage(err, "Failed to update member role"), "error");
     } finally {
       setUpdatingMemberRoleId(null);
     }
@@ -176,7 +176,7 @@ export function TeamSettingsSection({
       onMessage(`${member.name} removed from the team.`);
       await refreshMembers(teamId);
     } catch (err) {
-      onMessage(err instanceof Error ? err.message : "Failed to remove member");
+      onMessage(errorMessage(err, "Failed to remove member"), "error");
     } finally {
       setRemovingMemberId(null);
     }
@@ -197,7 +197,7 @@ export function TeamSettingsSection({
       onMessage(`You left ${teamName}.`);
       onTeamLeft?.(teamId);
     } catch (err) {
-      onMessage(err instanceof Error ? err.message : "Failed to leave team");
+      onMessage(errorMessage(err, "Failed to leave team"), "error");
     } finally {
       setLeavingTeam(false);
     }
@@ -227,7 +227,7 @@ export function TeamSettingsSection({
       onMessage(`Deleted ${label}.`);
       onTeamDeleted?.(teamId);
     } catch (err) {
-      onMessage(err instanceof Error ? err.message : "Failed to delete team");
+      onMessage(errorMessage(err, "Failed to delete team"), "error");
     } finally {
       setDeletingTeam(false);
     }
@@ -249,7 +249,7 @@ export function TeamSettingsSection({
       onTeamJoined?.(team.id);
       await refreshMembers(team.id);
     } catch (err) {
-      onMessage(err instanceof Error ? err.message : "Failed to join team");
+      onMessage(errorMessage(err, "Failed to join team"), "error");
     } finally {
       setJoining(false);
     }

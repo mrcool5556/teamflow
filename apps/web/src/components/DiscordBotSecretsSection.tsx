@@ -2,11 +2,13 @@ import { useCallback, useEffect, useState } from "react";
 import type { DiscordBotSecretsPublic } from "@teamflow/core";
 import { client } from "../api";
 import { useDiscordSecretsQuery } from "../queries/integrations";
+import { errorMessage } from "../lib/errorSink";
+import type { PanelMessage } from "../lib/panelStatus";
 
 type DiscordBotSecretsSectionProps = {
   teamId: string;
   canManage: boolean;
-  onMessage: (message: string | null) => void;
+  onMessage: PanelMessage;
   onSaved?: () => void;
 };
 
@@ -44,7 +46,7 @@ export function DiscordBotSecretsSection({
 
   useEffect(() => {
     if (secretsQuery.error) {
-      onMessage(secretsQuery.error instanceof Error ? secretsQuery.error.message : "Failed to load Discord secrets");
+      onMessage(errorMessage(secretsQuery.error, "Failed to load Discord secrets"), "error");
     }
   }, [secretsQuery.error, onMessage]);
 
@@ -78,7 +80,7 @@ export function DiscordBotSecretsSection({
       );
       onSaved?.();
     } catch (err) {
-      onMessage(err instanceof Error ? err.message : "Failed to save Discord secrets");
+      onMessage(errorMessage(err, "Failed to save Discord secrets"), "error");
     } finally {
       setSaving(false);
     }

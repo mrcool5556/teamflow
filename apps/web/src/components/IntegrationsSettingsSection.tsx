@@ -2,13 +2,14 @@ import { useState } from "react";
 import { DiscordBotSecretsSection } from "./DiscordBotSecretsSection";
 import { DiscordBotServiceSection } from "./DiscordBotServiceSection";
 import { DiscordBotSettingsSection } from "./DiscordBotSettingsSection";
+import type { PanelMessage } from "../lib/panelStatus";
 
 type IntegrationsSettingsSectionProps = {
   teamId: string;
   teamKey: string;
   canManageDiscord: boolean;
   canManageSecrets: boolean;
-  onMessage: (message: string | null) => void;
+  onMessage: PanelMessage;
 };
 
 export function IntegrationsSettingsSection({
@@ -21,14 +22,7 @@ export function IntegrationsSettingsSection({
   const [serviceRefreshKey, setServiceRefreshKey] = useState(0);
 
   return (
-    <div className="settings-panel">
-      <header className="settings-panel-header">
-        <h2>Integrations</h2>
-        <p className="settings-copy settings-lead">
-          Connect Teamflow to Discord. Bot credentials are instance-wide; guild, roles, and tickets
-          are configured per team below.
-        </p>
-      </header>
+    <>
 
       {canManageSecrets ? (
         <DiscordBotSecretsSection
@@ -53,6 +47,6 @@ export function IntegrationsSettingsSection({
         canManage={canManageDiscord}
         onMessage={onMessage}
       />
-    </div>
+    </>
   );
 }

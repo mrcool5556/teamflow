@@ -4,11 +4,13 @@ import type { DiscordBotServiceStatusPublic } from "@teamflow/core";
 import { client } from "../api";
 import { queryKeys } from "../queries/keys";
 import { useDiscordServiceQuery } from "../queries/integrations";
+import { errorMessage } from "../lib/errorSink";
+import type { PanelMessage } from "../lib/panelStatus";
 
 type DiscordBotServiceSectionProps = {
   teamId: string;
   canManage: boolean;
-  onMessage: (message: string | null) => void;
+  onMessage: PanelMessage;
   onSecretsRefresh?: () => void;
 };
 
@@ -49,7 +51,7 @@ export function DiscordBotServiceSection({
 
   useEffect(() => {
     if (statusQuery.error) {
-      onMessage(statusQuery.error instanceof Error ? statusQuery.error.message : "Failed to load Discord bot service status");
+      onMessage(errorMessage(statusQuery.error, "Failed to load Discord bot service status"), "error");
     }
   }, [statusQuery.error, onMessage]);
 
@@ -76,7 +78,7 @@ export function DiscordBotServiceSection({
         onMessage("Discord bot stopped.");
       }
     } catch (err) {
-      onMessage(err instanceof Error ? err.message : `Failed to ${action} Discord bot`);
+      onMessage(errorMessage(err, `Failed to ${action} Discord bot`), "error");
     } finally {
       setBusy(false);
     }

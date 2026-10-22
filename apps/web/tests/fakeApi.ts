@@ -234,6 +234,11 @@ export function installFakeApi(db: FakeDb, options: FakeApiOptions = {}) {
     ["GET", /^\/teams\/([^/]+)\/roles$/, () => ({ roles: [] })],
     ["GET", /^\/teams\/([^/]+)\/invites$/, () => ({ invites: [] })],
     [
+      "POST",
+      /^\/teams\/([^/]+)\/invites$/,
+      ({ params }) => ({ invite: { id: "invite-1", teamId: params[0], token: "tok-new" } }),
+    ],
+    [
       "GET",
       /^\/teams\/([^/]+)\/files$/,
       () => ({ files: [], totalBytes: 0, fileCount: 0, trash: false }),

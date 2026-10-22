@@ -2,12 +2,14 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import type { TeamDiscordSettingsPublic } from "@teamflow/core";
 import { client } from "../api";
 import { useDiscordSettingsQuery } from "../queries/integrations";
+import { errorMessage } from "../lib/errorSink";
+import type { PanelMessage } from "../lib/panelStatus";
 
 type DiscordBotSettingsSectionProps = {
   teamId: string;
   teamKey: string;
   canManage: boolean;
-  onMessage: (message: string | null) => void;
+  onMessage: PanelMessage;
 };
 
 function parseIdList(raw: string) {
@@ -68,7 +70,7 @@ export function DiscordBotSettingsSection({
 
   useEffect(() => {
     if (settingsQuery.error) {
-      onMessage(settingsQuery.error instanceof Error ? settingsQuery.error.message : "Failed to load Discord settings");
+      onMessage(errorMessage(settingsQuery.error, "Failed to load Discord settings"), "error");
     }
   }, [settingsQuery.error, onMessage]);
 
@@ -85,7 +87,7 @@ export function DiscordBotSettingsSection({
       setCopiedKey(key);
       copyTimeoutRef.current = window.setTimeout(() => setCopiedKey(null), 1500);
     } catch {
-      onMessage("Could not copy — select and copy manually.");
+      onMessage("Could not copy — select and copy manually.", "error");
     }
   }
 
@@ -104,7 +106,7 @@ export function DiscordBotSettingsSection({
       applySettings(settings);
       onMessage("Discord bot settings saved. Bot picks up changes within ~10 seconds.");
     } catch (err) {
-      onMessage(err instanceof Error ? err.message : "Failed to save Discord settings");
+      onMessage(errorMessage(err, "Failed to save Discord settings"), "error");
     } finally {
       setSaving(false);
     }

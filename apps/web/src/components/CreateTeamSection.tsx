@@ -1,8 +1,10 @@
 import { useState } from "react";
 import { client } from "../api";
+import { errorMessage } from "../lib/errorSink";
+import type { PanelMessage } from "../lib/panelStatus";
 
 type CreateTeamSectionProps = {
-  onMessage: (message: string | null) => void;
+  onMessage: PanelMessage;
   onTeamCreated: (teamId: string, switchToNew: boolean) => void;
 };
 
@@ -37,11 +39,11 @@ export function CreateTeamSection({ onMessage, onTeamCreated }: CreateTeamSectio
     const trimmedName = name.trim();
     const trimmedKey = normalizeTeamKey(key);
     if (!trimmedName) {
-      onMessage("Team name is required.");
+      onMessage("Team name is required.", "error");
       return;
     }
     if (trimmedKey.length < 2) {
-      onMessage("Team key must be at least 2 characters (A–Z, 0–9).");
+      onMessage("Team key must be at least 2 characters (A–Z, 0–9).", "error");
       return;
     }
 
@@ -59,7 +61,7 @@ export function CreateTeamSection({ onMessage, onTeamCreated }: CreateTeamSectio
       setKeyTouched(false);
       onTeamCreated(team.id, switchToNew);
     } catch (err) {
-      onMessage(err instanceof Error ? err.message : "Failed to create team");
+      onMessage(errorMessage(err, "Failed to create team"), "error");
     } finally {
       setCreating(false);
     }

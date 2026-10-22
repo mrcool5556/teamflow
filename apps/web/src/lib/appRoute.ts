@@ -11,7 +11,7 @@ export const SETTINGS_PANELS: SettingsPanel[] = [
   "tokens",
 ];
 
-export function isSettingsPanel(value: string | undefined): value is SettingsPanel {
+export function isSettingsPanel(value: string | null | undefined): value is SettingsPanel {
   return SETTINGS_PANELS.includes(value as SettingsPanel);
 }
 

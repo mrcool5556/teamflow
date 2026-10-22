@@ -67,8 +67,11 @@ describe("demo seed", () => {
   });
 
   it("login screen no longer ships demo credentials", () => {
-    const appTsx = fs.readFileSync(path.join(repoRoot, "apps", "web", "src", "App.tsx"), "utf8");
-    expect(appTsx).not.toMatch(/changeme123/);
-    expect(appTsx).not.toMatch(/demo@teamflow\.local/);
+    const loginTsx = fs.readFileSync(
+      path.join(repoRoot, "apps", "web", "src", "routes", "auth", "LoginScreen.tsx"),
+      "utf8",
+    );
+    expect(loginTsx).not.toMatch(/changeme123/);
+    expect(loginTsx).not.toMatch(/demo@teamflow\.local/);
   });
 });
