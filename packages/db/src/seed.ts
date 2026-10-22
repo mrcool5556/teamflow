@@ -1,4 +1,9 @@
-import { DEFAULT_STATUSES, generateEntityKey } from "@teamflow/core";
+import {
+  DEFAULT_STATUSES,
+  generateEntityKey,
+  permissionsForSystemSlug,
+  type SystemRoleSlug,
+} from "@teamflow/core";
 import bcrypt from "bcryptjs";
 import { createDb, schema } from "./index.js";
 
@@ -44,32 +49,8 @@ async function seed() {
     issueCounter: 3,
   });
 
-  const ownerPermissions = JSON.stringify([
-    "team.members.view",
-    "team.members.manage",
-    "team.invites.manage",
-    "team.roles.view",
-    "team.roles.manage",
-    "team.delete",
-    "team.data.transfer",
-    "integrations.discord.view",
-    "integrations.discord.manage",
-    "integrations.discord.secrets",
-    "server.maintenance.view",
-    "server.maintenance.run",
-  ]);
-  const adminPermissions = JSON.stringify([
-    "team.members.view",
-    "team.members.manage",
-    "team.invites.manage",
-    "team.roles.view",
-    "team.roles.manage",
-    "team.delete",
-    "integrations.discord.view",
-    "integrations.discord.manage",
-    "integrations.discord.secrets",
-  ]);
-  const memberPermissions = JSON.stringify(["team.members.view"]);
+  // Same permission sets as every new team (single source: @teamflow/core).
+  const permissionsFor = (slug: SystemRoleSlug) => JSON.stringify(permissionsForSystemSlug(slug));
   const ownerRoleId = crypto.randomUUID();
   const adminRoleId = crypto.randomUUID();
   const memberRoleId = crypto.randomUUID();
@@ -81,7 +62,7 @@ async function seed() {
       teamId,
       name: "Owner",
       slug: "owner",
-      permissions: ownerPermissions,
+      permissions: permissionsFor("owner"),
       isSystem: 1,
       position: 0,
     },
@@ -90,7 +71,7 @@ async function seed() {
       teamId,
       name: "Admin",
       slug: "admin",
-      permissions: adminPermissions,
+      permissions: permissionsFor("admin"),
       isSystem: 1,
       position: 1,
     },
@@ -99,7 +80,7 @@ async function seed() {
       teamId,
       name: "Member",
       slug: "member",
-      permissions: memberPermissions,
+      permissions: permissionsFor("member"),
       isSystem: 1,
       position: 2,
     },
@@ -108,7 +89,7 @@ async function seed() {
       teamId,
       name: "Viewer",
       slug: "viewer",
-      permissions: memberPermissions,
+      permissions: permissionsFor("viewer"),
       isSystem: 1,
       position: 3,
     },
