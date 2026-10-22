@@ -68,6 +68,9 @@ export const DEFAULT_BOARD_COLUMN_WIDTH = 420;
 export const MIN_BOARD_COLUMN_WIDTH = 240;
 export const MAX_BOARD_COLUMN_WIDTH = 720;
 export const BOARD_COLUMN_WIDTH_STEP = 20;
+/** "auto" fits four columns in the row's width (between the min and default widths). */
+export const BOARD_COLUMN_WIDTH_MODES = ["auto", "custom"] as const;
+export type BoardColumnWidthMode = (typeof BOARD_COLUMN_WIDTH_MODES)[number];
 
 export const DEFAULT_CARD_MIN_HEIGHT = 72;
 export const MIN_CARD_MIN_HEIGHT = 48;
@@ -75,6 +78,8 @@ export const MAX_CARD_MIN_HEIGHT = 200;
 
 export const userProfileBoardSchema = z.object({
   columnWidth: z.number().int().min(MIN_BOARD_COLUMN_WIDTH).max(MAX_BOARD_COLUMN_WIDTH),
+  /** Unset on profiles saved before the mode existed; see `boardColumnWidthMode`. */
+  columnWidthMode: z.enum(BOARD_COLUMN_WIDTH_MODES).optional(),
   cardMinHeight: z
     .number()
     .int()
@@ -136,6 +141,18 @@ export function clampBoardColumnWidth(value: number) {
       Math.round(value / BOARD_COLUMN_WIDTH_STEP) * BOARD_COLUMN_WIDTH_STEP,
     ),
   );
+}
+
+/**
+ * Profiles saved before the mode existed count as "auto" only if they kept the default width,
+ * so a width someone picked on purpose stays in effect.
+ */
+export function boardColumnWidthMode(board: {
+  columnWidth: number;
+  columnWidthMode?: BoardColumnWidthMode;
+}): BoardColumnWidthMode {
+  if (board.columnWidthMode) return board.columnWidthMode;
+  return board.columnWidth === DEFAULT_BOARD_COLUMN_WIDTH ? "auto" : "custom";
 }
 
 export function clampCardMinHeight(value: number) {
