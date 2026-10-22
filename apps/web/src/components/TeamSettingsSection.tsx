@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import type {
   TeamInvitePublic,
   TeamMemberPublic,
@@ -6,7 +7,9 @@ import type {
   TeamRolePublic,
 } from "@teamflow/core";
 import { client } from "../api";
-import { useTeamRoles } from "../hooks/useTeamRoles";
+import { queryKeys } from "../queries/keys";
+import { useInvitesQuery } from "../queries/members";
+import { useTeamRolesQuery } from "../queries/roles";
 import { buildInviteShareUrl, extractInviteToken } from "../lib/inviteLinks";
 import { hasTeamPermission } from "../lib/teamPermissions";
 import { TeamDataTransferSection } from "./TeamDataTransferSection";
@@ -18,13 +21,15 @@ type TeamSettingsSectionProps = {
   members: TeamMemberPublic[];
   currentUserId: string | null;
   permissions: TeamPermissionsPublic | null;
-  onMembersChange: (members: TeamMemberPublic[]) => void;
   onMessage: (message: string | null) => void;
   onTeamJoined?: (teamId: string) => void;
   onTeamLeft?: (teamId: string) => void;
   onTeamDeleted?: (teamId: string) => void;
   onBoardChanged?: () => void;
 };
+
+const NO_ROLES: TeamRolePublic[] = [];
+const NO_INVITES: TeamInvitePublic[] = [];
 
 export function TeamSettingsSection({
   teamId,
@@ -33,15 +38,13 @@ export function TeamSettingsSection({
   members,
   currentUserId,
   permissions,
-  onMembersChange,
   onMessage,
   onTeamJoined,
   onTeamLeft,
   onTeamDeleted,
   onBoardChanged,
 }: TeamSettingsSectionProps) {
-  const [invites, setInvites] = useState<TeamInvitePublic[]>([]);
-  const [invitesLoading, setInvitesLoading] = useState(false);
+  const queryClient = useQueryClient();
   const [creatingInvite, setCreatingInvite] = useState(false);
   const [multiUseInvite, setMultiUseInvite] = useState(false);
   const [latestInviteUrl, setLatestInviteUrl] = useState<string | null>(null);
@@ -59,7 +62,11 @@ export function TeamSettingsSection({
   const canManageInvites = hasTeamPermission(permissions, "team.invites.manage");
   const canDeleteTeam = hasTeamPermission(permissions, "team.delete");
   const canTransferData = hasTeamPermission(permissions, "team.data.transfer");
-  const { roles } = useTeamRoles(canManageMembers || canManageInvites ? teamId : null);
+  const rolesQuery = useTeamRolesQuery(canManageMembers || canManageInvites ? teamId : null);
+  const roles = rolesQuery.data ?? NO_ROLES;
+  const invitesQuery = useInvitesQuery(teamId, canManageInvites);
+  const invites = canManageInvites ? (invitesQuery.data ?? NO_INVITES) : NO_INVITES;
+  const invitesLoading = invitesQuery.isFetching;
 
   useEffect(() => {
     if (!inviteRoleId && roles.length > 0) {
@@ -68,25 +75,28 @@ export function TeamSettingsSection({
     }
   }, [inviteRoleId, roles]);
 
-  const loadInvites = useCallback(async () => {
-    if (!canManageInvites) {
-      setInvites([]);
-      return;
-    }
-    setInvitesLoading(true);
-    try {
-      const { invites: next } = await client.listTeamInvites(teamId);
-      setInvites(next);
-    } catch (err) {
-      onMessage(err instanceof Error ? err.message : "Failed to load invites");
-    } finally {
-      setInvitesLoading(false);
-    }
-  }, [canManageInvites, onMessage, teamId]);
-
   useEffect(() => {
-    void loadInvites();
-  }, [loadInvites]);
+    if (invitesQuery.error) {
+      onMessage(
+        invitesQuery.error instanceof Error ? invitesQuery.error.message : "Failed to load invites",
+      );
+    }
+  }, [invitesQuery.error, onMessage]);
+
+  const loadInvites = useCallback(
+    () => queryClient.invalidateQueries({ queryKey: queryKeys.invites(teamId) }),
+    [queryClient, teamId],
+  );
+
+  /** Membership changed: refresh the member list and (for own role changes) permissions. */
+  const refreshMembers = useCallback(
+    (forTeamId: string) =>
+      Promise.all([
+        queryClient.invalidateQueries({ queryKey: queryKeys.members(forTeamId) }),
+        queryClient.invalidateQueries({ queryKey: queryKeys.permissions(forTeamId) }),
+      ]),
+    [queryClient],
+  );
 
   async function createInviteLink() {
     setCreatingInvite(true);
@@ -142,8 +152,7 @@ export function TeamSettingsSection({
     onMessage(null);
     try {
       await client.updateTeamMemberRole(teamId, member.id, roleId);
-      const { members: refreshed } = await client.listTeamMembers(teamId);
-      onMembersChange(refreshed);
+      await refreshMembers(teamId);
       onMessage(`Updated role for ${member.name}.`);
     } catch (err) {
       onMessage(err instanceof Error ? err.message : "Failed to update member role");
@@ -165,8 +174,7 @@ export function TeamSettingsSection({
     try {
       await client.removeTeamMember(teamId, member.id);
       onMessage(`${member.name} removed from the team.`);
-      const { members: refreshed } = await client.listTeamMembers(teamId);
-      onMembersChange(refreshed);
+      await refreshMembers(teamId);
     } catch (err) {
       onMessage(err instanceof Error ? err.message : "Failed to remove member");
     } finally {
@@ -239,8 +247,7 @@ export function TeamSettingsSection({
       );
       setJoinToken("");
       onTeamJoined?.(team.id);
-      const { members: refreshed } = await client.listTeamMembers(team.id);
-      onMembersChange(refreshed);
+      await refreshMembers(team.id);
     } catch (err) {
       onMessage(err instanceof Error ? err.message : "Failed to join team");
     } finally {

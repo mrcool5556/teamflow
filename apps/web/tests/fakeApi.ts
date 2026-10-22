@@ -188,7 +188,7 @@ function abortError() {
 }
 
 export type FakeApiOptions = {
-  /** Return a promise to hold a response until it resolves (for race tests). */
+  /** Return a promise to hold a response until it resolves (for race tests). Path has the query. */
   gate?: (method: string, path: string) => Promise<void> | undefined;
 };
 
@@ -363,7 +363,7 @@ export function installFakeApi(db: FakeDb, options: FakeApiOptions = {}) {
 
     const signal = init.signal;
     if (signal?.aborted) throw abortError();
-    const gate = options.gate?.(method, path);
+    const gate = options.gate?.(method, `${path}${url.search}`);
     if (gate) {
       await new Promise<void>((resolve, reject) => {
         signal?.addEventListener("abort", () => reject(abortError()), { once: true });

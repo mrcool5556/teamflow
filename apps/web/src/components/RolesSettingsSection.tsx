@@ -1,7 +1,12 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import type { TeamPermission, TeamRolePublic } from "@teamflow/core";
 import { TEAM_PERMISSION_GROUPS, TEAM_PERMISSION_LABELS } from "@teamflow/core";
 import { client } from "../api";
+import { queryKeys } from "../queries/keys";
+import { useTeamRolesQuery } from "../queries/roles";
+
+const NO_ROLES: TeamRolePublic[] = [];
 
 type RolesSettingsSectionProps = {
   teamId: string;
@@ -16,9 +21,12 @@ export function RolesSettingsSection({
   onMessage,
   onRolesChange,
 }: RolesSettingsSectionProps) {
-  const [roles, setRoles] = useState<TeamRolePublic[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [selectedRoleId, setSelectedRoleId] = useState<string | null>(null);
+  const queryClient = useQueryClient();
+  const rolesQuery = useTeamRolesQuery(teamId);
+  const roles = rolesQuery.data ?? NO_ROLES;
+  const loading = rolesQuery.isPending;
+  const [pickedRoleId, setSelectedRoleId] = useState<string | null>(null);
+  const selectedRoleId = pickedRoleId ?? roles[0]?.id ?? null;
   const [draftName, setDraftName] = useState("");
   const [draftPermissions, setDraftPermissions] = useState<TeamPermission[]>([]);
   const [saving, setSaving] = useState(false);
@@ -30,22 +38,17 @@ export function RolesSettingsSection({
     [roles, selectedRoleId],
   );
 
-  const loadRoles = useCallback(async () => {
-    setLoading(true);
-    try {
-      const { roles: next } = await client.listTeamRoles(teamId);
-      setRoles(next);
-      setSelectedRoleId((current) => current ?? next[0]?.id ?? null);
-    } catch (err) {
-      onMessage(err instanceof Error ? err.message : "Failed to load roles");
-    } finally {
-      setLoading(false);
-    }
-  }, [onMessage, teamId]);
-
   useEffect(() => {
-    void loadRoles();
-  }, [loadRoles]);
+    if (rolesQuery.error) {
+      onMessage(rolesQuery.error instanceof Error ? rolesQuery.error.message : "Failed to load roles");
+    }
+  }, [rolesQuery.error, onMessage]);
+
+  function setRoles(update: TeamRolePublic[] | ((current: TeamRolePublic[]) => TeamRolePublic[])) {
+    queryClient.setQueryData<TeamRolePublic[]>(queryKeys.roles(teamId), (current = []) =>
+      typeof update === "function" ? update(current) : update,
+    );
+  }
 
   useEffect(() => {
     if (!selectedRole) return;

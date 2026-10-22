@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import type { DiscordBotSecretsPublic } from "@teamflow/core";
 import { client } from "../api";
+import { useDiscordSecretsQuery } from "../queries/integrations";
 
 type DiscordBotSecretsSectionProps = {
   teamId: string;
@@ -15,7 +16,8 @@ export function DiscordBotSecretsSection({
   onMessage,
   onSaved,
 }: DiscordBotSecretsSectionProps) {
-  const [loading, setLoading] = useState(true);
+  const secretsQuery = useDiscordSecretsQuery(teamId);
+  const loading = secretsQuery.isPending;
   const [saving, setSaving] = useState(false);
   const [secrets, setSecrets] = useState<DiscordBotSecretsPublic | null>(null);
   const [clientId, setClientId] = useState("");
@@ -35,21 +37,16 @@ export function DiscordBotSecretsSection({
     setPat("");
   }, []);
 
-  const loadSecrets = useCallback(async () => {
-    setLoading(true);
-    try {
-      const { secrets: next } = await client.getDiscordBotSecrets(teamId);
-      applySecrets(next);
-    } catch (err) {
-      onMessage(err instanceof Error ? err.message : "Failed to load Discord secrets");
-    } finally {
-      setLoading(false);
-    }
-  }, [applySecrets, onMessage, teamId]);
+  // Copy the loaded secrets into the form whenever the server copy changes.
+  useEffect(() => {
+    if (secretsQuery.data) applySecrets(secretsQuery.data);
+  }, [secretsQuery.data, applySecrets]);
 
   useEffect(() => {
-    void loadSecrets();
-  }, [loadSecrets]);
+    if (secretsQuery.error) {
+      onMessage(secretsQuery.error instanceof Error ? secretsQuery.error.message : "Failed to load Discord secrets");
+    }
+  }, [secretsQuery.error, onMessage]);
 
   async function saveSecrets() {
     if (!canManage) return;

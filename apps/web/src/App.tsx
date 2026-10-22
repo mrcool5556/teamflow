@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Navigate, useLocation, useNavigate, type Location } from "react-router";
+import { useQueryClient } from "@tanstack/react-query";
 import type {
   BoardRowPublic,
   IssuePublic,
@@ -40,7 +41,11 @@ import { TeamSettingsSection } from "./components/TeamSettingsSection";
 import { UndoToast } from "./components/UndoToast";
 import { AboutDialog } from "./components/AboutDialog";
 import { useChangeHistory } from "./hooks/useChangeHistory";
-import { useTeamPermissions } from "./hooks/useTeamPermissions";
+import { queryKeys } from "./queries/keys";
+import { refreshTeams, useTeamPermissionsQuery, useTeamsQuery } from "./queries/teams";
+import { updateBoard, useBoardQuery } from "./queries/board";
+import { useMembersQuery } from "./queries/members";
+import { useAuthConfigQuery } from "./queries/auth";
 import { hasTeamPermission } from "./lib/teamPermissions";
 import {
   normalizeRefInput,
@@ -66,6 +71,18 @@ type NavState = { from?: Pick<Location, "pathname" | "search" | "state">; ref?: 
 
 const APP_VERSION = __TEAMFLOW_VERSION__;
 
+const NO_TEAMS: TeamPublic[] = [];
+const NO_ROWS: BoardRowPublic[] = [];
+const NO_STATUSES: IssueStatusPublic[] = [];
+const NO_ISSUES: IssuePublic[] = [];
+const NO_MEMBERS: TeamMemberPublic[] = [];
+
+type ListUpdate<T> = T[] | ((prev: T[]) => T[]);
+
+function applyListUpdate<T>(prev: T[], next: ListUpdate<T>) {
+  return typeof next === "function" ? next(prev) : next;
+}
+
 type QuickAddTarget =
   | { kind: "row" }
   | { kind: "column"; rowId: string }
@@ -76,16 +93,24 @@ export function App() {
   const navigate = useNavigate();
   const route = useAppRoute();
   const navState = location.state as NavState;
+  const queryClient = useQueryClient();
   const [user, setUser] = useState<UserPublic | null>(getStoredUser);
-  const [teams, setTeams] = useState<TeamPublic[]>([]);
-  const [teamsLoaded, setTeamsLoaded] = useState(false);
-  const [rows, setRows] = useState<BoardRowPublic[]>([]);
-  const [statuses, setStatuses] = useState<IssueStatusPublic[]>([]);
-  const [issues, setIssues] = useState<IssuePublic[]>([]);
-  const [members, setMembers] = useState<TeamMemberPublic[]>([]);
+  /** Set once /auth/me and the profile are loaded; team data waits for it. */
+  const [sessionReady, setSessionReady] = useState(false);
+  const teamsQuery = useTeamsQuery(Boolean(user) && sessionReady);
+  const teams = teamsQuery.data ?? NO_TEAMS;
+  const teamsLoaded = teamsQuery.isSuccess;
   const routeTeam = route.teamKey ? (teams.find((team) => team.key === route.teamKey) ?? null) : null;
   const teamId = routeTeam?.id ?? null;
   const teamKey = routeTeam?.key ?? null;
+  // Board data is keyed by team: a slow response for the previous team cannot land here.
+  const boardQuery = useBoardQuery(teamId);
+  const rows = boardQuery.data?.rows ?? NO_ROWS;
+  const statuses = boardQuery.data?.statuses ?? NO_STATUSES;
+  const issues = boardQuery.data?.issues ?? NO_ISSUES;
+  const boardTeamId = boardQuery.isSuccess ? teamId : null;
+  const membersQuery = useMembersQuery(teamId);
+  const members = membersQuery.data ?? NO_MEMBERS;
   const [selectedIssue, setSelectedIssue] = useState<IssuePublic | null>(null);
   const [rowFilesRow, setRowFilesRow] = useState<BoardRowPublic | null>(null);
   const [teamFilesOpen, setTeamFilesOpen] = useState(false);
@@ -93,9 +118,8 @@ export function App() {
     () => peekRefBack()?.label ?? null,
   );
   const [error, setError] = useState<string | null>(null);
-  const [loading, setLoading] = useState(false);
-  /** Team whose board data is currently loaded. */
-  const [boardTeamId, setBoardTeamId] = useState<string | null>(null);
+  const [sessionLoading, setSessionLoading] = useState(false);
+  const loading = sessionLoading || (Boolean(teamId) && boardQuery.isPending);
   const [patName, setPatName] = useState("Cursor MCP");
   const [createdPat, setCreatedPat] = useState<string | null>(null);
   const [profile, setProfile] = useState<UserProfile>(createDefaultUserProfile);
@@ -128,11 +152,9 @@ export function App() {
   const settingsPanel: SettingsPanel = isSettingsPanel(route.settingsPanel ?? undefined)
     ? (route.settingsPanel as SettingsPanel)
     : "general";
-  const {
-    permissions: teamPermissions,
-    ready: teamPermissionsReady,
-    reload: reloadTeamPermissions,
-  } = useTeamPermissions(teamId);
+  const permissionsQuery = useTeamPermissionsQuery(teamId);
+  const teamPermissions = permissionsQuery.data ?? null;
+  const teamPermissionsReady = Boolean(teamId) && permissionsQuery.isFetched;
   const currentMember = members.find((member) => member.userId === user?.id);
   const effectiveTeamPermissions =
     teamPermissions ??
@@ -215,36 +237,27 @@ export function App() {
     );
   }
 
-  const loadBoard = useCallback(async (activeTeamId: string) => {
-    if (!activeTeamId) return;
-    setLoading(true);
-    setError(null);
-    try {
-      const [statusesResult, rowsResult, issuesResult, membersResult] = await Promise.allSettled([
-        client.listStatuses(activeTeamId),
-        client.listRows(activeTeamId),
-        client.listIssues({ teamId: activeTeamId }),
-        client.listTeamMembers(activeTeamId),
-      ]);
-
-      if (statusesResult.status === "rejected") throw statusesResult.reason;
-      if (rowsResult.status === "rejected") throw rowsResult.reason;
-      if (issuesResult.status === "rejected") throw issuesResult.reason;
-
-      setStatuses(statusesResult.value.statuses);
-      setRows(rowsResult.value.rows);
-      setIssues(issuesResult.value.issues);
-      setMembers(membersResult.status === "fulfilled" ? membersResult.value.members : []);
-      setBoardTeamId(activeTeamId);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to load board");
-    } finally {
-      setLoading(false);
+  // Handlers below still edit board lists in place; these write into the team's query cache.
+  // Each captures the team it was created for, so a late result never lands on another team.
+  function setRows(next: ListUpdate<BoardRowPublic>) {
+    if (teamId) updateBoard(queryClient, teamId, (b) => ({ ...b, rows: applyListUpdate(b.rows, next) }));
+  }
+  function setStatuses(next: ListUpdate<IssueStatusPublic>) {
+    if (teamId) {
+      updateBoard(queryClient, teamId, (b) => ({ ...b, statuses: applyListUpdate(b.statuses, next) }));
     }
-  }, []);
+  }
+  function setIssues(next: ListUpdate<IssuePublic>) {
+    if (teamId) {
+      updateBoard(queryClient, teamId, (b) => ({ ...b, issues: applyListUpdate(b.issues, next) }));
+    }
+  }
+  function reloadBoard() {
+    if (teamId) void queryClient.invalidateQueries({ queryKey: queryKeys.board(teamId) });
+  }
 
   const bootstrap = useCallback(async () => {
-    setLoading(true);
+    setSessionLoading(true);
     setError(null);
     try {
       const { user: me } = await client.me();
@@ -267,14 +280,12 @@ export function App() {
         setProfile(fallback);
       }
 
-      const { teams: nextTeams } = await client.listTeams();
-      setTeams(nextTeams);
-      setTeamsLoaded(true);
+      setSessionReady(true);
     } catch {
       clearSession();
       setUser(null);
     } finally {
-      setLoading(false);
+      setSessionLoading(false);
     }
   }, []);
 
@@ -290,17 +301,6 @@ export function App() {
     updateProfile(mergeUserProfile(profileRef.current, { ui: { lastTeamId: teamId } }));
   }, [teamId, updateProfile]);
 
-  useEffect(() => {
-    if (!teamId) {
-      setRows([]);
-      setIssues([]);
-      setStatuses([]);
-      setMembers([]);
-      return;
-    }
-    void loadBoard(teamId);
-  }, [teamId, loadBoard]);
-
   const switchTeam = useCallback(
     (nextTeamId: string, list: TeamPublic[] = teams) => {
       const next = list.find((team) => team.id === nextTeamId);
@@ -313,22 +313,19 @@ export function App() {
   );
 
   async function refreshTeamsAndSwitch(teamIdToSelect: string) {
-    const { teams: nextTeams } = await client.listTeams();
-    setTeams(nextTeams);
+    const nextTeams = await refreshTeams(queryClient);
     switchTeam(teamIdToSelect, nextTeams);
   }
 
   async function handleTeamCreated(newTeamId: string, switchToNew: boolean) {
-    const { teams: nextTeams } = await client.listTeams();
-    setTeams(nextTeams);
+    const nextTeams = await refreshTeams(queryClient);
     if (switchToNew || !teamId) {
       switchTeam(newTeamId, nextTeams);
     }
   }
 
   async function handleTeamLeft(leftTeamId: string) {
-    const { teams: nextTeams } = await client.listTeams();
-    setTeams(nextTeams);
+    const nextTeams = await refreshTeams(queryClient);
     if (teamId === leftTeamId) {
       const fallback = nextTeams[0]?.key ?? null;
       navigate(boardPath(fallback));
@@ -336,8 +333,7 @@ export function App() {
   }
 
   async function handleTeamDeleted(deletedTeamId: string) {
-    const { teams: nextTeams } = await client.listTeams();
-    setTeams(nextTeams);
+    const nextTeams = await refreshTeams(queryClient);
     if (teamId === deletedTeamId) {
       const fallback = nextTeams[0]?.key ?? null;
       navigate(boardPath(fallback));
@@ -353,8 +349,7 @@ export function App() {
     void (async () => {
       try {
         const { team, alreadyMember } = await client.acceptInvite(token);
-        const { teams: nextTeams } = await client.listTeams();
-        setTeams(nextTeams);
+        await refreshTeams(queryClient);
         setRefNotice(
           alreadyMember
             ? `Already on team ${team.key} — ${team.name}`
@@ -366,7 +361,7 @@ export function App() {
         navigate("/", { replace: true });
       }
     })();
-  }, [route.inviteToken, user, teamsLoaded, navigate]);
+  }, [route.inviteToken, user, teamsLoaded, navigate, queryClient]);
 
   // A row/column ref handed over by a legacy ?ref= link or by goToRef across a reload.
   useEffect(() => {
@@ -439,7 +434,7 @@ export function App() {
   );
 
   async function handleLogin(email: string, password: string) {
-    setLoading(true);
+    setSessionLoading(true);
     setError(null);
     try {
       const result = await client.login({ email, password });
@@ -449,12 +444,12 @@ export function App() {
     } catch (err) {
       setError(err instanceof Error ? err.message : "Login failed");
     } finally {
-      setLoading(false);
+      setSessionLoading(false);
     }
   }
 
   async function handleRegister(name: string, email: string, password: string) {
-    setLoading(true);
+    setSessionLoading(true);
     setError(null);
     try {
       const inviteToken = takePendingInvite() ?? undefined;
@@ -470,7 +465,7 @@ export function App() {
     } catch (err) {
       setError(err instanceof Error ? err.message : "Registration failed");
     } finally {
-      setLoading(false);
+      setSessionLoading(false);
     }
   }
 
@@ -488,7 +483,7 @@ export function App() {
       await client.updateRow(activeRowId, { position: newIndex });
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to reorder row");
-      if (teamId) await loadBoard(teamId);
+      reloadBoard();
     }
   }
 
@@ -514,7 +509,7 @@ export function App() {
       await client.updateStatus(activeStatusId, { position: newIndex });
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to reorder column");
-      if (teamId) await loadBoard(teamId);
+      reloadBoard();
     }
   }
 
@@ -547,7 +542,7 @@ export function App() {
       ),
     ).catch((err) => {
       setError(err instanceof Error ? err.message : "Failed to reorder issue");
-      if (teamId) void loadBoard(teamId);
+      reloadBoard();
     });
   }
   async function assignIssue(issue: IssuePublic, assigneeIds: string[]) {
@@ -649,7 +644,7 @@ export function App() {
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to update issues");
-      if (teamId) await loadBoard(teamId);
+      reloadBoard();
     }
   }
 
@@ -681,7 +676,7 @@ export function App() {
       ),
     ).catch((err) => {
       setError(err instanceof Error ? err.message : "Failed to move issues");
-      if (teamId) void loadBoard(teamId);
+      reloadBoard();
     });
   }
 
@@ -731,7 +726,7 @@ export function App() {
       [...patchById.entries()].map(([id, patch]) => client.updateIssue(id, patch)),
     ).catch((err) => {
       setError(err instanceof Error ? err.message : "Failed to update timers");
-      if (teamId) void loadBoard(teamId);
+      reloadBoard();
     });
   }
 
@@ -837,7 +832,7 @@ export function App() {
       })
       .catch((err) => {
         setError(err instanceof Error ? err.message : "Failed to update timer");
-        if (teamId) void loadBoard(teamId);
+        reloadBoard();
       });
   }
 
@@ -1157,8 +1152,8 @@ export function App() {
     handledRefStateRef.current = null;
     handledInviteRef.current = null;
     setUser(null);
-    setTeams([]);
-    setTeamsLoaded(false);
+    setSessionReady(false);
+    queryClient.clear();
     navigate("/login");
   }
 
@@ -1485,7 +1480,9 @@ export function App() {
         </div>
       </header>
 
-      {error && <div className="banner error">{error}</div>}
+      {(error ?? boardQuery.error?.message) && (
+        <div className="banner error">{error ?? boardQuery.error?.message}</div>
+      )}
       {refNotice && <div className="banner ref-notice">{refNotice}</div>}
       {loading && <div className="banner">Loading…</div>}
 
@@ -1576,14 +1573,11 @@ export function App() {
                       members={members}
                       currentUserId={user?.id ?? null}
                       permissions={effectiveTeamPermissions}
-                      onMembersChange={setMembers}
                       onMessage={setProfileMessage}
                       onTeamJoined={(joinedTeamId) => void refreshTeamsAndSwitch(joinedTeamId)}
                       onTeamLeft={(leftTeamId) => void handleTeamLeft(leftTeamId)}
                       onTeamDeleted={(deletedTeamId) => void handleTeamDeleted(deletedTeamId)}
-                      onBoardChanged={() => {
-                        if (teamId) void loadBoard(teamId);
-                      }}
+                      onBoardChanged={reloadBoard}
                     />
                   </div>
                 ) : null}
@@ -1593,7 +1587,7 @@ export function App() {
                     teamId={teamId}
                     canManage={canManageRoles}
                     onMessage={setProfileMessage}
-                    onRolesChange={() => void reloadTeamPermissions()}
+                    onRolesChange={() => void permissionsQuery.refetch()}
                   />
                 ) : null}
 
@@ -1769,25 +1763,13 @@ function LoginScreen({
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [resetToken, setResetToken] = useState(routeResetToken ?? "");
-  const [inviteOnly, setInviteOnly] = useState(false);
-  const [passwordResetEmail, setPasswordResetEmail] = useState(false);
+  const authConfig = useAuthConfigQuery().data;
+  const inviteOnly = authConfig?.inviteOnly ?? false;
+  const passwordResetEmail = authConfig?.passwordResetEmail ?? false;
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
   const [localError, setLocalError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const pendingInvite = hasPendingInvite();
-
-  useEffect(() => {
-    void client
-      .getAuthConfig()
-      .then((config) => {
-        setInviteOnly(config.inviteOnly);
-        setPasswordResetEmail(config.passwordResetEmail);
-      })
-      .catch(() => {
-        setInviteOnly(false);
-        setPasswordResetEmail(false);
-      });
-  }, []);
 
   const registerBlocked = inviteOnly && !pendingInvite;
   const displayError = localError ?? error;

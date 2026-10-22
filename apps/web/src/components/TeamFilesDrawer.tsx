@@ -1,11 +1,14 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import type { IssueAttachmentPublic, TeamFilePublic } from "@teamflow/core";
 import {
   FILE_TRASH_RETENTION_DAYS,
   getTeamFileDisplayName,
   isZipAttachmentFile,
 } from "@teamflow/core";
+import { useQueryClient } from "@tanstack/react-query";
 import { client } from "../api";
+import { queryKeys } from "../queries/keys";
+import { useTeamFilesQuery } from "../queries/files";
 import { useBackdropDismiss } from "../hooks/useBackdropDismiss";
 import { getSharedTeamFilePreviewCache } from "../lib/teamFilePreviewCache";
 import { AttachmentLightbox } from "./AttachmentImagePreview";
@@ -63,15 +66,26 @@ type TeamFilesDrawerProps = {
   onNavigateRef?: (ref: string) => void;
 };
 
+const NO_FILES: TeamFilePublic[] = [];
+
 type SortMode = "size" | "name" | "refs";
 type FilesTab = "active" | "trash";
 
 export function TeamFilesDrawer({ teamId, open, onClose, onNavigateRef }: TeamFilesDrawerProps) {
   const [tab, setTab] = useState<FilesTab>("active");
-  const [files, setFiles] = useState<TeamFilePublic[]>([]);
-  const [totalBytes, setTotalBytes] = useState(0);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const queryClient = useQueryClient();
+  const filesQuery = useTeamFilesQuery(teamId, tab === "trash", open);
+  const files = filesQuery.data?.files ?? NO_FILES;
+  const totalBytes = filesQuery.data?.totalBytes ?? 0;
+  const loading = filesQuery.isFetching;
+  const [actionError, setError] = useState<string | null>(null);
+  const error =
+    actionError ??
+    (filesQuery.error
+      ? filesQuery.error instanceof Error
+        ? filesQuery.error.message
+        : "Could not load team files"
+      : null);
   const [query, setQuery] = useState("");
   const [sort, setSort] = useState<SortMode>("size");
   const [busyFileId, setBusyFileId] = useState<string | null>(null);
@@ -84,25 +98,9 @@ export function TeamFilesDrawer({ teamId, open, onClose, onNavigateRef }: TeamFi
   const previewCache = useMemo(() => getSharedTeamFilePreviewCache(), []);
 
   const loadFiles = useCallback(async () => {
-    setLoading(true);
     setError(null);
-    try {
-      const result = await client.listTeamFiles(teamId, { trash: tab === "trash" });
-      setFiles(result.files);
-      setTotalBytes(result.totalBytes);
-    } catch (err) {
-      setFiles([]);
-      setTotalBytes(0);
-      setError(err instanceof Error ? err.message : "Could not load team files");
-    } finally {
-      setLoading(false);
-    }
-  }, [teamId, tab]);
-
-  useEffect(() => {
-    if (!open) return;
-    void loadFiles();
-  }, [open, loadFiles]);
+    await queryClient.invalidateQueries({ queryKey: ["files", teamId] });
+  }, [queryClient, teamId]);
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -197,8 +195,13 @@ export function TeamFilesDrawer({ teamId, open, onClose, onNavigateRef }: TeamFi
   }
 
   function handleFileRenamed(fileId: string, filename: string) {
-    setFiles((current) =>
-      current.map((file) => (file.fileId === fileId ? { ...file, filename } : file)),
+    queryClient.setQueryData<{ files: TeamFilePublic[] }>(
+      queryKeys.teamFiles(teamId, tab === "trash"),
+      (data) =>
+        data && {
+          ...data,
+          files: data.files.map((file) => (file.fileId === fileId ? { ...file, filename } : file)),
+        },
     );
   }
 
