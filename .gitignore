@@ -5,7 +5,10 @@ build/
 .env.local
 *.db
 *.db-journal
+*.db-wal
+*.db-shm
 /data/
+/packages/data/
 *.log
 .turbo/
 coverage/
