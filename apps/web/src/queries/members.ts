@@ -21,7 +21,8 @@ export function useMembersQuery(teamId: string | null) {
 export function useInvitesQuery(teamId: string, enabled: boolean) {
   return useQuery({
     queryKey: queryKeys.invites(teamId),
-    queryFn: async ({ signal }) => (await client.withSignal(signal).listTeamInvites(teamId)).invites,
+    queryFn: async ({ signal }) =>
+      (await client.withSignal(signal).listTeamInvites(teamId)).invites,
     enabled,
   });
 }

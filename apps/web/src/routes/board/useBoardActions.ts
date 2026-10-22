@@ -65,7 +65,6 @@ export function useBoardActions({
   const [quickAdd, setQuickAdd] = useState<QuickAddTarget | null>(null);
   const [quickAddValue, setQuickAddValue] = useState("");
 
-
   function reorderRows(activeRowId: string, overRowId: string) {
     const change = reorderRowsChange(board, activeRowId, overRowId);
     if (change) void mutateBoard(change);
@@ -88,7 +87,9 @@ export function useBoardActions({
   }
 
   function assignIssue(issue: IssuePublic, assigneeIds: string[]) {
-    void mutateBoard(patchIssue(board, members, issue.id, { assigneeIds }, "Failed to assign issue"));
+    void mutateBoard(
+      patchIssue(board, members, issue.id, { assigneeIds }, "Failed to assign issue"),
+    );
   }
 
   /** Column assign and bulk assign: one change, parallel requests, one rollback. */
@@ -233,7 +234,9 @@ export function useBoardActions({
   }
 
   function updateIssueColor(issue: IssuePublic, color: string | null) {
-    void mutateBoard(patchIssue(board, members, issue.id, { color }, "Failed to update card color"));
+    void mutateBoard(
+      patchIssue(board, members, issue.id, { color }, "Failed to update card color"),
+    );
   }
 
   function updateIssuePriority(issue: IssuePublic, priority: Priority) {

@@ -91,8 +91,7 @@ export function useChangeHistory() {
       }
       patchEntry(id, "committed", {
         issueId: payload.issueId,
-        restorableUntil:
-          payload.timing === "now" ? Date.now() + RESTORE_RETENTION_MS : undefined,
+        restorableUntil: payload.timing === "now" ? Date.now() + RESTORE_RETENTION_MS : undefined,
       });
     },
     [patchEntry, runCommit],

@@ -51,7 +51,10 @@ export function DiscordBotServiceSection({
 
   useEffect(() => {
     if (statusQuery.error) {
-      onMessage(errorMessage(statusQuery.error, "Failed to load Discord bot service status"), "error");
+      onMessage(
+        errorMessage(statusQuery.error, "Failed to load Discord bot service status"),
+        "error",
+      );
     }
   }, [statusQuery.error, onMessage]);
 

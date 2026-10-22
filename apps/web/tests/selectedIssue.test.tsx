@@ -16,7 +16,9 @@ describe("selected issue", () => {
     db.issues[0] = { ...db.issues[0]!, title: "Renamed by Grace" };
     await act(() => queryClient.invalidateQueries({ queryKey: queryKeys.board(db.teams[0]!.id) }));
 
-    await waitFor(() => expect(screen.getByLabelText("Issue title")).toHaveValue("Renamed by Grace"));
+    await waitFor(() =>
+      expect(screen.getByLabelText("Issue title")).toHaveValue("Renamed by Grace"),
+    );
     expect(screen.getByRole("heading", { name: "Renamed by Grace" })).toBeInTheDocument();
   });
 
@@ -33,7 +35,10 @@ describe("selected issue", () => {
     expect(await screen.findByRole("heading", { name: "ENG issue 2 edited" })).toBeInTheDocument();
     await waitFor(() =>
       expect(
-        calls.some((c) => c.method === "PATCH" && (c.body as { title?: string }).title === "ENG issue 2 edited"),
+        calls.some(
+          (c) =>
+            c.method === "PATCH" && (c.body as { title?: string }).title === "ENG issue 2 edited",
+        ),
       ).toBe(true),
     );
   });
