@@ -33,8 +33,8 @@ export const TEAMFLOW_SUPPORT = {
   },
   kofi: {
     label: "Ko-fi",
-    url: "https://ko-fi.com/YOUR_KOFI_USERNAME",
-    enabled: false,
+    url: "https://ko-fi.com/toters",
+    enabled: true,
   },
 } satisfies Record<string, SupportLinkConfig>;
 
