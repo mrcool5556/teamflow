@@ -1,5 +1,6 @@
 import { AppearanceSettingsSection } from "../../components/AppearanceSettingsSection";
 import { BoardLayoutPreview } from "../../components/BoardLayoutPreview";
+import { ProfileSaveStatus } from "../../components/ProfileSaveStatus";
 import { useSession } from "../../session/session";
 
 export function AppearancePanel() {
@@ -7,7 +8,10 @@ export function AppearancePanel() {
   return (
     <div className="settings-panel appearance-panel">
       <header className="settings-panel-header">
-        <h2>Appearance</h2>
+        <div className="settings-panel-title-row">
+          <h2>Appearance</h2>
+          <ProfileSaveStatus />
+        </div>
         <p className="settings-copy settings-lead">
           Pick a look, then fine-tune it. Changes apply as you go.
         </p>
