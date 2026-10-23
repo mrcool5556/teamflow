@@ -32,3 +32,13 @@ export function describeAttachmentLimits(limits: AttachmentLimitsPublic, gbDigit
   const size = (bytes: number) => formatFileSize(bytes, gbDigits);
   return `Images ${size(limits.imageBytes)}, videos ${size(limits.videoBytes)}, ZIPs ${size(limits.zipBytes)}`;
 }
+
+/** Up to two initials from a name ("Demo User" → "DU"). */
+export function initials(name: string) {
+  return name
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((part) => part[0]?.toUpperCase() ?? "")
+    .join("");
+}

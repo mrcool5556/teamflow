@@ -196,8 +196,11 @@ export const updateIssueSchema = z.object({
   dueDate: z.string().datetime().nullable().optional(),
   rowId: z.string().uuid().nullable().optional(),
   boardSort: z.number().int().min(0).optional(),
+  /** @deprecated The web app no longer has a timer; still accepted for older clients. */
   timerActiveAt: z.string().datetime().nullable().optional(),
+  /** @deprecated See timerActiveAt. */
   timerElapsedSec: z.number().int().min(0).optional(),
+  /** @deprecated See timerActiveAt. */
   timerTargetSec: z.number().int().min(0).nullable().optional(),
   color: boardColorSchema.optional(),
 });
@@ -448,8 +451,11 @@ export type IssuePublic = {
   creatorName: string;
   dueDate: string | null;
   boardSort: number;
+  /** @deprecated Timer removed from the web app; still returned so older clients keep working. */
   timerActiveAt: string | null;
+  /** @deprecated See timerActiveAt. */
   timerElapsedSec: number;
+  /** @deprecated See timerActiveAt. */
   timerTargetSec: number | null;
   completedAt: string | null;
   createdAt: string;

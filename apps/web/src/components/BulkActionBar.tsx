@@ -9,8 +9,7 @@ import type {
 import { PRIORITIES, PRIORITY_LABELS } from "@teamflow/core";
 import { MultiAssigneePicker } from "./MultiAssigneePicker";
 import { Docked } from "../ui/BottomDock";
-
-type TimerBulkAction = "pause" | "reset";
+import { DueDatePicker } from "./DueDatePicker";
 
 type BulkActionBarProps = {
   selectedIssues: IssuePublic[];
@@ -20,7 +19,8 @@ type BulkActionBarProps = {
   onMove: (issueIds: string[], rowId: string, statusId: string) => void;
   onAssign: (issueIds: string[], assigneeIds: string[]) => void;
   onPriority: (issueIds: string[], priority: Priority) => void;
-  onTimerAction: (issueIds: string[], action: TimerBulkAction) => void;
+  /** Set (ISO) or clear (null) the due date of every selected issue. */
+  onDueDate: (issueIds: string[], dueDate: string | null) => void;
   onDelete: (issues: IssuePublic[]) => void;
   onClear: () => void;
 };
@@ -33,7 +33,7 @@ export function BulkActionBar({
   onMove,
   onAssign,
   onPriority,
-  onTimerAction,
+  onDueDate,
   onDelete,
   onClear,
 }: BulkActionBarProps) {
@@ -51,7 +51,6 @@ export function BulkActionBar({
   const [moveStatusId, setMoveStatusId] = useState(rowStatuses[0]?.id ?? "");
   const [priority, setPriority] = useState<Priority>("medium");
   const [assigneeIds, setAssigneeIds] = useState<string[]>([]);
-  const [timerAction, setTimerAction] = useState<TimerBulkAction | "">("");
 
   const effectiveMoveRowId = moveRowId || rows[0]?.id || "";
   const effectiveMoveStatusId = rowStatuses.some((status) => status.id === moveStatusId)
@@ -163,28 +162,17 @@ export function BulkActionBar({
                 </div>
               </div>
 
-              <div className="bulk-action-field bulk-action-field--timer">
-                <span className="bulk-action-label">Timer</span>
-                <div className="bulk-action-controls bulk-action-controls--timer">
-                  <select
-                    value={timerAction}
-                    aria-label="Timer action"
-                    onChange={(e) => setTimerAction(e.target.value as TimerBulkAction | "")}
-                  >
-                    <option value="">Choose…</option>
-                    <option value="pause">Pause timers</option>
-                    <option value="reset">Reset timers</option>
-                  </select>
-                  <button
-                    type="button"
-                    disabled={!timerAction}
-                    onClick={() => {
-                      if (!timerAction) return;
-                      onTimerAction(issueIds, timerAction);
-                      setTimerAction("");
+              <div className="bulk-action-field bulk-action-field--due">
+                <span className="bulk-action-label">Due date</span>
+                <div className="bulk-action-controls bulk-action-controls--due">
+                  <DueDatePicker
+                    value={null}
+                    onChange={(dueDate) => {
+                      if (dueDate) onDueDate(issueIds, dueDate);
                     }}
-                  >
-                    Apply
+                  />
+                  <button type="button" className="ghost" onClick={() => onDueDate(issueIds, null)}>
+                    Clear due date
                   </button>
                 </div>
               </div>

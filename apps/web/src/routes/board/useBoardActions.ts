@@ -10,7 +10,6 @@ import type {
 import { client } from "../../api";
 import type { UndoPayload } from "../../hooks/useChangeHistory";
 import { useErrorSink } from "../../lib/errorSink";
-import type { IssueTimerPatch } from "../../lib/timer";
 import { updateBoard, type BoardData } from "../../queries/board";
 import {
   createColumn as createColumnChange,
@@ -137,6 +136,19 @@ export function useBoardActions({
     );
   }
 
+  /** One optimistic change for the whole selection; it all rolls back if a save fails. */
+  function bulkSetDueDate(issueIds: string[], dueDate: string | null) {
+    if (issueIds.length === 0) return;
+    void mutateBoard(
+      patchIssues(
+        board,
+        members,
+        issueIds.map((id) => ({ id, patch: { dueDate } })),
+        dueDate ? "Failed to set due dates" : "Failed to clear due dates",
+      ),
+    );
+  }
+
   function bulkSetPriority(issueIds: string[], priority: Priority) {
     if (issueIds.length === 0) return;
     void mutateBoard(
@@ -147,28 +159,6 @@ export function useBoardActions({
         "Failed to update issues",
       ),
     );
-  }
-
-  function bulkTimerIssues(issueIds: string[], action: "pause" | "reset") {
-    const now = Date.now();
-    const patches = issues
-      .filter((issue) => issueIds.includes(issue.id))
-      .map((issue) => ({
-        id: issue.id,
-        patch:
-          action === "reset"
-            ? { timerActiveAt: null, timerElapsedSec: 0, timerTargetSec: null }
-            : {
-                timerActiveAt: null,
-                timerElapsedSec: issue.timerActiveAt
-                  ? issue.timerElapsedSec +
-                    Math.max(0, Math.floor((now - Date.parse(issue.timerActiveAt)) / 1000))
-                  : issue.timerElapsedSec,
-                timerTargetSec: issue.timerTargetSec,
-              },
-      }));
-    if (patches.length === 0) return;
-    void mutateBoard(patchIssues(board, members, patches, "Failed to update timers"));
   }
 
   /**
@@ -233,6 +223,12 @@ export function useBoardActions({
     void mutateBoard(patchColumn(status, { color }, "Failed to update column color"));
   }
 
+  function updateIssueDueDate(issue: IssuePublic, dueDate: string | null) {
+    void mutateBoard(
+      patchIssue(board, members, issue.id, { dueDate }, "Failed to update due date"),
+    );
+  }
+
   function updateIssueColor(issue: IssuePublic, color: string | null) {
     void mutateBoard(
       patchIssue(board, members, issue.id, { color }, "Failed to update card color"),
@@ -244,10 +240,6 @@ export function useBoardActions({
     void mutateBoard(
       patchIssue(board, members, issue.id, { priority }, "Failed to update priority"),
     );
-  }
-
-  function updateIssueTimer(issue: IssuePublic, patch: IssueTimerPatch) {
-    void mutateBoard(patchIssue(board, members, issue.id, patch, "Failed to update timer"));
   }
 
   function renameStatus(status: IssueStatusPublic, name: string) {
@@ -388,13 +380,13 @@ export function useBoardActions({
     assignRow,
     bulkMoveIssues,
     bulkSetPriority,
-    bulkTimerIssues,
+    bulkSetDueDate,
     bulkDeleteIssues,
     updateRowColor,
     updateStatusColor,
     updateIssueColor,
+    updateIssueDueDate,
     updateIssuePriority,
-    updateIssueTimer,
     renameStatus,
     removeRow,
     removeColumn,
