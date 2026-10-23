@@ -177,6 +177,7 @@ export function AppearanceSettingsSection({
           options={[
             { value: "dark", label: "Dark" },
             { value: "light", label: "Light" },
+            { value: "system", label: "Match system" },
           ]}
           onChange={(theme) =>
             onProfileChange(patchAppearance(profile, { theme: theme as ThemeMode }))
