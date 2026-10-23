@@ -89,6 +89,8 @@ describe("appearance panel", () => {
       screen.queryByText(/Profile backup|Export profile|Import profile/),
     ).not.toBeInTheDocument();
     expect(screen.queryByRole("heading", { name: "Advanced" })).not.toBeInTheDocument();
+    expect(screen.getByLabelText("Team name")).toBeInTheDocument();
+    expect(screen.getByLabelText("Team key")).toHaveAccessibleDescription(/2–8 characters/);
   });
 
   it("shows Saving…, then Saved, and offers Retry when a save fails", async () => {
