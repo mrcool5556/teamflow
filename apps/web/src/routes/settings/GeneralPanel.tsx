@@ -10,7 +10,7 @@ import { useShell } from "../board/shellContext";
 import { downloadBlob } from "../../lib/download";
 
 export function GeneralPanel() {
-  const { user, profile, updateProfile, replaceProfile } = useSession();
+  const { user, replaceProfile } = useSession();
   const { onTeamCreated } = useShell();
   const { status, onMessage } = usePanelStatus();
   const [profileImportText, setProfileImportText] = useState("");
@@ -49,15 +49,11 @@ export function GeneralPanel() {
     <div className="settings-panel">
       <header className="settings-panel-header">
         <h2>General</h2>
-        <p className="settings-copy settings-lead">
-          Board layout, profile backup, and creating new teams.
-        </p>
+        <p className="settings-copy settings-lead">Profile backup and creating new teams.</p>
       </header>
       <PanelStatus status={status} />
 
       <AdvancedProfileSettingsSection
-        profile={profile}
-        onProfileChange={updateProfile}
         profileImportText={profileImportText}
         onProfileImportTextChange={setProfileImportText}
         profileMessage={profileMessage}

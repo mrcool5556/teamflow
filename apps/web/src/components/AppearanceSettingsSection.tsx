@@ -9,6 +9,8 @@ import type {
 import {
   CHROME_STYLES,
   COLOR_PRESETS,
+  DEFAULT_BOARD_COLUMN_WIDTH,
+  DEFAULT_CARD_MIN_HEIGHT,
   DEFAULT_UI_ACCENT,
   DEFAULT_UI_PRIMARY,
   SHAPE_PRESETS,
@@ -17,6 +19,7 @@ import {
   mergeUserProfile,
 } from "@teamflow/core";
 import { useRef, type ReactNode } from "react";
+import { AppearanceBoardControls } from "./AppearanceBoardControls";
 import { AppearanceLooks } from "./AppearanceLooks";
 import { CustomColorField } from "./CustomColorField";
 
@@ -314,6 +317,31 @@ export function AppearanceSettingsSection({
             ))}
           </div>
         </fieldset>
+      </AppearanceGroup>
+
+      <AppearanceGroup
+        title="Board"
+        actions={
+          <button
+            type="button"
+            className="link-btn appearance-group-reset"
+            onClick={() =>
+              onProfileChange(
+                mergeUserProfile(profile, {
+                  board: {
+                    columnWidth: DEFAULT_BOARD_COLUMN_WIDTH,
+                    columnWidthMode: "auto",
+                    cardMinHeight: DEFAULT_CARD_MIN_HEIGHT,
+                  },
+                }),
+              )
+            }
+          >
+            Reset board
+          </button>
+        }
+      >
+        <AppearanceBoardControls profile={profile} onProfileChange={onProfileChange} />
       </AppearanceGroup>
     </div>
   );
