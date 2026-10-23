@@ -177,19 +177,7 @@ select {
   color: var(--danger-text);
 }
 
-.preview-chip {
-  margin-left: auto;
-  font-size: 0.68rem;
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-  color: var(--muted);
-  border: 1px solid var(--border);
-  padding: 0.15rem 0.45rem;
-}
 
-.preview-muted {
-  opacity: 0.45;
-}
 
 .row-separator-title .ref-actions {
   flex-shrink: 0;
