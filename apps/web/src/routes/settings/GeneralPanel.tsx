@@ -1,65 +1,24 @@
-import { useState } from "react";
-import { client } from "../../api";
-import { AdvancedProfileSettingsSection } from "../../components/AdvancedProfileSettingsSection";
+import { Link } from "react-router";
 import { CreateTeamSection } from "../../components/CreateTeamSection";
 import { PanelStatus } from "../../components/PanelStatus";
-import { errorMessage } from "../../lib/errorSink";
 import { usePanelStatus } from "../../lib/panelStatus";
-import { useSession } from "../../session/session";
 import { useShell } from "../board/shellContext";
-import { downloadBlob } from "../../lib/download";
 
 export function GeneralPanel() {
-  const { user, replaceProfile } = useSession();
   const { onTeamCreated } = useShell();
   const { status, onMessage } = usePanelStatus();
-  const [profileImportText, setProfileImportText] = useState("");
-  const [profileMessage, setProfileMessage] = useState<string | null>(null);
-
-  async function exportProfileFile() {
-    setProfileMessage(null);
-    try {
-      const data = await client.exportProfile();
-      downloadBlob(
-        new Blob([JSON.stringify(data, null, 2)], { type: "application/json" }),
-        `teamflow-profile-${user?.name?.replace(/\s+/g, "-").toLowerCase() ?? "user"}.json`,
-      );
-      setProfileMessage("Profile exported. Share this file so others can import your layout.");
-    } catch (err) {
-      onMessage(errorMessage(err, "Failed to export profile"), "error");
-    }
-  }
-
-  async function importProfileFile() {
-    setProfileMessage(null);
-    const raw = profileImportText.trim();
-    if (!raw) return;
-    try {
-      const payload = JSON.parse(raw) as unknown;
-      const { profile: imported } = await client.importProfile(payload);
-      replaceProfile(imported);
-      setProfileImportText("");
-      setProfileMessage("Profile imported and saved to your account.");
-    } catch (err) {
-      onMessage(errorMessage(err, "Failed to import profile"), "error");
-    }
-  }
 
   return (
     <div className="settings-panel">
       <header className="settings-panel-header">
         <h2>General</h2>
-        <p className="settings-copy settings-lead">Profile backup and creating new teams.</p>
+        <p className="settings-copy settings-lead">Create another team.</p>
+        <p className="settings-hint">
+          Looks, board size and sharing your look are under{" "}
+          <Link to="../appearance">Appearance</Link>.
+        </p>
       </header>
       <PanelStatus status={status} />
-
-      <AdvancedProfileSettingsSection
-        profileImportText={profileImportText}
-        onProfileImportTextChange={setProfileImportText}
-        profileMessage={profileMessage}
-        onExportProfile={exportProfileFile}
-        onImportProfile={importProfileFile}
-      />
 
       <CreateTeamSection onMessage={onMessage} onTeamCreated={onTeamCreated} />
     </div>

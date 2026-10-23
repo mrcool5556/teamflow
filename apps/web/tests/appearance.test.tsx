@@ -1,6 +1,8 @@
 import { configure, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it } from "vitest";
+import { createDefaultUserProfile, mergeUserProfile } from "@teamflow/core";
+import { buildLookExport } from "../src/lib/appearanceShare";
 import { installFakeApi, seedDb, signIn } from "./fakeApi";
 import { renderApp } from "./renderApp";
 
@@ -82,7 +84,11 @@ describe("appearance panel", () => {
     await user.click(screen.getByRole("button", { name: "General" }));
     expect(await screen.findByRole("heading", { name: "General" })).toBeInTheDocument();
     expect(screen.queryByText("Card min height")).not.toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "Appearance → Board" })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Appearance" })).toBeInTheDocument();
+    expect(
+      screen.queryByText(/Profile backup|Export profile|Import profile/),
+    ).not.toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "Advanced" })).not.toBeInTheDocument();
   });
 
   it("shows Saving…, then Saved, and offers Retry when a save fails", async () => {
@@ -117,5 +123,38 @@ describe("appearance panel", () => {
     await user.click(within(region).getByRole("button", { name: "Undo" }));
     expect(document.documentElement.dataset.chromeStyle).toBe("glass");
     expect(within(region).queryByText(/reset to default/)).not.toBeInTheDocument();
+  });
+
+  it("previews an imported look before using it", async () => {
+    const user = userEvent.setup();
+    const db = await openAppearance();
+    const look = buildLookExport(
+      mergeUserProfile(createDefaultUserProfile(), { appearance: { chromeStyle: "neon" } }),
+    );
+    const share = screen.getByRole("region", { name: "Share this look" });
+    await user.click(within(share).getByRole("button", { name: /Import a look/ }));
+    const paste = within(share).getByPlaceholderText("Paste a look here");
+    await user.click(paste);
+    await user.paste(JSON.stringify(look));
+    await user.click(within(share).getByRole("button", { name: "Preview" }));
+    expect(document.documentElement.dataset.chromeStyle).toBe("neon");
+
+    await user.click(within(share).getByRole("button", { name: "Cancel" }));
+    expect(document.documentElement.dataset.chromeStyle).toBe("industrial");
+
+    await user.click(within(share).getByRole("button", { name: "Preview" }));
+    await user.click(within(share).getByRole("button", { name: "Use this look" }));
+    expect(document.documentElement.dataset.chromeStyle).toBe("neon");
+    await waitFor(() => expect(db.profile.appearance.chromeStyle).toBe("neon"));
+  });
+
+  it("explains a paste that is not a look", async () => {
+    const user = userEvent.setup();
+    await openAppearance();
+    const share = screen.getByRole("region", { name: "Share this look" });
+    await user.click(within(share).getByRole("button", { name: /Import a look/ }));
+    await user.type(within(share).getByPlaceholderText("Paste a look here"), "hello");
+    await user.click(within(share).getByRole("button", { name: "Preview" }));
+    expect(within(share).getByRole("alert")).toHaveTextContent(/not a Teamflow look/);
   });
 });
