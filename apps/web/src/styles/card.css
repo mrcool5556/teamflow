@@ -440,7 +440,7 @@
   z-index: calc(var(--z-base) + 1);
 }
 
-/* Card controls with nothing set (no assignee, colour or timer) wait for hover or focus on
+/* Card controls with nothing set (no assignee or colour) wait for hover or focus on
    devices that can hover; touch screens always show them. The wrapper adds no box. */
 .issue-card-optional {
   display: contents;
@@ -456,4 +456,54 @@
   .issue-card-optional[data-unset]:has([aria-expanded="true"]) {
     visibility: visible;
   }
+}
+
+/* Due date chip on a card: neutral later, amber within a day, red when overdue, muted when done. */
+.due-chip {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.05rem 0.4rem;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-xs);
+  background: transparent;
+  color: var(--text-soft);
+  box-shadow: none;
+  font-size: var(--font-size-xs);
+  line-height: 1.4;
+  white-space: nowrap;
+}
+
+button.due-chip:hover {
+  border-color: var(--accent);
+  color: var(--text);
+}
+
+.due-chip--soon {
+  border-color: color-mix(in srgb, #f59e0b 70%, transparent);
+  color: #f59e0b;
+}
+
+.due-chip--overdue {
+  border-color: var(--danger);
+  color: var(--danger-text);
+  background: color-mix(in srgb, var(--danger) 12%, transparent);
+}
+
+.due-chip--done {
+  color: var(--muted);
+  text-decoration: line-through;
+}
+
+:root[data-theme="light"] .due-chip--soon {
+  color: #b45309;
+}
+
+.issue-card-header-meta .due-chip {
+  flex-shrink: 0;
+}
+
+/* The meta row clips overflow and may shrink by a fraction of a pixel; with a due chip it keeps
+   its full width so the chip's border is never shaved off. */
+.issue-card-header-meta:has(.due-chip) {
+  flex-shrink: 0;
 }

@@ -22,13 +22,8 @@
   flex-shrink: 0;
 }
 
-.issue-card-header-meta .assignee-picker,
-.issue-card-header-meta .issue-timer {
+.issue-card-header-meta .assignee-picker {
   flex-shrink: 0;
-}
-
-.issue-card-header-meta .issue-timer-trigger.compact .issue-timer-value {
-  max-width: 4.25rem;
 }
 
 .priority-picker-trigger {
@@ -305,106 +300,6 @@
   gap: 0.45rem;
 }
 
-.timer-clock {
-  display: flex;
-  flex-direction: column;
-  gap: 0.35rem;
-  margin: 0.5rem 0 0.75rem;
-  padding: 0.75rem 0.5rem;
-  background: var(--panel);
-  border: 2px solid var(--border);
-}
-
-.timer-clock-labels,
-.timer-clock-digits {
-  display: grid;
-  grid-template-columns: repeat(6, minmax(0, 1fr));
-  gap: 0.25rem;
-  text-align: center;
-}
-
-.timer-clock-label {
-  font-size: 0.62rem;
-  text-transform: lowercase;
-  letter-spacing: 0.06em;
-  color: var(--muted);
-}
-
-.timer-clock-digit {
-  font-family: "JetBrains Mono", monospace;
-  font-size: 1.55rem;
-  font-weight: 700;
-  line-height: 1.1;
-  color: var(--text);
-  padding: 0.2rem 0;
-}
-
-.timer-clock-digits--live .timer-clock-digit {
-  font-size: 1.85rem;
-  color: var(--accent);
-}
-
-.timer-clock-digit-input {
-  width: 100%;
-  text-align: center;
-  background: var(--surface);
-  border: 2px solid var(--border);
-  box-shadow: none;
-  padding: 0.25rem 0;
-}
-
-.timer-clock-digit-input:focus {
-  outline: none;
-  border-color: var(--accent);
-}
-
-.timer-clock-digit-input--scroll {
-  cursor: ns-resize;
-}
-
-.timer-clock-digit-input--scroll:hover {
-  border-color: color-mix(in srgb, var(--accent) 55%, var(--border));
-}
-
-.issue-timer.running .timer-clock-digits--live .timer-clock-digit {
-  color: var(--accent);
-}
-
-.issue-timer.finished .timer-clock-digits--live .timer-clock-digit {
-  color: var(--done);
-}
-
-.timer-clock--add {
-  margin-top: 0.55rem;
-  padding: 0.55rem 0.45rem 0.65rem;
-  background: var(--surface);
-}
-
-.timer-clock-add-label {
-  margin: 0 0 0.35rem;
-  font-size: 0.68rem;
-  text-transform: uppercase;
-  letter-spacing: 0.07em;
-  color: var(--muted);
-}
-
-.timer-clock--add .timer-clock-digit {
-  font-size: 1.1rem;
-}
-
-.timer-clock--add .timer-clock-digit-input {
-  font-size: 1.1rem;
-}
-
-.issue-timer-actions--add {
-  margin-top: 0.45rem;
-  margin-bottom: 0;
-}
-
-.issue-timer-actions--add button {
-  width: 100%;
-}
-
 .color-picker--compact .color-picker-trigger {
   padding: 0.18rem 0.28rem;
 }
@@ -414,27 +309,19 @@
   left: auto;
 }
 
-.assignee-picker-trigger.compact,
-.issue-timer-trigger.compact {
+.assignee-picker-trigger.compact {
   padding: 0.2rem 0.35rem;
   min-width: 0;
 }
 
-.issue-timer-trigger.compact .issue-timer-value {
-  font-size: 0.68rem;
-  max-width: 3.5rem;
-}
-
 .assignee-picker,
 .color-picker,
-.issue-timer,
 .priority-picker {
   position: relative;
 }
 
 .assignee-picker-trigger,
-.color-picker-trigger,
-.issue-timer-trigger {
+.color-picker-trigger {
   display: inline-flex;
   align-items: center;
   gap: 0.4rem;
@@ -448,29 +335,25 @@
 }
 
 .assignee-picker.open .assignee-picker-trigger,
-.color-picker.open .color-picker-trigger,
-.issue-timer.open .issue-timer-trigger {
+.color-picker.open .color-picker-trigger {
   border-color: var(--accent);
 }
 
 .assignee-picker-label,
-.color-picker-label,
-.issue-timer-value {
+.color-picker-label {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
   max-width: 7rem;
 }
 
-.assignee-picker-caret,
-.issue-timer-icon {
+.assignee-picker-caret {
   color: var(--muted);
   flex-shrink: 0;
 }
 
 .assignee-picker-panel,
-.color-picker-panel,
-.issue-timer-panel {
+.color-picker-panel {
   position: absolute;
   top: calc(100% + 0.35rem);
   left: 0;
@@ -484,7 +367,6 @@
 
 .assignee-picker-panel--floating,
 .color-picker-panel--floating,
-.issue-timer-panel--floating,
 .priority-picker-panel--floating {
   position: fixed;
   top: 0;
@@ -495,7 +377,6 @@
 
 .assignee-picker-panel--floating.assignee-picker-panel--positioned,
 .color-picker-panel--floating.color-picker-panel--positioned,
-.issue-timer-panel--floating.issue-timer-panel--positioned,
 .priority-picker-panel--floating.priority-picker-panel--positioned {
   opacity: 1;
   pointer-events: auto;
@@ -504,39 +385,6 @@
 .assignee-picker-panel--floating.assignee-picker-panel--positioned {
   min-width: 260px;
   max-width: 380px;
-}
-
-.issue-timer-panel--floating.issue-timer-panel--positioned {
-  min-width: 280px;
-  max-width: 520px;
-  max-height: 70vh;
-  overflow: auto;
-}
-
-.issue-timer-panel--compact {
-  padding: 0.55rem;
-}
-
-.issue-timer-panel--compact.issue-timer-panel--floating.issue-timer-panel--positioned {
-  min-width: 240px;
-  max-width: 380px;
-}
-
-.issue-timer-panel--clock {
-  min-width: min(360px, 92vw);
-  max-height: 75vh;
-  overflow: auto;
-}
-
-.issue-timer-panel--compact .timer-clock-digit,
-.issue-timer-panel--compact .timer-clock-digit-input {
-  font-size: 1.1rem;
-}
-
-.issue-timer-panel--compact .timer-clock,
-.issue-timer-panel--compact .timer-clock--add {
-  padding-left: 0.35rem;
-  padding-right: 0.35rem;
 }
 
 .assignee-picker-head {
@@ -635,27 +483,6 @@
 .color-picker-option.active {
   outline: 2px solid var(--accent);
   outline-offset: 2px;
-}
-
-.issue-timer.running .issue-timer-value {
-  color: var(--accent);
-}
-
-.issue-timer.finished .issue-timer-value {
-  color: var(--primary);
-}
-
-.issue-timer-mode {
-  color: var(--muted);
-  font-size: 0.72rem;
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-}
-
-.issue-timer-actions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.45rem;
 }
 
 /* Bottom dock: the bulk bar slot stacks above the toast region; nothing overlaps. */

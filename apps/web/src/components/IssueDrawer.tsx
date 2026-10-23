@@ -17,7 +17,6 @@ import { queryKeys } from "../queries/keys";
 import { useIssueQuery } from "../queries/issue";
 import { useAttachmentList } from "../hooks/useAttachmentList";
 import { AttachmentLightboxes } from "./AttachmentLightboxes";
-import { IssueTimer } from "./IssueTimer";
 import { DescriptionEditor } from "./DescriptionEditor";
 import { MultiAssigneePicker } from "./MultiAssigneePicker";
 import { BoardColorPicker } from "./BoardColorPicker";
@@ -25,14 +24,13 @@ import { FileRefCopyButton } from "./FileRefCopyButton";
 import { RefCopyButton } from "./RefCopyButton";
 import { RichText } from "./RichText";
 import { LinkPasteOffer } from "./LinkPasteOffer";
-import { initials } from "../lib/timer";
 import { useLinkPasteOffer } from "../hooks/useLinkPasteOffer";
 import { Drawer } from "../ui/Dialog";
 import { AttachmentImageThumbnail, isImageAttachment } from "./AttachmentImagePreview";
 import { AttachmentVideoThumbnail, isVideoAttachment } from "./AttachmentVideoPlayer";
 import { LinkRowFilePanel } from "./LinkRowFilePanel";
 import { DueDatePicker } from "./DueDatePicker";
-import { describeAttachmentLimits, formatFileSize, formatTimestamp } from "../lib/format";
+import { describeAttachmentLimits, formatFileSize, formatTimestamp, initials } from "../lib/format";
 
 const NO_COMMENTS: CommentPublic[] = [];
 
@@ -336,17 +334,6 @@ export function IssueDrawer({
                 </select>
               </label>
             )}
-
-            <div className="issue-drawer-field">
-              <span className="issue-drawer-label">Due</span>
-              <DueDatePicker
-                value={issue.dueDate}
-                disabled={!canEdit}
-                onChange={(dueDate) => {
-                  void patchIssue({ dueDate });
-                }}
-              />
-            </div>
           </div>
         </section>
 
@@ -370,13 +357,13 @@ export function IssueDrawer({
               />
             </div>
 
-            <div className="issue-drawer-field issue-drawer-field--timer">
-              <span className="issue-drawer-label">Timer</span>
-              <IssueTimer
-                issue={issue}
+            <div className="issue-drawer-field">
+              <span className="issue-drawer-label">Due</span>
+              <DueDatePicker
+                value={issue.dueDate}
                 disabled={!canEdit}
-                onUpdate={(patch) => {
-                  void patchIssue(patch);
+                onChange={(dueDate) => {
+                  void patchIssue({ dueDate });
                 }}
               />
             </div>

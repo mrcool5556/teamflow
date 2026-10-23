@@ -28,6 +28,10 @@ server together with the request id.
 Server code throws `ApiError` from `apps/server/src/lib/errors.ts` (`badRequest`, `forbidden`,
 `notFound`, `conflict`, ...); one `onError` handler renders it.
 
+## Deprecated fields
+
+- **Issue timer** (`timerActiveAt`, `timerElapsedSec`, `timerTargetSec`): the web app removed its timer on 2026-10-23 and uses the due date (`dueDate`) instead. The columns are kept, so no data is lost: issues still return these fields and `PATCH /issues/:id` (`updateIssueSchema`) still accepts them, so MCP, the CLI and older clients keep working. Do not build on them; they are planned to be dropped in a later schema version.
+
 <!-- BEGIN GENERATED ROUTES (scripts/gen-api-docs.mjs) -->
 
 ## Routes (92)
