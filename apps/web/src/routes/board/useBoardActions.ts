@@ -136,6 +136,19 @@ export function useBoardActions({
     );
   }
 
+  /** One optimistic change for the whole selection; it all rolls back if a save fails. */
+  function bulkSetDueDate(issueIds: string[], dueDate: string | null) {
+    if (issueIds.length === 0) return;
+    void mutateBoard(
+      patchIssues(
+        board,
+        members,
+        issueIds.map((id) => ({ id, patch: { dueDate } })),
+        dueDate ? "Failed to set due dates" : "Failed to clear due dates",
+      ),
+    );
+  }
+
   function bulkSetPriority(issueIds: string[], priority: Priority) {
     if (issueIds.length === 0) return;
     void mutateBoard(
@@ -208,6 +221,12 @@ export function useBoardActions({
 
   function updateStatusColor(status: IssueStatusPublic, color: string | null) {
     void mutateBoard(patchColumn(status, { color }, "Failed to update column color"));
+  }
+
+  function updateIssueDueDate(issue: IssuePublic, dueDate: string | null) {
+    void mutateBoard(
+      patchIssue(board, members, issue.id, { dueDate }, "Failed to update due date"),
+    );
   }
 
   function updateIssueColor(issue: IssuePublic, color: string | null) {
@@ -361,10 +380,12 @@ export function useBoardActions({
     assignRow,
     bulkMoveIssues,
     bulkSetPriority,
+    bulkSetDueDate,
     bulkDeleteIssues,
     updateRowColor,
     updateStatusColor,
     updateIssueColor,
+    updateIssueDueDate,
     updateIssuePriority,
     renameStatus,
     removeRow,

@@ -1,5 +1,15 @@
 import { useRef, useState } from "react";
-import { formatDue, monthGrid, quickDays, sameDay, timeOf, withTime } from "../lib/dueDate";
+import {
+  dueState,
+  formatDue,
+  formatDueChip,
+  monthGrid,
+  parseDue,
+  quickDays,
+  sameDay,
+  timeOf,
+  withTime,
+} from "../lib/dueDate";
 import { Popover } from "../ui/Popover";
 
 const WEEKDAYS = ["Mo", "Tu", "We", "Th", "Fr", "Sa", "Su"];
@@ -10,11 +20,21 @@ type DueDatePickerProps = {
   /** ISO timestamp or null. */
   value: string | null;
   disabled?: boolean;
+  /** "field" (drawer, bulk bar) or a compact "chip" on a card. */
+  variant?: "field" | "chip";
+  /** The issue is done: a chip is not shown as overdue. */
+  done?: boolean;
   onChange: (iso: string | null) => void;
 };
 
 /** Due date button; opens a month calendar with quick picks and a time field. */
-export function DueDatePicker({ value, disabled, onChange }: DueDatePickerProps) {
+export function DueDatePicker({
+  value,
+  disabled,
+  variant = "field",
+  done = false,
+  onChange,
+}: DueDatePickerProps) {
   const anchorRef = useRef<HTMLButtonElement | null>(null);
   const [open, setOpen] = useState(false);
   const current = value ? new Date(value) : null;
@@ -38,22 +58,46 @@ export function DueDatePicker({ value, disabled, onChange }: DueDatePickerProps)
   }
 
   const overdue = valid ? valid.getTime() < now.getTime() : false;
+  const chip = variant === "chip";
+  // A card shows no chip without a date (set it in the drawer or the bulk bar).
+  if (chip && !valid) return null;
 
   return (
     <>
-      <button
-        ref={anchorRef}
-        type="button"
-        className={`due-picker-trigger${overdue ? " due-picker-trigger--overdue" : ""}`}
-        disabled={disabled}
-        aria-haspopup="dialog"
-        aria-expanded={open}
-        aria-label={valid ? `Due ${formatDue(valid, now)}` : "Set due date"}
-        onClick={() => (open ? setOpen(false) : openPicker())}
-      >
-        <span aria-hidden="true">📅</span>
-        <span className="due-picker-value">{valid ? formatDue(valid, now) : "No due date"}</span>
-      </button>
+      {chip && valid ? (
+        <button
+          ref={anchorRef}
+          type="button"
+          className={`due-chip due-chip--${dueState(valid, done, now)}`}
+          aria-haspopup="dialog"
+          aria-expanded={open}
+          aria-label={`Due ${formatDue(valid, now)}`}
+          title={`Due ${formatDue(valid, now)}`}
+          // On a card: keep presses and clicks from selecting or opening the issue.
+          onPointerDown={(e) => e.stopPropagation()}
+          onClick={(e) => {
+            e.stopPropagation();
+            if (open) setOpen(false);
+            else openPicker();
+          }}
+        >
+          {formatDueChip(valid, now)}
+        </button>
+      ) : (
+        <button
+          ref={anchorRef}
+          type="button"
+          className={`due-picker-trigger${overdue && !done ? " due-picker-trigger--overdue" : ""}`}
+          disabled={disabled}
+          aria-haspopup="dialog"
+          aria-expanded={open}
+          aria-label={valid ? `Due ${formatDue(valid, now)}` : "Set due date"}
+          onClick={() => (open ? setOpen(false) : openPicker())}
+        >
+          <span aria-hidden="true">📅</span>
+          <span className="due-picker-value">{valid ? formatDue(valid, now) : "No due date"}</span>
+        </button>
+      )}
       <Popover
         open={open}
         onClose={() => setOpen(false)}
@@ -151,5 +195,21 @@ export function DueDatePicker({ value, disabled, onChange }: DueDatePickerProps)
         </div>
       </Popover>
     </>
+  );
+}
+
+/** Read-only due date chip for people who cannot edit the board; nothing without a date. */
+export function DueChip({ value, done = false }: { value: string | null; done?: boolean }) {
+  const due = parseDue(value);
+  if (!due) return null;
+  const now = new Date();
+  return (
+    <span
+      className={`due-chip due-chip--${dueState(due, done, now)}`}
+      title={`Due ${formatDue(due, now)}`}
+    >
+      <span className="sr-only">Due </span>
+      {formatDueChip(due, now)}
+    </span>
   );
 }
