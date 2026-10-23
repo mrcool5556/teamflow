@@ -1508,3 +1508,62 @@
   font-size: var(--font-size-sm);
   color: var(--danger-text);
 }
+
+.appearance-preview-bar {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-3);
+}
+
+.appearance-preview-toggle {
+  margin-left: auto;
+  font-size: var(--font-size-xs);
+}
+
+.appearance-group-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  width: 100%;
+  padding: 0;
+  border: none;
+  background: none;
+  box-shadow: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+}
+
+.appearance-group--collapsed .appearance-group-header {
+  margin-bottom: 0;
+}
+
+.appearance-group-header h3 {
+  flex: 1;
+}
+
+/* Phones: the preview sticks to the top of the settings scroll area as a slim strip. */
+@media (max-width: 767px) {
+  .appearance-preview {
+    position: sticky;
+    top: calc(-1 * var(--space-4));
+    z-index: var(--z-sticky);
+    margin: 0 calc(-1 * var(--space-3)) var(--space-4);
+    padding: var(--space-2) var(--space-3);
+    background: var(--bg);
+    border-bottom: 1px solid var(--border);
+  }
+
+  .appearance-preview-caption {
+    margin-bottom: var(--space-1);
+  }
+
+  .appearance-preview--strip .appearance-preview-frame {
+    height: 96px;
+  }
+
+  .appearance-preview--strip .board-layout-preview {
+    zoom: 0.5;
+  }
+}

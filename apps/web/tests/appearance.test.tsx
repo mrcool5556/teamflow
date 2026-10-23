@@ -1,6 +1,6 @@
 import { configure, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { createDefaultUserProfile, mergeUserProfile } from "@teamflow/core";
 import { buildLookExport } from "../src/lib/appearanceShare";
 import { installFakeApi, seedDb, signIn } from "./fakeApi";
@@ -156,5 +156,32 @@ describe("appearance panel", () => {
     await user.type(within(share).getByPlaceholderText("Paste a look here"), "hello");
     await user.click(within(share).getByRole("button", { name: "Preview" }));
     expect(within(share).getByRole("alert")).toHaveTextContent(/not a Teamflow look/);
+  });
+
+  describe("on a phone", () => {
+    afterEach(() => vi.unstubAllGlobals());
+
+    it("collapses the Customise groups and keeps a small preview strip", async () => {
+      vi.stubGlobal("matchMedia", (query: string) => ({
+        matches: query.includes("max-width: 767px"),
+        addEventListener: () => {},
+        removeEventListener: () => {},
+      }));
+      const user = userEvent.setup();
+      await openAppearance();
+
+      const toggle = screen.getByRole("button", { name: /Colour/ });
+      expect(toggle).toHaveAttribute("aria-expanded", "false");
+      expect(screen.queryByRole("radiogroup", { name: "UI color" })).not.toBeInTheDocument();
+      expect(screen.getByRole("radiogroup", { name: "Looks" })).toBeInTheDocument();
+
+      await user.click(toggle);
+      expect(screen.getByRole("radiogroup", { name: "UI color" })).toBeInTheDocument();
+
+      const preview = screen.getByRole("complementary", { name: "Preview" });
+      expect(preview).toHaveClass("appearance-preview--strip");
+      await user.click(within(preview).getByRole("button", { name: "Bigger" }));
+      expect(preview).not.toHaveClass("appearance-preview--strip");
+    });
   });
 });
