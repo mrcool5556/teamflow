@@ -1,7 +1,6 @@
 import type {
   ChromeStyle,
   ColorPreset,
-  SemanticContrastMode,
   ShapePreset,
   TextContrastPreset,
   ThemeMode,
@@ -12,7 +11,6 @@ import {
   COLOR_PRESETS,
   DEFAULT_UI_ACCENT,
   DEFAULT_UI_PRIMARY,
-  SEMANTIC_CONTRAST_MODES,
   SHAPE_PRESETS,
   TEXT_CONTRAST_PRESETS,
   UI_COLOR_PRESET_PALETTES,
@@ -77,11 +75,6 @@ const TEXT_CONTRAST_LABELS: Record<TextContrastPreset, string> = {
   default: "Default",
   high: "High",
   muted: "Muted",
-};
-
-const SEMANTIC_CONTRAST_LABELS: Record<SemanticContrastMode, string> = {
-  adapt: "Adapt to theme",
-  preserve: "Keep team colors literal",
 };
 
 function patchAppearance(profile: UserProfile, appearance: Partial<UserProfile["appearance"]>) {
@@ -234,22 +227,6 @@ export function AppearanceSettingsSection({
                   customDraftRef={customDraftRef}
                   onCommit={onProfileChange}
                 />
-                <CustomColorField
-                  label="Text"
-                  value={custom.text ?? (appearance.theme === "light" ? "#141414" : "#ececec")}
-                  profile={profile}
-                  colorKey="text"
-                  customDraftRef={customDraftRef}
-                  onCommit={onProfileChange}
-                />
-                <CustomColorField
-                  label="Soft text"
-                  value={custom.textSoft ?? (appearance.theme === "light" ? "#404040" : "#b8b8b8")}
-                  profile={profile}
-                  colorKey="textSoft"
-                  customDraftRef={customDraftRef}
-                  onCommit={onProfileChange}
-                />
               </div>
             </div>
           ) : null}
@@ -271,30 +248,28 @@ export function AppearanceSettingsSection({
           />
         </div>
 
-        <label className="appearance-select-field">
-          Team color display
-          <select
-            value={appearance.semanticContrast}
-            onChange={(e) => {
+        <label className="appearance-switch">
+          <input
+            type="checkbox"
+            role="switch"
+            checked={appearance.semanticContrast === "preserve"}
+            onChange={(e) =>
               onProfileChange(
                 patchAppearance(profile, {
-                  semanticContrast: e.target.value as SemanticContrastMode,
+                  semanticContrast: e.target.checked ? "preserve" : "adapt",
                 }),
-              );
-            }}
-          >
-            {SEMANTIC_CONTRAST_MODES.map((mode) => (
-              <option key={mode} value={mode}>
-                {SEMANTIC_CONTRAST_LABELS[mode]}
-              </option>
-            ))}
-          </select>
+              )
+            }
+          />
+          <span className="appearance-switch-track" aria-hidden="true" />
+          <span>
+            Keep exact team colours
+            <span className="appearance-switch-hint">
+              Off: row and column colours are toned to suit light or dark. On: they stay exactly as
+              picked.
+            </span>
+          </span>
         </label>
-        <p className="muted appearance-settings-hint">
-          {appearance.semanticContrast === "adapt"
-            ? "Row and column tints adjust slightly for light or dark mode while keeping the same hue."
-            : "Row and column colors use the same mixing as dark mode regardless of your theme."}
-        </p>
       </AppearanceGroup>
 
       <AppearanceGroup title="Shape & style">

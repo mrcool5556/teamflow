@@ -1293,3 +1293,65 @@
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
+
+/* On/off switch built on a checkbox (role="switch"). */
+.appearance-switch {
+  position: relative;
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-3);
+  margin-top: var(--space-4);
+  font-size: var(--font-size-sm);
+  cursor: pointer;
+}
+
+.appearance-switch input {
+  position: absolute;
+  opacity: 0;
+  width: 2.25rem;
+  height: 1.25rem;
+  margin: 0;
+}
+
+.appearance-switch-track {
+  position: relative;
+  flex: none;
+  width: 2.25rem;
+  height: 1.25rem;
+  border-radius: 999px;
+  background: var(--border-strong);
+  transition: background 0.15s ease;
+}
+
+.appearance-switch-track::after {
+  content: "";
+  position: absolute;
+  top: 0.15rem;
+  left: 0.15rem;
+  width: 0.95rem;
+  height: 0.95rem;
+  border-radius: 50%;
+  background: var(--text);
+  transition: transform 0.15s ease;
+}
+
+.appearance-switch input:checked + .appearance-switch-track {
+  background: var(--accent);
+}
+
+.appearance-switch input:checked + .appearance-switch-track::after {
+  transform: translateX(1rem);
+  background: #111;
+}
+
+.appearance-switch input:focus-visible + .appearance-switch-track {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.appearance-switch-hint {
+  display: block;
+  margin-top: var(--space-1);
+  font-size: var(--font-size-xs);
+  color: var(--muted);
+}

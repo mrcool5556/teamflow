@@ -56,13 +56,9 @@ function applyUiColorOverrides(profile: UserProfile, root: HTMLElement) {
 
   root.style.setProperty("--accent-text", accent);
 
-  if (appearance.colorPreset !== "custom") return;
-
-  const { customColors } = appearance;
-
-  if (customColors.text) root.style.setProperty("--text", customColors.text);
-
-  if (customColors.textSoft) root.style.setProperty("--text-soft", customColors.textSoft);
+  // Custom text colours (customColors.text / textSoft) are no longer applied: one value could
+  // not suit both themes, and Text contrast covers the need. Old profiles keep the fields;
+  // clearUiColorOverrides above removes anything a previous version set.
 }
 
 const SYSTEM_DARK_QUERY = "(prefers-color-scheme: dark)";

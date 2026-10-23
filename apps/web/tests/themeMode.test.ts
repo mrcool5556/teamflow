@@ -1,4 +1,4 @@
-import { createDefaultUserProfile, mergeUserProfile } from "@teamflow/core";
+import { createDefaultUserProfile, mergeUserProfile, parseUserProfile } from "@teamflow/core";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { applyUserProfile, resolveTheme } from "../src/profile";
 
@@ -36,5 +36,29 @@ describe("Match system theme", () => {
     expect(document.documentElement.dataset.theme).toBe("dark");
     system.switchTo(true);
     expect(document.documentElement.dataset.theme).toBe("light");
+  });
+});
+
+describe("custom text colours", () => {
+  it("load from old profiles without error but are no longer applied", () => {
+    const old = parseUserProfile({
+      ...createDefaultUserProfile(),
+      appearance: {
+        ...createDefaultUserProfile().appearance,
+        colorPreset: "custom",
+        customColors: {
+          primary: "#112233",
+          accent: "#445566",
+          text: "#000000",
+          textSoft: "#111111",
+        },
+      },
+    });
+    expect(old.appearance.customColors.text).toBe("#000000");
+    applyUserProfile(old);
+    const style = document.documentElement.style;
+    expect(style.getPropertyValue("--primary")).toBe("#112233");
+    expect(style.getPropertyValue("--text")).toBe("");
+    expect(style.getPropertyValue("--text-soft")).toBe("");
   });
 });
