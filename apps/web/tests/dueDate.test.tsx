@@ -79,6 +79,22 @@ describe("due date on the board", () => {
     await waitFor(() => expect(chipOf("ENG issue 4")).toBeNull());
   });
 
+  it("opens the drawer with an editable title above the field groups", async () => {
+    const user = userEvent.setup();
+    const db = await openBoard();
+    await user.click(screen.getByText("ENG issue 1"));
+    const title = await screen.findByLabelText("Issue title");
+    expect(title).toHaveValue("ENG issue 1");
+    expect(title).not.toHaveAttribute("readonly");
+    const workflow = screen.getByRole("region", { name: "Workflow" });
+    expect(title.compareDocumentPosition(workflow) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+
+    await user.clear(title);
+    await user.type(title, "Renamed issue");
+    await user.tab();
+    await waitFor(() => expect(db.issues[0]!.title).toBe("Renamed issue"));
+  });
+
   it("puts Due next to Assignees in the drawer, with no Timer field", async () => {
     const user = userEvent.setup();
     await openBoard();
