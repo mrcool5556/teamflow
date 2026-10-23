@@ -1,7 +1,7 @@
 import { useCallback, useRef, useState } from "react";
 import type { TeamMemberPublic } from "@teamflow/core";
 import { Popover } from "../ui/Popover";
-import { initials } from "../lib/timer";
+import { initials } from "../lib/format";
 
 type MultiAssigneePickerProps = {
   members: TeamMemberPublic[];

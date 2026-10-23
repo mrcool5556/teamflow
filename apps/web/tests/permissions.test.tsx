@@ -31,7 +31,7 @@ describe("board permissions", () => {
     expect(screen.getAllByRole("button", { name: "+ Add issue" })[0]).toBeDisabled();
     expect(screen.getAllByRole("button", { name: "+ Column" })[0]).toBeDisabled();
     for (const trigger of document.querySelectorAll(
-      ".priority-picker-trigger, .color-picker-trigger, .issue-timer-trigger",
+      ".priority-picker-trigger, .color-picker-trigger",
     )) {
       expect(trigger).toBeDisabled();
     }
@@ -101,7 +101,7 @@ describe("issue drawer permissions", () => {
     expect(d.getByLabelText("Issue title")).toHaveAttribute("readonly");
     for (const select of drawer.querySelectorAll("select")) expect(select).toBeDisabled();
     for (const trigger of drawer.querySelectorAll(
-      ".due-picker-trigger, .color-picker-trigger, .assignee-picker-trigger, .issue-timer-trigger",
+      ".due-picker-trigger, .color-picker-trigger, .assignee-picker-trigger",
     )) {
       expect(trigger).toBeDisabled();
     }

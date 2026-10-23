@@ -43,7 +43,6 @@ import { ContextMenu, type ContextMenuEntry } from "./components/ContextMenu";
 import { MultiAssigneePicker } from "./components/MultiAssigneePicker";
 import { RefCopyButton } from "./components/RefCopyButton";
 import { RowEditMenu, RowEditMenuItem, RowEditMenuSection } from "./components/RowEditMenu";
-import { IssueTimer } from "./components/IssueTimer";
 import { RowColorPicker } from "./components/RowColorPicker";
 import { BulkActionBar } from "./components/BulkActionBar";
 import { BoardColorPicker } from "./components/BoardColorPicker";
@@ -54,7 +53,6 @@ import { copyTextToClipboard } from "./lib/clipboard";
 import { useInlineRename } from "./hooks/useInlineRename";
 import { useCanEditBoard } from "./lib/teamPermissions";
 import { useLayer } from "./ui/layerStack";
-import type { IssueTimerPatch } from "./lib/timer";
 import type { Priority } from "@teamflow/core";
 
 export const issueDndId = (issueId: string) => `issue:${issueId}`;
@@ -285,14 +283,12 @@ type KanbanBoardProps = {
   onUpdateIssuePriority: (issue: IssuePublic, priority: Priority) => void;
   onAssignRow: (row: BoardRowPublic, assigneeIds: string[]) => void;
   onUpdateRowColor: (row: BoardRowPublic, color: string | null) => void;
-  onUpdateIssueTimer: (issue: IssuePublic, patch: IssueTimerPatch) => void;
   highlightedIssueId?: string | null;
   highlightedColumnKey?: string | null;
   onGoToRef?: (ref: string) => void;
   onBulkMove?: (issueIds: string[], rowId: string, statusId: string) => void;
   onBulkAssign?: (issueIds: string[], assigneeIds: string[]) => void;
   onBulkPriority?: (issueIds: string[], priority: Priority) => void;
-  onBulkTimer?: (issueIds: string[], action: "pause" | "reset") => void;
   onBulkDelete?: (issues: IssuePublic[]) => void;
   onOpenRowFiles?: (row: BoardRowPublic) => void;
 };
@@ -325,14 +321,12 @@ export function KanbanBoard({
   onUpdateIssuePriority,
   onAssignRow,
   onUpdateRowColor,
-  onUpdateIssueTimer,
   highlightedIssueId = null,
   highlightedColumnKey = null,
   onGoToRef,
   onBulkMove,
   onBulkAssign,
   onBulkPriority,
-  onBulkTimer,
   onBulkDelete,
   onOpenRowFiles,
 }: KanbanBoardProps) {
@@ -842,7 +836,6 @@ export function KanbanBoard({
                 onAssignIssues={onAssignIssues}
                 onUpdateIssueColor={onUpdateIssueColor}
                 onUpdateIssuePriority={onUpdateIssuePriority}
-                onUpdateIssueTimer={onUpdateIssueTimer}
                 highlightedIssueId={highlightedIssueId}
                 highlightedColumnKey={highlightedColumnKey}
                 rowSearch={rowSearchQueries[row.id] ?? ""}
@@ -908,13 +901,7 @@ export function KanbanBoard({
         ) : null}
       </DragOverlay>
 
-      {!previewMode &&
-      canEdit &&
-      onBulkMove &&
-      onBulkAssign &&
-      onBulkPriority &&
-      onBulkTimer &&
-      onBulkDelete ? (
+      {!previewMode && canEdit && onBulkMove && onBulkAssign && onBulkPriority && onBulkDelete ? (
         <BulkActionBar
           selectedIssues={selectedIssues}
           rows={rows}
@@ -931,9 +918,6 @@ export function KanbanBoard({
           onPriority={(issueIds, priority) => {
             onBulkPriority(issueIds, priority);
             clearIssueSelection();
-          }}
-          onTimerAction={(issueIds, action) => {
-            onBulkTimer(issueIds, action);
           }}
           onDelete={(items) => {
             onBulkDelete(items);
@@ -1148,7 +1132,6 @@ function SortableBoardRow({
   onAssignIssues,
   onUpdateIssueColor,
   onUpdateIssuePriority,
-  onUpdateIssueTimer,
   highlightedIssueId = null,
   highlightedColumnKey = null,
   rowSearch = "",
@@ -1191,7 +1174,6 @@ function SortableBoardRow({
   onAssignIssues: (issueIds: string[], assigneeIds: string[]) => void;
   onUpdateIssueColor: (issue: IssuePublic, color: string | null) => void;
   onUpdateIssuePriority: (issue: IssuePublic, priority: Priority) => void;
-  onUpdateIssueTimer: (issue: IssuePublic, patch: IssueTimerPatch) => void;
   highlightedIssueId?: string | null;
   highlightedColumnKey?: string | null;
   rowSearch?: string;
@@ -1429,7 +1411,6 @@ function SortableBoardRow({
                               onAssignIssue={onAssignIssue}
                               onUpdateIssueColor={onUpdateIssueColor}
                               onUpdateIssuePriority={onUpdateIssuePriority}
-                              onUpdateIssueTimer={onUpdateIssueTimer}
                               onGoToRef={onGoToRef}
                               onContextMenu={(event) => onIssueContextMenu?.(issue, event)}
                             />
@@ -1568,7 +1549,6 @@ function SortableIssueCard({
   onAssignIssue,
   onUpdateIssueColor,
   onUpdateIssuePriority,
-  onUpdateIssueTimer,
   onGoToRef,
   onContextMenu,
 }: {
@@ -1584,7 +1564,6 @@ function SortableIssueCard({
   onAssignIssue: (issue: IssuePublic, assigneeIds: string[]) => void;
   onUpdateIssueColor: (issue: IssuePublic, color: string | null) => void;
   onUpdateIssuePriority: (issue: IssuePublic, priority: Priority) => void;
-  onUpdateIssueTimer: (issue: IssuePublic, patch: IssueTimerPatch) => void;
   onGoToRef?: (ref: string) => void;
   onContextMenu?: (event: React.MouseEvent) => void;
 }) {
@@ -1651,20 +1630,6 @@ function SortableIssueCard({
               floatingPanel
               disabled={!canEdit}
               onChange={(assigneeIds) => onAssignIssue(issue, assigneeIds)}
-            />
-          </span>
-          <span
-            className="issue-card-optional"
-            data-unset={
-              (!issue.timerActiveAt && !issue.timerElapsedSec && !issue.timerTargetSec) || undefined
-            }
-          >
-            <IssueTimer
-              issue={issue}
-              compact
-              floatingPanel
-              disabled={!canEdit}
-              onUpdate={(patch) => onUpdateIssueTimer(issue, patch)}
             />
           </span>
         </div>
