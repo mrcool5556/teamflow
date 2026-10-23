@@ -1,0 +1,423 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Teamflow appearance v1</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600&family=Space+Grotesk:wght@500;700&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="../../apps/web/src/styles/tokens.css" />
+<style>
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text); font-family: "JetBrains Mono", monospace; font-size: 14px; line-height: 1.5; }
+  h1, h2, h3, h4 { font-family: "Space Grotesk", sans-serif; margin: 0 0 var(--space-2); }
+  a { color: var(--accent-text); }
+  code { font-size: 0.92em; }
+  .doc-head { position: sticky; top: 0; z-index: 50; display: flex; gap: var(--space-4); align-items: center; flex-wrap: wrap; padding: var(--space-3) var(--space-6); background: var(--surface); border-bottom: 1px solid var(--border); }
+  .doc-head nav { display: flex; gap: var(--space-2); flex-wrap: wrap; font-size: var(--font-size-sm); }
+  .doc-head nav a { text-decoration: none; padding: 2px 8px; border: 1px solid var(--border); border-radius: var(--radius-sm); }
+  .spacer { flex: 1; }
+  main { max-width: 1500px; margin: 0 auto; padding: var(--space-6); }
+  section.item { border-top: 1px solid var(--border); padding: var(--space-6) 0; }
+  .eyebrow { color: var(--accent-text); letter-spacing: .18em; font-size: var(--font-size-xs); text-transform: uppercase; margin: 0 0 var(--space-1); }
+  .lead { color: var(--text-soft); max-width: 86ch; }
+  .cmp { display: grid; grid-template-columns: minmax(0, 5fr) minmax(0, 7fr); gap: var(--space-6); margin-top: var(--space-4); }
+  @media (max-width: 1100px) { .cmp { grid-template-columns: 1fr; } }
+  .col-label { font-size: var(--font-size-xs); letter-spacing: .14em; text-transform: uppercase; color: var(--muted); margin-bottom: var(--space-2); }
+  .shots { display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-2); align-items: start; }
+  .shots figure { margin: 0; }
+  .shots img { width: 100%; display: block; border: 1px solid var(--border); border-radius: var(--radius-xs); }
+  .shots figcaption { font-size: var(--font-size-xs); color: var(--muted); }
+  .problems, .changes { margin: var(--space-3) 0 0; padding-left: 1.2rem; font-size: var(--font-size-sm); }
+  .problems { color: var(--text-soft); }
+  .problems li::marker { color: var(--danger); }
+  .changes li::marker { color: var(--done); }
+  .mocks { display: flex; flex-wrap: wrap; gap: var(--space-4); align-items: flex-start; }
+  .frame-cap { font-size: var(--font-size-xs); color: var(--muted); margin-top: 4px; max-width: 60ch; }
+  table.list { border-collapse: collapse; width: 100%; font-size: var(--font-size-sm); }
+  table.list td, table.list th { border-bottom: 1px solid var(--border); padding: 6px 8px; text-align: left; vertical-align: top; }
+  table.list th { color: var(--muted); font-weight: 400; font-size: var(--font-size-xs); text-transform: uppercase; letter-spacing: .1em; }
+  table.list td:first-child { color: var(--accent-text); white-space: nowrap; }
+  .ok { color: var(--done); } .bad { color: var(--danger); } .meh { color: #e3c34f; }
+
+  .frame { --s: .5; width: calc(var(--w) * var(--s) * 1px); height: calc(var(--h) * var(--s) * 1px); overflow: hidden; border: 1px solid var(--border-strong); border-radius: var(--radius-sm); background: var(--bg); position: relative; flex: none; }
+  .frame > .vp { width: calc(var(--w) * 1px); height: calc(var(--h) * 1px); transform: scale(var(--s)); transform-origin: 0 0; position: relative; overflow: hidden; background: var(--bg); }
+
+  /* ---- mock app parts ---- */
+  .m-btn { display: inline-flex; align-items: center; gap: 6px; font: inherit; font-size: 13px; padding: 6px 10px; border-radius: var(--radius-sm); border: 1px solid var(--border); background: transparent; color: var(--text); white-space: nowrap; }
+  .m-btn.primary { background: var(--primary); color: var(--chrome-btn-text); border: var(--chrome-btn-border-width) solid var(--chrome-btn-border-color); box-shadow: var(--chrome-btn-shadow); }
+  .m-btn.sm { padding: 3px 8px; font-size: 12px; }
+  .m-link { color: var(--accent-text); font-size: 12px; text-decoration: underline; }
+  .m-top { display: flex; align-items: center; gap: 10px; height: 56px; padding: 0 20px; border-bottom: 1px solid var(--border); background: var(--surface); }
+  .m-logo { font-family: "Space Grotesk", sans-serif; font-weight: 700; color: var(--accent-text); letter-spacing: .12em; font-size: 12px; }
+  .m-team { display: inline-flex; gap: 8px; padding: 6px 10px; border: 1px solid var(--border-strong); border-radius: var(--radius-sm); font-weight: 600; font-size: 14px; }
+  .m-avatar { width: 30px; height: 30px; border-radius: 50%; background: var(--accent); color: #111; display: grid; place-items: center; font-weight: 600; font-size: 12px; }
+  .m-settings { display: grid; grid-template-columns: 220px minmax(0, 1fr); height: calc(100% - 56px); }
+  .m-snav { border-right: 1px solid var(--border); padding: 14px 10px; font-size: 13px; background: var(--surface); }
+  .m-snav .back { display: block; border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 5px 9px; margin-bottom: 14px; color: var(--text-soft); }
+  .m-snav .h { font-size: 10px; letter-spacing: .14em; color: var(--muted); text-transform: uppercase; margin: 10px 8px 4px; }
+  .m-snav .it { padding: 6px 10px; border-radius: var(--radius-xs); color: var(--text-soft); }
+  .m-snav .it.on { background: color-mix(in srgb, var(--accent) 14%, transparent); color: var(--text); box-shadow: inset 2px 0 0 var(--accent); }
+  .m-content { display: grid; grid-template-columns: minmax(0, 620px) 400px; gap: 32px; padding: 22px 32px; align-items: start; overflow: hidden; }
+  .m-head { display: flex; align-items: baseline; gap: 12px; }
+  .m-head h2 { font-size: 24px; margin: 0; }
+  .m-saved { font-size: 12px; color: var(--done); border: 1px solid color-mix(in srgb, var(--done) 50%, transparent); border-radius: 99px; padding: 1px 9px; }
+  .m-sub { color: var(--text-soft); font-size: 13px; margin: 4px 0 16px; }
+  .m-sec { border: 1px solid var(--border); border-radius: var(--radius-md); background: var(--surface); padding: 14px 16px; margin-bottom: 14px; }
+  .m-sec-h { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
+  .m-sec-h strong { font-family: "Space Grotesk", sans-serif; font-size: 16px; }
+  .m-sec-h .m-link { color: var(--muted); }
+  .m-row { display: grid; grid-template-columns: 130px 1fr; gap: 10px; align-items: center; margin: 9px 0; font-size: 13px; }
+  .m-row > span:first-child { color: var(--text-soft); }
+  .m-seg { display: inline-flex; border: 1px solid var(--border-strong); border-radius: var(--radius-sm); overflow: hidden; font-size: 12px; width: fit-content; }
+  .m-seg span { padding: 4px 11px; }
+  .m-seg span + span { border-left: 1px solid var(--border-strong); }
+  .m-seg span.on { background: var(--accent); color: #111; }
+  .m-swatches { display: flex; gap: 8px; flex-wrap: wrap; }
+  .m-sw { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; padding: 3px 8px 3px 4px; border: 1px solid var(--border); border-radius: 99px; }
+  .m-sw i { width: 18px; height: 18px; border-radius: 50%; display: inline-block; box-shadow: inset 0 0 0 2px rgba(0,0,0,.25); }
+  .m-sw i.split { background: conic-gradient(var(--a) 0 50%, var(--b) 50% 100%); }
+  .m-sw.on { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
+  .m-tiles { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
+  .m-tile { border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 7px; font-size: 11px; text-align: center; color: var(--text-soft); }
+  .m-tile.on { border-color: var(--accent); color: var(--text); box-shadow: 0 0 0 1px var(--accent); }
+  .m-tile b { display: block; height: 22px; margin-bottom: 5px; background: var(--panel); }
+  .m-toggle { display: inline-flex; align-items: center; gap: 8px; font-size: 12px; }
+  .m-toggle i { width: 30px; height: 16px; border-radius: 99px; background: var(--border-strong); position: relative; }
+  .m-toggle i::after { content: ""; position: absolute; left: 2px; top: 2px; width: 12px; height: 12px; border-radius: 50%; background: var(--text); }
+  .m-range { height: 4px; border-radius: 2px; background: linear-gradient(90deg, var(--accent) 40%, var(--border-strong) 40%); width: 220px; position: relative; }
+  .m-range::after { content: ""; position: absolute; left: 40%; top: -5px; width: 14px; height: 14px; border-radius: 50%; background: var(--accent); }
+  .m-collapsed { display: flex; justify-content: space-between; align-items: center; }
+
+  /* preset cards: hard-coded mini themes so each card shows its own look */
+  .presets { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+  .preset { border: 1px solid var(--border); border-radius: var(--radius-md); padding: 8px; font-size: 12px; }
+  .preset.on { border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent); }
+  .preset .pv { height: 62px; border-radius: 6px; padding: 7px; display: grid; grid-template-columns: 1fr 1fr; gap: 5px; margin-bottom: 6px; }
+  .preset .pv .c { border-radius: var(--r, 4px); border: var(--bw, 1px) solid var(--bc); background: var(--cs); position: relative; box-shadow: var(--sh, none); }
+  .preset .pv .c::before { content: ""; position: absolute; left: 5px; top: 5px; width: 22px; height: 6px; border-radius: 2px; background: var(--ac); }
+  .preset .pv .c::after { content: ""; position: absolute; left: 5px; bottom: 6px; width: 60%; height: 5px; border-radius: 2px; background: var(--tx); opacity: .7; }
+  .preset .pv .btn { grid-column: 1 / -1; height: 10px; width: 44px; border-radius: var(--r, 3px); background: var(--pr); }
+  .preset .name { display: flex; justify-content: space-between; }
+  .preset .name small { color: var(--muted); }
+
+  /* live preview panel */
+  .m-preview { position: sticky; top: 0; border: 1px solid var(--border-strong); border-radius: var(--radius-md); background: var(--bg); overflow: hidden; }
+  .m-preview .bar { display: flex; justify-content: space-between; align-items: center; padding: 7px 10px; border-bottom: 1px solid var(--border); font-size: 11px; color: var(--muted); letter-spacing: .1em; text-transform: uppercase; }
+  .m-preview .stage { position: relative; height: 330px; }
+  .p-top { display: flex; align-items: center; gap: 6px; height: 34px; padding: 0 10px; background: var(--surface); border-bottom: 1px solid var(--border); font-size: 10px; }
+  .p-top .m-avatar { width: 18px; height: 18px; font-size: 8px; margin-left: auto; }
+  .p-body { padding: 10px; }
+  .p-rowh { border: 1px solid var(--border); border-left: 4px solid #2dd4bf; border-radius: var(--radius-sm); padding: 5px 8px; font-size: 11px; font-weight: 700; background: color-mix(in srgb, #2dd4bf 18%, var(--surface)); margin-bottom: 7px; }
+  .p-cols { display: grid; grid-template-columns: 1fr 1fr; gap: 7px; }
+  .p-colh { font-size: 10px; font-weight: 600; padding: 4px 6px; border: 1px solid var(--border); border-radius: var(--radius-xs); background: var(--panel); margin-bottom: 6px; display: flex; gap: 5px; align-items: center; }
+  .p-colh i { width: 7px; height: 7px; border-radius: 50%; background: #6366f1; }
+  .p-card { border: var(--chrome-card-border-width) solid var(--border); border-radius: var(--radius-sm); background: var(--surface); padding: 6px; font-size: 10px; margin-bottom: 6px; }
+  .p-card .ref { color: var(--accent-text); border: 1px solid var(--accent); border-radius: 3px; padding: 0 3px; font-size: 9px; }
+  .p-card b { display: block; font-family: "Space Grotesk", sans-serif; font-size: 11px; margin-top: 3px; }
+  .p-drawer { position: absolute; top: 34px; right: 0; bottom: 0; width: 120px; background: var(--surface); border-left: 2px solid var(--border-strong); box-shadow: var(--chrome-modal-shadow); padding: 8px; font-size: 10px; }
+  .p-drawer .f { border: 1px solid var(--border-strong); border-radius: var(--radius-xs); padding: 3px 5px; margin: 4px 0 8px; background: var(--cell); }
+  .p-drawer .m-btn { font-size: 10px; padding: 2px 6px; }
+
+  .m-mtop { display: flex; align-items: center; gap: 8px; height: 50px; padding: 0 12px; border-bottom: 1px solid var(--border); background: var(--surface); }
+  .m-sel { display: flex; justify-content: space-between; padding: 7px 10px; border: 1px solid var(--border-strong); border-radius: var(--radius-sm); font-size: 13px; flex: 1; }
+  .m-mpreview { position: sticky; top: 0; z-index: 2; margin: 0 -12px 12px; border-bottom: 1px solid var(--border); background: var(--bg); padding: 8px 12px; display: flex; gap: 8px; align-items: center; font-size: 12px; }
+  .m-mpreview .mini { flex: 1; height: 46px; border: 1px solid var(--border-strong); border-radius: var(--radius-sm); display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 4px; padding: 5px; }
+  .m-mpreview .mini span { border: 1px solid var(--border); border-radius: 3px; background: var(--surface); position: relative; }
+  .m-mpreview .mini span::before { content: ""; position: absolute; left: 3px; top: 3px; width: 12px; height: 4px; border-radius: 2px; background: var(--accent); }
+</style>
+</head>
+<body>
+<header class="doc-head">
+  <strong style="font-family:'Space Grotesk'">Teamflow · Appearance v1 mock-up</strong>
+  <nav>
+    <a href="#inventory">Inventory</a><a href="#flow">1 Flow</a><a href="#presets">2 Looks</a><a href="#customise">3 Customise</a><a href="#preview">4 Preview</a><a href="#save">5 Save &amp; reset</a><a href="#share">6 Share</a><a href="#mobile">7 Mobile</a><a href="#list">Change list</a>
+  </nav>
+  <span class="spacer"></span>
+  <button class="m-btn" id="theme" type="button">☀ Light</button>
+</header>
+
+<main>
+  <p class="eyebrow">Appearance flow · phase 1 · 2026-10-22</p>
+  <h1>Changing how Teamflow looks</h1>
+  <p class="lead">Left: the Appearance panel on <code>main</code> today (screenshots in <code>docs/mockups/appearance-before/</code>, click for full size). Right: the proposed flow, drawn with the app's own tokens. The light/dark toggle above switches this page (and every mock) between themes. Nothing in the app has changed yet; the numbered list at the bottom is what to pick from.</p>
+
+  <!-- INVENTORY -->
+  <section class="item" id="inventory">
+    <p class="eyebrow">Today</p><h2>Inventory of the current controls</h2>
+    <div class="shots" style="grid-template-columns: 3fr 1fr 3fr; max-width: 1200px">
+      <figure><a href="appearance-before/04-appearance-custom-advanced-1440.png"><img src="appearance-before/04-appearance-custom-advanced-1440.png" alt=""></a><figcaption>1440, Custom colour and Advanced opened</figcaption></figure>
+      <figure><a href="appearance-before/03-appearance-all-375.png"><img src="appearance-before/03-appearance-all-375.png" alt=""></a><figcaption>375, whole panel</figcaption></figure>
+      <figure><a href="appearance-before/05-general-board-and-backup-1440.png"><img src="appearance-before/05-general-board-and-backup-1440.png" alt=""></a><figcaption>General panel: board size and profile backup live here</figcaption></figure>
+    </div>
+    <table class="list" style="margin-top: var(--space-4)">
+      <tr><th>Control</th><th>Values</th><th>What it changes</th><th>Stored</th><th>Sample preview reacts?</th></tr>
+      <tr><td>Theme</td><td>Dark · Light</td><td>Whole palette (<code>data-theme</code>)</td><td>user profile (server)</td><td class="ok">yes</td></tr>
+      <tr><td>UI color</td><td>Default · Sunset · Ocean · Forest · Custom</td><td>Primary (orange buttons) and accent (cyan outlines, refs)</td><td>user profile</td><td class="meh">accent only: the preview has no primary button, so primary changes are invisible</td></tr>
+      <tr><td>Custom colours</td><td>Primary · Accent · Text · Soft text (shown only for Custom)</td><td>Overrides the four colours</td><td>user profile</td><td class="meh">yes, but Text/Soft text are one value for both themes: pick light text in dark, switch to Light, and text becomes unreadable</td></tr>
+      <tr><td>Text contrast</td><td>Default · High · Muted</td><td>Text and soft-text strength</td><td>user profile</td><td class="ok">yes (subtle)</td></tr>
+      <tr><td>UI style</td><td>8 in a dropdown: Industrial, Minimal, Soft, Classic, Glass, Terminal, Paper, Neon</td><td>Border weight, shadows, glows, some fonts (<code>data-chrome-style</code>)</td><td>user profile</td><td class="ok">yes, but you only see one at a time; the dropdown hides what each looks like</td></tr>
+      <tr><td>Corner style</td><td>Hard edge · Slightly rounded · Rounded · Octagon</td><td>Radii and chamfers (<code>data-shape</code>)</td><td>user profile</td><td class="ok">yes</td></tr>
+      <tr><td>Team color display</td><td>Adapt to theme · Keep team colors literal</td><td>How row/column colours mix with the theme</td><td>user profile</td><td class="meh">yes, but only visible in light theme</td></tr>
+      <tr><td>Advanced chrome tuning</td><td>none</td><td class="bad">nothing: a placeholder ("sliders … are planned here") that also mentions a "live board preview" that no longer exists</td><td>n/a</td><td class="bad">n/a</td></tr>
+      <tr><td>Column width</td><td>Auto · Custom (300–420 / 240–720px)</td><td>Board column width</td><td>user profile</td><td class="bad">not on this panel: lives under General → Advanced</td></tr>
+      <tr><td>Card min height</td><td>48–200px</td><td>Card height</td><td>user profile</td><td class="bad">General → Advanced</td></tr>
+      <tr><td>Export / import profile</td><td>JSON download / paste</td><td>Copies a whole look (and board layout) between people</td><td>server</td><td class="bad">General → Advanced</td></tr>
+      <tr><td>Row headers shown</td><td>per row</td><td>Board toggle, also in the profile</td><td>user profile</td><td>not a setting on any panel (fine)</td></tr>
+    </table>
+    <ul class="problems">
+      <li>No starting point: seven independent choices (2×5×3×8×4×2 = 1,920 combinations) and no named looks to start from.</li>
+      <li>Order mixes colour, shape and board ideas; "UI style" and "Corner style" overlap (several styles also change radii), and the empty "Advanced chrome tuning" suggests a third place.</li>
+      <li>No Reset, neither per section nor for everything; the only reset ("Reset board layout defaults") is on General.</li>
+      <li>No feedback that a change was saved (it is saved 0.6 s later to the server; errors appear as a toast).</li>
+      <li>You cannot see the other theme without switching to it.</li>
+      <li>The preview shows a row and three columns but no topbar, primary button or drawer, so most of the chrome a style changes is not in it. Its card titles talk about "column width", which is set on another panel.</li>
+      <li>On phones the preview sits at the top and scrolls away, so you change settings without seeing them.</li>
+      <li>Small: no gap between "Corner style" tiles and "Team color display"; two different control kinds for one-of-N choices (buttons for theme, dropdown for style).</li>
+    </ul>
+  </section>
+
+  <!-- 1 FLOW -->
+  <section class="item" id="flow">
+    <p class="eyebrow">1</p><h2>The new flow at a glance</h2>
+    <div class="cmp">
+      <div>
+        <div class="col-label">Now</div>
+        <div class="shots" style="grid-template-columns:1fr"><figure><a href="appearance-before/01-appearance-1440.png"><img src="appearance-before/01-appearance-1440.png" alt=""></a><figcaption>One long list, preview beside it</figcaption></figure></div>
+      </div>
+      <div>
+        <div class="col-label">Proposed (1440)</div>
+        <div class="frame" style="--w:1440;--h:980;--s:.56"><div class="vp">
+          <div class="m-top"><span class="m-logo">TEAMFLOW</span><span class="m-team">ENG — Engineering ▾</span><span class="spacer"></span><span class="m-avatar">DU</span></div>
+          <div class="m-settings">
+            <div class="m-snav"><span class="back">← Back to board</span><div class="h">Account</div><div class="it">General</div><div class="it on">Appearance</div><div class="it">API tokens</div><div class="h">Team · ENG</div><div class="it">Team</div><div class="it">Roles</div><div class="it">Integrations</div></div>
+            <div class="m-content">
+              <div>
+                <div class="m-head"><h2>Appearance</h2><span class="m-saved">✓ Saved</span><span class="spacer"></span><span class="m-link" style="color:var(--muted)">Reset all to default</span></div>
+                <p class="m-sub">Pick a look, then fine-tune it. Changes apply and save as you go.</p>
+                <div class="m-sec"><div class="m-sec-h"><strong>Looks</strong><span class="m-link">What's this?</span></div>
+                  <div class="presets">
+                    <div class="preset on" style="--cs:#1f1f1f;--bc:#444;--ac:#00d8ff;--tx:#ececec;--pr:#ff5500;--bw:2px;--sh:2px 2px 0 #000"><div class="pv" style="background:#0f0f0f"><span class="c"></span><span class="c"></span><span class="btn"></span></div><div class="name"><b>Teamflow</b><small>dark</small></div></div>
+                    <div class="preset" style="--cs:#fff;--bc:#d4d4d4;--ac:#0ea5e9;--tx:#141414;--pr:#ff5500;--r:6px"><div class="pv" style="background:#f3f3f3"><span class="c"></span><span class="c"></span><span class="btn"></span></div><div class="name"><b>Daylight</b><small>light</small></div></div>
+                    <div class="preset" style="--cs:#18212b;--bc:#2b3a48;--ac:#38bdf8;--tx:#dbe7f3;--pr:#2563eb;--r:10px"><div class="pv" style="background:#0d141b"><span class="c"></span><span class="c"></span><span class="btn"></span></div><div class="name"><b>Calm</b><small>dark</small></div></div>
+                    <div class="preset" style="--cs:#fbf6ea;--bc:#3b3226;--ac:#b45309;--tx:#2a2117;--pr:#c2410c;--r:0"><div class="pv" style="background:#f1e9d6"><span class="c"></span><span class="c"></span><span class="btn"></span></div><div class="name"><b>Paper</b><small>light</small></div></div>
+                    <div class="preset" style="--cs:#07140c;--bc:#1f7a43;--ac:#22c55e;--tx:#bbf7d0;--pr:#16a34a;--r:0;--sh:0 0 6px #22c55e66"><div class="pv" style="background:#030a06"><span class="c"></span><span class="c"></span><span class="btn"></span></div><div class="name"><b>Terminal</b><small>dark</small></div></div>
+                    <div class="preset" style="--cs:#14101f;--bc:#a855f7;--ac:#f0abfc;--tx:#f5f3ff;--pr:#ec4899;--r:8px;--sh:0 0 8px #a855f788"><div class="pv" style="background:#0b0814"><span class="c"></span><span class="c"></span><span class="btn"></span></div><div class="name"><b>Neon</b><small>dark</small></div></div>
+                  </div>
+                </div>
+                <div class="m-sec"><div class="m-collapsed"><strong style="font-family:'Space Grotesk';font-size:16px">Customise</strong><span style="color:var(--muted);font-size:12px">Colour · Shape &amp; style · Board ▾</span></div></div>
+                <div class="m-sec"><div class="m-collapsed"><strong style="font-family:'Space Grotesk';font-size:16px">Share this look</strong><span style="color:var(--muted);font-size:12px">Export · Import ▾</span></div></div>
+              </div>
+              <div class="m-preview">
+                <div class="bar">Preview <span class="m-seg" style="text-transform:none;letter-spacing:0"><span class="on">As set</span><span>Dark</span><span>Light</span></span></div>
+                <div class="stage">
+                  <div class="p-top"><b style="color:var(--accent-text)">TEAMFLOW</b><span class="m-btn sm" style="font-size:9px;padding:1px 5px">Files</span><span class="m-avatar">DU</span></div>
+                  <div class="p-body">
+                    <div class="p-rowh">Sample row</div>
+                    <div class="p-cols">
+                      <div><div class="p-colh">TODO <span>2</span></div><div class="p-card"><span class="ref">ENG-1</span><b>Write the release notes</b></div><div class="p-card"><span class="ref">ENG-2</span><b>Fix login redirect</b></div></div>
+                      <div><div class="p-colh"><i></i>DOING <span>1</span></div><div class="p-card"><span class="ref">ENG-3</span><b>Board tips popover</b></div><span class="m-btn primary sm" style="font-size:10px">+ Add issue</span></div>
+                    </div>
+                  </div>
+                  <div class="p-drawer"><b style="font-family:'Space Grotesk'">ENG-3</b><div style="color:var(--muted);margin-top:6px">STATUS</div><div class="f">Doing ▾</div><span class="m-btn sm">✓ Done</span></div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div></div>
+        <div class="frame-cap">Order: Looks (one click) → Customise (opened when you want details) → Share. The preview stays in view and shows the topbar, a row, a column header, cards, a primary button and a drawer edge.</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 2 PRESETS -->
+  <section class="item" id="presets">
+    <p class="eyebrow">2</p><h2>Looks: named presets</h2>
+    <div class="cmp">
+      <div>
+        <div class="col-label">Now</div>
+        <ul class="problems" style="margin-top:0"><li>Start from scratch every time: Theme, UI colour, Text contrast, UI style, Corner style, Team colours.</li><li>Nothing tells you which combinations work well together.</li></ul>
+      </div>
+      <div>
+        <div class="col-label">Proposed</div>
+        <ul class="changes" style="margin-top:0">
+          <li>Six looks, each one card with a miniature of itself: <b>Teamflow</b> (dark · default colour · Industrial · slightly rounded, today's default), <b>Daylight</b> (light · default · Classic · rounded), <b>Calm</b> (dark · Ocean · Minimal · rounded), <b>Paper</b> (light · Sunset · Paper · hard edge), <b>Terminal</b> (dark · Forest · Terminal · hard edge), <b>Neon</b> (dark · custom pink/violet · Neon · rounded). Names and mixes are a first draft.</li>
+          <li>A look sets theme, colour, style and corners in one click; text contrast and team colours are left as you had them.</li>
+          <li>If you then change anything, the card shows <b>"Teamflow · customised"</b> and offers "Back to Teamflow".</li>
+          <li>No new stored field: a look is just a bundle of the existing profile values, so export/import and old profiles keep working.</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <!-- 3 CUSTOMISE -->
+  <section class="item" id="customise">
+    <p class="eyebrow">3</p><h2>Customise, in three groups</h2>
+    <div class="cmp">
+      <div>
+        <div class="col-label">Now</div>
+        <div class="shots" style="grid-template-columns:1fr"><figure><a href="appearance-before/03-appearance-all-1440.png"><img src="appearance-before/03-appearance-all-1440.png" alt=""></a><figcaption>One flat list; board size and backup on another panel</figcaption></figure></div>
+      </div>
+      <div>
+        <div class="col-label">Proposed</div>
+        <div class="frame" style="--w:660;--h:690;--s:.8"><div class="vp" style="padding:16px">
+          <div class="m-sec"><div class="m-sec-h"><strong>Colour</strong><span class="m-link">Reset colour</span></div>
+            <div class="m-row"><span>Theme</span><span class="m-seg"><span class="on">Dark</span><span>Light</span><span>Match system</span></span></div>
+            <div class="m-row"><span>Palette</span><span class="m-swatches">
+              <span class="m-sw on"><i class="split" style="--a:#ff5500;--b:#00d8ff"></i>Default</span>
+              <span class="m-sw"><i class="split" style="--a:#ff6b35;--b:#ffb627"></i>Sunset</span>
+              <span class="m-sw"><i class="split" style="--a:#2563eb;--b:#38bdf8"></i>Ocean</span>
+              <span class="m-sw"><i class="split" style="--a:#16a34a;--b:#86efac"></i>Forest</span>
+              <span class="m-sw"><i style="background:conic-gradient(red,yellow,lime,cyan,blue,magenta,red)"></i>Custom…</span></span></div>
+            <div class="m-row"><span>Text</span><span class="m-seg"><span>Softer</span><span class="on">Normal</span><span>Stronger</span></span></div>
+            <div class="m-row"><span>Team colours</span><span class="m-toggle"><i></i>Keep exact colours in light theme</span></div>
+          </div>
+          <div class="m-sec"><div class="m-sec-h"><strong>Shape &amp; style</strong><span class="m-link">Reset shape &amp; style</span></div>
+            <div style="font-size:12px;color:var(--text-soft);margin-bottom:6px">Style</div>
+            <div class="m-tiles">
+              <div class="m-tile on"><b style="border:3px solid #111;box-shadow:3px 3px 0 #000"></b>Industrial</div>
+              <div class="m-tile"><b style="border:1px solid var(--border-strong)"></b>Minimal</div>
+              <div class="m-tile"><b style="border:1px solid var(--border);box-shadow:0 3px 8px rgba(0,0,0,.4)"></b>Soft</div>
+              <div class="m-tile"><b style="border:2px solid var(--border-strong)"></b>Classic</div>
+              <div class="m-tile"><b style="border:1px solid #00d8ff55;background:linear-gradient(#00d8ff22,#ff550022)"></b>Glass</div>
+              <div class="m-tile"><b style="border:1px solid #22c55e;box-shadow:0 0 6px #22c55e88"></b>Terminal</div>
+              <div class="m-tile"><b style="border:1px solid #3b3226;background:#f1e9d6"></b>Paper</div>
+              <div class="m-tile"><b style="border:1px solid #a855f7;box-shadow:0 0 8px #a855f7"></b>Neon</div>
+            </div>
+            <div style="font-size:12px;color:var(--text-soft);margin:10px 0 6px">Corners</div>
+            <div class="m-tiles"><div class="m-tile"><b style="border-radius:0;border:2px solid var(--border-strong)"></b>Square</div><div class="m-tile on"><b style="border-radius:6px;border:2px solid var(--border-strong)"></b>Slight</div><div class="m-tile"><b style="border-radius:12px;border:2px solid var(--border-strong)"></b>Round</div><div class="m-tile"><b style="clip-path:polygon(8px 0,calc(100% - 8px) 0,100% 8px,100% calc(100% - 8px),calc(100% - 8px) 100%,8px 100%,0 calc(100% - 8px),0 8px);background:var(--border-strong)"></b>Octagon</div></div>
+          </div>
+          <div class="m-sec"><div class="m-sec-h"><strong>Board</strong><span class="m-link">Reset board</span></div>
+            <div class="m-row"><span>Column width</span><span class="m-seg"><span class="on">Auto</span><span>Custom</span></span></div>
+            <div class="m-row"><span>Card height</span><span style="display:flex;gap:10px;align-items:center"><span class="m-range"></span><span style="font-size:12px;color:var(--muted)">72px</span></span></div>
+          </div>
+        </div></div>
+        <ul class="changes">
+          <li><b>Colour</b>: Theme gains "Match system" (follows the OS); palette swatches show both colours; "Custom…" opens Primary + Accent only. Text contrast keeps its three values with clearer names. Team colours becomes one switch.</li>
+          <li><b>Custom text colours</b> (Text, Soft text) are dropped from the UI: they break the other theme and Text contrast covers the need. Existing values keep working; Reset clears them.</li>
+          <li><b>Shape &amp; style</b>: the 8 styles become picture tiles instead of a dropdown, corners stay tiles. The empty "Advanced chrome tuning" box is removed.</li>
+          <li><b>Board</b>: column width and card height move here from General (General keeps a link "Board size is under Appearance").</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <!-- 4 PREVIEW -->
+  <section class="item" id="preview">
+    <p class="eyebrow">4</p><h2>A preview you can always see</h2>
+    <div class="cmp">
+      <div>
+        <div class="col-label">Now</div>
+        <div class="shots" style="grid-template-columns:2fr 1fr"><figure><a href="appearance-before/01-appearance-1440.png"><img src="appearance-before/01-appearance-1440.png" alt=""></a><figcaption>Row and three columns only</figcaption></figure><figure><a href="appearance-before/01-appearance-375.png"><img src="appearance-before/01-appearance-375.png" alt=""></a><figcaption>Phone: scrolls away</figcaption></figure></div>
+      </div>
+      <div>
+        <div class="col-label">Proposed</div>
+        <ul class="changes" style="margin-top:0">
+          <li>Preview shows the parts a style changes: topbar, row header with team colour, a column header, two cards, a primary "+ Add issue" button and the edge of a drawer with a field.</li>
+          <li>Stays in view while the controls scroll (sticky; it already is on desktop, see 7 for phones).</li>
+          <li>"As set · Dark · Light" switch on the preview shows the other theme without changing yours. This needs the theme tokens to work on a container as well as on the page root (a mechanical change to <code>tokens.css</code> selectors); without it, the switch is dropped and only "As set" remains.</li>
+          <li>Card titles no longer mention column width.</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <!-- 5 SAVE & RESET -->
+  <section class="item" id="save">
+    <p class="eyebrow">5</p><h2>Saved feedback and reset</h2>
+    <div class="cmp">
+      <div><div class="col-label">Now</div><ul class="problems" style="margin-top:0"><li>Silent save 0.6 s after a change; errors only as a toast.</li><li>No way back to the default look except picking every value again.</li></ul></div>
+      <div>
+        <div class="col-label">Proposed</div>
+        <div class="mocks">
+          <div class="m-sec" style="width:360px"><div class="m-head"><h2 style="font-size:18px">Appearance</h2><span class="m-saved" style="color:var(--muted);border-color:var(--border)">Saving…</span></div></div>
+          <div class="m-sec" style="width:360px"><div class="m-head"><h2 style="font-size:18px">Appearance</h2><span class="m-saved">✓ Saved</span></div></div>
+          <div class="m-sec" style="width:360px"><div class="m-head"><h2 style="font-size:18px">Appearance</h2><span class="m-saved" style="color:var(--danger-text);border-color:var(--danger)">Not saved · Retry</span></div></div>
+        </div>
+        <ul class="changes">
+          <li>A small status pill next to the heading: "Saving…" while the 0.6 s save is pending, "✓ Saved" when the server confirms, "Not saved · Retry" on failure.</li>
+          <li>Each group has "Reset colour / shape &amp; style / board"; the header has "Reset all to default". Resets apply at once and show an Undo toast (same dock as the board's undo), instead of a confirm dialog.</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <!-- 6 SHARE -->
+  <section class="item" id="share">
+    <p class="eyebrow">6</p><h2>Share this look</h2>
+    <div class="cmp">
+      <div><div class="col-label">Now</div><div class="shots" style="grid-template-columns:1fr"><figure><a href="appearance-before/05-general-board-and-backup-1440.png"><img src="appearance-before/05-general-board-and-backup-1440.png" alt=""></a><figcaption>General → "Board layout &amp; profile backup": export downloads JSON, import needs pasting JSON into a textarea</figcaption></figure></div></div>
+      <div>
+        <div class="col-label">Proposed</div>
+        <div class="m-sec" style="max-width:620px">
+          <div class="m-sec-h"><strong>Share this look</strong></div>
+          <p class="m-sub" style="margin-top:0">Send your look to someone, or use one they sent you. Board size comes along; nothing about your teams does.</p>
+          <div style="display:flex;gap:8px;flex-wrap:wrap"><span class="m-btn">⇩ Download look (.json)</span><span class="m-btn">⧉ Copy as text</span><span class="m-btn">⇪ Import a look…</span></div>
+          <p style="font-size:12px;color:var(--muted);margin:8px 0 0">Import accepts a file or pasted text, shows the new look in the preview first, then "Use this look" / "Cancel".</p>
+        </div>
+        <ul class="changes"><li>Moves from General to the bottom of Appearance. Uses the same export/import API; adds a file picker and a preview-before-apply step.</li></ul>
+      </div>
+    </div>
+  </section>
+
+  <!-- 7 MOBILE -->
+  <section class="item" id="mobile">
+    <p class="eyebrow">7</p><h2>Phones</h2>
+    <div class="cmp">
+      <div><div class="col-label">Now (375)</div><div class="shots" style="grid-template-columns:1fr 1fr"><figure><a href="appearance-before/01-appearance-375.png"><img src="appearance-before/01-appearance-375.png" alt=""></a></figure><figure><a href="appearance-before/03-appearance-all-375.png"><img src="appearance-before/03-appearance-all-375.png" alt=""></a></figure></div></div>
+      <div>
+        <div class="col-label">Proposed (375)</div>
+        <div class="frame" style="--w:375;--h:760;--s:.62"><div class="vp">
+          <div class="m-mtop"><span class="m-btn sm">← Board</span><span class="m-sel">Appearance <span>▾</span></span></div>
+          <div style="padding:0 12px">
+            <div class="m-mpreview"><div class="mini"><span></span><span></span><span></span></div><span class="m-saved">✓ Saved</span></div>
+            <div class="m-head"><h2 style="font-size:20px">Appearance</h2></div>
+            <p class="m-sub">Pick a look, then fine-tune it.</p>
+            <div class="presets" style="grid-template-columns:1fr 1fr">
+              <div class="preset on" style="--cs:#1f1f1f;--bc:#444;--ac:#00d8ff;--tx:#ececec;--pr:#ff5500;--bw:2px"><div class="pv" style="background:#0f0f0f"><span class="c"></span><span class="c"></span><span class="btn"></span></div><div class="name"><b>Teamflow</b></div></div>
+              <div class="preset" style="--cs:#fff;--bc:#d4d4d4;--ac:#0ea5e9;--tx:#141414;--pr:#ff5500;--r:6px"><div class="pv" style="background:#f3f3f3"><span class="c"></span><span class="c"></span><span class="btn"></span></div><div class="name"><b>Daylight</b></div></div>
+              <div class="preset" style="--cs:#18212b;--bc:#2b3a48;--ac:#38bdf8;--tx:#dbe7f3;--pr:#2563eb;--r:10px"><div class="pv" style="background:#0d141b"><span class="c"></span><span class="c"></span><span class="btn"></span></div><div class="name"><b>Calm</b></div></div>
+              <div class="preset" style="--cs:#fbf6ea;--bc:#3b3226;--ac:#b45309;--tx:#2a2117;--pr:#c2410c;--r:0"><div class="pv" style="background:#f1e9d6"><span class="c"></span><span class="c"></span><span class="btn"></span></div><div class="name"><b>Paper</b></div></div>
+            </div>
+            <div class="m-sec" style="margin-top:12px"><div class="m-collapsed"><strong>Colour</strong><span>▾</span></div></div>
+            <div class="m-sec"><div class="m-collapsed"><strong>Shape &amp; style</strong><span>▾</span></div></div>
+            <div class="m-sec"><div class="m-collapsed"><strong>Board</strong><span>▾</span></div></div>
+            <div class="m-sec"><div class="m-collapsed"><strong>Share this look</strong><span>▾</span></div></div>
+          </div>
+        </div></div>
+        <ul class="changes"><li>Below 768px the preview becomes a slim sticky strip (mini board + saved pill) that stays at the top while you scroll; tap it to expand the full preview. Groups are collapsed by default.</li></ul>
+      </div>
+    </div>
+  </section>
+
+  <!-- LIST -->
+  <section class="item" id="list">
+    <p class="eyebrow">Pick</p><h2>Proposed changes (one commit each)</h2>
+    <table class="list">
+      <tr><th>#</th><th>Change</th><th>Size</th></tr>
+      <tr><td>1</td><td>Regroup the panel into Looks / Customise (Colour, Shape &amp; style, Board) / Share; remove the empty "Advanced chrome tuning".</td><td>M</td></tr>
+      <tr><td>2</td><td>Six named Looks (one click sets theme + colour + style + corners), with "customised" state and "Back to &lt;look&gt;".</td><td>M</td></tr>
+      <tr><td>3</td><td>Styles and corners as picture tiles instead of a dropdown; palette swatches show both colours.</td><td>S</td></tr>
+      <tr><td>4</td><td>Theme "Match system" option (follows the OS light/dark setting; new profile value).</td><td>S</td></tr>
+      <tr><td>5</td><td>Drop custom Text / Soft text from the UI (keep Primary + Accent); Team colours becomes a switch.</td><td>S</td></tr>
+      <tr><td>6</td><td>Move column width and card height from General to Appearance → Board.</td><td>S</td></tr>
+      <tr><td>7</td><td>Richer preview: topbar, row, column header, cards, primary button, drawer edge; card copy fixed.</td><td>S</td></tr>
+      <tr><td>8</td><td>Preview "As set · Dark · Light" switch (needs theme tokens usable on a container).</td><td>M</td></tr>
+      <tr><td>9</td><td>"Saving… / ✓ Saved / Not saved · Retry" status next to the heading.</td><td>S</td></tr>
+      <tr><td>10</td><td>Reset per group and "Reset all to default", each with an Undo toast.</td><td>S</td></tr>
+      <tr><td>11</td><td>"Share this look" on Appearance (download, copy, import by file or paste, preview before applying); removed from General.</td><td>M</td></tr>
+      <tr><td>12</td><td>Phones: sticky mini preview strip at the top, groups collapsed.</td><td>S</td></tr>
+    </table>
+    <p class="frame-cap">After-screenshots will go in <code>docs/mockups/appearance-after/</code>.</p>
+  </section>
+</main>
+<script>
+  const root = document.documentElement, btn = document.getElementById("theme");
+  btn.addEventListener("click", () => {
+    const light = root.dataset.theme !== "light";
+    root.dataset.theme = light ? "light" : "dark";
+    btn.textContent = light ? "☾ Dark" : "☀ Light";
+  });
+</script>
+</body>
+</html>

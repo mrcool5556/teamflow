@@ -2,6 +2,9 @@ import { createContext, useContext } from "react";
 import type { TeamPublic, UserProfile, UserPublic } from "@teamflow/core";
 import { useTeamsQuery } from "../queries/teams";
 
+/** Where the latest profile change is: nothing yet, waiting/sending, confirmed, or failed. */
+export type ProfileSaveState = "idle" | "saving" | "saved" | "error";
+
 export type Session = {
   /** The signed-in user (from storage until /auth/me answers), or null. */
   user: UserPublic | null;
@@ -14,6 +17,10 @@ export type Session = {
   profileRef: { readonly current: UserProfile };
   /** Apply a profile change now and save it shortly after. */
   updateProfile: (next: UserProfile) => void;
+  /** State of the debounced profile save (for "Saving… / Saved / Not saved"). */
+  profileSaveState: ProfileSaveState;
+  /** Send the current profile again after a failed save. */
+  retryProfileSave: () => void;
   /** Apply a profile the server already saved (profile import). */
   replaceProfile: (next: UserProfile) => void;
   login: (email: string, password: string) => Promise<void>;

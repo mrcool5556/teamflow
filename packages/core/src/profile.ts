@@ -2,8 +2,10 @@ import { z } from "zod";
 
 export const USER_PROFILE_VERSION = 1 as const;
 
-export const THEME_MODES = ["dark", "light"] as const;
+/** "system" follows the OS light/dark setting; the page itself is always dark or light. */
+export const THEME_MODES = ["dark", "light", "system"] as const;
 export type ThemeMode = (typeof THEME_MODES)[number];
+export type ResolvedTheme = Exclude<ThemeMode, "system">;
 
 export const COLOR_PRESETS = ["default", "sunset", "ocean", "forest", "custom"] as const;
 export type ColorPreset = (typeof COLOR_PRESETS)[number];
