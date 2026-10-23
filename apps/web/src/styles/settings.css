@@ -1085,3 +1085,115 @@
 .appearance-preview-frame .issue-card {
   padding: var(--space-2);
 }
+
+/* Looks: one card per named look, each drawn in its own colours. */
+.appearance-looks-status {
+  margin: 0 0 var(--space-3);
+  font-size: var(--font-size-sm);
+  color: var(--text-soft);
+}
+
+.appearance-looks {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--space-2);
+}
+
+.appearance-look {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-2);
+  background: transparent;
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  box-shadow: none;
+  text-align: left;
+}
+
+.appearance-look:hover {
+  border-color: var(--border-strong);
+}
+
+.appearance-look.active {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px var(--accent);
+}
+
+.appearance-look-preview {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 5px;
+  height: 64px;
+  padding: 7px;
+  border-radius: 6px;
+  background: var(--look-bg);
+}
+
+.appearance-look-card {
+  position: relative;
+  border: var(--look-border-width) solid var(--look-border);
+  border-radius: var(--look-radius);
+  background: var(--look-surface);
+  box-shadow: var(--look-shadow);
+}
+
+.appearance-look-card::before {
+  content: "";
+  position: absolute;
+  left: 5px;
+  top: 5px;
+  width: 22px;
+  height: 6px;
+  border-radius: 2px;
+  background: var(--look-accent);
+}
+
+.appearance-look-card::after {
+  content: "";
+  position: absolute;
+  left: 5px;
+  bottom: 6px;
+  width: 60%;
+  height: 5px;
+  border-radius: 2px;
+  background: var(--look-text);
+  opacity: 0.7;
+}
+
+.appearance-look-button {
+  grid-column: 1 / -1;
+  width: 44px;
+  height: 10px;
+  border-radius: var(--look-radius);
+  background: var(--look-primary);
+}
+
+.appearance-look-name {
+  display: flex;
+  justify-content: space-between;
+  font-size: var(--font-size-sm);
+  font-weight: 600;
+}
+
+.appearance-look-name small {
+  font-weight: 400;
+  color: var(--muted);
+}
+
+.appearance-customise-heading {
+  margin: var(--space-6) 0 var(--space-3);
+  font-size: var(--font-size-xs);
+  font-family: "JetBrains Mono", monospace;
+  font-weight: 400;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+@media (max-width: 767px) {
+  .appearance-looks {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
