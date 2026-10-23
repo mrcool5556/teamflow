@@ -54,4 +54,18 @@ describe("appearance panel", () => {
       "true",
     );
   });
+
+  it("offers only primary and accent for custom colours, and team colours as a switch", async () => {
+    const user = userEvent.setup();
+    openAppearance();
+    await user.click(await screen.findByRole("radio", { name: "Custom" }));
+    expect(screen.getByText("Primary")).toBeInTheDocument();
+    expect(screen.getByText("Accent")).toBeInTheDocument();
+    expect(screen.queryByText("Soft text")).not.toBeInTheDocument();
+
+    const exact = screen.getByRole("switch", { name: /Keep exact team colours/ });
+    expect(exact).not.toBeChecked();
+    await user.click(exact);
+    expect(document.documentElement.dataset.semanticContrast).toBe("preserve");
+  });
 });
