@@ -19,6 +19,7 @@ import {
   mergeUserProfile,
 } from "@teamflow/core";
 import { useRef, type ReactNode } from "react";
+import { AppearanceLooks } from "./AppearanceLooks";
 import { CustomColorField } from "./CustomColorField";
 
 type AppearanceSettingsSectionProps = {
@@ -162,6 +163,11 @@ export function AppearanceSettingsSection({
 
   return (
     <div className="appearance-settings">
+      <AppearanceGroup title="Looks">
+        <AppearanceLooks profile={profile} onProfileChange={onProfileChange} />
+      </AppearanceGroup>
+
+      <h3 className="appearance-customise-heading">Customise</h3>
       <AppearanceGroup title="Colour">
         <AppearanceSegmentGroup
           label="Theme"

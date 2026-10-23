@@ -9,7 +9,7 @@ export function AppearancePanel() {
       <header className="settings-panel-header">
         <h2>Appearance</h2>
         <p className="settings-copy settings-lead">
-          Personalize how you feel your board should be. Changes apply as you go.
+          Pick a look, then fine-tune it. Changes apply as you go.
         </p>
       </header>
 
