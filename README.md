@@ -123,7 +123,9 @@ A Docker setup exists for hosts that already run Docker: [deploy/docker/README.m
 
 ## Support
 
-Teamflow is free to use under [AGPL-3.0](LICENSE). Optional donation links (PayPal, Ko-fi) appear in the in-app **About** dialog when enabled in [`packages/core/src/about.ts`](packages/core/src/about.ts).
+Teamflow is free to use under [AGPL-3.0](LICENSE). If it saves you time, you can support it on [Ko-fi](https://ko-fi.com/toters).
+
+The same link appears in the in-app **About** dialog. Donation links are configured in [`packages/core/src/about.ts`](packages/core/src/about.ts).
 
 ## License
 
