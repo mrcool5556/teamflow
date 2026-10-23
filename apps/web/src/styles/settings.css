@@ -1355,3 +1355,12 @@
   font-size: var(--font-size-xs);
   color: var(--muted);
 }
+
+.appearance-group-reset {
+  font-size: var(--font-size-xs);
+  color: var(--muted);
+}
+
+.appearance-group-reset:hover {
+  color: var(--accent-text);
+}

@@ -1,4 +1,4 @@
-import { configure, screen, within } from "@testing-library/react";
+import { configure, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it } from "vitest";
 import { installFakeApi, seedDb, signIn } from "./fakeApi";
@@ -7,17 +7,19 @@ import { renderApp } from "./renderApp";
 // Whole-app renders: allow for a slow first paint when the full suite runs in parallel.
 configure({ asyncUtilTimeout: 3000 });
 
-function openAppearance() {
+/** Render Appearance and wait until the saved profile has loaded (teams load after it). */
+async function openAppearance() {
   const db = seedDb();
   installFakeApi(db);
   signIn(db);
   renderApp("/t/ENG/settings/appearance");
+  await waitFor(() => expect(screen.getByLabelText("Workspace")).toBeEnabled());
   return db;
 }
 
 describe("appearance panel", () => {
   it("groups controls into Colour and Shape & style, with no empty advanced box", async () => {
-    openAppearance();
+    await openAppearance();
     expect(await screen.findByRole("region", { name: "Colour" })).toBeInTheDocument();
     expect(screen.getByRole("region", { name: "Shape & style" })).toBeInTheDocument();
     expect(screen.queryByText("Advanced chrome tuning")).not.toBeInTheDocument();
@@ -25,7 +27,7 @@ describe("appearance panel", () => {
 
   it("applies a look in one click and offers to go back after a change", async () => {
     const user = userEvent.setup();
-    openAppearance();
+    await openAppearance();
     const looks = await screen.findByRole("radiogroup", { name: "Looks" });
     expect(within(looks).getByRole("radio", { name: /Teamflow/ })).toHaveAttribute(
       "aria-checked",
@@ -44,7 +46,7 @@ describe("appearance panel", () => {
 
   it("picks a UI style from picture tiles", async () => {
     const user = userEvent.setup();
-    openAppearance();
+    await openAppearance();
     const styles = await screen.findByRole("radiogroup", { name: "UI style" });
     expect(within(styles).getAllByRole("radio")).toHaveLength(8);
     await user.click(within(styles).getByRole("radio", { name: "Glass" }));
@@ -57,8 +59,9 @@ describe("appearance panel", () => {
 
   it("offers only primary and accent for custom colours, and team colours as a switch", async () => {
     const user = userEvent.setup();
-    openAppearance();
-    await user.click(await screen.findByRole("radio", { name: "Custom" }));
+    await openAppearance();
+    const palette = await screen.findByRole("radiogroup", { name: "UI color" });
+    await user.click(within(palette).getByRole("radio", { name: "Custom" }));
     expect(screen.getByText("Primary")).toBeInTheDocument();
     expect(screen.getByText("Accent")).toBeInTheDocument();
     expect(screen.queryByText("Soft text")).not.toBeInTheDocument();
@@ -67,5 +70,18 @@ describe("appearance panel", () => {
     expect(exact).not.toBeChecked();
     await user.click(exact);
     expect(document.documentElement.dataset.semanticContrast).toBe("preserve");
+  });
+
+  it("has board size under Appearance, not General", async () => {
+    const user = userEvent.setup();
+    await openAppearance();
+    const board = await screen.findByRole("region", { name: "Board" });
+    expect(within(board).getByRole("radiogroup", { name: "Column width" })).toBeInTheDocument();
+    expect(within(board).getByText("Card min height")).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "General" }));
+    expect(await screen.findByRole("heading", { name: "General" })).toBeInTheDocument();
+    expect(screen.queryByText("Card min height")).not.toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Appearance → Board" })).toBeInTheDocument();
   });
 });
