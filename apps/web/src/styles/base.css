@@ -177,20 +177,6 @@ select {
   color: var(--danger-text);
 }
 
-.preview-chip {
-  margin-left: auto;
-  font-size: 0.68rem;
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-  color: var(--muted);
-  border: 1px solid var(--border);
-  padding: 0.15rem 0.45rem;
-}
-
-.preview-muted {
-  opacity: 0.45;
-}
-
 .row-separator-title .ref-actions {
   flex-shrink: 0;
 }
@@ -491,4 +477,18 @@ button.secondary.compact {
   clip: rect(0, 0, 0, 0);
   white-space: nowrap;
   border: 0;
+}
+
+/* A button that reads as an inline link (secondary actions inside text). */
+.link-btn {
+  display: inline;
+  padding: 0;
+  border: none;
+  background: none;
+  box-shadow: none;
+  color: var(--accent-text);
+  font: inherit;
+  text-decoration: underline;
+  text-underline-offset: 0.15em;
+  cursor: pointer;
 }

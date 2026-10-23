@@ -7,7 +7,7 @@ import { clearSession, client, getStoredUser, setSession } from "../api";
 import { applyUserProfile, clearLegacyLocalProfile, mergeWithLegacyDefaults } from "../profile";
 import { useErrorSink } from "../lib/errorSink";
 import { takePendingInvite } from "../lib/inviteLinks";
-import { SessionContext, type Session } from "./session";
+import { SessionContext, type ProfileSaveState, type Session } from "./session";
 
 /** Who is signed in, their saved profile, and the login/register/logout flows. */
 export function SessionProvider({ children }: { children: ReactNode }) {
@@ -20,6 +20,9 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   const [profile, setProfile] = useState<UserProfile>(createDefaultUserProfile);
   const profileRef = useRef<UserProfile>(createDefaultUserProfile());
   const profileSaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [profileSaveState, setProfileSaveState] = useState<ProfileSaveState>("idle");
+  /** Bumped on every change; a save only reports "saved" if nothing changed since it started. */
+  const profileChangeSeqRef = useRef(0);
 
   const applyProfile = useCallback((next: UserProfile) => {
     profileRef.current = next;
@@ -29,6 +32,8 @@ export function SessionProvider({ children }: { children: ReactNode }) {
 
   const persistProfile = useCallback(
     async (next: UserProfile) => {
+      const seq = profileChangeSeqRef.current;
+      setProfileSaveState("saving");
       try {
         const { profile: saved } = await client.saveProfile(next);
         applyProfile(
@@ -37,7 +42,9 @@ export function SessionProvider({ children }: { children: ReactNode }) {
             board: { rowHeadersVisible: next.board.rowHeadersVisible },
           }),
         );
+        if (seq === profileChangeSeqRef.current) setProfileSaveState("saved");
       } catch (err) {
+        if (seq === profileChangeSeqRef.current) setProfileSaveState("error");
         report(err, "Failed to save profile");
       }
     },
@@ -47,6 +54,8 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   const updateProfile = useCallback(
     (next: UserProfile) => {
       applyProfile(next);
+      profileChangeSeqRef.current += 1;
+      setProfileSaveState("saving");
       if (profileSaveTimerRef.current) clearTimeout(profileSaveTimerRef.current);
       profileSaveTimerRef.current = setTimeout(() => {
         void persistProfile(profileRef.current);
@@ -54,6 +63,10 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     },
     [applyProfile, persistProfile],
   );
+
+  const retryProfileSave = useCallback(() => {
+    void persistProfile(profileRef.current);
+  }, [persistProfile]);
 
   const bootstrap = useCallback(async () => {
     setSessionLoading(true);
@@ -138,6 +151,8 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       profile,
       profileRef,
       updateProfile,
+      profileSaveState,
+      retryProfileSave,
       replaceProfile: applyProfile,
       login,
       register,
@@ -149,6 +164,8 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       sessionLoading,
       profile,
       updateProfile,
+      profileSaveState,
+      retryProfileSave,
       applyProfile,
       login,
       register,

@@ -4,6 +4,7 @@ import {
   createDefaultUserProfile,
   DEFAULT_BOARD_COLUMN_WIDTH,
   mergeUserProfile,
+  parseUserProfile,
   registerSchema,
 } from "../src/index.js";
 
@@ -39,5 +40,24 @@ describe("boardColumnWidthMode", () => {
       board: { columnWidthMode: "custom" },
     });
     expect(merged.board.columnWidthMode).toBe("custom");
+  });
+});
+
+describe("theme mode", () => {
+  it("still loads profiles saved with dark or light, and accepts system", () => {
+    for (const theme of ["dark", "light", "system"] as const) {
+      const profile = parseUserProfile({
+        ...createDefaultUserProfile(),
+        appearance: { ...createDefaultUserProfile().appearance, theme },
+      });
+      expect(profile.appearance.theme).toBe(theme);
+    }
+  });
+
+  it("defaults a profile without a theme to dark", () => {
+    const { appearance, ...rest } = createDefaultUserProfile();
+    const { theme: _drop, ...withoutTheme } = appearance;
+    void _drop;
+    expect(parseUserProfile({ ...rest, appearance: withoutTheme }).appearance.theme).toBe("dark");
   });
 });

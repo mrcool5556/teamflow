@@ -74,8 +74,8 @@ export function CreateTeamSection({ onMessage, onTeamCreated }: CreateTeamSectio
         Add another board to your account. Your main board stays as-is — use the workspace dropdown
         in the header to switch between teams.
       </p>
-      <label>
-        Team name
+      <label className="settings-field">
+        <span className="settings-field-label">Team name</span>
         <input
           value={name}
           onChange={(e) => updateName(e.target.value)}
@@ -83,9 +83,13 @@ export function CreateTeamSection({ onMessage, onTeamCreated }: CreateTeamSectio
           maxLength={120}
         />
       </label>
-      <label>
-        Team key
+      <div className="settings-field">
+        <label className="settings-field-label" htmlFor="create-team-key">
+          Team key
+        </label>
         <input
+          id="create-team-key"
+          aria-describedby="create-team-key-hint"
           value={key}
           onChange={(e) => {
             setKeyTouched(true);
@@ -95,10 +99,10 @@ export function CreateTeamSection({ onMessage, onTeamCreated }: CreateTeamSectio
           maxLength={8}
           spellCheck={false}
         />
-      </label>
-      <p className="settings-hint settings-key-hint">
-        Short label for refs and the header (2–8 characters, A–Z and 0–9).
-      </p>
+        <span className="settings-field-hint" id="create-team-key-hint">
+          Short label for refs and the header (2–8 characters, A–Z and 0–9).
+        </span>
+      </div>
       <label className="settings-checkbox">
         <input
           type="checkbox"

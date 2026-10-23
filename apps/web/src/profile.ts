@@ -6,6 +6,7 @@ import {
   PRIORITY_COLOR_DEFAULTS,
   resolveUiColors,
   type ColorPreset,
+  type ResolvedTheme,
   type ThemeMode,
   type UserProfile,
 } from "@teamflow/core";
@@ -55,13 +56,33 @@ function applyUiColorOverrides(profile: UserProfile, root: HTMLElement) {
 
   root.style.setProperty("--accent-text", accent);
 
-  if (appearance.colorPreset !== "custom") return;
+  // Custom text colours (customColors.text / textSoft) are no longer applied: one value could
+  // not suit both themes, and Text contrast covers the need. Old profiles keep the fields;
+  // clearUiColorOverrides above removes anything a previous version set.
+}
 
-  const { customColors } = appearance;
+const SYSTEM_DARK_QUERY = "(prefers-color-scheme: dark)";
 
-  if (customColors.text) root.style.setProperty("--text", customColors.text);
+/** The theme to paint: "system" becomes dark or light from the OS (dark if it cannot tell). */
+export function resolveTheme(theme: ThemeMode): ResolvedTheme {
+  if (theme !== "system") return theme;
+  if (typeof window.matchMedia !== "function") return "dark";
+  return window.matchMedia("(prefers-color-scheme: light)").matches ? "light" : "dark";
+}
 
-  if (customColors.textSoft) root.style.setProperty("--text-soft", customColors.textSoft);
+let systemThemeProfile: UserProfile | null = null;
+let systemThemeListening = false;
+
+/** While the theme is "system", repaint when the OS switches between light and dark. */
+function followSystemTheme(profile: UserProfile) {
+  systemThemeProfile = profile.appearance.theme === "system" ? profile : null;
+  if (systemThemeListening || !systemThemeProfile || typeof window.matchMedia !== "function") {
+    return;
+  }
+  systemThemeListening = true;
+  window.matchMedia(SYSTEM_DARK_QUERY).addEventListener("change", () => {
+    if (systemThemeProfile) applyUserProfile(systemThemeProfile);
+  });
 }
 
 export function applyUserProfile(profile: UserProfile) {
@@ -69,7 +90,8 @@ export function applyUserProfile(profile: UserProfile) {
 
   const { appearance } = profile;
 
-  root.dataset.theme = appearance.theme;
+  root.dataset.theme = resolveTheme(appearance.theme);
+  followSystemTheme(profile);
 
   root.dataset.colorPreset = appearance.colorPreset;
 
