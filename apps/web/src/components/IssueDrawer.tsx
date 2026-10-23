@@ -334,17 +334,6 @@ export function IssueDrawer({
                 </select>
               </label>
             )}
-
-            <div className="issue-drawer-field">
-              <span className="issue-drawer-label">Due</span>
-              <DueDatePicker
-                value={issue.dueDate}
-                disabled={!canEdit}
-                onChange={(dueDate) => {
-                  void patchIssue({ dueDate });
-                }}
-              />
-            </div>
           </div>
         </section>
 
@@ -364,6 +353,17 @@ export function IssueDrawer({
                 }
                 onChange={(assigneeIds) => {
                   void patchIssue({ assigneeIds });
+                }}
+              />
+            </div>
+
+            <div className="issue-drawer-field">
+              <span className="issue-drawer-label">Due</span>
+              <DueDatePicker
+                value={issue.dueDate}
+                disabled={!canEdit}
+                onChange={(dueDate) => {
+                  void patchIssue({ dueDate });
                 }}
               />
             </div>

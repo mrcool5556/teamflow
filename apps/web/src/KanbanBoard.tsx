@@ -48,6 +48,7 @@ import { BulkActionBar } from "./components/BulkActionBar";
 import { BoardColorPicker } from "./components/BoardColorPicker";
 import { PriorityPicker } from "./components/PriorityPicker";
 import { RowScroller } from "./components/RowScroller";
+import { DueChip, DueDatePicker } from "./components/DueDatePicker";
 import { issueMatchesBoardSearch, buildRefShareUrl } from "./lib/refLinks";
 import { copyTextToClipboard } from "./lib/clipboard";
 import { useInlineRename } from "./hooks/useInlineRename";
@@ -280,6 +281,7 @@ type KanbanBoardProps = {
   /** Assign many issues at once (column header picker). */
   onAssignIssues: (issueIds: string[], assigneeIds: string[]) => void;
   onUpdateIssueColor: (issue: IssuePublic, color: string | null) => void;
+  onUpdateIssueDueDate: (issue: IssuePublic, dueDate: string | null) => void;
   onUpdateIssuePriority: (issue: IssuePublic, priority: Priority) => void;
   onAssignRow: (row: BoardRowPublic, assigneeIds: string[]) => void;
   onUpdateRowColor: (row: BoardRowPublic, color: string | null) => void;
@@ -289,6 +291,7 @@ type KanbanBoardProps = {
   onBulkMove?: (issueIds: string[], rowId: string, statusId: string) => void;
   onBulkAssign?: (issueIds: string[], assigneeIds: string[]) => void;
   onBulkPriority?: (issueIds: string[], priority: Priority) => void;
+  onBulkDueDate?: (issueIds: string[], dueDate: string | null) => void;
   onBulkDelete?: (issues: IssuePublic[]) => void;
   onOpenRowFiles?: (row: BoardRowPublic) => void;
 };
@@ -318,6 +321,7 @@ export function KanbanBoard({
   onAssignIssue,
   onAssignIssues,
   onUpdateIssueColor,
+  onUpdateIssueDueDate,
   onUpdateIssuePriority,
   onAssignRow,
   onUpdateRowColor,
@@ -327,6 +331,7 @@ export function KanbanBoard({
   onBulkMove,
   onBulkAssign,
   onBulkPriority,
+  onBulkDueDate,
   onBulkDelete,
   onOpenRowFiles,
 }: KanbanBoardProps) {
@@ -835,6 +840,7 @@ export function KanbanBoard({
                 onAssignIssue={onAssignIssue}
                 onAssignIssues={onAssignIssues}
                 onUpdateIssueColor={onUpdateIssueColor}
+                onUpdateIssueDueDate={onUpdateIssueDueDate}
                 onUpdateIssuePriority={onUpdateIssuePriority}
                 highlightedIssueId={highlightedIssueId}
                 highlightedColumnKey={highlightedColumnKey}
@@ -901,7 +907,13 @@ export function KanbanBoard({
         ) : null}
       </DragOverlay>
 
-      {!previewMode && canEdit && onBulkMove && onBulkAssign && onBulkPriority && onBulkDelete ? (
+      {!previewMode &&
+      canEdit &&
+      onBulkMove &&
+      onBulkAssign &&
+      onBulkPriority &&
+      onBulkDueDate &&
+      onBulkDelete ? (
         <BulkActionBar
           selectedIssues={selectedIssues}
           rows={rows}
@@ -913,6 +925,10 @@ export function KanbanBoard({
           }}
           onAssign={(issueIds, assigneeIds) => {
             onBulkAssign(issueIds, assigneeIds);
+            clearIssueSelection();
+          }}
+          onDueDate={(issueIds, dueDate) => {
+            onBulkDueDate(issueIds, dueDate);
             clearIssueSelection();
           }}
           onPriority={(issueIds, priority) => {
@@ -1131,6 +1147,7 @@ function SortableBoardRow({
   onAssignIssue,
   onAssignIssues,
   onUpdateIssueColor,
+  onUpdateIssueDueDate,
   onUpdateIssuePriority,
   highlightedIssueId = null,
   highlightedColumnKey = null,
@@ -1173,6 +1190,7 @@ function SortableBoardRow({
   onAssignIssue: (issue: IssuePublic, assigneeIds: string[]) => void;
   onAssignIssues: (issueIds: string[], assigneeIds: string[]) => void;
   onUpdateIssueColor: (issue: IssuePublic, color: string | null) => void;
+  onUpdateIssueDueDate: (issue: IssuePublic, dueDate: string | null) => void;
   onUpdateIssuePriority: (issue: IssuePublic, priority: Priority) => void;
   highlightedIssueId?: string | null;
   highlightedColumnKey?: string | null;
@@ -1410,6 +1428,7 @@ function SortableBoardRow({
                               onDelete={() => onDeleteIssue(issue)}
                               onAssignIssue={onAssignIssue}
                               onUpdateIssueColor={onUpdateIssueColor}
+                              onUpdateIssueDueDate={onUpdateIssueDueDate}
                               onUpdateIssuePriority={onUpdateIssuePriority}
                               onGoToRef={onGoToRef}
                               onContextMenu={(event) => onIssueContextMenu?.(issue, event)}
@@ -1548,6 +1567,7 @@ function SortableIssueCard({
   onDelete,
   onAssignIssue,
   onUpdateIssueColor,
+  onUpdateIssueDueDate,
   onUpdateIssuePriority,
   onGoToRef,
   onContextMenu,
@@ -1563,6 +1583,7 @@ function SortableIssueCard({
   onDelete: () => void;
   onAssignIssue: (issue: IssuePublic, assigneeIds: string[]) => void;
   onUpdateIssueColor: (issue: IssuePublic, color: string | null) => void;
+  onUpdateIssueDueDate: (issue: IssuePublic, dueDate: string | null) => void;
   onUpdateIssuePriority: (issue: IssuePublic, priority: Priority) => void;
   onGoToRef?: (ref: string) => void;
   onContextMenu?: (event: React.MouseEvent) => void;
@@ -1632,6 +1653,16 @@ function SortableIssueCard({
               onChange={(assigneeIds) => onAssignIssue(issue, assigneeIds)}
             />
           </span>
+          {canEdit ? (
+            <DueDatePicker
+              variant="chip"
+              value={issue.dueDate}
+              done={Boolean(issue.completedAt)}
+              onChange={(dueDate) => onUpdateIssueDueDate(issue, dueDate)}
+            />
+          ) : (
+            <DueChip value={issue.dueDate} done={Boolean(issue.completedAt)} />
+          )}
         </div>
         <div className="issue-card-header-actions">
           <span className="issue-card-optional" data-unset={!issue.color || undefined}>
