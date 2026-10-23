@@ -1,9 +1,10 @@
-import { eq, sql } from "drizzle-orm";
+import { eq, inArray, sql } from "drizzle-orm";
 import type { Db, DbExecutor } from "@teamflow/db";
 import { schema } from "@teamflow/db";
 import { userHasTeamPermission } from "./permissions.js";
 import { findTeamRoleBySlug, seedDefaultTeamRoles } from "./roles.js";
 import { createDefaultBoardRow } from "./board.js";
+import { removeStoredFilesFromDisk } from "./attachments.js";
 import { forbidden, internalError, notFound } from "./errors.js";
 
 export function personalWorkspaceSlug(userId: string) {
@@ -79,7 +80,70 @@ export async function deleteTeam(db: Db, teamId: string, actorUserId: string) {
     throw notFound("Team not found");
   }
 
-  await db.delete(schema.teams).where(eq(schema.teams.id, teamId));
+  const storagePaths = db.transaction((tx) => {
+    const files = listTeamOnlyStoredFiles(tx, teamId);
+
+    // team_members.role_id and team_invites.role_id reference team_roles ON DELETE RESTRICT,
+    // so the cascade from teams to team_roles is refused while either still exists.
+    tx.delete(schema.teamInvites).where(eq(schema.teamInvites.teamId, teamId)).run();
+    tx.delete(schema.teamMembers).where(eq(schema.teamMembers.teamId, teamId)).run();
+    tx.delete(schema.teams).where(eq(schema.teams.id, teamId)).run();
+
+    // stored_files has no team column, so the cascade only removes its links.
+    if (files.length > 0) {
+      tx.delete(schema.storedFiles)
+        .where(
+          inArray(
+            schema.storedFiles.id,
+            files.map((f) => f.id),
+          ),
+        )
+        .run();
+    }
+    return files.map((f) => f.storagePath);
+  });
+
+  await removeStoredFilesFromDisk(storagePaths);
 
   return team;
+}
+
+/** Stored files linked to the team's issues or rows and to no other team's. */
+function listTeamOnlyStoredFiles(db: DbExecutor, teamId: string) {
+  const fileLinksWithTeam = (fileIds?: string[]) => [
+    ...db
+      .select({ fileId: schema.issueFileLinks.fileId, teamId: schema.issues.teamId })
+      .from(schema.issueFileLinks)
+      .innerJoin(schema.issues, eq(schema.issues.id, schema.issueFileLinks.issueId))
+      .where(
+        fileIds ? inArray(schema.issueFileLinks.fileId, fileIds) : eq(schema.issues.teamId, teamId),
+      )
+      .all(),
+    ...db
+      .select({ fileId: schema.rowFileLinks.fileId, teamId: schema.boardRows.teamId })
+      .from(schema.rowFileLinks)
+      .innerJoin(schema.boardRows, eq(schema.boardRows.id, schema.rowFileLinks.rowId))
+      .where(
+        fileIds
+          ? inArray(schema.rowFileLinks.fileId, fileIds)
+          : eq(schema.boardRows.teamId, teamId),
+      )
+      .all(),
+  ];
+
+  const teamFileIds = [...new Set(fileLinksWithTeam().map((l) => l.fileId))];
+  if (teamFileIds.length === 0) return [];
+  const linkedElsewhere = new Set(
+    fileLinksWithTeam(teamFileIds)
+      .filter((l) => l.teamId !== teamId)
+      .map((l) => l.fileId),
+  );
+  const fileIds = teamFileIds.filter((id) => !linkedElsewhere.has(id));
+  if (fileIds.length === 0) return [];
+
+  return db
+    .select({ id: schema.storedFiles.id, storagePath: schema.storedFiles.storagePath })
+    .from(schema.storedFiles)
+    .where(inArray(schema.storedFiles.id, fileIds))
+    .all();
 }
