@@ -102,4 +102,20 @@ describe("appearance panel", () => {
     expect(await screen.findByText("✓ Saved")).toBeInTheDocument();
     expect(db.profile.appearance.theme).toBe("light");
   });
+
+  it("resets a group and lets you undo it", async () => {
+    const user = userEvent.setup();
+    await openAppearance();
+    await user.click(screen.getByRole("radio", { name: "Glass" }));
+    expect(document.documentElement.dataset.chromeStyle).toBe("glass");
+
+    await user.click(screen.getByRole("button", { name: "Reset shape & style" }));
+    expect(document.documentElement.dataset.chromeStyle).toBe("industrial");
+    const region = screen.getByRole("region", { name: "Notifications" });
+    expect(within(region).getByText(/Shape & style reset to default/)).toBeInTheDocument();
+
+    await user.click(within(region).getByRole("button", { name: "Undo" }));
+    expect(document.documentElement.dataset.chromeStyle).toBe("glass");
+    expect(within(region).queryByText(/reset to default/)).not.toBeInTheDocument();
+  });
 });

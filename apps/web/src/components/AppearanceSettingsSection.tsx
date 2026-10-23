@@ -9,8 +9,6 @@ import type {
 import {
   CHROME_STYLES,
   COLOR_PRESETS,
-  DEFAULT_BOARD_COLUMN_WIDTH,
-  DEFAULT_CARD_MIN_HEIGHT,
   DEFAULT_UI_ACCENT,
   DEFAULT_UI_PRIMARY,
   SHAPE_PRESETS,
@@ -18,7 +16,9 @@ import {
   UI_COLOR_PRESET_PALETTES,
   mergeUserProfile,
 } from "@teamflow/core";
-import { useRef, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
+import { RESET_LABELS, resetAppearance, type ResetScope } from "../lib/appearanceReset";
+import { Toast } from "../ui/BottomDock";
 import { AppearanceBoardControls } from "./AppearanceBoardControls";
 import { AppearanceLooks } from "./AppearanceLooks";
 import { CustomColorField } from "./CustomColorField";
@@ -158,14 +158,43 @@ export function AppearanceSettingsSection({
 
   customDraftRef.current = { ...custom };
 
+  const [undo, setUndo] = useState<{ label: string; previous: UserProfile } | null>(null);
+  useEffect(() => {
+    if (!undo) return;
+    const id = window.setTimeout(() => setUndo(null), 8000);
+    return () => window.clearTimeout(id);
+  }, [undo]);
+
+  const reset = (scope: ResetScope) => {
+    setUndo({ label: RESET_LABELS[scope], previous: profile });
+    onProfileChange(resetAppearance(profile, scope));
+  };
+
+  const resetButton = (scope: Exclude<ResetScope, "all">, label: string) => (
+    <button type="button" className="link-btn appearance-group-reset" onClick={() => reset(scope)}>
+      {label}
+    </button>
+  );
+
   return (
     <div className="appearance-settings">
-      <AppearanceGroup title="Looks">
+      <AppearanceGroup
+        title="Looks"
+        actions={
+          <button
+            type="button"
+            className="link-btn appearance-group-reset"
+            onClick={() => reset("all")}
+          >
+            Reset all to default
+          </button>
+        }
+      >
         <AppearanceLooks profile={profile} onProfileChange={onProfileChange} />
       </AppearanceGroup>
 
       <h3 className="appearance-customise-heading">Customise</h3>
-      <AppearanceGroup title="Colour">
+      <AppearanceGroup title="Colour" actions={resetButton("colour", "Reset colour")}>
         <AppearanceSegmentGroup
           label="Theme"
           value={appearance.theme}
@@ -275,7 +304,7 @@ export function AppearanceSettingsSection({
         </label>
       </AppearanceGroup>
 
-      <AppearanceGroup title="Shape & style">
+      <AppearanceGroup title="Shape & style" actions={resetButton("shape", "Reset shape & style")}>
         <div className="appearance-block">
           <span className="appearance-block-label">UI style</span>
           <div className="appearance-style-grid" role="radiogroup" aria-label="UI style">
@@ -319,30 +348,25 @@ export function AppearanceSettingsSection({
         </fieldset>
       </AppearanceGroup>
 
-      <AppearanceGroup
-        title="Board"
-        actions={
-          <button
-            type="button"
-            className="link-btn appearance-group-reset"
-            onClick={() =>
-              onProfileChange(
-                mergeUserProfile(profile, {
-                  board: {
-                    columnWidth: DEFAULT_BOARD_COLUMN_WIDTH,
-                    columnWidthMode: "auto",
-                    cardMinHeight: DEFAULT_CARD_MIN_HEIGHT,
-                  },
-                }),
-              )
-            }
-          >
-            Reset board
-          </button>
-        }
-      >
+      <AppearanceGroup title="Board" actions={resetButton("board", "Reset board")}>
         <AppearanceBoardControls profile={profile} onProfileChange={onProfileChange} />
       </AppearanceGroup>
+
+      {undo ? (
+        <Toast onDismiss={() => setUndo(null)}>
+          {undo.label}.{" "}
+          <button
+            type="button"
+            className="link-btn"
+            onClick={() => {
+              onProfileChange(undo.previous);
+              setUndo(null);
+            }}
+          >
+            Undo
+          </button>
+        </Toast>
+      ) : null}
     </div>
   );
 }
