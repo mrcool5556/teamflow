@@ -21,6 +21,7 @@ import { RESET_LABELS, resetAppearance, type ResetScope } from "../lib/appearanc
 import { Toast } from "../ui/BottomDock";
 import { AppearanceBoardControls } from "./AppearanceBoardControls";
 import { AppearanceLooks } from "./AppearanceLooks";
+import { AppearanceShare } from "./AppearanceShare";
 import { CustomColorField } from "./CustomColorField";
 
 type AppearanceSettingsSectionProps = {
@@ -350,6 +351,10 @@ export function AppearanceSettingsSection({
 
       <AppearanceGroup title="Board" actions={resetButton("board", "Reset board")}>
         <AppearanceBoardControls profile={profile} onProfileChange={onProfileChange} />
+      </AppearanceGroup>
+
+      <AppearanceGroup title="Share this look">
+        <AppearanceShare />
       </AppearanceGroup>
 
       {undo ? (

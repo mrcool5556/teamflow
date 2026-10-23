@@ -967,15 +967,6 @@
   margin: 0;
 }
 
-.profile-import {
-  width: 100%;
-  min-height: 8rem;
-  resize: vertical;
-  font-family: "JetBrains Mono", monospace;
-  font-size: 0.8rem;
-  line-height: 1.4;
-}
-
 .settings-range {
   display: grid;
   gap: var(--space-2);
@@ -1463,4 +1454,57 @@
 .save-status--error {
   color: var(--danger-text);
   border-color: var(--danger);
+}
+
+/* Share this look */
+.appearance-share-intro {
+  margin-top: 0;
+}
+
+.appearance-share-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.appearance-share-import {
+  display: grid;
+  gap: var(--space-3);
+  margin-top: var(--space-3);
+  padding: var(--space-3);
+  border: 1px dashed var(--border-strong);
+  border-radius: var(--radius-sm);
+}
+
+.appearance-share-file,
+.appearance-share-paste {
+  display: grid;
+  gap: var(--space-1);
+  font-size: var(--font-size-sm);
+  color: var(--text-soft);
+}
+
+.appearance-share-paste textarea {
+  width: 100%;
+  min-height: 8rem;
+  resize: vertical;
+  font-family: "JetBrains Mono", monospace;
+  font-size: 0.8rem;
+  line-height: 1.4;
+}
+
+.appearance-share-import > button {
+  width: fit-content;
+}
+
+.appearance-share-previewing {
+  margin: 0;
+  font-size: var(--font-size-sm);
+  color: var(--accent-text);
+}
+
+.appearance-share-error {
+  margin: 0;
+  font-size: var(--font-size-sm);
+  color: var(--danger-text);
 }

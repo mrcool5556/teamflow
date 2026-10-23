@@ -177,8 +177,6 @@ select {
   color: var(--danger-text);
 }
 
-
-
 .row-separator-title .ref-actions {
   flex-shrink: 0;
 }
