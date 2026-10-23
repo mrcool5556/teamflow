@@ -560,7 +560,6 @@
   min-height: calc(var(--card-min-height) + 4rem);
 }
 
-
 .token-box {
   margin-top: 1rem;
   padding: 1rem;
@@ -1434,4 +1433,34 @@
   width: fit-content;
   padding: 0.2rem 0.5rem;
   font-size: var(--font-size-xs);
+}
+
+.settings-panel-title-row {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+}
+
+.settings-panel-title-row h2 {
+  margin-bottom: 0.35rem;
+}
+
+/* Profile save state next to a panel heading. */
+.save-status {
+  font-size: var(--font-size-xs);
+  padding: 0.05rem 0.6rem;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  color: var(--muted);
+}
+
+.save-status--saved {
+  color: var(--done);
+  border-color: color-mix(in srgb, var(--done) 50%, transparent);
+}
+
+.save-status--error {
+  color: var(--danger-text);
+  border-color: var(--danger);
 }

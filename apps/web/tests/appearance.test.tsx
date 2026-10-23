@@ -8,9 +8,9 @@ import { renderApp } from "./renderApp";
 configure({ asyncUtilTimeout: 3000 });
 
 /** Render Appearance and wait until the saved profile has loaded (teams load after it). */
-async function openAppearance() {
+async function openAppearance(options?: Parameters<typeof installFakeApi>[1]) {
   const db = seedDb();
-  installFakeApi(db);
+  installFakeApi(db, options);
   signIn(db);
   renderApp("/t/ENG/settings/appearance");
   await waitFor(() => expect(screen.getByLabelText("Workspace")).toBeEnabled());
@@ -83,5 +83,23 @@ describe("appearance panel", () => {
     expect(await screen.findByRole("heading", { name: "General" })).toBeInTheDocument();
     expect(screen.queryByText("Card min height")).not.toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Appearance → Board" })).toBeInTheDocument();
+  });
+
+  it("shows Saving…, then Saved, and offers Retry when a save fails", async () => {
+    const user = userEvent.setup();
+    let failSaves = true;
+    const db = await openAppearance({
+      fail: (method, path) =>
+        failSaves && method === "PUT" && path.startsWith("/auth/profile") ? "Disk full" : undefined,
+    });
+
+    await user.click(screen.getByRole("radio", { name: "Light" }));
+    expect(screen.getByText("Saving…")).toBeInTheDocument();
+    expect(await screen.findByText(/Not saved/)).toBeInTheDocument();
+
+    failSaves = false;
+    await user.click(screen.getByRole("button", { name: "Retry" }));
+    expect(await screen.findByText("✓ Saved")).toBeInTheDocument();
+    expect(db.profile.appearance.theme).toBe("light");
   });
 });
