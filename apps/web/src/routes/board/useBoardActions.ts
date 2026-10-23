@@ -10,7 +10,6 @@ import type {
 import { client } from "../../api";
 import type { UndoPayload } from "../../hooks/useChangeHistory";
 import { useErrorSink } from "../../lib/errorSink";
-import type { IssueTimerPatch } from "../../lib/timer";
 import { updateBoard, type BoardData } from "../../queries/board";
 import {
   createColumn as createColumnChange,
@@ -149,28 +148,6 @@ export function useBoardActions({
     );
   }
 
-  function bulkTimerIssues(issueIds: string[], action: "pause" | "reset") {
-    const now = Date.now();
-    const patches = issues
-      .filter((issue) => issueIds.includes(issue.id))
-      .map((issue) => ({
-        id: issue.id,
-        patch:
-          action === "reset"
-            ? { timerActiveAt: null, timerElapsedSec: 0, timerTargetSec: null }
-            : {
-                timerActiveAt: null,
-                timerElapsedSec: issue.timerActiveAt
-                  ? issue.timerElapsedSec +
-                    Math.max(0, Math.floor((now - Date.parse(issue.timerActiveAt)) / 1000))
-                  : issue.timerElapsedSec,
-                timerTargetSec: issue.timerTargetSec,
-              },
-      }));
-    if (patches.length === 0) return;
-    void mutateBoard(patchIssues(board, members, patches, "Failed to update timers"));
-  }
-
   /**
    * Issues go to the server trash at once. Undo (and Restore in the history) calls the restore
    * route for every one of them, so an undone delete survives the next refetch.
@@ -244,10 +221,6 @@ export function useBoardActions({
     void mutateBoard(
       patchIssue(board, members, issue.id, { priority }, "Failed to update priority"),
     );
-  }
-
-  function updateIssueTimer(issue: IssuePublic, patch: IssueTimerPatch) {
-    void mutateBoard(patchIssue(board, members, issue.id, patch, "Failed to update timer"));
   }
 
   function renameStatus(status: IssueStatusPublic, name: string) {
@@ -388,13 +361,11 @@ export function useBoardActions({
     assignRow,
     bulkMoveIssues,
     bulkSetPriority,
-    bulkTimerIssues,
     bulkDeleteIssues,
     updateRowColor,
     updateStatusColor,
     updateIssueColor,
     updateIssuePriority,
-    updateIssueTimer,
     renameStatus,
     removeRow,
     removeColumn,

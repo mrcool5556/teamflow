@@ -296,13 +296,11 @@ export function BoardShell() {
     assignRow,
     bulkMoveIssues,
     bulkSetPriority,
-    bulkTimerIssues,
     bulkDeleteIssues,
     updateRowColor,
     updateStatusColor,
     updateIssueColor,
     updateIssuePriority,
-    updateIssueTimer,
     renameStatus,
     removeRow,
     removeColumn,
@@ -478,14 +476,12 @@ export function BoardShell() {
           onUpdateRowColor={(row, color) => void updateRowColor(row, color)}
           onUpdateIssueColor={(issue, color) => void updateIssueColor(issue, color)}
           onUpdateIssuePriority={(issue, priority) => void updateIssuePriority(issue, priority)}
-          onUpdateIssueTimer={updateIssueTimer}
           highlightedIssueId={highlightedIssueId}
           highlightedColumnKey={highlightedColumnKey}
           onGoToRef={(ref) => void goToRef(ref)}
           onBulkMove={bulkMoveIssues}
           onBulkAssign={assignIssues}
           onBulkPriority={bulkSetPriority}
-          onBulkTimer={bulkTimerIssues}
           onBulkDelete={bulkDeleteIssues}
           onOpenRowFiles={setRowFilesRow}
         />

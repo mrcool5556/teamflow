@@ -440,7 +440,7 @@
   z-index: calc(var(--z-base) + 1);
 }
 
-/* Card controls with nothing set (no assignee, colour or timer) wait for hover or focus on
+/* Card controls with nothing set (no assignee or colour) wait for hover or focus on
    devices that can hover; touch screens always show them. The wrapper adds no box. */
 .issue-card-optional {
   display: contents;

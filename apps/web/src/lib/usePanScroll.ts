@@ -21,7 +21,7 @@ function shouldStartPan(event: MouseEvent, target: HTMLElement) {
 
   if (
     target.closest(
-      "button, input, textarea, select, a, [contenteditable], .assignee-picker-panel, .issue-timer-panel, .priority-picker-panel",
+      "button, input, textarea, select, a, [contenteditable], .assignee-picker-panel, .priority-picker-panel",
     )
   ) {
     return false;
