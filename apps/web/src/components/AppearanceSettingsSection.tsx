@@ -19,6 +19,7 @@ import {
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { RESET_LABELS, resetAppearance, type ResetScope } from "../lib/appearanceReset";
 import { Toast } from "../ui/BottomDock";
+import { NARROW_SCREEN, useMediaQuery } from "../hooks/useMediaQuery";
 import { AppearanceBoardControls } from "./AppearanceBoardControls";
 import { AppearanceLooks } from "./AppearanceLooks";
 import { AppearanceShare } from "./AppearanceShare";
@@ -126,24 +127,50 @@ function AppearanceSegmentGroup<T extends string>({
   );
 }
 
-/** One titled group of appearance controls (Colour, Shape & style, Board). */
+/**
+ * One titled group of appearance controls. On phones a `collapsible` group starts closed and its
+ * title becomes the toggle; on wider screens every group is open.
+ */
 export function AppearanceGroup({
   title,
   actions,
+  collapsible = false,
   children,
 }: {
   title: string;
   actions?: ReactNode;
+  collapsible?: boolean;
   children: ReactNode;
 }) {
+  const narrow = useMediaQuery(NARROW_SCREEN);
+  const [openOnPhone, setOpenOnPhone] = useState(false);
+  const canCollapse = collapsible && narrow;
+  const open = !canCollapse || openOnPhone;
   const id = `appearance-group-${title.toLowerCase().replace(/[^a-z]+/g, "-")}`;
   return (
-    <section className="appearance-group" aria-labelledby={id}>
+    <section
+      className={`appearance-group${open ? "" : " appearance-group--collapsed"}`}
+      aria-labelledby={id}
+    >
       <header className="appearance-group-header">
-        <h3 id={id}>{title}</h3>
-        {actions}
+        <h3 id={id}>
+          {canCollapse ? (
+            <button
+              type="button"
+              className="appearance-group-toggle"
+              aria-expanded={open}
+              onClick={() => setOpenOnPhone((value) => !value)}
+            >
+              {title}
+              <span aria-hidden="true">{open ? "▴" : "▾"}</span>
+            </button>
+          ) : (
+            title
+          )}
+        </h3>
+        {open ? actions : null}
       </header>
-      {children}
+      {open ? children : null}
     </section>
   );
 }
@@ -195,7 +222,7 @@ export function AppearanceSettingsSection({
       </AppearanceGroup>
 
       <h3 className="appearance-customise-heading">Customise</h3>
-      <AppearanceGroup title="Colour" actions={resetButton("colour", "Reset colour")}>
+      <AppearanceGroup title="Colour" collapsible actions={resetButton("colour", "Reset colour")}>
         <AppearanceSegmentGroup
           label="Theme"
           value={appearance.theme}
@@ -305,7 +332,11 @@ export function AppearanceSettingsSection({
         </label>
       </AppearanceGroup>
 
-      <AppearanceGroup title="Shape & style" actions={resetButton("shape", "Reset shape & style")}>
+      <AppearanceGroup
+        title="Shape & style"
+        collapsible
+        actions={resetButton("shape", "Reset shape & style")}
+      >
         <div className="appearance-block">
           <span className="appearance-block-label">UI style</span>
           <div className="appearance-style-grid" role="radiogroup" aria-label="UI style">
@@ -349,11 +380,11 @@ export function AppearanceSettingsSection({
         </fieldset>
       </AppearanceGroup>
 
-      <AppearanceGroup title="Board" actions={resetButton("board", "Reset board")}>
+      <AppearanceGroup title="Board" collapsible actions={resetButton("board", "Reset board")}>
         <AppearanceBoardControls profile={profile} onProfileChange={onProfileChange} />
       </AppearanceGroup>
 
-      <AppearanceGroup title="Share this look">
+      <AppearanceGroup title="Share this look" collapsible>
         <AppearanceShare />
       </AppearanceGroup>
 
