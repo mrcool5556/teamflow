@@ -18,7 +18,7 @@ import {
   UI_COLOR_PRESET_PALETTES,
   mergeUserProfile,
 } from "@teamflow/core";
-import { useRef } from "react";
+import { useRef, type ReactNode } from "react";
 import { CustomColorField } from "./CustomColorField";
 
 type AppearanceSettingsSectionProps = {
@@ -127,6 +127,28 @@ function AppearanceSegmentGroup<T extends string>({
   );
 }
 
+/** One titled group of appearance controls (Colour, Shape & style, Board). */
+export function AppearanceGroup({
+  title,
+  actions,
+  children,
+}: {
+  title: string;
+  actions?: ReactNode;
+  children: ReactNode;
+}) {
+  const id = `appearance-group-${title.toLowerCase().replace(/[^a-z]+/g, "-")}`;
+  return (
+    <section className="appearance-group" aria-labelledby={id}>
+      <header className="appearance-group-header">
+        <h3 id={id}>{title}</h3>
+        {actions}
+      </header>
+      {children}
+    </section>
+  );
+}
+
 export function AppearanceSettingsSection({
   profile,
   onProfileChange,
@@ -139,180 +161,170 @@ export function AppearanceSettingsSection({
   customDraftRef.current = { ...custom };
 
   return (
-    <section className="settings-section appearance-settings">
-      <AppearanceSegmentGroup
-        label="Theme"
-        value={appearance.theme}
-        ariaLabel="Theme"
-        options={[
-          { value: "dark", label: "Dark" },
-          { value: "light", label: "Light" },
-        ]}
-        onChange={(theme) =>
-          onProfileChange(patchAppearance(profile, { theme: theme as ThemeMode }))
-        }
-      />
-
-      <div className="appearance-block">
-        <span className="appearance-block-label">UI color</span>
-        <div className="appearance-preset-grid" role="radiogroup" aria-label="UI color">
-          {COLOR_PRESETS.map((preset) => {
-            const swatch = COLOR_PRESET_SWATCHES[preset];
-            return (
-              <button
-                key={preset}
-                type="button"
-                role="radio"
-                aria-checked={appearance.colorPreset === preset}
-                className={`appearance-preset-btn ${appearance.colorPreset === preset ? "active" : ""}`}
-                onClick={() => onProfileChange(patchAppearance(profile, { colorPreset: preset }))}
-              >
-                {swatch ? (
-                  <span
-                    className="appearance-preset-swatch"
-                    style={{ background: swatch }}
-                    aria-hidden="true"
-                  />
-                ) : null}
-                {COLOR_PRESET_LABELS[preset]}
-              </button>
-            );
-          })}
-        </div>
-
-        {showCustomColors ? (
-          <div className="appearance-custom-colors">
-            <div className="appearance-color-grid">
-              <CustomColorField
-                label="Primary"
-                value={custom.primary ?? DEFAULT_UI_PRIMARY}
-                profile={profile}
-                colorKey="primary"
-                customDraftRef={customDraftRef}
-                onCommit={onProfileChange}
-              />
-              <CustomColorField
-                label="Accent"
-                value={custom.accent ?? DEFAULT_UI_ACCENT}
-                profile={profile}
-                colorKey="accent"
-                customDraftRef={customDraftRef}
-                onCommit={onProfileChange}
-              />
-              <CustomColorField
-                label="Text"
-                value={custom.text ?? (appearance.theme === "light" ? "#141414" : "#ececec")}
-                profile={profile}
-                colorKey="text"
-                customDraftRef={customDraftRef}
-                onCommit={onProfileChange}
-              />
-              <CustomColorField
-                label="Soft text"
-                value={custom.textSoft ?? (appearance.theme === "light" ? "#404040" : "#b8b8b8")}
-                profile={profile}
-                colorKey="textSoft"
-                customDraftRef={customDraftRef}
-                onCommit={onProfileChange}
-              />
-            </div>
-          </div>
-        ) : null}
-
+    <div className="appearance-settings">
+      <AppearanceGroup title="Colour">
         <AppearanceSegmentGroup
-          label="Text contrast"
-          value={appearance.textContrast}
-          ariaLabel="Text contrast"
-          className="appearance-subblock"
-          options={TEXT_CONTRAST_PRESETS.map((preset) => ({
-            value: preset,
-            label: TEXT_CONTRAST_LABELS[preset],
-          }))}
-          onChange={(textContrast) =>
-            onProfileChange(
-              patchAppearance(profile, { textContrast: textContrast as TextContrastPreset }),
-            )
+          label="Theme"
+          value={appearance.theme}
+          ariaLabel="Theme"
+          options={[
+            { value: "dark", label: "Dark" },
+            { value: "light", label: "Light" },
+          ]}
+          onChange={(theme) =>
+            onProfileChange(patchAppearance(profile, { theme: theme as ThemeMode }))
           }
         />
-      </div>
 
-      <label className="appearance-select-field">
-        UI style
-        <select
-          value={appearance.chromeStyle}
-          onChange={(e) => {
-            onProfileChange(
-              patchAppearance(profile, { chromeStyle: e.target.value as ChromeStyle }),
-            );
-          }}
-        >
-          {CHROME_STYLES.map((chromeStyle) => (
-            <option key={chromeStyle} value={chromeStyle}>
-              {CHROME_STYLE_LABELS[chromeStyle]}
-            </option>
-          ))}
-        </select>
-      </label>
-      <p className="muted appearance-style-hint">{CHROME_STYLE_HINTS[appearance.chromeStyle]}</p>
+        <div className="appearance-block">
+          <span className="appearance-block-label">UI color</span>
+          <div className="appearance-preset-grid" role="radiogroup" aria-label="UI color">
+            {COLOR_PRESETS.map((preset) => {
+              const swatch = COLOR_PRESET_SWATCHES[preset];
+              return (
+                <button
+                  key={preset}
+                  type="button"
+                  role="radio"
+                  aria-checked={appearance.colorPreset === preset}
+                  className={`appearance-preset-btn ${appearance.colorPreset === preset ? "active" : ""}`}
+                  onClick={() => onProfileChange(patchAppearance(profile, { colorPreset: preset }))}
+                >
+                  {swatch ? (
+                    <span
+                      className="appearance-preset-swatch"
+                      style={{ background: swatch }}
+                      aria-hidden="true"
+                    />
+                  ) : null}
+                  {COLOR_PRESET_LABELS[preset]}
+                </button>
+              );
+            })}
+          </div>
 
-      <fieldset className="appearance-fieldset">
-        <legend>Corner style</legend>
-        <div className="appearance-shape-grid" role="radiogroup" aria-label="Corner style">
-          {SHAPE_PRESETS.map((shape) => (
-            <button
-              key={shape}
-              type="button"
-              role="radio"
-              aria-checked={appearance.shape === shape}
-              className={`appearance-shape-option ${appearance.shape === shape ? "active" : ""}`}
-              data-shape-preview={shape}
-              onClick={() => onProfileChange(patchAppearance(profile, { shape }))}
-            >
-              <span className="appearance-shape-swatch" aria-hidden="true" />
-              <span className="appearance-shape-label">{SHAPE_LABELS[shape]}</span>
-            </button>
-          ))}
+          {showCustomColors ? (
+            <div className="appearance-custom-colors">
+              <div className="appearance-color-grid">
+                <CustomColorField
+                  label="Primary"
+                  value={custom.primary ?? DEFAULT_UI_PRIMARY}
+                  profile={profile}
+                  colorKey="primary"
+                  customDraftRef={customDraftRef}
+                  onCommit={onProfileChange}
+                />
+                <CustomColorField
+                  label="Accent"
+                  value={custom.accent ?? DEFAULT_UI_ACCENT}
+                  profile={profile}
+                  colorKey="accent"
+                  customDraftRef={customDraftRef}
+                  onCommit={onProfileChange}
+                />
+                <CustomColorField
+                  label="Text"
+                  value={custom.text ?? (appearance.theme === "light" ? "#141414" : "#ececec")}
+                  profile={profile}
+                  colorKey="text"
+                  customDraftRef={customDraftRef}
+                  onCommit={onProfileChange}
+                />
+                <CustomColorField
+                  label="Soft text"
+                  value={custom.textSoft ?? (appearance.theme === "light" ? "#404040" : "#b8b8b8")}
+                  profile={profile}
+                  colorKey="textSoft"
+                  customDraftRef={customDraftRef}
+                  onCommit={onProfileChange}
+                />
+              </div>
+            </div>
+          ) : null}
+
+          <AppearanceSegmentGroup
+            label="Text contrast"
+            value={appearance.textContrast}
+            ariaLabel="Text contrast"
+            className="appearance-subblock"
+            options={TEXT_CONTRAST_PRESETS.map((preset) => ({
+              value: preset,
+              label: TEXT_CONTRAST_LABELS[preset],
+            }))}
+            onChange={(textContrast) =>
+              onProfileChange(
+                patchAppearance(profile, { textContrast: textContrast as TextContrastPreset }),
+              )
+            }
+          />
         </div>
-      </fieldset>
 
-      <label className="appearance-select-field">
-        Team color display
-        <select
-          value={appearance.semanticContrast}
-          onChange={(e) => {
-            onProfileChange(
-              patchAppearance(profile, {
-                semanticContrast: e.target.value as SemanticContrastMode,
-              }),
-            );
-          }}
-        >
-          {SEMANTIC_CONTRAST_MODES.map((mode) => (
-            <option key={mode} value={mode}>
-              {SEMANTIC_CONTRAST_LABELS[mode]}
-            </option>
-          ))}
-        </select>
-      </label>
-      <p className="muted appearance-settings-hint">
-        {appearance.semanticContrast === "adapt"
-          ? "Row and column tints adjust slightly for light or dark mode while keeping the same hue."
-          : "Row and column colors use the same mixing as dark mode regardless of your theme."}
-      </p>
+        <label className="appearance-select-field">
+          Team color display
+          <select
+            value={appearance.semanticContrast}
+            onChange={(e) => {
+              onProfileChange(
+                patchAppearance(profile, {
+                  semanticContrast: e.target.value as SemanticContrastMode,
+                }),
+              );
+            }}
+          >
+            {SEMANTIC_CONTRAST_MODES.map((mode) => (
+              <option key={mode} value={mode}>
+                {SEMANTIC_CONTRAST_LABELS[mode]}
+              </option>
+            ))}
+          </select>
+        </label>
+        <p className="muted appearance-settings-hint">
+          {appearance.semanticContrast === "adapt"
+            ? "Row and column tints adjust slightly for light or dark mode while keeping the same hue."
+            : "Row and column colors use the same mixing as dark mode regardless of your theme."}
+        </p>
+      </AppearanceGroup>
 
-      <details className="settings-advanced appearance-advanced">
-        <summary className="settings-advanced-toggle">Advanced chrome tuning</summary>
-        <div className="settings-advanced-panel">
-          <p className="settings-copy">
-            Fine-grained sliders for shadow depth, border weight, surface darkness, and glow
-            intensity are planned here. Presets above set sensible defaults; advanced controls will
-            layer on top without replacing your chosen UI style.
-          </p>
-          <p className="muted appearance-settings-hint">
-            Tune while watching the live board preview.
-          </p>
-        </div>
-      </details>
-    </section>
+      <AppearanceGroup title="Shape & style">
+        <label className="appearance-select-field">
+          UI style
+          <select
+            value={appearance.chromeStyle}
+            onChange={(e) => {
+              onProfileChange(
+                patchAppearance(profile, { chromeStyle: e.target.value as ChromeStyle }),
+              );
+            }}
+          >
+            {CHROME_STYLES.map((chromeStyle) => (
+              <option key={chromeStyle} value={chromeStyle}>
+                {CHROME_STYLE_LABELS[chromeStyle]}
+              </option>
+            ))}
+          </select>
+        </label>
+        <p className="muted appearance-style-hint">{CHROME_STYLE_HINTS[appearance.chromeStyle]}</p>
+
+        <fieldset className="appearance-fieldset">
+          <legend>Corner style</legend>
+          <div className="appearance-shape-grid" role="radiogroup" aria-label="Corner style">
+            {SHAPE_PRESETS.map((shape) => (
+              <button
+                key={shape}
+                type="button"
+                role="radio"
+                aria-checked={appearance.shape === shape}
+                className={`appearance-shape-option ${appearance.shape === shape ? "active" : ""}`}
+                data-shape-preview={shape}
+                onClick={() => onProfileChange(patchAppearance(profile, { shape }))}
+              >
+                <span className="appearance-shape-swatch" aria-hidden="true" />
+                <span className="appearance-shape-label">{SHAPE_LABELS[shape]}</span>
+              </button>
+            ))}
+          </div>
+        </fieldset>
+      </AppearanceGroup>
+    </div>
   );
 }

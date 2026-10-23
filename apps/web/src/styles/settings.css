@@ -615,6 +615,33 @@
   margin-bottom: 0.35rem;
 }
 
+/* Appearance groups (Colour, Shape & style, Board): one framed section each. */
+.appearance-group {
+  margin-top: 0;
+  margin-bottom: var(--space-4);
+  padding: var(--space-4);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--surface);
+}
+
+.appearance-group-header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-3);
+  margin-bottom: var(--space-3);
+}
+
+.appearance-group-header h3 {
+  margin: 0;
+  font-size: var(--font-size-md);
+}
+
+.appearance-group > .appearance-select-field {
+  margin-top: var(--space-4);
+}
+
 .appearance-block {
   margin-bottom: 0.85rem;
 }
@@ -730,10 +757,6 @@
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 0.35rem;
-}
-
-.appearance-advanced {
-  margin-top: 1.25rem;
 }
 
 .appearance-shape-option {
