@@ -35,11 +35,12 @@ const COLOR_PRESET_LABELS: Record<ColorPreset, string> = {
   custom: "Custom",
 };
 
-const COLOR_PRESET_SWATCHES: Record<ColorPreset, string | null> = {
-  default: DEFAULT_UI_PRIMARY,
-  sunset: UI_COLOR_PRESET_PALETTES.sunset.primary,
-  ocean: UI_COLOR_PRESET_PALETTES.ocean.primary,
-  forest: UI_COLOR_PRESET_PALETTES.forest.primary,
+/** Primary then accent; custom shows a colour wheel until its colours are picked. */
+const COLOR_PRESET_SWATCHES: Record<ColorPreset, [string, string] | null> = {
+  default: [DEFAULT_UI_PRIMARY, DEFAULT_UI_ACCENT],
+  sunset: [UI_COLOR_PRESET_PALETTES.sunset.primary, UI_COLOR_PRESET_PALETTES.sunset.accent],
+  ocean: [UI_COLOR_PRESET_PALETTES.ocean.primary, UI_COLOR_PRESET_PALETTES.ocean.accent],
+  forest: [UI_COLOR_PRESET_PALETTES.forest.primary, UI_COLOR_PRESET_PALETTES.forest.accent],
   custom: null,
 };
 
@@ -196,13 +197,17 @@ export function AppearanceSettingsSection({
                   className={`appearance-preset-btn ${appearance.colorPreset === preset ? "active" : ""}`}
                   onClick={() => onProfileChange(patchAppearance(profile, { colorPreset: preset }))}
                 >
-                  {swatch ? (
-                    <span
-                      className="appearance-preset-swatch"
-                      style={{ background: swatch }}
-                      aria-hidden="true"
-                    />
-                  ) : null}
+                  <span
+                    className={`appearance-preset-swatch${swatch ? "" : " appearance-preset-swatch--custom"}`}
+                    style={
+                      swatch
+                        ? {
+                            background: `conic-gradient(${swatch[0]} 0 50%, ${swatch[1]} 50% 100%)`,
+                          }
+                        : undefined
+                    }
+                    aria-hidden="true"
+                  />
                   {COLOR_PRESET_LABELS[preset]}
                 </button>
               );
@@ -292,23 +297,26 @@ export function AppearanceSettingsSection({
       </AppearanceGroup>
 
       <AppearanceGroup title="Shape & style">
-        <label className="appearance-select-field">
-          UI style
-          <select
-            value={appearance.chromeStyle}
-            onChange={(e) => {
-              onProfileChange(
-                patchAppearance(profile, { chromeStyle: e.target.value as ChromeStyle }),
-              );
-            }}
-          >
+        <div className="appearance-block">
+          <span className="appearance-block-label">UI style</span>
+          <div className="appearance-style-grid" role="radiogroup" aria-label="UI style">
             {CHROME_STYLES.map((chromeStyle) => (
-              <option key={chromeStyle} value={chromeStyle}>
+              <button
+                key={chromeStyle}
+                type="button"
+                role="radio"
+                aria-checked={appearance.chromeStyle === chromeStyle}
+                title={CHROME_STYLE_HINTS[chromeStyle]}
+                className={`appearance-style-tile${appearance.chromeStyle === chromeStyle ? " active" : ""}`}
+                data-style-preview={chromeStyle}
+                onClick={() => onProfileChange(patchAppearance(profile, { chromeStyle }))}
+              >
+                <span className="appearance-style-swatch" aria-hidden="true" />
                 {CHROME_STYLE_LABELS[chromeStyle]}
-              </option>
+              </button>
             ))}
-          </select>
-        </label>
+          </div>
+        </div>
         <p className="muted appearance-style-hint">{CHROME_STYLE_HINTS[appearance.chromeStyle]}</p>
 
         <fieldset className="appearance-fieldset">

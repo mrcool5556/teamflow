@@ -41,4 +41,17 @@ describe("appearance panel", () => {
     await user.click(screen.getByRole("button", { name: "Back to Calm" }));
     expect(document.documentElement.dataset.shape).toBe("round");
   });
+
+  it("picks a UI style from picture tiles", async () => {
+    const user = userEvent.setup();
+    openAppearance();
+    const styles = await screen.findByRole("radiogroup", { name: "UI style" });
+    expect(within(styles).getAllByRole("radio")).toHaveLength(8);
+    await user.click(within(styles).getByRole("radio", { name: "Glass" }));
+    expect(document.documentElement.dataset.chromeStyle).toBe("glass");
+    expect(within(styles).getByRole("radio", { name: "Glass" })).toHaveAttribute(
+      "aria-checked",
+      "true",
+    );
+  });
 });
