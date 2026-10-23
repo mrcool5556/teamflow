@@ -300,8 +300,15 @@ async function hardDeleteStoredFile(db: Db, fileId: string) {
   if (!file) return;
 
   await db.delete(schema.storedFiles).where(eq(schema.storedFiles.id, fileId));
-  const fullPath = path.join(getUploadDir(), file.storagePath);
-  await fs.unlink(fullPath).catch(() => {});
+  await removeStoredFilesFromDisk([file.storagePath]);
+}
+
+/** Remove stored files from the upload dir by their stored relative path; missing files are ignored. */
+export async function removeStoredFilesFromDisk(storagePaths: string[]) {
+  const uploadDir = getUploadDir();
+  await Promise.all(
+    storagePaths.map((storagePath) => fs.unlink(path.join(uploadDir, storagePath)).catch(() => {})),
+  );
 }
 
 async function deleteStoredFileIfOrphaned(db: Db, fileId: string) {
