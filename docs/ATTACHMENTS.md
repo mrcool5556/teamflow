@@ -33,12 +33,15 @@ Reading files needs team membership. Uploading, linking, moving, renaming, trash
 
 ## Serving
 
-- `GET /attachments/:id/download` sends the file with `Content-Disposition` and supports `Range`.
+- `GET /attachments/:id/download` sends the file with `Content-Disposition: attachment` and supports `Range`. It takes Bearer auth or `?token=` (below).
+- **Browser downloads use a token, not a Blob.** The web app calls `POST /attachments/:id/download-token`, then points a hidden link at the returned `downloadUrl` (`/attachments/:id/download?token=…`). The browser's own download manager fetches the file, so progress shows at once and multi-GB files go straight to disk instead of into the tab's memory. The token is the short-lived stream token (1 hour, bound to that attachment and user); the server rechecks team access on every request. Missing, malformed or expired tokens are `401 unauthorized`; a token for another attachment, or a user who lost team access, is `403 forbidden`.
+- `client.downloadAttachment()` (whole file into a Blob) is only for small in-app uses: image thumbnails/lightbox and the team file preview cache.
+- **Team bundle export** works the same way: `POST /teams/:teamId/export-token[?includeFiles=true]` returns a `downloadUrl` for `GET /teams/:teamId/export?token=…`. That token has its own audience, lasts 10 minutes, is bound to the team, and the user must still hold `team.data.transfer`. The server streams the zip as it is written (nothing is buffered), so there is no `Content-Length` and no `Range` for exports.
 - Files are shown **inline** only when their own bytes are an image, video or PDF (the client-supplied MIME type is not trusted). Everything else, HTML and SVG included, downloads as `application/octet-stream`. Every response carries `X-Content-Type-Options: nosniff`.
 
 ## API
 
-Bearer auth on every route. Full list with permissions: [API.md](API.md#attachments).
+Bearer auth on every route, except the `?token=` forms of `download` and `stream`. Full list with permissions: [API.md](API.md#attachments).
 
 | Method | Path | Description |
 |--------|------|-------------|
@@ -51,7 +54,8 @@ Bearer auth on every route. Full list with permissions: [API.md](API.md#attachme
 | POST | `/rows/:rowId/attachments` | Upload to a row |
 | POST | `/rows/:rowId/attachments/link` | `{ fileId }` |
 | DELETE | `/rows/:rowId/attachments/:id` | Remove the row link |
-| GET | `/attachments/:id/download` | Download (Range supported) |
+| GET | `/attachments/:id/download` | Download (Range supported); Bearer or `?token=` |
+| POST | `/attachments/:id/download-token` | Short-lived token + `downloadUrl` for a browser download (any file type) |
 | POST | `/attachments/:id/stream-token` | Short-lived token for `<video src>` |
 | GET | `/attachments/:id/stream?token=` | Range-capable stream |
 
@@ -114,5 +118,6 @@ Trashed files are deleted for good after **7 days**; the purge runs when the ser
 - **Issue drawer → Attachments:** choose a file or drop it on the zone. Image thumbnails open a lightbox; videos play with seek and speed controls. Large files upload in chunks with progress.
 - **Row → Files:** files shared by a whole row; link one into an issue without re-uploading.
 - **Files drawer:** every team file, rename, trash and restore, copy a file ref.
+- **Downloads** (file name in the drawers, Download in the Files drawer and lightboxes, Settings → Team → Download bundle): the control shows a spinner and "Starting…" while the token is fetched and the browser takes over, then a toast says "Downloading <name> — progress is in your browser's downloads". If the download cannot start, an error toast offers Retry.
 
 Viewers see all of these read-only.
