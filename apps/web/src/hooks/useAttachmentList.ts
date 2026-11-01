@@ -9,7 +9,7 @@ import {
 import { client } from "../api";
 import { createAttachmentBlobCache, isImageAttachment } from "../components/AttachmentImagePreview";
 import { isVideoAttachment } from "../components/AttachmentVideoPlayer";
-import { downloadAttachmentFile } from "../lib/download";
+import { useFileDownload } from "./useFileDownload";
 import { useErrorSink } from "../lib/errorSink";
 import { formatFileSize } from "../lib/format";
 import { queryKeys } from "../queries/keys";
@@ -54,6 +54,7 @@ export function useAttachmentList(
   const queryClient = useQueryClient();
   const confirm = useConfirm();
   const { report, show } = useErrorSink();
+  const downloader = useFileDownload();
   const api = ownerApi(owner);
 
   const query = useQuery({
@@ -141,12 +142,9 @@ export function useAttachmentList(
     }
   }
 
-  async function download(attachment: IssueAttachmentPublic) {
-    try {
-      await downloadAttachmentFile(attachment.id, attachment.filename);
-    } catch (error) {
-      report(error, "Download failed");
-    }
+  /** Hand the file to the browser's download manager (toasts and Retry come from the hook). */
+  function download(attachment: IssueAttachmentPublic) {
+    return downloader.start(attachment.id, attachment.filename);
   }
 
   async function remove(attachment: IssueAttachmentPublic) {
@@ -230,6 +228,8 @@ export function useAttachmentList(
     chooseFile: () => input?.click(),
     upload,
     download,
+    /** Attachment id whose download is being handed to the browser. */
+    startingDownloadId: downloader.startingId,
     remove,
     addLinked,
     open,

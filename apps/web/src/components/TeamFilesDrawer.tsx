@@ -19,7 +19,8 @@ import { FileRefCopyButton } from "./FileRefCopyButton";
 import { TeamFileEditableName } from "./TeamFileEditableName";
 import { filePreviewAttachment, TeamFilePreview } from "./TeamFilePreview";
 import { formatFileSize } from "../lib/format";
-import { downloadAttachmentFile } from "../lib/download";
+import { useFileDownload } from "../hooks/useFileDownload";
+import { DownloadStarting } from "./DownloadStarting";
 
 function formatPurgeDate(iso: string | null | undefined) {
   if (!iso) return null;
@@ -87,7 +88,7 @@ export function TeamFilesDrawer({ teamId, open, onClose, onNavigateRef }: TeamFi
   const [query, setQuery] = useState("");
   const [sort, setSort] = useState<SortMode>("size");
   const [busyFileId, setBusyFileId] = useState<string | null>(null);
-  const [downloadingFileId, setDownloadingFileId] = useState<string | null>(null);
+  const downloader = useFileDownload();
   const [imageLightbox, setImageLightbox] = useState<{
     attachment: IssueAttachmentPublic;
     imageUrl: string;
@@ -174,18 +175,10 @@ export function TeamFilesDrawer({ teamId, open, onClose, onNavigateRef }: TeamFi
     }
   }
 
-  async function downloadFile(file: TeamFilePublic) {
+  function downloadFile(file: TeamFilePublic) {
     const attachment = filePreviewAttachment(file);
     if (!attachment) return;
-
-    setDownloadingFileId(file.fileId);
-    try {
-      await downloadAttachmentFile(attachment.id, getTeamFileDisplayName(file));
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Download failed");
-    } finally {
-      setDownloadingFileId(null);
-    }
+    void downloader.start(attachment.id, getTeamFileDisplayName(file));
   }
 
   function handleFileRenamed(fileId: string, filename: string) {
@@ -199,8 +192,8 @@ export function TeamFilesDrawer({ teamId, open, onClose, onNavigateRef }: TeamFi
     );
   }
 
-  async function downloadAttachment(attachment: IssueAttachmentPublic) {
-    await downloadAttachmentFile(attachment.id, attachment.filename);
+  function downloadAttachment(attachment: IssueAttachmentPublic) {
+    void downloader.start(attachment.id, attachment.filename);
   }
 
   return (
@@ -372,10 +365,15 @@ export function TeamFilesDrawer({ teamId, open, onClose, onNavigateRef }: TeamFi
                         <button
                           type="button"
                           className="secondary team-files-action-btn"
-                          disabled={downloadingFileId === file.fileId}
-                          onClick={() => void downloadFile(file)}
+                          disabled={downloader.startingId === filePreviewAttachment(file)?.id}
+                          aria-busy={downloader.startingId === filePreviewAttachment(file)?.id}
+                          onClick={() => downloadFile(file)}
                         >
-                          {downloadingFileId === file.fileId ? "…" : "Download"}
+                          {downloader.startingId === filePreviewAttachment(file)?.id ? (
+                            <DownloadStarting />
+                          ) : (
+                            "Download"
+                          )}
                         </button>
                       ) : null}
                       {tab === "active" ? (
@@ -410,7 +408,8 @@ export function TeamFilesDrawer({ teamId, open, onClose, onNavigateRef }: TeamFi
           attachment={imageLightbox.attachment}
           imageUrl={imageLightbox.imageUrl}
           onClose={() => setImageLightbox(null)}
-          onDownload={() => void downloadAttachment(imageLightbox.attachment)}
+          onDownload={() => downloadAttachment(imageLightbox.attachment)}
+          downloadStarting={downloader.startingId === imageLightbox.attachment.id}
         />
       ) : null}
 
@@ -418,7 +417,8 @@ export function TeamFilesDrawer({ teamId, open, onClose, onNavigateRef }: TeamFi
         <AttachmentVideoLightbox
           attachment={videoLightbox}
           onClose={() => setVideoLightbox(null)}
-          onDownload={() => void downloadAttachment(videoLightbox)}
+          onDownload={() => downloadAttachment(videoLightbox)}
+          downloadStarting={downloader.startingId === videoLightbox.id}
         />
       ) : null}
     </Drawer>

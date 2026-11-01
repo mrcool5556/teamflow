@@ -4,7 +4,7 @@ import { AttachmentVideoLightbox } from "./AttachmentVideoPlayer";
 
 type LightboxState = Pick<
   AttachmentList,
-  "imageLightbox" | "videoLightbox" | "closeLightboxes" | "download"
+  "imageLightbox" | "videoLightbox" | "closeLightboxes" | "download" | "startingDownloadId"
 >;
 
 /** The image and video lightboxes of a useAttachmentList() list. */
@@ -19,6 +19,7 @@ export function AttachmentLightboxes({ list }: { list: LightboxState }) {
           imageUrl={image.imageUrl}
           onClose={list.closeLightboxes}
           onDownload={() => void list.download(image.attachment)}
+          downloadStarting={list.startingDownloadId === image.attachment.id}
         />
       ) : null}
       {video ? (
@@ -26,6 +27,7 @@ export function AttachmentLightboxes({ list }: { list: LightboxState }) {
           attachment={video}
           onClose={list.closeLightboxes}
           onDownload={() => void list.download(video)}
+          downloadStarting={list.startingDownloadId === video.id}
         />
       ) : null}
     </>
