@@ -2,7 +2,10 @@ import { useRef, useState } from "react";
 import { client } from "../api";
 import { errorMessage } from "../lib/errorSink";
 import type { PanelMessage } from "../lib/panelStatus";
-import { downloadBlob } from "../lib/download";
+import { startBrowserDownload } from "../lib/download";
+import { DOWNLOAD_HANDOFF_MS } from "../hooks/useFileDownload";
+import { useToasts } from "../ui/toastContext";
+import { DownloadStarting } from "./DownloadStarting";
 
 type TeamDataTransferSectionProps = {
   teamId: string;
@@ -25,26 +28,31 @@ export function TeamDataTransferSection({
   const [exporting, setExporting] = useState(false);
   const [importing, setImporting] = useState(false);
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
+  const { push } = useToasts();
 
+  /** The server streams the zip; the browser's download manager shows its progress. */
   async function exportBundle() {
     setExporting(true);
     setStatusMessage(null);
     onMessage(null);
     try {
-      const { blob, filename } = await client.exportTeamBundle(teamId, includeFiles);
-      if (blob.size === 0) {
-        throw new Error("Export returned an empty file");
-      }
-      downloadBlob(blob, filename);
-      const message = `Exported ${teamKey} bundle${includeFiles ? " with files" : ""} for ${teamName}.`;
+      startBrowserDownload(await client.resolveExportUrl(teamId, includeFiles), "");
+      const label = `${teamKey} bundle${includeFiles ? " with files" : ""}`;
+      push({ message: `Downloading ${label} — progress is in your browser's downloads` });
+      const message = `Export of ${label} for ${teamName} started.`;
       setStatusMessage(message);
       onMessage(message);
+      setTimeout(() => setExporting(false), DOWNLOAD_HANDOFF_MS);
     } catch (err) {
       const message = errorMessage(err, "Export failed");
       setStatusMessage(message);
       onMessage(message, "error");
-    } finally {
       setExporting(false);
+      push({
+        tone: "error",
+        message: `Could not export the ${teamKey} bundle: ${message}`,
+        action: { label: "Retry", onClick: () => void exportBundle() },
+      });
     }
   }
 
@@ -96,8 +104,13 @@ export function TeamDataTransferSection({
           />
           Include attached files (larger download)
         </label>
-        <button type="button" disabled={exporting} onClick={() => void exportBundle()}>
-          {exporting ? "Exporting…" : "Download bundle"}
+        <button
+          type="button"
+          disabled={exporting}
+          aria-busy={exporting}
+          onClick={() => void exportBundle()}
+        >
+          {exporting ? <DownloadStarting /> : "Download bundle"}
         </button>
         {statusMessage ? <p className="settings-hint">{statusMessage}</p> : null}
       </div>

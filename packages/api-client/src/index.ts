@@ -445,6 +445,21 @@ export class TeamflowClient {
     );
   }
 
+  createExportToken(teamId: string, includeFiles = false) {
+    const query = includeFiles ? "?includeFiles=true" : "";
+    return this.request<DownloadTokenPublic>(`/teams/${teamId}/export-token${query}`, {
+      method: "POST",
+    });
+  }
+
+  /** A URL the browser can download the team bundle from directly (streams, shows progress). */
+  async resolveExportUrl(teamId: string, includeFiles = false) {
+    const { downloadUrl } = await this.createExportToken(teamId, includeFiles);
+    if (downloadUrl.startsWith("http")) return downloadUrl;
+    return `${this.baseUrl}${downloadUrl}`;
+  }
+
+  /** Fetch the whole bundle into a Blob (CLI and scripts); the web app uses resolveExportUrl. */
   async exportTeamBundle(teamId: string, includeFiles = false) {
     const headers = new Headers();
     if (this.token) {
