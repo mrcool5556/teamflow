@@ -11,6 +11,7 @@ import type {
   IssueAttachmentPublic,
   AttachmentLimitsPublic,
   StreamTokenPublic,
+  DownloadTokenPublic,
   UploadSessionPublic,
   CreateIssueInput,
   CreateProjectInput,
@@ -444,6 +445,21 @@ export class TeamflowClient {
     );
   }
 
+  createExportToken(teamId: string, includeFiles = false) {
+    const query = includeFiles ? "?includeFiles=true" : "";
+    return this.request<DownloadTokenPublic>(`/teams/${teamId}/export-token${query}`, {
+      method: "POST",
+    });
+  }
+
+  /** A URL the browser can download the team bundle from directly (streams, shows progress). */
+  async resolveExportUrl(teamId: string, includeFiles = false) {
+    const { downloadUrl } = await this.createExportToken(teamId, includeFiles);
+    if (downloadUrl.startsWith("http")) return downloadUrl;
+    return `${this.baseUrl}${downloadUrl}`;
+  }
+
+  /** Fetch the whole bundle into a Blob (CLI and scripts); the web app uses resolveExportUrl. */
   async exportTeamBundle(teamId: string, includeFiles = false) {
     const headers = new Headers();
     if (this.token) {
@@ -779,6 +795,24 @@ export class TeamflowClient {
     return `${this.baseUrl}${streamUrl}`;
   }
 
+  createDownloadToken(linkId: string) {
+    return this.request<DownloadTokenPublic>(`/attachments/${linkId}/download-token`, {
+      method: "POST",
+    });
+  }
+
+  /**
+   * A URL the browser can download directly (no Authorization header needed), so the file goes
+   * through the browser's download manager instead of into memory. Prefer this over
+   * downloadAttachment() for saving files; keep downloadAttachment() for small in-app previews.
+   */
+  async resolveDownloadUrl(linkId: string) {
+    const { downloadUrl } = await this.createDownloadToken(linkId);
+    if (downloadUrl.startsWith("http")) return downloadUrl;
+    return `${this.baseUrl}${downloadUrl}`;
+  }
+
+  /** Fetch the whole file into a Blob. Only for small in-app uses (image previews). */
   async downloadAttachment(attachmentId: string) {
     const headers = new Headers();
     if (this.token) {

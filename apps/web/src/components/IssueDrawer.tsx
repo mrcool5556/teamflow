@@ -17,6 +17,7 @@ import { queryKeys } from "../queries/keys";
 import { useIssueQuery } from "../queries/issue";
 import { useAttachmentList } from "../hooks/useAttachmentList";
 import { AttachmentLightboxes } from "./AttachmentLightboxes";
+import { DownloadStarting } from "./DownloadStarting";
 import { DescriptionEditor } from "./DescriptionEditor";
 import { MultiAssigneePicker } from "./MultiAssigneePicker";
 import { BoardColorPicker } from "./BoardColorPicker";
@@ -429,9 +430,11 @@ export function IssueDrawer({
                     <button
                       type="button"
                       className="ghost issue-attachment-name"
+                      aria-busy={files.startingDownloadId === attachment.id}
                       onClick={() => files.open(attachment)}
                     >
                       {attachment.filename}
+                      {files.startingDownloadId === attachment.id ? <DownloadStarting /> : null}
                     </button>
                     <span className="issue-attachment-meta muted">
                       {attachment.fileRef} · {formatFileSize(attachment.sizeBytes)} ·{" "}

@@ -8,6 +8,7 @@ import { Drawer } from "../ui/Dialog";
 import { DialogTitle } from "../ui/DialogTitle";
 import { AttachmentImageThumbnail, isImageAttachment } from "./AttachmentImagePreview";
 import { AttachmentLightboxes } from "./AttachmentLightboxes";
+import { DownloadStarting } from "./DownloadStarting";
 import { AttachmentVideoThumbnail, isVideoAttachment } from "./AttachmentVideoPlayer";
 import { FileRefCopyButton } from "./FileRefCopyButton";
 import { LinkFromFileRef } from "./LinkFromFileRef";
@@ -113,9 +114,11 @@ export function RowFilesDrawer({ row, onClose, onNavigateRef }: RowFilesDrawerPr
                     <button
                       type="button"
                       className="ghost issue-attachment-name"
+                      aria-busy={files.startingDownloadId === attachment.id}
                       onClick={() => files.open(attachment)}
                     >
                       {attachment.filename}
+                      {files.startingDownloadId === attachment.id ? <DownloadStarting /> : null}
                     </button>
                     <span className="issue-attachment-meta muted">
                       {attachment.fileRef} · {formatFileSize(attachment.sizeBytes, 2)} ·{" "}

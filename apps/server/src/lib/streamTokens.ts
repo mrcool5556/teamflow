@@ -29,6 +29,36 @@ export async function verifyStreamToken(token: string) {
   return { userId: payload.sub, linkId: payload.linkId };
 }
 
+const EXPORT_AUDIENCE = "teamflow-export";
+const EXPORT_TTL_SEC = 10 * 60;
+
+/** Lets the browser download a team bundle itself (no Bearer header on a navigation). */
+export async function signExportToken(teamId: string, userId: string) {
+  return new SignJWT({ sub: userId, teamId, type: "export" })
+    .setProtectedHeader({ alg: "HS256" })
+    .setIssuer(JWT_ISSUER)
+    .setAudience(EXPORT_AUDIENCE)
+    .setIssuedAt()
+    .setExpirationTime(`${EXPORT_TTL_SEC}s`)
+    .sign(getJwtSecret());
+}
+
+export async function verifyExportToken(token: string) {
+  const { payload } = await jwtVerify(token, getJwtSecret(), {
+    issuer: JWT_ISSUER,
+    audience: EXPORT_AUDIENCE,
+  });
+  if (payload.type !== "export" || typeof payload.sub !== "string") {
+    throw new Error("Invalid export token");
+  }
+  if (typeof payload.teamId !== "string") throw new Error("Invalid export token");
+  return { userId: payload.sub, teamId: payload.teamId };
+}
+
+export function exportTokenExpiresAt() {
+  return new Date(Date.now() + EXPORT_TTL_SEC * 1000).toISOString();
+}
+
 export function streamTokenExpiresAt() {
   return new Date(Date.now() + STREAM_TTL_SEC * 1000).toISOString();
 }

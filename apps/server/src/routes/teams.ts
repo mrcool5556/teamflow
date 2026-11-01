@@ -15,8 +15,11 @@ import { requireAuth, requireWrite } from "../middleware/auth.js";
 import { loadTeam, requirePermission } from "../middleware/team.js";
 import { createTeamWithOwner, deleteTeam } from "../lib/teams.js";
 import { resolveTeamRefDetailed } from "../lib/refs.js";
-import { exportTeamBundle, importTeamBundle } from "../lib/teamBundle.js";
-import { getTeamPermissionsForUser } from "../lib/permissions.js";
+import { importTeamBundle, streamTeamBundle } from "../lib/teamBundle.js";
+import { Readable } from "node:stream";
+import { exportTokenExpiresAt, signExportToken, verifyExportToken } from "../lib/streamTokens.js";
+import { getTeamPermissionsForUser, userHasTeamPermission } from "../lib/permissions.js";
+import { forbidden, unauthorized } from "../lib/errors.js";
 
 /** Team list/create/delete, bundle export/import, permissions and ref resolution. */
 const routes = new Hono<AppEnv>();
@@ -80,24 +83,68 @@ routes.delete(
   },
 );
 
-routes.get(
-  "/teams/:teamId/export",
+async function bundleResponse(teamId: string, includeFiles: boolean) {
+  const { filename, stream } = await streamTeamBundle(db, teamId, includeFiles);
+  return new Response(Readable.toWeb(stream) as ReadableStream<Uint8Array>, {
+    headers: {
+      "Content-Type": "application/zip",
+      "Content-Disposition": `attachment; filename="${filename}"`,
+    },
+  });
+}
+
+/**
+ * A short-lived token so the browser downloads the bundle itself via
+ * `GET /teams/:teamId/export?token=` (its download manager shows progress at once).
+ */
+routes.post(
+  "/teams/:teamId/export-token",
   requireAuth,
   validateParams,
   loadTeam(),
   requirePermission("team.data.transfer"),
   async (c) => {
     const teamId = c.var.teamId;
-
     const query = parseWith(teamBundleExportQuerySchema, c.req.query());
-
-    const { filename, buffer } = await exportTeamBundle(db, teamId, query.includeFiles ?? false);
-    return new Response(buffer, {
-      headers: {
-        "Content-Type": "application/zip",
-        "Content-Disposition": `attachment; filename="${filename}"`,
-      },
+    const token = await signExportToken(teamId, c.var.auth.userId);
+    const files = query.includeFiles ? "&includeFiles=true" : "";
+    return c.json({
+      token,
+      expiresAt: exportTokenExpiresAt(),
+      downloadUrl: `/teams/${teamId}/export?token=${encodeURIComponent(token)}${files}`,
     });
+  },
+);
+
+/** Bearer auth, or `?token=` from export-token for browser-driven downloads. */
+routes.get(
+  "/teams/:teamId/export",
+  validateParams,
+  async (c, next) => {
+    const token = c.req.query("token");
+    if (token === undefined) return next();
+    let verified: { userId: string; teamId: string };
+    try {
+      verified = await verifyExportToken(token);
+    } catch {
+      throw unauthorized("Invalid or expired export token");
+    }
+    const teamId = c.req.param("teamId");
+    if (verified.teamId !== teamId) throw forbidden("Export token is for another team");
+    if (!(await userHasTeamPermission(db, verified.userId, teamId, "team.data.transfer"))) {
+      throw forbidden("Permission denied");
+    }
+    const query = parseWith(teamBundleExportQuerySchema, {
+      includeFiles: c.req.query("includeFiles"),
+    });
+    return bundleResponse(teamId, query.includeFiles ?? false);
+  },
+  requireAuth,
+  loadTeam(),
+  requirePermission("team.data.transfer"),
+  async (c) => {
+    const query = parseWith(teamBundleExportQuerySchema, c.req.query());
+    return bundleResponse(c.var.teamId, query.includeFiles ?? false);
   },
 );
 

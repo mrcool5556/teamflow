@@ -34,7 +34,7 @@ Server code throws `ApiError` from `apps/server/src/lib/errors.ts` (`badRequest`
 
 <!-- BEGIN GENERATED ROUTES (scripts/gen-api-docs.mjs) -->
 
-## Routes (92)
+## Routes (94)
 
 Generated from `apps/server/src/routes/*.ts` by `pnpm docs:api`; do not edit by hand.
 
@@ -88,6 +88,7 @@ Team list/create/delete, bundle export/import, permissions and ref resolution.
 | GET | `/teams` | bearer |  |  |  |  |
 | POST | `/teams` | bearer | yes |  |  | body `createTeamSchema` |
 | DELETE | `/teams/:teamId` | bearer | yes | member | `team.delete` |  |
+| POST | `/teams/:teamId/export-token` | bearer |  | member | `team.data.transfer` | query `teamBundleExportQuerySchema` |
 | GET | `/teams/:teamId/export` | bearer |  | member | `team.data.transfer` | query `teamBundleExportQuerySchema` |
 | POST | `/teams/:teamId/import` | bearer | yes | member | `team.data.transfer` | query `teamBundleImportOptionsSchema` (`force`), multipart field `bundle` |
 | GET | `/teams/:teamId/permissions/me` | bearer |  | member |  |  |
@@ -230,7 +231,8 @@ Issue/row attachments, linking, moving, streaming and downloads.
 | POST | `/issues/:issueId/attachments/:id/move` | bearer | yes |  |  | body `moveAttachmentSchema` |
 | POST | `/issues/:issueId/attachments/link` | bearer | yes | member (via issue) | `board.edit` | body `linkAttachmentSchema` |
 | POST | `/attachments/:id/stream-token` | bearer |  | member (via attachment) |  |  |
-| GET | `/attachments/:id/stream` | stream token |  |  |  | query `token` |
+| GET | `/attachments/:id/stream` | none |  |  |  | query `token` |
+| POST | `/attachments/:id/download-token` | bearer |  | member (via attachment) |  |  |
 | GET | `/attachments/:id/download` | bearer |  | member (via attachment) |  |  |
 | DELETE | `/issues/:issueId/attachments/:id` | bearer | yes | member (via issue) | `board.edit` |  |
 

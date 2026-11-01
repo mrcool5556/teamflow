@@ -74,22 +74,19 @@ function resolveAssigneeIds(emails: string[], memberEmails: Map<string, string>)
   return [...new Set(ids)];
 }
 
-function zipToBuffer(append: (archive: ZipArchive) => void | Promise<void>): Promise<Buffer> {
-  return new Promise((resolve, reject) => {
-    const chunks: Buffer[] = [];
-    const passthrough = new PassThrough();
-    passthrough.on("data", (chunk: Buffer) => chunks.push(chunk));
-    passthrough.on("end", () => resolve(Buffer.concat(chunks)));
-    passthrough.on("error", reject);
-
-    const archive = new ZipArchive({ zlib: { level: 9 } });
-    archive.on("error", reject);
-    archive.pipe(passthrough);
-
-    Promise.resolve(append(archive))
-      .then(() => archive.finalize())
-      .catch(reject);
-  });
+/**
+ * A zip produced on the fly: bytes flow to the reader as entries are compressed, so a bundle
+ * with gigabytes of files never sits in server memory and the download starts at once.
+ */
+function zipToStream(append: (archive: ZipArchive) => void | Promise<void>): PassThrough {
+  const output = new PassThrough();
+  const archive = new ZipArchive({ zlib: { level: 9 } });
+  archive.on("error", (err) => output.destroy(err));
+  archive.pipe(output);
+  Promise.resolve(append(archive))
+    .then(() => archive.finalize())
+    .catch((err: Error) => output.destroy(err));
+  return output;
 }
 
 const JSON_ENTRY_MAX_BYTES = 64 * 1024 * 1024;
@@ -297,11 +294,12 @@ function validateManifest(manifest: TeamBundleManifest) {
   }
 }
 
-export async function exportTeamBundle(
+/** Build a team bundle; metadata is read up front, the zip streams as it is written. */
+export async function streamTeamBundle(
   db: Db,
   teamId: string,
   includeFiles: boolean,
-): Promise<{ filename: string; buffer: Buffer }> {
+): Promise<{ filename: string; stream: PassThrough }> {
   const [team] = await db.select().from(schema.teams).where(eq(schema.teams.id, teamId)).limit(1);
   if (!team) throw new TeamBundleError("Team not found", 404);
 
@@ -542,7 +540,7 @@ export async function exportTeamBundle(
     },
   };
 
-  const buffer = await zipToBuffer(async (archive) => {
+  const stream = zipToStream(async (archive) => {
     archive.append(JSON.stringify(manifest, null, 2), { name: "manifest.json" });
     archive.append(JSON.stringify(boardBundle, null, 2), { name: "board.json" });
     archive.append(JSON.stringify(issuesBundle, null, 2), { name: "issues.json" });
@@ -567,7 +565,7 @@ export async function exportTeamBundle(
   const stamp = manifest.exportedAt.slice(0, 10);
   return {
     filename: `${team.key.toLowerCase()}-bundle-${stamp}.zip`,
-    buffer,
+    stream,
   };
 }
 

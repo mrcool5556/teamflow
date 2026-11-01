@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { IssueAttachmentPublic } from "@teamflow/core";
 import { client } from "../api";
+import { DownloadStarting } from "./DownloadStarting";
 import { Dialog } from "../ui/Dialog";
 import { DialogTitle } from "../ui/DialogTitle";
 
@@ -61,12 +62,15 @@ type AttachmentVideoLightboxProps = {
   attachment: IssueAttachmentPublic;
   onClose: () => void;
   onDownload: () => void;
+  /** Show "Starting…" on the Download button while the browser takes over. */
+  downloadStarting?: boolean;
 };
 
 export function AttachmentVideoLightbox({
   attachment,
   onClose,
   onDownload,
+  downloadStarting = false,
 }: AttachmentVideoLightboxProps) {
   const videoElementRef = useRef<HTMLVideoElement | null>(null);
   const [src, setSrc] = useState<string | null>(null);
@@ -163,8 +167,14 @@ export function AttachmentVideoLightbox({
               ))}
             </select>
           </label>
-          <button type="button" className="ghost" onClick={onDownload}>
-            Download
+          <button
+            type="button"
+            className="ghost"
+            aria-busy={downloadStarting}
+            disabled={downloadStarting}
+            onClick={onDownload}
+          >
+            {downloadStarting ? <DownloadStarting /> : "Download"}
           </button>
           <button type="button" className="ghost" onClick={handleClose}>
             Close

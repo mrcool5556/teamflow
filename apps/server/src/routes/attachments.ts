@@ -25,11 +25,33 @@ import {
 } from "../lib/attachments.js";
 import { createFileRangeResponse } from "../lib/fileStream.js";
 import { signStreamToken, streamTokenExpiresAt, verifyStreamToken } from "../lib/streamTokens.js";
-import { forbidden } from "../lib/errors.js";
+import { forbidden, notFound, unauthorized } from "../lib/errors.js";
 import { userHasTeamPermission } from "../lib/permissions.js";
 
 /** Issue/row attachments, linking, moving, streaming and downloads. */
 const routes = new Hono<AppEnv>();
+
+/**
+ * Resolve an attachment from a short-lived stream token (`?token=`), for URLs the browser loads
+ * itself (video element, download manager) and so cannot send a Bearer header. The token must
+ * name this attachment, and its user must still have access to the attachment's team.
+ */
+async function attachmentFromToken(linkId: string, token: string | undefined) {
+  if (!token) throw unauthorized("Missing file token");
+  let verified: { userId: string; linkId: string };
+  try {
+    verified = await verifyStreamToken(token);
+  } catch {
+    throw unauthorized("Invalid or expired file token");
+  }
+  if (verified.linkId !== linkId) throw forbidden("File token is for another attachment");
+  const row = await getAttachmentForDownload(db, linkId);
+  if (!row) throw notFound("Attachment not found");
+  if (!(await userHasTeamAccess(db, verified.userId, row.teamId))) {
+    throw forbidden("Team access denied");
+  }
+  return row;
+}
 
 routes.get(
   "/issues/:issueId/attachments",
@@ -228,26 +250,7 @@ routes.post(
 );
 
 routes.get("/attachments/:id/stream", validateParams, async (c) => {
-  const linkId = c.req.param("id");
-  const token = c.req.query("token");
-  if (!token) return c.json({ error: "Missing stream token" }, 401);
-
-  let userId: string;
-  try {
-    const verified = await verifyStreamToken(token);
-    if (verified.linkId !== linkId) {
-      return c.json({ error: "Invalid stream token" }, 401);
-    }
-    userId = verified.userId;
-  } catch {
-    return c.json({ error: "Invalid or expired stream token" }, 401);
-  }
-
-  const row = await getAttachmentForDownload(db, linkId);
-  if (!row) return c.json({ error: "Attachment not found" }, 404);
-  if (!(await userHasTeamAccess(db, userId, row.teamId))) {
-    return c.json({ error: "Team access denied" }, 403);
-  }
+  const row = await attachmentFromToken(c.req.param("id"), c.req.query("token"));
 
   try {
     return await createFileRangeResponse(row.fullPath, {
@@ -261,25 +264,54 @@ routes.get("/attachments/:id/stream", validateParams, async (c) => {
   }
 });
 
-routes.get(
-  "/attachments/:id/download",
+/**
+ * A short-lived token so the browser can download the file itself (its download manager shows
+ * progress and writes to disk) via `GET /attachments/:id/download?token=`. Works for every file
+ * type, unlike the stream token, which is only issued for streamable media.
+ */
+routes.post(
+  "/attachments/:id/download-token",
   requireAuth,
   validateParams,
   loadTeam("attachment"),
   async (c) => {
-    const row = c.var.attachment;
-
-    try {
-      return await createFileRangeResponse(row.fullPath, {
-        mimeType: row.mimeType,
-        filename: row.filename,
-        inline: false,
-        rangeHeader: c.req.header("range"),
-      });
-    } catch {
-      return c.json({ error: "File missing on server" }, 404);
-    }
+    const linkId = c.req.param("id");
+    const token = await signStreamToken(linkId, c.var.auth.userId);
+    return c.json({
+      token,
+      expiresAt: streamTokenExpiresAt(),
+      downloadUrl: `/attachments/${linkId}/download?token=${encodeURIComponent(token)}`,
+    });
   },
+);
+
+function downloadResponse(
+  row: { fullPath: string; mimeType: string; filename: string },
+  rangeHeader: string | undefined,
+) {
+  return createFileRangeResponse(row.fullPath, {
+    mimeType: row.mimeType,
+    filename: row.filename,
+    inline: false,
+    rangeHeader,
+  }).catch(() => {
+    throw notFound("File missing on server");
+  });
+}
+
+/** Bearer auth, or `?token=` from download-token / stream-token for browser-driven downloads. */
+routes.get(
+  "/attachments/:id/download",
+  validateParams,
+  async (c, next) => {
+    const token = c.req.query("token");
+    if (token === undefined) return next();
+    const row = await attachmentFromToken(c.req.param("id"), token);
+    return downloadResponse(row, c.req.header("range"));
+  },
+  requireAuth,
+  loadTeam("attachment"),
+  async (c) => downloadResponse(c.var.attachment, c.req.header("range")),
 );
 
 routes.delete(
