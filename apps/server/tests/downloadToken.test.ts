@@ -134,3 +134,57 @@ describe("download tokens", () => {
     expect(await res.json()).toMatchObject({ code: "unauthorized" });
   });
 });
+
+describe("team export tokens", () => {
+  it("streams the bundle zip to a token URL without a Bearer header", async () => {
+    const res = await api(app, "POST", `/teams/${owner.teamId}/export-token?includeFiles=true`, {
+      token: owner.token,
+    });
+    expect(res.status).toBe(200);
+    const { downloadUrl } = await json<{ downloadUrl: string }>(res);
+    expect(downloadUrl.startsWith(`/teams/${owner.teamId}/export?token=`)).toBe(true);
+    expect(downloadUrl.endsWith("&includeFiles=true")).toBe(true);
+
+    const dl = await app.request(downloadUrl);
+    expect(dl.status).toBe(200);
+    expect(dl.headers.get("content-type")).toBe("application/zip");
+    expect(dl.headers.get("content-disposition")).toMatch(/^attachment; filename=".+\.zip"$/);
+    const bytes = Buffer.from(await dl.arrayBuffer());
+    expect(bytes.subarray(0, 2).toString()).toBe("PK");
+    // With files, the uploaded zip attachment is inside the bundle.
+    expect(bytes.includes(Buffer.from("big.zip"))).toBe(true);
+  });
+
+  it("rejects a token for another team, a garbage token, and users without the permission", async () => {
+    const { token } = await json<{ token: string }>(
+      await api(app, "POST", `/teams/${owner.teamId}/export-token`, { token: owner.token }),
+    );
+    const other = await app.request(`/teams/${outsider.teamId}/export?token=${token}`);
+    expect(other.status).toBe(403);
+    expect(await other.json()).toMatchObject({ code: "forbidden" });
+
+    const bad = await app.request(`/teams/${owner.teamId}/export?token=nope`);
+    expect(bad.status).toBe(401);
+    expect(await bad.json()).toMatchObject({ code: "unauthorized" });
+
+    // A stream token is not an export token.
+    const { token: streamToken } = await json<{ token: string }>(await downloadToken(zipId));
+    const wrongKind = await app.request(`/teams/${owner.teamId}/export?token=${streamToken}`);
+    expect(wrongKind.status).toBe(401);
+
+    const denied = await api(app, "POST", `/teams/${owner.teamId}/export-token`, {
+      token: outsider.token,
+    });
+    expect([403, 404]).toContain(denied.status);
+  });
+
+  it("keeps Bearer exports working", async () => {
+    const res = await api(app, "GET", `/teams/${owner.teamId}/export`, { token: owner.token });
+    expect(res.status).toBe(200);
+    expect(
+      Buffer.from(await res.arrayBuffer())
+        .subarray(0, 2)
+        .toString(),
+    ).toBe("PK");
+  });
+});

@@ -369,6 +369,17 @@ export function installFakeApi(db: FakeDb, options: FakeApiOptions = {}) {
     ],
     [
       "POST",
+      /^\/teams\/([^/]+)\/export-token$/,
+      ({ params, query }) => ({
+        token: "tok-export",
+        expiresAt: new Date(Date.now() + 600_000).toISOString(),
+        downloadUrl: `/teams/${params[0]}/export?token=tok-export${
+          query.get("includeFiles") === "true" ? "&includeFiles=true" : ""
+        }`,
+      }),
+    ],
+    [
+      "POST",
       /^\/attachments\/([^/]+)\/download-token$/,
       ({ params }) => {
         if (!db.attachments.some((a) => a.id === params[0])) return notFound();

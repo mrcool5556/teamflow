@@ -133,3 +133,30 @@ describe("attachment downloads", () => {
     expect(within(lightbox).getByRole("button", { name: /Starting…/ })).toBeDisabled();
   });
 });
+
+describe("team bundle export", () => {
+  it("hands the streamed bundle to the browser with feedback", async () => {
+    const user = userEvent.setup();
+    const db = seedDb();
+    const { calls } = installFakeApi(db);
+    signIn(db);
+    renderApp("/t/ENG/settings/team");
+
+    await user.click(await screen.findByLabelText(/Include attached files/));
+    const button = screen.getByRole("button", { name: "Download bundle" });
+    await user.click(button);
+
+    await waitFor(() => expect(clicked).toHaveLength(1));
+    expect(clicked[0]!.href).toMatch(
+      /\/api\/teams\/[^/]+\/export\?token=tok-export&includeFiles=true$/,
+    );
+    expect(button).toHaveTextContent("Starting…");
+    expect(
+      await screen.findByText(
+        "Downloading ENG bundle with files — progress is in your browser's downloads",
+      ),
+    ).toBeInTheDocument();
+    // The bundle is never fetched into the page.
+    expect(calls.some((c) => c.method === "GET" && c.path.includes("/export"))).toBe(false);
+  });
+});
