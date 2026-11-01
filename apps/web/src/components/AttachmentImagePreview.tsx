@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import type { IssueAttachmentPublic } from "@teamflow/core";
 import { isImageAttachmentFile } from "@teamflow/core";
 import { client } from "../api";
+import { DownloadStarting } from "./DownloadStarting";
 import { Dialog } from "../ui/Dialog";
 import { DialogTitle } from "../ui/DialogTitle";
 
@@ -103,6 +104,8 @@ type AttachmentLightboxProps = {
   imageUrl: string;
   onClose: () => void;
   onDownload: () => void;
+  /** Show "Starting…" on the Download button while the browser takes over. */
+  downloadStarting?: boolean;
 };
 
 export function AttachmentLightbox({
@@ -110,6 +113,7 @@ export function AttachmentLightbox({
   imageUrl,
   onClose,
   onDownload,
+  downloadStarting = false,
 }: AttachmentLightboxProps) {
   return (
     <Dialog
@@ -124,8 +128,14 @@ export function AttachmentLightbox({
           {attachment.filename}
         </DialogTitle>
         <span className="attachment-lightbox-actions">
-          <button type="button" className="ghost" onClick={onDownload}>
-            Download
+          <button
+            type="button"
+            className="ghost"
+            aria-busy={downloadStarting}
+            disabled={downloadStarting}
+            onClick={onDownload}
+          >
+            {downloadStarting ? <DownloadStarting /> : "Download"}
           </button>
           <button type="button" className="ghost" onClick={onClose}>
             Close

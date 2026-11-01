@@ -155,3 +155,10 @@ export type StreamTokenPublic = {
   expiresAt: string;
   streamUrl: string;
 };
+
+/** A short-lived token for a browser-driven download (`downloadUrl` carries it). */
+export type DownloadTokenPublic = {
+  token: string;
+  expiresAt: string;
+  downloadUrl: string;
+};

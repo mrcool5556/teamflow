@@ -492,3 +492,39 @@ button.secondary.compact {
   text-underline-offset: 0.15em;
   cursor: pointer;
 }
+
+/* Small inline busy indicator (e.g. a download being handed to the browser). */
+.spinner {
+  display: inline-block;
+  width: 0.85em;
+  height: 0.85em;
+  border: 2px solid currentColor;
+  border-right-color: transparent;
+  border-radius: 50%;
+  animation: spinner-turn 0.7s linear infinite;
+  vertical-align: -0.1em;
+}
+
+@keyframes spinner-turn {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .spinner {
+    animation-duration: 2s;
+  }
+}
+
+.download-starting {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin-left: var(--space-2);
+  font-size: var(--font-size-sm);
+}
+
+button > .download-starting:only-child {
+  margin-left: 0;
+}

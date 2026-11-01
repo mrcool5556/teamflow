@@ -11,6 +11,7 @@ import type {
   IssueAttachmentPublic,
   AttachmentLimitsPublic,
   StreamTokenPublic,
+  DownloadTokenPublic,
   UploadSessionPublic,
   CreateIssueInput,
   CreateProjectInput,
@@ -779,6 +780,24 @@ export class TeamflowClient {
     return `${this.baseUrl}${streamUrl}`;
   }
 
+  createDownloadToken(linkId: string) {
+    return this.request<DownloadTokenPublic>(`/attachments/${linkId}/download-token`, {
+      method: "POST",
+    });
+  }
+
+  /**
+   * A URL the browser can download directly (no Authorization header needed), so the file goes
+   * through the browser's download manager instead of into memory. Prefer this over
+   * downloadAttachment() for saving files; keep downloadAttachment() for small in-app previews.
+   */
+  async resolveDownloadUrl(linkId: string) {
+    const { downloadUrl } = await this.createDownloadToken(linkId);
+    if (downloadUrl.startsWith("http")) return downloadUrl;
+    return `${this.baseUrl}${downloadUrl}`;
+  }
+
+  /** Fetch the whole file into a Blob. Only for small in-app uses (image previews). */
   async downloadAttachment(attachmentId: string) {
     const headers = new Headers();
     if (this.token) {
