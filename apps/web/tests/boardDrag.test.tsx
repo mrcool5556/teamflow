@@ -89,6 +89,8 @@ async function drag(identifier: string, dx: number, dy: number, { release = true
   await act(async () => {
     fireEvent.pointerMove(document, { ...pointer, clientX: start.x + 8, clientY: start.y });
   });
+  // Let the board lift the card out of its column once dnd-kit has measured it.
+  await act(() => new Promise((resolve) => setTimeout(resolve, 40)));
   await act(async () => {
     fireEvent.pointerMove(document, { ...pointer, clientX: start.x + dx, clientY: start.y + dy });
   });
@@ -139,7 +141,11 @@ afterAll(() => {
   if (!hadPointerEvent) delete (window as { PointerEvent?: unknown }).PointerEvent;
 });
 
-afterEach(() => {
+afterEach(async () => {
+  // Let go of a drag a test left in hand, or dnd-kit's document listeners outlive the board.
+  fireEvent.pointerUp(document, pointer);
+  // dnd-kit swallows clicks for a moment after a drag ends; let that pass before the next test.
+  await new Promise((resolve) => setTimeout(resolve, 100));
   vi.restoreAllMocks();
 });
 
@@ -172,5 +178,83 @@ describe("dropping a card where it already is", () => {
         .map((c) => [c.path.split("/").pop(), (c.body as { boardSort: number }).boardSort]),
     );
     expect(sorts).toEqual({ "eng-issue-1": 0, "eng-issue-4": 1, "eng-issue-2": 2 });
+  });
+});
+
+function dropLines() {
+  return Array.from(
+    document.querySelectorAll<HTMLElement>(".issue-card--drop-before, .issue-card--drop-after"),
+  ).map((el) => {
+    const title = within(el).getByRole("button", { name: /issue/ }).textContent;
+    return `${el.classList.contains("issue-card--drop-before") ? "before" : "after"} ${title}`;
+  });
+}
+
+const PITCH = CARD.height + CARD.gap;
+
+describe("while a card is in hand", () => {
+  it("takes the card out of its column and shows a full copy under the pointer", async () => {
+    await renderThreeCardColumn();
+
+    await drag("ENG-2", 0, 0, { release: false });
+
+    expect(card("ENG-2")).toHaveClass("issue-card--lifted");
+    const overlay = document.querySelector<HTMLElement>(".issue-card-overlay")!;
+    expect(within(overlay).getByText("ENG issue 2")).toBeInTheDocument();
+    expect(overlay.style.opacity).toBe("");
+    expect(overlay.closest("[style*='opacity']")).toBeNull();
+  });
+
+  it.each([
+    ["at its own place", 0],
+    ["just above its own place", -8],
+    ["just below its own place", 8],
+  ])("shows no line %s", async (_label, dy) => {
+    await renderThreeCardColumn();
+
+    await drag("ENG-2", 0, dy, { release: false });
+
+    expect(dropLines()).toEqual([]);
+  });
+
+  it("shows one line where the drop would change the order", async () => {
+    await renderThreeCardColumn();
+
+    // Up past ENG-1's middle: before ENG-1.
+    await drag("ENG-2", 0, -(PITCH / 2 + 10), { release: false });
+    expect(dropLines()).toEqual(["before ENG issue 1"]);
+
+    // Down past ENG-4's middle (ENG-4 slid up into the lifted card's place): after ENG-4.
+    await act(async () => {
+      const start = centre(card("ENG-1"));
+      fireEvent.pointerMove(document, {
+        ...pointer,
+        clientX: start.x,
+        clientY: start.y + PITCH + PITCH / 2,
+      });
+    });
+    expect(dropLines()).toEqual(["after ENG issue 4"]);
+  });
+
+  it("shows the line in another column", async () => {
+    await renderThreeCardColumn();
+
+    await drag("ENG-2", COLUMN.width + COLUMN.gap, 0, { release: false });
+
+    expect(dropLines()).toEqual(["after ENG issue 3"]);
+  });
+
+  it("lifts every selected card and stacks a count on the overlay", async () => {
+    await renderThreeCardColumn();
+    fireEvent.click(card("ENG-1"), { ctrlKey: true });
+    fireEvent.click(card("ENG-2"), { ctrlKey: true });
+
+    await drag("ENG-2", 0, 0, { release: false });
+
+    expect(card("ENG-1")).toHaveClass("issue-card--lifted");
+    expect(card("ENG-2")).toHaveClass("issue-card--lifted");
+    expect(card("ENG-4")).not.toHaveClass("issue-card--lifted");
+    const stack = document.querySelector(".issue-card-overlay-stack--multi")!;
+    expect(within(stack as HTMLElement).getByText("2")).toBeInTheDocument();
   });
 });

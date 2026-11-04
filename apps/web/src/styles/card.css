@@ -172,16 +172,39 @@
   cursor: grabbing;
 }
 
-.issue-card-dragging {
-  border-color: var(--accent);
-  opacity: 0.45;
+/* Cards in hand are taken out of their column; the drag overlay is the only copy shown. */
+/* Doubled class: .issue-card's own display rule comes later in this file. */
+.issue-card.issue-card--lifted {
+  display: none;
 }
 
-.issue-card-dragging-companion {
-  border-color: var(--accent);
-  opacity: 0.5;
-  filter: brightness(0.92);
-  box-shadow: 0 0 0 1px color-mix(in srgb, var(--accent) 40%, transparent);
+/* The insertion line sits in the gap next to a card, so showing it never moves the layout. */
+.issue-card--drop-before::before,
+.issue-card--drop-after::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: var(--accent);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--accent) 25%, transparent);
+  border-radius: 1px;
+  pointer-events: none;
+}
+
+.issue-card--drop-before::before {
+  top: calc(-0.55rem / 2 - 1px - var(--chrome-card-border-width, 0px));
+}
+
+.issue-card--drop-after::after {
+  bottom: calc(-0.55rem / 2 - 1px - var(--chrome-card-border-width, 0px));
+}
+
+.issue-card-overlay-priority {
+  margin-left: auto;
+  font-size: 0.68rem;
+  font-weight: 600;
+  color: var(--muted);
 }
 
 .issue-card-drag-count {
