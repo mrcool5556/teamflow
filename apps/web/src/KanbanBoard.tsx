@@ -11,9 +11,9 @@ import {
   useSensors,
   type CollisionDetection,
   type DragEndEvent,
+  type DragMoveEvent,
   type DragOverEvent,
   type DragStartEvent,
-  type Over,
 } from "@dnd-kit/core";
 import {
   SortableContext,
@@ -52,6 +52,13 @@ import { DueChip, DueDatePicker } from "./components/DueDatePicker";
 import { issueMatchesBoardSearch, buildRefShareUrl } from "./lib/refLinks";
 import { copyTextToClipboard } from "./lib/clipboard";
 import { useInlineRename } from "./hooks/useInlineRename";
+import {
+  reorderMultipleIssueIds,
+  sameOrder,
+  slotForPointer,
+  type CardBox,
+  type DropSlot,
+} from "./lib/boardDrop";
 import { useCanEditBoard } from "./lib/teamPermissions";
 import { useLayer } from "./ui/layerStack";
 import type { Priority } from "@teamflow/core";
@@ -98,80 +105,19 @@ function parseDndId(id: string): ParsedDndId {
   return { kind: "unknown" };
 }
 
-type IssueInsertHint = {
-  rowId: string;
-  statusId: string;
-  anchorIssueId: string | null;
-  insertAfter: boolean;
-};
+/** The cell a dragged card is over and the slot in it, as the pointer last resolved them. */
+type IssueInsertHint = DropSlot & { rowId: string; statusId: string };
 
-function shouldInsertAfter(active: DragEndEvent["active"], over: Over): boolean {
-  const activeRect = active.rect.current.translated;
-  const overRect = over.rect;
-  if (!activeRect || !overRect) return false;
+const cellKeyOf = (rowId: string, statusId: string) => `${rowId}:${statusId}`;
 
-  const activeMidY = activeRect.top + activeRect.height / 2;
-  const overMidY = overRect.top + overRect.height / 2;
-  return activeMidY > overMidY;
-}
-
-function resolveIssueInsertHint(
-  active: DragEndEvent["active"],
-  over: Over | null,
-  issues: IssuePublic[],
-  defaultRowId: string | null,
-): IssueInsertHint | null {
-  if (!over) return null;
-
-  const activeParsed = parseDndId(String(active.id));
-  if (activeParsed.kind !== "issue") return null;
-
-  const overParsed = parseDndId(String(over.id));
-
-  if (overParsed.kind === "cell" || overParsed.kind === "cell-tail") {
-    return {
-      rowId: overParsed.rowId,
-      statusId: overParsed.statusId,
-      anchorIssueId: null,
-      insertAfter: true,
-    };
-  }
-
-  if (overParsed.kind === "issue") {
-    const overIssue = issues.find((item) => item.id === overParsed.issueId);
-    if (!overIssue) return null;
-
-    const rowId = overIssue.rowId ?? defaultRowId;
-    if (!rowId) return null;
-
-    return {
-      rowId,
-      statusId: overIssue.statusId,
-      anchorIssueId: overIssue.id,
-      insertAfter: shouldInsertAfter(active, over),
-    };
-  }
-
-  return null;
-}
-
-function reorderMultipleIssueIds(
-  orderedIds: string[],
-  draggedIds: string[],
-  overId: string | null,
-  insertAfter: boolean,
-): string[] {
-  const dragSet = new Set(draggedIds);
-  const next = orderedIds.filter((id) => !dragSet.has(id));
-  const block = draggedIds;
-
-  if (!overId) return [...next, ...block];
-
-  let insertIndex = next.indexOf(overId);
-  if (insertIndex < 0) return [...next, ...block];
-  if (insertAfter) insertIndex += 1;
-  next.splice(insertIndex, 0, ...block);
-  return next;
+function sameHint(a: IssueInsertHint | null, b: IssueInsertHint | null): boolean {
+  if (!a || !b) return a === b;
+  return (
+    a.rowId === b.rowId &&
+    a.statusId === b.statusId &&
+    a.anchorIssueId === b.anchorIssueId &&
+    a.insertAfter === b.insertAfter
+  );
 }
 
 function sortIssueIdsByBoardOrder(
@@ -207,27 +153,62 @@ function draggingIssueIds(
   return [activeIssueId];
 }
 
-const issueCollisionDetection: CollisionDetection = (args) => {
-  const activeParsed = parseDndId(String(args.active.id));
-  if (activeParsed.kind === "issue") {
-    const pointerHits = pointerWithin(args);
-    if (pointerHits.length > 0) return pointerHits;
-    return closestCorners(args);
-  }
-  if (activeParsed.kind === "column") {
-    const columnContainers = args.droppableContainers.filter((container) => {
-      const parsed = parseDndId(String(container.id));
-      return parsed.kind === "column";
-    });
-    if (columnContainers.length === 0) return [];
+/**
+ * Collision detection for the board. A dragged card resolves to the cell under the pointer (or
+ * the nearest cell) and then to a slot between the cards that stay in it, so a drop in the gap
+ * between two cards lands between them. The resolved slot is written to `issueTargetRef` because
+ * dnd-kit only carries a droppable id forward.
+ */
+function createBoardCollisionDetection(
+  movingIdsRef: { current: ReadonlySet<string> },
+  issueTargetRef: { current: IssueInsertHint | null },
+): CollisionDetection {
+  return (args) => {
+    const activeParsed = parseDndId(String(args.active.id));
+    if (activeParsed.kind === "issue") {
+      const cellArgs = {
+        ...args,
+        droppableContainers: args.droppableContainers.filter(
+          (container) => parseDndId(String(container.id)).kind === "cell",
+        ),
+      };
+      const cellHit = pointerWithin(cellArgs)[0] ?? closestCorners(cellArgs)[0];
+      const cell = cellHit ? parseDndId(String(cellHit.id)) : null;
+      if (!cellHit || cell?.kind !== "cell") {
+        issueTargetRef.current = null;
+        return [];
+      }
 
-    const columnArgs = { ...args, droppableContainers: columnContainers };
-    const pointerHits = pointerWithin(columnArgs);
-    if (pointerHits.length > 0) return pointerHits;
-    return closestCenter(columnArgs);
-  }
-  return closestCorners(args);
-};
+      const cellKey = cellKeyOf(cell.rowId, cell.statusId);
+      const cards: CardBox[] = [];
+      for (const container of args.droppableContainers) {
+        const parsed = parseDndId(String(container.id));
+        if (parsed.kind !== "issue" || container.data.current?.cellKey !== cellKey) continue;
+        const rect = args.droppableRects.get(container.id);
+        if (rect) cards.push({ id: parsed.issueId, top: rect.top, bottom: rect.bottom });
+      }
+      // The pointer picks the cell; the top edge of the card in hand picks the slot. Using the
+      // edge keeps the starting position a stable "no change" once the lifted card collapses
+      // and the card below slides up under the pointer.
+      const slot = slotForPointer(cards, movingIdsRef.current, args.collisionRect.top);
+      issueTargetRef.current = { rowId: cell.rowId, statusId: cell.statusId, ...slot };
+      return [{ id: slot.anchorIssueId ? issueDndId(slot.anchorIssueId) : cellHit.id }];
+    }
+    if (activeParsed.kind === "column") {
+      const columnContainers = args.droppableContainers.filter((container) => {
+        const parsed = parseDndId(String(container.id));
+        return parsed.kind === "column";
+      });
+      if (columnContainers.length === 0) return [];
+
+      const columnArgs = { ...args, droppableContainers: columnContainers };
+      const pointerHits = pointerWithin(columnArgs);
+      if (pointerHits.length > 0) return pointerHits;
+      return closestCenter(columnArgs);
+    }
+    return closestCorners(args);
+  };
+}
 
 function resolveColumnDropTarget(
   overParsed: ParsedDndId,
@@ -346,6 +327,12 @@ export function KanbanBoard({
   const [contextMenu, setContextMenu] = useState<BoardContextMenu | null>(null);
   const lastSelectedIssueIdRef = useRef<string | null>(null);
   const suppressClickRef = useRef<string | null>(null);
+  const movingIssueIdsRef = useRef<ReadonlySet<string>>(new Set());
+  const issueTargetRef = useRef<IssueInsertHint | null>(null);
+  const collisionDetection = useMemo(
+    () => createBoardCollisionDetection(movingIssueIdsRef, issueTargetRef),
+    [],
+  );
 
   const selectedIssues = useMemo(
     () => issues.filter((issue) => selectedIssueIds.has(issue.id)),
@@ -650,14 +637,27 @@ export function KanbanBoard({
   }, [activeId, rows, statuses]);
 
   function handleDragStart(event: DragStartEvent) {
+    const parsed = parseDndId(String(event.active.id));
+    movingIssueIdsRef.current = new Set(
+      parsed.kind === "issue"
+        ? draggingIssueIds(parsed.issueId, selectedIssueIds, issues, defaultRowId)
+        : [],
+    );
+    issueTargetRef.current = null;
     setActiveId(String(event.active.id));
     setIssueInsertHint(null);
     setColumnDropTargetId(null);
     suppressClickRef.current = String(event.active.id);
   }
 
+  /** The slot can change without the droppable changing (top half to bottom half of a card). */
+  function handleDragMove(_event?: DragMoveEvent) {
+    const next = issueTargetRef.current;
+    setIssueInsertHint((prev) => (sameHint(prev, next) ? prev : next));
+  }
+
   function handleDragOver(event: DragOverEvent) {
-    setIssueInsertHint(resolveIssueInsertHint(event.active, event.over, issues, defaultRowId));
+    handleDragMove();
 
     const activeParsed = parseDndId(String(event.active.id));
     if (activeParsed.kind !== "column") {
@@ -673,6 +673,8 @@ export function KanbanBoard({
   }
 
   function handleDragCancel() {
+    movingIssueIdsRef.current = new Set();
+    issueTargetRef.current = null;
     setActiveId(null);
     setIssueInsertHint(null);
     setColumnDropTargetId(null);
@@ -687,6 +689,9 @@ export function KanbanBoard({
 
   function handleDragEnd(event: DragEndEvent) {
     const { active, over } = event;
+    const issueTarget = issueTargetRef.current;
+    movingIssueIdsRef.current = new Set();
+    issueTargetRef.current = null;
     setActiveId(null);
     setIssueInsertHint(null);
     setColumnDropTargetId(null);
@@ -724,7 +729,7 @@ export function KanbanBoard({
 
     const movingIds = draggingIssueIds(issue.id, selectedIssueIds, issues, defaultRowId);
 
-    const dropTarget = resolveIssueInsertHint(active, over, issues, defaultRowId);
+    const dropTarget = issueTarget;
     if (!dropTarget) return;
 
     const sourceRowId = issue.rowId ?? defaultRowId;
@@ -747,7 +752,7 @@ export function KanbanBoard({
     if (sameCell) {
       const sourceCell = issuesForCell(sourceRowId, sourceStatusId).map((item) => item.id);
       const nextCell = reorderMultipleIssueIds(sourceCell, movingIds, overIssueId, insertAfter);
-      if (nextCell.join("|") === sourceCell.join("|")) return;
+      if (sameOrder(nextCell, sourceCell)) return;
       onReorderIssuesInCell(targetRowId, targetStatusId, nextCell);
       return;
     }
@@ -785,8 +790,9 @@ export function KanbanBoard({
   return (
     <DndContext
       sensors={canEdit ? sensors : NO_SENSORS}
-      collisionDetection={issueCollisionDetection}
+      collisionDetection={collisionDetection}
       onDragStart={handleDragStart}
+      onDragMove={handleDragMove}
       onDragOver={handleDragOver}
       onDragCancel={handleDragCancel}
       onDragEnd={handleDragEnd}
@@ -1414,6 +1420,7 @@ function SortableBoardRow({
                             )}
                             <SortableIssueCard
                               issue={issue}
+                              cellKey={cellKeyOf(row.id, status.id)}
                               members={members}
                               selected={selectedIssueIds.has(issue.id)}
                               draggingCompanion={
@@ -1557,6 +1564,7 @@ function IssueDropIndicator() {
 
 function SortableIssueCard({
   issue,
+  cellKey,
   members,
   selected = false,
   draggingCompanion = false,
@@ -1573,6 +1581,8 @@ function SortableIssueCard({
   onContextMenu,
 }: {
   issue: IssuePublic;
+  /** Which board cell the card is rendered in; collision detection groups cards by it. */
+  cellKey: string;
   members: TeamMemberPublic[];
   selected?: boolean;
   draggingCompanion?: boolean;
@@ -1593,6 +1603,7 @@ function SortableIssueCard({
   // role/tabIndex attributes are left off so the card's own buttons are not nested in one.
   const { listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: issueDndId(issue.id),
+    data: { cellKey },
     ...(layoutAnimationDisabled ? { animateLayoutChanges: () => false } : {}),
   });
 
