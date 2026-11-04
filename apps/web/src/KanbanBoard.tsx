@@ -953,7 +953,9 @@ export function KanbanBoard({
         ref={boardRef}
         className={`board-stack ${previewMode ? "board-stack--preview" : ""} ${selectedIssueIds.size > 0 ? "board-stack--selecting" : ""}`}
         onKeyDown={handleBoardKeyDown}
-        onPointerDown={(event) => {
+        // On click, not press: a press on empty space may become a drag-to-pan, which keeps
+        // the selection (the pan swallows its closing click).
+        onClick={(event) => {
           if (previewMode || selectedIssueIds.size === 0) return;
           const target = event.target as HTMLElement;
           if (target.closest(".issue-card")) return;

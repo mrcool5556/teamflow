@@ -4,7 +4,8 @@ import { Popover } from "../ui/Popover";
 const TIPS: [string, string][] = [
   ["Ctrl/Shift+click", "select several cards"],
   ["Drag a selected card", "moves every selected card"],
-  ["Alt+drag or middle-click", "pan the board"],
+  ["Drag empty space", "pan the row sideways"],
+  ["Alt+drag or middle-click", "pan anywhere, even over a column"],
   ["Mouse wheel", "passes through columns and scrolls the board"],
   ["/", "jump to an issue or paste a link"],
   ["Esc", "close the topmost panel"],
