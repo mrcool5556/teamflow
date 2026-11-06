@@ -11,6 +11,7 @@ import { formatTimestamp } from "../../lib/format";
 import { useInstanceOverviewQuery } from "../../queries/instance";
 import { useShell } from "../board/shellContext";
 import { FIX_HEALTH, type Health } from "./adminHealth";
+import { howToForFix } from "./howTos";
 
 export function StatusDot({ health }: { health: Health }) {
   return <span className={`admin-dot admin-dot--${health}`} aria-hidden="true" />;
@@ -396,7 +397,22 @@ export function OverviewPanel() {
                   <StatusDot health={FIX_HEALTH[fix.severity]} />
                   <div>
                     <strong>{fix.title}</strong>
-                    <p>{fix.detail}</p>
+                    <p>
+                      {fix.detail}{" "}
+                      {howToForFix(fix.id) ? (
+                        <button
+                          type="button"
+                          className="admin-link"
+                          onClick={() =>
+                            navigate(
+                              `${adminPath(teamKey, "help")}#howto-${howToForFix(fix.id)!.id}`,
+                            )
+                          }
+                        >
+                          How-to
+                        </button>
+                      ) : null}
+                    </p>
                   </div>
                 </li>
               ))}

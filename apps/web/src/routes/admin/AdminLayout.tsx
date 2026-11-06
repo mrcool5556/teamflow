@@ -13,6 +13,7 @@ const ADMIN_NAV: {
   { id: "spaces", label: "Spaces", group: "Server" },
   { id: "updates", label: "Updates & backups", group: "Server" },
   { id: "bot", label: "Discord bot", group: "Server" },
+  { id: "help", label: "How-tos & fixes", group: "Help" },
   { id: "defaults", label: "Space defaults", group: "Settings" },
 ];
 
