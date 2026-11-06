@@ -73,3 +73,9 @@ Fields (`input`, `select` in `base.css`) read `--field-*` variables. `inputs` va
 ## Looks
 
 `lib/appearanceLooks.ts` lists the Looks. Each one is a full mix: theme, accent colour, UI style, corners and every design aspect, so picking a look sets all of them (text contrast and team colours stay). Teamflow, Daylight, Calm, Paper, Terminal and Neon leave the aspects on auto. Machined, Paper desk, Retro 95 and Synth night are the design library's presets (Gold arcade, Paper desk, Retro 95, Synth night). A profile matches a look when every setting matches (lip metal and rim shadow only count for lipped buttons); "Back to …" is offered while all but three settings still match.
+
+## Design page
+
+Settings → Appearance → Design (`/settings/appearance/design`, `routes/settings/DesignPanel.tsx`) holds every aspect: Colours (eleven chips, each a colour theme in one mode, plus Light or dark and Accent), Fonts, Corners, Windows and cards, Buttons (with Lip metal and Rim shadow, greyed out unless Lipped), Text fields, Switches, Base UI style and Text. Option labels live in `lib/designAspects.ts`. Changes apply and save as you go, like Appearance.
+
+The preview (`components/DesignPreview.tsx`) is a sample app built from the real class names, so every aspect shows on it, with three views: Board, Drawer open and Settings. On a phone the preview sticks to the top (small, with Bigger preview) and each aspect is a collapsed section showing its current value.

@@ -21,8 +21,9 @@ export type AuthMode = "login" | "register" | "reset";
 export function useAppRoute() {
   const team = useMatch("/t/:teamKey/*");
   const issue = useMatch("/t/:teamKey/issue/:issueRef");
-  const teamSettings = useMatch("/t/:teamKey/settings/:panel");
-  const settings = useMatch("/settings/:panel");
+  // A panel may have a page of its own under it (settings/appearance/design).
+  const teamSettings = useMatch("/t/:teamKey/settings/:panel/*");
+  const settings = useMatch("/settings/:panel/*");
   const teamPlan = useMatch("/t/:teamKey/plan");
   const plan = useMatch("/plan");
   const invite = useMatch("/invite/:token");
@@ -31,6 +32,7 @@ export function useAppRoute() {
   const admin = useMatch("/admin/*");
 
   const panel = teamSettings?.params.panel ?? settings?.params.panel;
+  const subpage = teamSettings?.params["*"] ?? settings?.params["*"] ?? "";
   // "/admin", "/admin/spaces", "/admin/spaces/<teamId>" (also under /t/:teamKey).
   const adminRest = teamAdmin?.params["*"] ?? admin?.params["*"];
   const [adminSection, adminSpaceId] = (adminRest ?? "").split("/");
@@ -41,6 +43,8 @@ export function useAppRoute() {
     /** Raw panel segment; may be unknown (the shell redirects to general). */
     settingsPanel: panel ?? null,
     settingsOpen: panel !== undefined,
+    /** Page under the panel ("design" under appearance), or "". */
+    settingsSubpage: subpage,
     planOpen: Boolean(teamPlan || plan),
     adminOpen: adminRest !== undefined,
     /** Raw section segment ("" for the index); unknown values fall back to the overview. */
@@ -62,6 +66,11 @@ export function issuePath(teamKey: string, identifier: string) {
 
 export function settingsPath(teamKey: string | null, panel: SettingsPanel) {
   return `${teamBasePath(teamKey)}/settings/${panel}`;
+}
+
+/** The Design page under Appearance. */
+export function designPath(teamKey: string | null) {
+  return `${settingsPath(teamKey, "appearance")}/design`;
 }
 
 export function planPath(teamKey: string | null) {

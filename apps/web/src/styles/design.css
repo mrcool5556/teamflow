@@ -1,0 +1,350 @@
+/* Settings → Appearance → Design: aspects on the left, a large live preview, saved mixes. */
+.settings-column.settings-column--full {
+  max-width: none;
+}
+
+.design-back {
+  padding: 0.3rem 0.6rem;
+  font-size: var(--font-size-sm);
+}
+
+.design-layout {
+  display: grid;
+  grid-template-columns: minmax(300px, 400px) minmax(0, 1fr);
+  grid-template-areas: "aspects preview";
+  gap: var(--space-5);
+  align-items: start;
+}
+
+.design-aspects {
+  grid-area: aspects;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  min-width: 0;
+}
+
+.design-preview {
+  grid-area: preview;
+  position: sticky;
+  top: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
+.design-aspect {
+  padding: var(--space-3) var(--space-4);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--surface);
+}
+
+.design-aspect-title {
+  margin: 0 0 var(--space-2);
+  font-size: var(--font-size-sm);
+  letter-spacing: 0.04em;
+}
+
+.design-aspect--collapsed .design-aspect-title {
+  margin: 0;
+}
+
+.design-aspect-toggle {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  width: 100%;
+  padding: 0;
+  border: 0;
+  background: none;
+  box-shadow: none;
+  color: var(--text);
+  font: inherit;
+  text-align: left;
+}
+
+.design-aspect-current {
+  margin-left: auto;
+  color: var(--muted);
+  font-weight: 400;
+}
+
+.design-aspect-note {
+  margin: var(--space-2) 0 0;
+  font-size: var(--font-size-xs);
+  color: var(--muted);
+}
+
+.design-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+}
+
+.design-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.3rem 0.65rem;
+  font-size: var(--font-size-sm);
+  color: var(--text);
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-control);
+  box-shadow: none;
+  transform: none;
+}
+
+.design-chip:hover:not(:disabled) {
+  border-color: var(--border-strong);
+}
+
+.design-chip.active {
+  border-color: var(--primary);
+  background: color-mix(in srgb, var(--primary) 16%, var(--panel));
+  font-weight: 700;
+}
+
+.design-chip:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.design-colour-swatch {
+  width: 1rem;
+  height: 1rem;
+  flex: none;
+  border-radius: 50%;
+  border: 1px solid color-mix(in srgb, var(--text) 30%, transparent);
+  background: linear-gradient(
+    135deg,
+    var(--chip-bg) 0 45%,
+    var(--chip-panel) 45% 70%,
+    var(--chip-accent) 70%
+  );
+}
+
+.design-subrow {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  margin-top: var(--space-3);
+}
+
+.design-subrow.is-off {
+  opacity: 0.6;
+}
+
+.design-subrow-label {
+  font-size: var(--font-size-xs);
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.design-aspect .appearance-color-grid {
+  margin-top: var(--space-3);
+}
+
+.design-aspect .appearance-switch {
+  margin-top: var(--space-3);
+}
+
+.design-preview-bar .link-btn {
+  white-space: nowrap;
+}
+
+.design-preview-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+
+.design-preview-frame {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+  background: var(--bg);
+}
+
+/* The sample app inside the frame. */
+.design-preview-app {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  min-height: 460px;
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font-body);
+  pointer-events: none;
+  user-select: none;
+}
+
+.design-preview-topbar {
+  min-height: 48px;
+  padding: var(--space-2) var(--space-4);
+  gap: var(--space-2);
+}
+
+.design-preview-spacer {
+  flex: 1;
+}
+
+.design-preview-avatar {
+  display: inline-grid;
+  place-items: center;
+  width: 1.9rem;
+  height: 1.9rem;
+  border-radius: 50%;
+  background: var(--accent);
+  color: #111;
+  font-size: 0.7rem;
+  font-weight: 700;
+}
+
+.design-preview-body {
+  position: relative;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding: var(--space-4);
+}
+
+.design-preview-toolbar,
+.design-preview-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.design-preview-row {
+  gap: var(--space-3);
+}
+
+.design-preview-toolbar .row-bar-action {
+  font-size: var(--font-size-sm);
+}
+
+.design-preview-columns {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-3);
+}
+
+.design-preview-cell {
+  min-height: 0;
+  max-height: none;
+}
+
+.design-preview-card {
+  cursor: default;
+}
+
+.design-preview-drawer {
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: min(46%, 360px);
+  height: auto;
+  z-index: 1;
+}
+
+.design-preview-drawer-body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  height: 100%;
+  padding: var(--space-4);
+}
+
+.design-preview-drawer-title {
+  font-family: var(--font-display);
+  font-size: var(--font-size-lg);
+}
+
+.design-preview-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+}
+
+.design-preview-settings {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  max-width: 460px;
+}
+
+.design-preview-segmented {
+  align-self: flex-start;
+}
+
+/* Phone: the preview sticks to the top, small unless made bigger; aspects collapse. */
+@media (max-width: 767px) {
+  .design-layout {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-areas:
+      "preview"
+      "aspects";
+    gap: var(--space-3);
+  }
+
+  .design-preview {
+    z-index: var(--z-sticky);
+    padding: var(--space-2) 0;
+    background: var(--bg);
+  }
+
+  .design-preview--small .design-preview-frame {
+    max-height: 190px;
+  }
+
+  .design-preview-app {
+    min-height: 380px;
+  }
+
+  .design-preview-views button {
+    padding: 0.3rem 0.5rem;
+    font-size: var(--font-size-xs);
+  }
+
+  .design-preview-drawer {
+    width: 62%;
+  }
+}
+
+/* Appearance → Design page link. */
+.design-page-link {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: var(--space-2) var(--space-4);
+  margin-bottom: var(--space-4);
+  padding: var(--space-3) var(--space-4);
+  border: 1px dashed var(--border-strong);
+  border-radius: var(--radius-md);
+  background: var(--surface);
+}
+
+.design-page-link-hint {
+  display: block;
+  font-size: var(--font-size-xs);
+  color: var(--muted);
+}
+
+.design-page-link-cta {
+  color: var(--accent-text);
+  font-weight: 700;
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.design-page-link-cta:hover {
+  text-decoration: underline;
+}
