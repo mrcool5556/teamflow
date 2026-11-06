@@ -1,4 +1,5 @@
 import {
+  formatStorageBytes,
   spaceStorageState,
   type SpaceStorageBreakdown,
   type SpaceStoragePublic,
@@ -8,7 +9,7 @@ import { schema, type Db } from "@teamflow/db";
 import { eq } from "drizzle-orm";
 import { getUploadDir } from "./attachments.js";
 import { readDiskSpace } from "./disk.js";
-import { notFound } from "./errors.js";
+import { ApiError, notFound } from "./errors.js";
 import { getSpaceSettings } from "./spaceSettings.js";
 
 /**
@@ -134,3 +135,54 @@ export function getAllSpaceUsage(db: Db): Map<string, number> {
   return usage;
 }
 
+
+/**
+ * Refuse an upload of `fileBytes` into `teamId` before any bytes are written:
+ * - 507 `server_storage_low` when the upload disk would drop under the free-disk floor;
+ * - 413 `space_storage_full` when the space's cap would be passed (body adds usedBytes,
+ *   capBytes, fileBytes, remainingBytes).
+ * Spaces with no cap only meet the disk floor. `excludeSessionId` leaves a chunked session's
+ * own reservation out when it completes.
+ */
+export async function assertSpaceHasRoom(
+  db: Db,
+  teamId: string,
+  fileBytes: number,
+  options: { filename?: string; excludeSessionId?: string } = {},
+) {
+  const { minFreeDiskBytes } = getSpaceSettings(db);
+  if (minFreeDiskBytes > 0) {
+    const disk = await readDiskSpace(getUploadDir());
+    if (disk && disk.freeBytes - fileBytes < minFreeDiskBytes) {
+      throw new ApiError(
+        507,
+        "The server is almost out of disk space, so uploads are paused for everyone. " +
+          "Issues and comments still work. A server admin needs to free space.",
+        "server_storage_low",
+      );
+    }
+  }
+
+  const team = getSpaceRow(db, teamId);
+  const capBytes = team.storageCapBytes;
+  if (capBytes === null) return;
+  const usedBytes = sumBreakdown(getSpaceUsageBreakdown(db, teamId, options));
+  if (usedBytes + fileBytes <= capBytes) return;
+
+  const remainingBytes = Math.max(0, capBytes - usedBytes);
+  const cap = formatStorageBytes(capBytes);
+  const name = options.filename ? `${options.filename} (${formatStorageBytes(fileBytes)})` : "This file";
+  const message =
+    remainingBytes === 0
+      ? `This space is full (${formatStorageBytes(usedBytes)} of ${cap}). New uploads are paused; ` +
+        "issues, comments and linking existing files still work. Empty the trash or remove files, " +
+        "or ask a server admin for more."
+      : `${name} won't fit: this space has ${formatStorageBytes(remainingBytes)} left of its ${cap}. ` +
+        "Remove files or ask a server admin for more.";
+  throw new ApiError(413, message, "space_storage_full", {
+    usedBytes,
+    capBytes,
+    fileBytes,
+    remainingBytes,
+  });
+}
