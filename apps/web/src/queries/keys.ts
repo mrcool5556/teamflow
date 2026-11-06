@@ -17,6 +17,12 @@ export const queryKeys = {
   discordSettings: (teamId: string) => ["discord", teamId, "settings"] as const,
   discordSecrets: (teamId: string) => ["discord", teamId, "secrets"] as const,
   discordService: (teamId: string) => ["discord", teamId, "service"] as const,
+  teamStorage: (teamId: string) => ["storage", teamId] as const,
+  instanceOverview: ["instance", "overview"] as const,
+  instanceSpaces: ["instance", "spaces"] as const,
+  instanceSpace: (teamId: string) => ["instance", "spaces", teamId] as const,
+  instanceSettings: ["instance", "settings"] as const,
+  instanceUsers: (query: string) => ["instance", "users", query] as const,
 };
 
 export function createQueryClient() {

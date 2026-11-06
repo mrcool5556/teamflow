@@ -199,7 +199,18 @@ export function seedDb(roleSlug: "owner" | "member" | "viewer" = "owner"): FakeD
   };
 }
 
-type Handler = (args: { params: string[]; body: unknown; query: URLSearchParams }) => unknown;
+export type Handler = (args: {
+  params: string[];
+  body: unknown;
+  query: URLSearchParams;
+}) => unknown;
+
+export type FakeRoute = [method: string, pattern: RegExp, handler: Handler];
+
+/** Throw from a handler to answer with `status` and this exact JSON body (error, code, extras). */
+export function fakeHttpError(status: number, body: Record<string, unknown>) {
+  return Object.assign(new Error(String(body.error ?? "Request failed")), { status, body });
+}
 
 function json(status: number, body: unknown) {
   return new Response(body === undefined ? null : JSON.stringify(body), {
@@ -217,6 +228,8 @@ export type FakeApiOptions = {
   gate?: (method: string, path: string) => Promise<void> | undefined;
   /** Return an error message to make that request fail with HTTP 500. */
   fail?: (method: string, path: string) => string | undefined;
+  /** Routes checked before the built-in ones (admin page, storage meter, upload refusals). */
+  extraRoutes?: FakeRoute[];
 };
 
 export function installFakeApi(db: FakeDb, options: FakeApiOptions = {}) {
@@ -228,7 +241,8 @@ export function installFakeApi(db: FakeDb, options: FakeApiOptions = {}) {
     throw Object.assign(new Error("Not found"), { status: 404 });
   };
 
-  const routes: [string, RegExp, Handler][] = [
+  const routes: FakeRoute[] = [
+    ...(options.extraRoutes ?? []),
     ["GET", /^\/auth\/me$/, () => ({ user: db.user })],
     ["GET", /^\/auth\/config$/, () => ({ inviteOnly: false, passwordResetEmail: false })],
     ["GET", /^\/auth\/profile$/, () => ({ profile: db.profile })],
@@ -451,7 +465,8 @@ export function installFakeApi(db: FakeDb, options: FakeApiOptions = {}) {
         return json(result === undefined ? 204 : 200, result);
       } catch (err) {
         const status = (err as { status?: number }).status ?? 500;
-        return json(status, { error: (err as Error).message });
+        const errorBody = (err as { body?: unknown }).body;
+        return json(status, errorBody ?? { error: (err as Error).message });
       }
     }
     return json(404, { error: `No fake route for ${method} ${path}` });

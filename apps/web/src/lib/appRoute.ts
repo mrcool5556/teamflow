@@ -27,8 +27,13 @@ export function useAppRoute() {
   const plan = useMatch("/plan");
   const invite = useMatch("/invite/:token");
   const index = useMatch("/");
+  const teamAdmin = useMatch("/t/:teamKey/admin/*");
+  const admin = useMatch("/admin/*");
 
   const panel = teamSettings?.params.panel ?? settings?.params.panel;
+  // "/admin", "/admin/spaces", "/admin/spaces/<teamId>" (also under /t/:teamKey).
+  const adminRest = teamAdmin?.params["*"] ?? admin?.params["*"];
+  const [adminSection, adminSpaceId] = (adminRest ?? "").split("/");
 
   return {
     teamKey: team?.params.teamKey ?? null,
@@ -37,6 +42,10 @@ export function useAppRoute() {
     settingsPanel: panel ?? null,
     settingsOpen: panel !== undefined,
     planOpen: Boolean(teamPlan || plan),
+    adminOpen: adminRest !== undefined,
+    /** Raw section segment ("" for the index); unknown values fall back to the overview. */
+    adminSection: adminRest === undefined ? null : adminSection || "overview",
+    adminSpaceId: adminSpaceId || null,
     inviteToken: invite?.params.token ?? null,
     isIndex: Boolean(index),
   };
@@ -57,6 +66,31 @@ export function settingsPath(teamKey: string | null, panel: SettingsPanel) {
 
 export function planPath(teamKey: string | null) {
   return `${teamBasePath(teamKey)}/plan`;
+}
+
+export type AdminSection = "overview" | "spaces" | "updates" | "bot" | "help" | "defaults";
+
+export const ADMIN_SECTIONS: AdminSection[] = [
+  "overview",
+  "spaces",
+  "updates",
+  "bot",
+  "help",
+  "defaults",
+];
+
+export function isAdminSection(value: string | null | undefined): value is AdminSection {
+  return ADMIN_SECTIONS.includes(value as AdminSection);
+}
+
+/** The instance admin page; kept under the current team so team-scoped panels can be reused. */
+export function adminPath(
+  teamKey: string | null,
+  section: AdminSection = "overview",
+  spaceId?: string,
+) {
+  const base = `${teamBasePath(teamKey)}/admin/${section}`;
+  return spaceId ? `${base}/${encodeURIComponent(spaceId)}` : base;
 }
 
 export function boardPath(teamKey: string | null) {

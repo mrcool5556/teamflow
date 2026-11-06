@@ -2,6 +2,9 @@ import { createBrowserRouter, Navigate, type RouteObject } from "react-router";
 import { RoadmapPanel } from "./components/RoadmapPanel";
 import { RouteMarker } from "./components/RouteMarker";
 import { RootLayout } from "./routes/RootLayout";
+import { AdminLayout } from "./routes/admin/AdminLayout";
+import { OverviewPanel } from "./routes/admin/OverviewPanel";
+import { AdminBotPanel, AdminUpdatesPanel } from "./routes/admin/ServerSections";
 import { AuthRoute } from "./routes/auth/AuthRoute";
 import { InviteRoute } from "./routes/auth/InviteRoute";
 import { BoardShell } from "./routes/board/BoardShell";
@@ -31,6 +34,19 @@ const settingsRoute: RouteObject = {
   ],
 };
 
+/** Server admin page (instance admins only), mounted like settings under a team and teamless. */
+const adminRoute: RouteObject = {
+  path: "admin",
+  element: <AdminLayout />,
+  children: [
+    { index: true, element: <Navigate to="overview" replace /> },
+    { path: "overview", element: <OverviewPanel /> },
+    { path: "updates", element: <AdminUpdatesPanel /> },
+    { path: "bot", element: <AdminBotPanel /> },
+    { path: "*", element: <Navigate to="../overview" replace /> },
+  ],
+};
+
 /**
  * URL map. Legacy links (`/?ref=`, `/?invite=`, `/?reset=`) are redirected by the board shell
  * at `/`, before it asks for a login.
@@ -54,11 +70,13 @@ export const routes: RouteObject[] = [
               { index: true, element: <RouteMarker /> },
               { path: "issue/:issueRef", element: <RouteMarker /> },
               settingsRoute,
+              adminRoute,
               { path: "plan", element: <RoadmapPanel /> },
             ],
           },
           // Without any team the shell still offers settings (create a team) and the plan.
           settingsRoute,
+          adminRoute,
           { path: "plan", element: <RoadmapPanel /> },
         ],
       },
