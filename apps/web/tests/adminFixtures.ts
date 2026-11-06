@@ -65,6 +65,7 @@ export function makeOverview(extra: Partial<InstanceOverviewPublic> = {}): Insta
       backupScript: "/opt/teamflow/backup.sh",
       updateScript: "/opt/teamflow/update.sh",
       sudoReady: true,
+      sudoPending: false,
       sudoDetail: null,
       backupDir: "/var/backups/teamflow",
       backups: [
