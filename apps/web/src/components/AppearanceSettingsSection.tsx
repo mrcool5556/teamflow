@@ -24,6 +24,7 @@ import { AppearanceBoardControls } from "./AppearanceBoardControls";
 import { AppearanceLooks } from "./AppearanceLooks";
 import { AppearanceShare } from "./AppearanceShare";
 import { CustomColorField } from "./CustomColorField";
+import { DesignPageLink } from "./DesignPageLink";
 
 type AppearanceSettingsSectionProps = {
   profile: UserProfile;
@@ -221,6 +222,8 @@ export function AppearanceSettingsSection({
       >
         <AppearanceLooks profile={profile} onProfileChange={onProfileChange} />
       </AppearanceGroup>
+
+      <DesignPageLink />
 
       <h3 className="appearance-customise-heading">Customise</h3>
       <AppearanceGroup title="Colour" collapsible actions={resetButton("colour", "Reset colour")}>

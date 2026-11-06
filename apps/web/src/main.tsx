@@ -21,6 +21,7 @@ import "./styles/settings.css";
 import "./styles/admin.css";
 import "./styles/plan.css";
 import "./styles/auth.css";
+import "./styles/design.css";
 import "./styles/aspects.css";
 
 applyUserProfile(createDefaultUserProfile());
