@@ -21,6 +21,7 @@ import { schema, type Db } from "@teamflow/db";
 import { eq, sql, and, isNull, isNotNull, lte } from "drizzle-orm";
 import { config } from "../config.js";
 import { ApiError } from "./errors.js";
+import { assertSpaceHasRoom } from "./spaceStorage.js";
 
 const MB = 1024 * 1024;
 const FILE_TRASH_MS = FILE_TRASH_RETENTION_DAYS * 24 * 60 * 60 * 1000;
@@ -630,6 +631,9 @@ export async function saveIssueAttachment(
     throw new AttachmentError(limitErrorMessage(file.name, mimeType, maxBytes), 413);
   }
 
+  const teamId = await teamIdForUploadTarget(db, { issueId });
+  await assertSpaceHasRoom(db, teamId, file.size, { filename: file.name });
+
   const fileId = randomUUID();
   const linkId = randomUUID();
   const filename = await resolveFriendlyUploadFilename(db, file.name, { issueId });
@@ -658,7 +662,7 @@ export async function saveIssueAttachment(
     sizeBytes: buffer.length,
     storagePath: relativePath,
     key: fileKey,
-    teamId: await teamIdForUploadTarget(db, { issueId }),
+    teamId,
     createdAt: now,
   });
   await db.insert(schema.issueFileLinks).values({
@@ -726,6 +730,9 @@ export async function saveRowAttachment(
     throw new AttachmentError(limitErrorMessage(file.name, mimeType, maxBytes), 413);
   }
 
+  const teamId = await teamIdForUploadTarget(db, { rowId });
+  await assertSpaceHasRoom(db, teamId, file.size, { filename: file.name });
+
   const fileId = randomUUID();
   const linkId = randomUUID();
   const filename = await resolveFriendlyUploadFilename(db, file.name, { rowId });
@@ -755,7 +762,7 @@ export async function saveRowAttachment(
     sizeBytes: buffer.length,
     storagePath: relativePath,
     key: fileKey,
-    teamId: await teamIdForUploadTarget(db, { rowId }),
+    teamId,
     createdAt: now,
   });
   await db.insert(schema.rowFileLinks).values({
