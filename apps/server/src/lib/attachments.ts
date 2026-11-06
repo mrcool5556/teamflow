@@ -16,6 +16,7 @@ import {
   type IssueAttachmentPublic,
   type TeamFilePublic,
   FILE_TRASH_RETENTION_DAYS,
+  formatStorageBytes,
 } from "@teamflow/core";
 import { schema, type Db } from "@teamflow/db";
 import { eq, sql, and, isNull, isNotNull, lte } from "drizzle-orm";
@@ -1073,6 +1074,39 @@ export async function renameTeamFile(db: Db, teamId: string, fileId: string, fil
     .where(eq(schema.storedFiles.id, fileId));
 
   return { fileId, filename: safeName, fileRef: file.key };
+}
+
+/**
+ * Delete a file in the team's trash for good: its links, its row and its bytes on disk go now,
+ * so the space's usage drops at once. Only trashed files; returns the bytes freed.
+ */
+export async function deleteTrashedTeamFileForever(
+  db: Db,
+  teamId: string,
+  fileId: string,
+  actorId: string,
+) {
+  const [file] = await db
+    .select()
+    .from(schema.storedFiles)
+    .where(eq(schema.storedFiles.id, fileId))
+    .limit(1);
+  // The file's own team decides; links are the fallback for rows the migration could not map.
+  const fileTeamId = file?.teamId ?? (file ? await getFileTeamId(db, fileId) : null);
+  if (!file || fileTeamId !== teamId) throw new AttachmentError("File not found", 404);
+  if (!file.deletedAt) {
+    throw new AttachmentError("Move the file to the trash before deleting it forever", 400);
+  }
+
+  await hardDeleteStoredFile(db, fileId);
+  await db.insert(schema.spaceEvents).values({
+    teamId,
+    actorId,
+    kind: "file_deleted_forever",
+    detail: `${file.filename}, ${formatStorageBytes(file.sizeBytes)} freed`,
+    createdAt: new Date().toISOString(),
+  });
+  return { fileId, freedBytes: file.sizeBytes };
 }
 
 export async function restoreTeamFile(db: Db, teamId: string, fileId: string) {
