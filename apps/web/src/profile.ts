@@ -85,6 +85,28 @@ function followSystemTheme(profile: UserProfile) {
   });
 }
 
+/**
+ * Design-your-own aspects become data-* attributes on <html>; "auto" removes the attribute so
+ * the UI style's own look shows. styles/aspects.css reads them.
+ */
+function applyDesignAspects(appearance: UserProfile["appearance"], root: HTMLElement) {
+  const set = (key: string, value: string | null) => {
+    if (value === null) delete root.dataset[key];
+    else root.dataset[key] = value;
+  };
+  const auto = (value: string) => (value === "auto" ? null : value);
+  set("palette", appearance.colorTheme === "teamflow" ? null : appearance.colorTheme);
+  set("font", auto(appearance.fontSet));
+  set("surface", auto(appearance.surface));
+  set("buttons", auto(appearance.buttons));
+  // Lip metal and rim shadow only mean something on lipped buttons.
+  const lipped = appearance.buttons === "lipped";
+  set("lip", lipped ? appearance.lip : null);
+  set("lipShadow", lipped ? appearance.lipShadow : null);
+  set("inputs", auto(appearance.inputs));
+  set("toggles", auto(appearance.toggles));
+}
+
 export function applyUserProfile(profile: UserProfile) {
   const root = document.documentElement;
 
@@ -102,6 +124,8 @@ export function applyUserProfile(profile: UserProfile) {
   root.dataset.semanticContrast = appearance.semanticContrast;
 
   root.dataset.textContrast = appearance.textContrast;
+
+  applyDesignAspects(appearance, root);
 
   applyUiColorOverrides(profile, root);
 
