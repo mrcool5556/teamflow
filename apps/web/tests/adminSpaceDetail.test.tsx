@@ -2,7 +2,7 @@ import { configure, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { GIB } from "@teamflow/core";
 import { describe, expect, it } from "vitest";
-import { adminRoutes } from "./adminFixtures";
+import { adminRoutes, makeSpaceDetail } from "./adminFixtures";
 import { installFakeApi, seedDb, signIn } from "./fakeApi";
 import { renderApp } from "./renderApp";
 
@@ -93,6 +93,19 @@ describe("space detail", () => {
     );
     expect(await screen.findByText(/1 file\(s\) deleted, 120 MB freed/)).toBeInTheDocument();
     expect(within(storage).getByRole("button", { name: "Empty trash now" })).toBeDisabled();
+  });
+
+  it("shows a tiny cap as it is and does not count it as a change", async () => {
+    const db = seedDb();
+    installFakeApi(db, {
+      extraRoutes: adminRoutes({ detail: makeSpaceDetail({ capBytes: 3_500_000 }) }),
+    });
+    signIn(db);
+    renderApp(`/t/ENG/admin/spaces/${MOD_ID}`);
+    const capTile = await screen.findByRole("region", { name: "Upload cap" });
+    expect(within(capTile).getByLabelText("Cap")).toHaveValue("0.00326");
+    expect(within(capTile).queryByRole("alert")).not.toBeInTheDocument();
+    expect(within(capTile).getByRole("button", { name: "Save" })).toBeDisabled();
   });
 
   it("says when a space does not exist", async () => {

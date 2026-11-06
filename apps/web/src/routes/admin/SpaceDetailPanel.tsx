@@ -163,10 +163,14 @@ function CapTile({
 }) {
   const update = useUpdateSpaceMutation(space.id);
   const settings = useSpaceSettingsQuery().data;
-  const [cap, setCap] = useState<CapDraft>(() => capDraftFrom(space.capBytes));
+  const initialCap = capDraftFrom(space.capBytes);
+  const [cap, setCap] = useState<CapDraft>(initialCap);
   const [type, setType] = useState<SpaceType>(space.spaceType);
   const capBytes = capFromDraft(cap);
-  const capChanged = capBytes !== "invalid" && capBytes !== space.capBytes;
+  // Compare the text, not bytes: GB text rounds, so re-parsing it would look like a change.
+  const capChanged =
+    capBytes !== "invalid" &&
+    (cap.noLimit !== initialCap.noLimit || (!cap.noLimit && cap.gbText !== initialCap.gbText));
   const typeChanged = type !== space.spaceType;
   const dirty = capChanged || typeChanged;
   const underUse = typeof capBytes === "number" && capBytes < space.usedBytes;
@@ -234,7 +238,7 @@ function CapTile({
           className="ghost"
           disabled={!dirty}
           onClick={() => {
-            setCap(capDraftFrom(space.capBytes));
+            setCap(initialCap);
             setType(space.spaceType);
           }}
         >

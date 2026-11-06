@@ -10,9 +10,9 @@ export function gbToBytes(text: string): number | null {
   return Math.round(value * GIB);
 }
 
-/** Bytes -> the GB text the field shows ("1", "2.5"). */
+/** Bytes -> the GB text the field shows ("1", "2.5", "0.00326" for small caps). */
 export function bytesToGbText(bytes: number) {
-  return String(Math.round((bytes / GIB) * 100) / 100);
+  return String(Number((bytes / GIB).toPrecision(3)));
 }
 
 export type CapDraft = { gbText: string; noLimit: boolean };
