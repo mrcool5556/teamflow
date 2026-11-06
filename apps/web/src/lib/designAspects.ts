@@ -184,14 +184,18 @@ export const TOGGLE_OPTIONS: AspectOption<ToggleStyle>[] = [
 ];
 
 export const UI_STYLE_OPTIONS: AspectOption<ChromeStyle>[] = [
-  { value: "industrial", label: "Industrial" },
-  { value: "minimal", label: "Minimal" },
-  { value: "soft", label: "Soft" },
-  { value: "classic", label: "Classic" },
-  { value: "glass", label: "Glass" },
-  { value: "terminal", label: "Terminal" },
-  { value: "paper", label: "Paper" },
-  { value: "neon", label: "Neon" },
+  {
+    value: "industrial",
+    label: "Industrial",
+    hint: "Thick borders and offset shadows, the default.",
+  },
+  { value: "minimal", label: "Minimal", hint: "Flat panels, thin borders, no drop shadows." },
+  { value: "soft", label: "Soft", hint: "Light borders with gentle elevation shadows." },
+  { value: "classic", label: "Classic", hint: "Balanced 2px chrome, closer to typical boards." },
+  { value: "glass", label: "Glass", hint: "Frosted translucent panels over a soft colour wash." },
+  { value: "terminal", label: "Terminal", hint: "Glow-accented borders, a retro control room." },
+  { value: "paper", label: "Paper", hint: "Warm editorial surfaces with ink-like borders." },
+  { value: "neon", label: "Neon", hint: "Dark stage with accent glow on interactive chrome." },
 ];
 
 export const TEXT_OPTIONS: AspectOption<TextContrastPreset>[] = [

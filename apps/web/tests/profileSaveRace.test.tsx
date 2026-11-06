@@ -32,7 +32,7 @@ describe("profile saves racing with clicks", () => {
     signIn(db);
     renderApp("/t/ENG/settings/appearance");
     await waitFor(() => expect(screen.getByLabelText("Workspace")).toBeEnabled());
-    const theme = await screen.findByRole("radiogroup", { name: "Theme" });
+    const theme = await screen.findByRole("radiogroup", { name: "Light or dark" });
 
     // Light goes out in a save that is slow to answer…
     await user.click(within(theme).getByRole("radio", { name: "Light" }));
@@ -61,7 +61,7 @@ describe("profile saves racing with clicks", () => {
     installFakeApi(db, { gate: hold.gate });
     signIn(db);
     renderApp("/t/ENG/settings/appearance");
-    const theme = await screen.findByRole("radiogroup", { name: "Theme" });
+    const theme = await screen.findByRole("radiogroup", { name: "Light or dark" });
     await waitFor(() => expect(hold.seen()).toBe(1));
 
     await user.click(within(theme).getByRole("radio", { name: "Light" }));
