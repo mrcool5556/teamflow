@@ -51,3 +51,11 @@ The files are self-hosted in `apps/web/src/assets/fonts`, one folder per family 
 ## Corners
 
 `shape` sets the radius tokens in `tokens.css`. Two extra tokens let Pill round controls fully without turning cards into capsules: `--radius-control` (buttons, fields, search boxes, segmented controls) and `--radius-chip` (issue id, due and priority chips). They follow `--radius-sm` and `--radius-xs` for the other shapes; Pill sets both to 999px and gives boxes larger radii (8 to 28px).
+
+## Windows and cards
+
+`styles/aspects.css` (imported last) ports the library's style layers. Each aspect value sets variables on the box carrying its attribute, and part rules read them, so the nearest box would win if a part later carries its own value. Part rules start with `:root[data-surface][data-theme]` so they outrank the UI style's rules.
+
+`surface` values: Flat (thin border, small shadow), Soft inset (carved in, no border), Indented (sunken fill), Glass (see-through with a soft wash behind), Paper (fibre texture and an offset shadow), Bevel (raised edge). Cards are issue cards; windows are column cells, drawers, the quick-add and about dialogs, Appearance groups and the topbar. Theme-aware shadows (`--shadow-1`, `--shadow-bevel`, `--shadow-inset`, `--soft-*`) come from the library tokens, per light/dark and per colour theme.
+
+Glass stays cheap: backdrop blur only on the topbar, drawers, dialogs and Appearance groups, never on issue cards or column cells (the Glass UI style no longer blurs cards either). Blur is switched off entirely for `prefers-reduced-transparency: reduce` and on low-powered devices (`markLowPowerDevice` sets `data-low-power` for 4 or fewer CPU cores or 4 GB or less memory).

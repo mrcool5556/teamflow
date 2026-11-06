@@ -1,0 +1,265 @@
+/*
+ * Design-your-own aspects, ported from the UI/UX design library's style layers
+ * (project/components/bundle.css) onto Teamflow's own classes. Each aspect value only sets
+ * variables on the box that carries its data-* attribute (today <html>); the part rules below
+ * read them, so a box further in could later carry its own value and win.
+ * No attribute (the "auto" choice) means the UI style draws the part as before.
+ * Part rules start with :root[data-…][data-theme] so they outrank the UI style's own rules.
+ */
+
+/* ── Theme shadows the aspects use (library tokens shadow-1, shadow-bevel, shadow-inset) ── */
+:root[data-theme="light"] {
+  --soft-lo: rgba(40, 30, 20, 0.16);
+  --soft-hi: rgba(255, 255, 255, 0.6);
+  --soft-rim: rgba(255, 255, 255, 0.85);
+  --shadow-1: 0 1px 2px rgba(28, 31, 35, 0.08);
+  --shadow-bevel: inset 0 1px 0 rgba(255, 255, 255, 0.7), 0 1px 2px rgba(28, 31, 35, 0.14);
+  --shadow-inset: inset 0 1px 2px rgba(28, 31, 35, 0.12);
+}
+
+:root[data-theme="dark"] {
+  --soft-lo: rgba(0, 0, 0, 0.5);
+  --soft-hi: rgba(255, 255, 255, 0.035);
+  --soft-rim: rgba(255, 255, 255, 0.07);
+  --shadow-1: 0 1px 2px rgba(0, 0, 0, 0.5);
+  --shadow-bevel: inset 0 1px 0 rgba(255, 255, 255, 0.08), 0 1px 2px rgba(0, 0, 0, 0.5);
+  --shadow-inset: inset 0 1px 2px rgba(0, 0, 0, 0.5);
+}
+
+:root[data-palette="arcade"][data-theme="dark"] {
+  --shadow-1: 0 1px 2px rgba(0, 0, 0, 0.6);
+  --shadow-bevel: inset 0 1px 0 rgba(255, 255, 255, 0.1), 0 2px 0 rgba(0, 0, 0, 0.6);
+  --shadow-inset: inset 0 2px 0 rgba(0, 0, 0, 0.5);
+}
+
+:root[data-palette="cozy"][data-theme="light"] {
+  --shadow-1: 0 1px 2px rgba(46, 33, 26, 0.1);
+  --shadow-bevel: inset 0 1px 0 rgba(255, 255, 255, 0.7), 0 1px 2px rgba(46, 33, 26, 0.16);
+  --shadow-inset: inset 0 1px 2px rgba(46, 33, 26, 0.14);
+}
+
+:root[data-palette="glass"][data-theme="dark"] {
+  --shadow-bevel:
+    inset 0 1px 0 rgba(255, 255, 255, 0.16), inset 0 0 0 1px rgba(255, 255, 255, 0.06),
+    0 8px 32px rgba(0, 0, 0, 0.45);
+  --shadow-inset: inset 0 2px 6px rgba(0, 0, 0, 0.5);
+}
+
+:root[data-palette="glass"][data-theme="light"] {
+  --shadow-1: 0 1px 2px rgba(31, 27, 51, 0.08);
+  --shadow-bevel:
+    inset 0 1px 0 rgba(255, 255, 255, 0.9), inset 0 0 0 1px rgba(255, 255, 255, 0.5),
+    0 8px 24px rgba(60, 40, 140, 0.1);
+  --shadow-inset: inset 0 2px 6px rgba(60, 40, 140, 0.12);
+}
+
+:root[data-palette="retro-console"][data-theme="light"] {
+  --shadow-1: inset 0 1px 0 rgba(255, 255, 255, 0.6), 0 1px 2px rgba(0, 0, 0, 0.25);
+  --shadow-bevel:
+    inset 0 2px 0 rgba(255, 255, 255, 0.75), inset 0 -3px 0 rgba(0, 0, 0, 0.18),
+    0 3px 6px rgba(0, 0, 0, 0.3);
+  --shadow-inset: inset 0 3px 6px rgba(0, 0, 0, 0.3), inset 0 -1px 0 rgba(255, 255, 255, 0.6);
+}
+
+:root[data-palette="machined"][data-theme="dark"] {
+  --shadow-1: 0 0 0 1px rgba(236, 233, 225, 0.07);
+  --shadow-bevel: inset 0 0 0 0.5px rgba(255, 255, 255, 0.14);
+  --shadow-inset: inset 0 0 0 1px rgba(236, 233, 225, 0.12);
+}
+
+:root[data-palette="machined"][data-theme="light"] {
+  --shadow-1: 0 0 0 1px rgba(20, 16, 10, 0.07);
+  --shadow-bevel: inset 0 0 0 0.5px rgba(255, 255, 255, 0.7), 0 1px 2px rgba(0, 0, 0, 0.04);
+  --shadow-inset: inset 0 0 0 1px rgba(20, 16, 10, 0.12);
+}
+
+:root {
+  /* Paper fibre: one cached SVG noise tile (from the design library). */
+  --fiber: url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22240%22%20height%3D%22240%22%3E%3Cfilter%20id%3D%22f%22%20x%3D%220%22%20y%3D%220%22%20width%3D%22100%25%22%20height%3D%22100%25%22%20color-interpolation-filters%3D%22sRGB%22%3E%3CfeTurbulence%20type%3D%22fractalNoise%22%20baseFrequency%3D%221.1%22%20numOctaves%3D%224%22%20seed%3D%224%22%20stitchTiles%3D%22stitch%22%20result%3D%22g%22%2F%3E%3CfeTurbulence%20type%3D%22fractalNoise%22%20baseFrequency%3D%220.02%200.5%22%20numOctaves%3D%222%22%20seed%3D%2213%22%20stitchTiles%3D%22stitch%22%20result%3D%22s%22%2F%3E%3CfeComposite%20in%3D%22g%22%20in2%3D%22s%22%20operator%3D%22arithmetic%22%20k2%3D%220.7%22%20k3%3D%220.5%22%20result%3D%22h%22%2F%3E%3CfeDiffuseLighting%20in%3D%22h%22%20surfaceScale%3D%220.9%22%20lighting-color%3D%22%23ffffff%22%20result%3D%22lit%22%3E%3CfeDistantLight%20azimuth%3D%22225%22%20elevation%3D%2252%22%2F%3E%3C%2FfeDiffuseLighting%3E%3CfeComponentTransfer%20in%3D%22lit%22%3E%3CfeFuncR%20type%3D%22linear%22%20slope%3D%220.16%22%20intercept%3D%220.86%22%2F%3E%3CfeFuncG%20type%3D%22linear%22%20slope%3D%220.16%22%20intercept%3D%220.86%22%2F%3E%3CfeFuncB%20type%3D%22linear%22%20slope%3D%220.16%22%20intercept%3D%220.86%22%2F%3E%3C%2FfeComponentTransfer%3E%3C%2Ffilter%3E%3Crect%20width%3D%22100%25%22%20height%3D%22100%25%22%20filter%3D%22url%28%23f%29%22%2F%3E%3C%2Fsvg%3E");
+}
+
+/* ── Windows and cards (data-surface) ──
+   Cards: issue cards. Windows: column cells, drawers, the quick-add and about dialogs,
+   Appearance groups and the topbar. Glass blurs windows only (a handful on screen); cards
+   get a see-through fill without blur, so a board of hundreds of cards stays cheap. */
+[data-surface] {
+  --sf-card-image: none;
+  --sf-win-image: none;
+  --sf-win-blur: none;
+}
+
+[data-surface="flat"] {
+  --sf-card-bg: var(--panel);
+  --sf-card-border: var(--border);
+  --sf-card-border-w: 1px;
+  --sf-card-shadow: var(--shadow-1);
+  --sf-win-bg: var(--surface);
+  --sf-win-border: var(--border);
+  --sf-win-border-w: 1px;
+  --sf-win-shadow: var(--shadow-1);
+}
+
+[data-surface="soft-inset"] {
+  --sf-card-bg: transparent;
+  --sf-card-border: transparent;
+  --sf-card-border-w: 0px;
+  --sf-card-shadow:
+    inset 5px 8px 22px var(--soft-lo), inset -3px -5px 14px var(--soft-hi), 0 1px 0 var(--soft-rim),
+    0 -1px 0 var(--soft-lo);
+  --sf-win-bg: var(--bg);
+  --sf-win-border: transparent;
+  --sf-win-border-w: 0px;
+  --sf-win-shadow: var(--sf-card-shadow);
+}
+
+[data-surface="indented"] {
+  --sf-card-bg: var(--cell);
+  --sf-card-border: transparent;
+  --sf-card-border-w: 0px;
+  --sf-card-shadow:
+    inset 4px 6px 12px rgba(0, 0, 0, 0.35), inset 1px 2px 3px rgba(0, 0, 0, 0.2),
+    inset -1px -1px 0 rgba(255, 255, 255, 0.25), 0 1px 0 var(--soft-rim);
+  --sf-win-bg: var(--cell);
+  --sf-win-border: transparent;
+  --sf-win-border-w: 0px;
+  --sf-win-shadow: var(--sf-card-shadow);
+}
+
+[data-surface="glass"] {
+  --sf-card-bg: color-mix(in srgb, var(--panel) 70%, transparent);
+  --sf-card-border: color-mix(in srgb, var(--border-strong) 55%, transparent);
+  --sf-card-border-w: 1px;
+  --sf-card-shadow: var(--shadow-bevel);
+  --sf-win-bg: color-mix(in srgb, var(--surface) 72%, transparent);
+  --sf-win-border: color-mix(in srgb, var(--border-strong) 55%, transparent);
+  --sf-win-border-w: 1px;
+  --sf-win-shadow: var(--shadow-bevel);
+  --sf-win-blur: blur(18px) saturate(140%);
+}
+
+[data-surface="paper"] {
+  --sf-card-bg: var(--panel);
+  --sf-card-image: var(--fiber);
+  --sf-card-border: transparent;
+  --sf-card-border-w: 0px;
+  --sf-card-shadow: 0 1px 0 rgba(30, 18, 4, 0.4), 3px 4px 0 rgba(30, 18, 4, 0.22);
+  --sf-win-bg: var(--surface);
+  --sf-win-image: var(--fiber);
+  --sf-win-border: transparent;
+  --sf-win-border-w: 0px;
+  --sf-win-shadow: var(--sf-card-shadow);
+}
+
+[data-surface="bevel"] {
+  --sf-card-bg: var(--panel);
+  --sf-card-border: transparent;
+  --sf-card-border-w: 0px;
+  --sf-card-shadow: var(--shadow-bevel);
+  --sf-win-bg: var(--surface);
+  --sf-win-border: transparent;
+  --sf-win-border-w: 0px;
+  --sf-win-shadow: var(--shadow-bevel);
+}
+
+/* Glass needs something behind it: the same soft wash the Glass UI style paints. */
+:root[data-surface="glass"] body {
+  background:
+    radial-gradient(
+      ellipse 80% 55% at 8% -8%,
+      color-mix(in srgb, var(--accent) 18%, transparent),
+      transparent 58%
+    ),
+    radial-gradient(
+      ellipse 70% 50% at 100% 0%,
+      color-mix(in srgb, var(--primary) 14%, transparent),
+      transparent 52%
+    ),
+    var(--bg);
+}
+
+:root[data-surface][data-theme] .issue-card {
+  background-color: var(--sf-card-bg);
+  background-image: var(--sf-card-image);
+  background-size: 240px 240px;
+  background-blend-mode: multiply;
+  border-color: var(--sf-card-border);
+  border-width: var(--sf-card-border-w);
+  box-shadow: var(--sf-card-shadow);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+
+:root[data-surface][data-theme] .issue-card:hover {
+  box-shadow:
+    var(--sf-card-shadow),
+    0 0 0 1px var(--border-strong);
+}
+
+:root[data-surface][data-theme] .issue-card.has-card-color {
+  border-left: 3px solid var(--card-accent);
+}
+
+:root[data-surface][data-theme] .issue-card.issue-card--selected {
+  box-shadow:
+    var(--sf-card-shadow),
+    0 0 0 2px color-mix(in srgb, var(--accent) 25%, transparent);
+}
+
+:root[data-surface][data-theme]
+  :is(.column.cell, .quick-add-modal, .about-dialog, .appearance-group) {
+  background-color: var(--sf-win-bg);
+  background-image: var(--sf-win-image);
+  background-size: 240px 240px;
+  background-blend-mode: multiply;
+  border-color: var(--sf-win-border);
+  border-width: var(--sf-win-border-w);
+  box-shadow: var(--sf-win-shadow);
+}
+
+/* Column cells are many on a big board, so only dialogs and groups are blurred. */
+:root[data-surface][data-theme] :is(.quick-add-modal, .about-dialog, .appearance-group) {
+  backdrop-filter: var(--sf-win-blur);
+  -webkit-backdrop-filter: var(--sf-win-blur);
+}
+
+:root[data-surface][data-theme] .column.cell {
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+
+:root[data-surface][data-theme] :is(.drawer, .topbar) {
+  background-color: var(--sf-win-bg);
+  background-image: var(--sf-win-image);
+  background-size: 240px 240px;
+  background-blend-mode: multiply;
+  box-shadow: var(--sf-win-shadow);
+  backdrop-filter: var(--sf-win-blur);
+  -webkit-backdrop-filter: var(--sf-win-blur);
+}
+
+/* Drawer bodies inherit the drawer's surface instead of painting their own. */
+:root[data-surface][data-theme] .drawer :is(.issue-drawer-surface, .row-files-drawer-surface) {
+  background: transparent;
+  border-color: transparent;
+  box-shadow: none;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+
+/* ── Cheap glass: no backdrop blur when the device asks for less transparency or is
+   low-powered (profile.ts sets data-low-power from CPU cores and memory). ── */
+@media (prefers-reduced-transparency: reduce) {
+  *,
+  *::before,
+  *::after {
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+  }
+}
+
+:root[data-low-power] *,
+:root[data-low-power] *::before,
+:root[data-low-power] *::after {
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
