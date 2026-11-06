@@ -12,6 +12,7 @@ import {
   restoreTeamFile,
   softDeleteTeamFile,
 } from "../lib/attachments.js";
+import { getSpaceStorage } from "../lib/spaceStorage.js";
 
 /** Team file library: list, rename, trash, restore. */
 const routes = new Hono<AppEnv>();
@@ -23,6 +24,11 @@ routes.get("/teams/:teamId/files", requireAuth, validateParams, loadTeam(), asyn
   const files = await listTeamFiles(db, teamId, { trash });
   const totalBytes = files.reduce((sum, file) => sum + file.sizeBytes, 0);
   return c.json({ files, totalBytes, fileCount: files.length, trash });
+});
+
+/** The space's upload allowance and what uses it (the Files drawer meter). Any member. */
+routes.get("/teams/:teamId/storage", requireAuth, validateParams, loadTeam(), async (c) => {
+  return c.json({ storage: await getSpaceStorage(db, c.var.teamId) });
 });
 
 routes.patch(
