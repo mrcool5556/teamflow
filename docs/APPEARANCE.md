@@ -41,3 +41,9 @@ Token mapping: surface-000 → `--bg`, surface-100 → `--surface` / `--panel`, 
 The accent colour setting (`colorPreset`) overrides a theme: "default" means the theme's own accent, any other choice paints over it. With Teamflow's colours, "default" is still orange and cyan.
 
 `apps/web/tests/colorThemes.test.ts` reads `tokens.css` and `themes.css` and checks, for Teamflow dark and light and every library theme with each text contrast level: body and soft text at 4.5:1 on every background, muted text at 3:1, and for library themes also button text on the accent, accent text, error text (4.5:1) and control borders (3:1). The theme CSS was generated from the library's `tokens.json`; regenerate rather than hand-edit if the library changes.
+
+## Font sets
+
+`styles/fonts.css` declares the library's font sets on `data-font`: Studio (Bricolage Grotesque, Atkinson Hyperlegible, JetBrains Mono), Machined (Encode Sans Semi Condensed, Manrope, IBM Plex Mono), Paper (Special Elite, Atkinson Hyperlegible, Caveat for notebook fields), Pixel (Pixelify Sans, VT323) and Neon (Orbitron, Atkinson Hyperlegible). Choosing any set also replaces the Paper UI style's serif headings.
+
+The files are self-hosted in `apps/web/src/assets/fonts`, one folder per family with its licence (SIL OFL 1.1; Special Elite is Apache 2.0) and a README listing the sources. Vite bundles them into `/assets`, and `@font-face` only downloads a file when a set that uses it is chosen, so unused sets cost nothing. VT323 is scaled up 25% (`size-adjust`) to match the other sets. `tests/fontSets.test.ts` checks every `@font-face` file exists and every family has a licence.

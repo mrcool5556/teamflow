@@ -76,7 +76,7 @@
   --font-display: "Space Grotesk", sans-serif;
   --font-mono: "JetBrains Mono", monospace;
   --font-serif: Georgia, "Times New Roman", serif;
-  --font-hand: "Segoe Print", "Bradley Hand", cursive;
+  --font-hand: Caveat, "Segoe Print", "Bradley Hand", cursive;
   font-family: var(--font-body);
 }
 
