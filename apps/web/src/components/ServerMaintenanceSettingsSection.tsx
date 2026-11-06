@@ -118,10 +118,17 @@ function MaintenanceStatusCard({
         <div className="maintenance-status-pills">
           <span className={`maintenance-pill maintenance-pill--${deployState}`}>{deployLabel}</span>
           {status.enabled ? (
+            // While a job runs, update.sh reinstalls the sudo scripts; the check waits for it.
             <span
-              className={`maintenance-pill maintenance-pill--${status.sudoReady ? "ok" : "warn"}`}
+              className={`maintenance-pill maintenance-pill--${
+                status.sudoPending ? "busy" : status.sudoReady ? "ok" : "warn"
+              }`}
             >
-              {status.sudoReady ? "Sudo ready" : "Sudo missing"}
+              {status.sudoPending
+                ? "Update in progress"
+                : status.sudoReady
+                  ? "Sudo ready"
+                  : "Sudo missing"}
             </span>
           ) : null}
           {!status.backupScriptReady || !status.updateScriptReady ? (

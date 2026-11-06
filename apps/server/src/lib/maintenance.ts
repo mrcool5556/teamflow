@@ -306,9 +306,16 @@ async function startJob(
 }
 
 type HostCheck = {
-  sudo: { ready: boolean; command: string; detail: string };
+  /** null: never probed (skipped because a job was running). */
+  sudo: { ready: boolean; command: string; detail: string } | null;
   version: MaintenanceVersionPublic;
   checkedAt: string;
+  /**
+   * The check ran while a backup or update job was running. update.sh re-runs
+   * setup-maintenance-sudo.sh, which reinstalls the scripts and the sudoers rule, so a sudo probe
+   * then can fail although nothing is wrong. The probe is redone once the job has finished.
+   */
+  duringJob: boolean;
 };
 
 /** Result of the last explicit host check (sudo probe + origin comparison), shown by the GET. */
@@ -325,14 +332,16 @@ export async function checkMaintenanceHost(): Promise<MaintenanceStatusPublic> {
   await reconcileStaleJob();
   const reason = disabledReason();
   const job = await readStoredJob();
+  const jobRunning = job?.status === "running";
+  // While a job runs, keep the last real probe result (if any) instead of probing mid-update.
   const sudo =
-    reason === null
-      ? await probeSudo(getBackupScript())
-      : { ready: false, command: "", detail: reason };
-  const version = await getMaintenanceVersionInfo({
-    skipOriginCheck: job?.status === "running",
-  });
-  hostCheck = { sudo, version, checkedAt: new Date().toISOString() };
+    reason !== null
+      ? { ready: false, command: "", detail: reason }
+      : jobRunning
+        ? (hostCheck?.sudo ?? null)
+        : await probeSudo(getBackupScript());
+  const version = await getMaintenanceVersionInfo({ skipOriginCheck: jobRunning });
+  hostCheck = { sudo, version, checkedAt: new Date().toISOString(), duringJob: jobRunning };
   return getMaintenanceStatus();
 }
 
@@ -341,7 +350,10 @@ export function resetMaintenanceHostCheck() {
   hostCheck = null;
 }
 
-/** Status for the GET route: reads files and local git only; no network, no sudo. */
+/**
+ * Status for the GET route: reads files and local git only; no network. It runs the sudo probe
+ * only once after a job ends, when the cached check was taken during that job.
+ */
 export async function getMaintenanceStatus(): Promise<MaintenanceStatusPublic> {
   await reconcileStaleJob();
   const reason = disabledReason();
@@ -350,6 +362,12 @@ export async function getMaintenanceStatus(): Promise<MaintenanceStatusPublic> {
   const enabled = reason === null;
   const backups = enabled ? await listBackups() : [];
   const job = await mapJob(await readStoredJob());
+  const jobRunning = job?.status === "running";
+  if (enabled && !jobRunning && hostCheck?.duringJob) {
+    hostCheck = { ...hostCheck, sudo: await probeSudo(backupScript), duringJob: false };
+  }
+  // During a job the scripts may be mid-reinstall: report "pending", not a sudo error.
+  const sudoPending = enabled && jobRunning;
   const sudoProbe = enabled
     ? (hostCheck?.sudo ?? { ready: false, command: "", detail: HOST_NOT_CHECKED })
     : { ready: false, command: "", detail: reason };
@@ -365,8 +383,9 @@ export async function getMaintenanceStatus(): Promise<MaintenanceStatusPublic> {
     backupScript: enabled ? backupScript : null,
     updateScript: enabled ? updateScript : null,
     sudoReady: sudoProbe.ready,
+    sudoPending,
     sudoDetail: enabled
-      ? sudoProbe.ready
+      ? sudoProbe.ready || sudoPending
         ? null
         : `${sudoProbe.detail}${sudoProbe.command ? ` (${sudoProbe.command})` : ""}`
       : null,

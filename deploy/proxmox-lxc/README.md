@@ -68,6 +68,8 @@ Settings → Updates (backup, update) and the Discord bot service buttons run ho
 - links `/usr/local/bin/teamflow-update`, `teamflow-backup`, `teamflow-discord` and `update` to those copies;
 - writes `/etc/sudoers.d/teamflow-maintenance`, which lets `teamflow` run only those three copies, and validates it with `visudo`.
 
+Each file is written to a temp name in the same folder, checked (`visudo -cf` for the sudoers file) and renamed into place, so there is never a moment when a script or the rule is missing; a sudoers file that fails validation leaves the working one alone. While an update runs, Settings → Updates shows **Update in progress** instead of probing sudo, and probes again once the update has finished.
+
 The checkout in `/opt/teamflow` is owned by `teamflow`, so it must never appear in sudoers (the app user could edit a script and run it as root). Re-run the helper after changing the scripts; `sudo update` does it for you.
 
 ```bash
