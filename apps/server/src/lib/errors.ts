@@ -14,7 +14,10 @@ export type ApiErrorCode =
   | "payload_too_large"
   | "rate_limited"
   | "internal_error"
-  | "service_unavailable";
+  | "service_unavailable"
+  | "space_storage_full"
+  | "server_storage_low"
+  | "free_space_limit";
 
 export const ERROR_CODES: Record<number, ApiErrorCode> = {
   400: "bad_request",
@@ -36,16 +39,24 @@ export function codeForStatus(status: number): ApiErrorCode {
 export class ApiError extends Error {
   readonly status: number;
   readonly code: ApiErrorCode;
+  /** Extra fields merged into the JSON body (for example the numbers behind a quota refusal). */
+  readonly details: Record<string, unknown> | undefined;
 
-  constructor(status: number, message: string, code: ApiErrorCode = codeForStatus(status)) {
+  constructor(
+    status: number,
+    message: string,
+    code: ApiErrorCode = codeForStatus(status),
+    details?: Record<string, unknown>,
+  ) {
     super(message);
     this.name = "ApiError";
     this.status = status;
     this.code = code;
+    this.details = details;
   }
 
-  toBody(): { error: string; code: ApiErrorCode } {
-    return { error: this.message, code: this.code };
+  toBody(): { error: string; code: ApiErrorCode } & Record<string, unknown> {
+    return { ...this.details, error: this.message, code: this.code };
   }
 }
 

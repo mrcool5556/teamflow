@@ -14,7 +14,7 @@ const DEFAULT_STATUSES = [
  * an older one runs every (idempotent) patch once, inside a single transaction, then records
  * the new version in schema_version.
  */
-export const SCHEMA_VERSION = 3;
+export const SCHEMA_VERSION = 4;
 
 export function getSchemaVersion(sqlite: Database.Database) {
   sqlite.exec(`
@@ -168,6 +168,7 @@ function runPatches(sqlite: Database.Database) {
   ensureTeamBundleTables(sqlite);
   ensureIssueNumberUnique(sqlite);
   ensureQueryIndexes(sqlite);
+  ensureSpaceColumns(sqlite);
 }
 
 function ensureTeamBundleTables(sqlite: Database.Database) {
@@ -1030,5 +1031,56 @@ function ensureQueryIndexes(sqlite: Database.Database) {
     CREATE INDEX IF NOT EXISTS activity_issue_created_idx ON activity(issue_id, created_at);
     CREATE INDEX IF NOT EXISTS projects_team_id_idx ON projects(team_id);
     CREATE INDEX IF NOT EXISTS team_members_user_id_idx ON team_members(user_id);
+  `);
+}
+
+/**
+ * Version 4: spaces. Every team gets a space type and an upload cap; existing teams default to
+ * "admin" with no cap, so nothing changes until an instance admin sets one. stored_files gets the
+ * team whose allowance it uses, backfilled from its issue link (else its row link).
+ */
+function ensureSpaceColumns(sqlite: Database.Database) {
+  const teamCols = sqlite.prepare("PRAGMA table_info(teams)").all() as { name: string }[];
+  if (!teamCols.some((col) => col.name === "space_type")) {
+    sqlite.exec(`ALTER TABLE teams ADD COLUMN space_type TEXT NOT NULL DEFAULT 'admin'`);
+    sqlite.exec(`ALTER TABLE teams ADD COLUMN storage_cap_bytes INTEGER`);
+    sqlite.exec(
+      `ALTER TABLE teams ADD COLUMN space_owner_id TEXT REFERENCES users(id) ON DELETE SET NULL`,
+    );
+    console.log("Added teams space_type, storage_cap_bytes and space_owner_id columns");
+  }
+
+  const fileCols = sqlite.prepare("PRAGMA table_info(stored_files)").all() as { name: string }[];
+  if (!fileCols.some((col) => col.name === "team_id")) {
+    sqlite.exec(
+      `ALTER TABLE stored_files ADD COLUMN team_id TEXT REFERENCES teams(id) ON DELETE SET NULL`,
+    );
+    console.log("Added stored_files.team_id column");
+  }
+  sqlite.exec(`
+    UPDATE stored_files SET team_id = COALESCE(
+      (SELECT i.team_id FROM issue_file_links l JOIN issues i ON i.id = l.issue_id
+        WHERE l.file_id = stored_files.id LIMIT 1),
+      (SELECT r.team_id FROM row_file_links l JOIN board_rows r ON r.id = l.row_id
+        WHERE l.file_id = stored_files.id LIMIT 1)
+    ) WHERE team_id IS NULL;
+    CREATE INDEX IF NOT EXISTS stored_files_team_id_idx ON stored_files(team_id);
+    CREATE INDEX IF NOT EXISTS teams_space_owner_id_idx ON teams(space_owner_id);
+
+    CREATE TABLE IF NOT EXISTS space_events (
+      id TEXT PRIMARY KEY,
+      team_id TEXT NOT NULL REFERENCES teams(id) ON DELETE CASCADE,
+      actor_id TEXT REFERENCES users(id) ON DELETE SET NULL,
+      kind TEXT NOT NULL,
+      detail TEXT,
+      created_at TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+    CREATE INDEX IF NOT EXISTS space_events_team_created_idx ON space_events(team_id, created_at);
+
+    CREATE TABLE IF NOT EXISTS instance_settings (
+      key TEXT PRIMARY KEY,
+      value TEXT NOT NULL,
+      updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+    );
   `);
 }

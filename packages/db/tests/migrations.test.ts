@@ -141,3 +141,35 @@ describe("runDataMaintenance", () => {
     expect(() => insertIssue(sqlite, "dup", 2)).toThrow(/UNIQUE/);
   });
 });
+
+describe("schema version 4: spaces", () => {
+  it("keeps existing teams as admin spaces with no cap and backfills each file's team", () => {
+    const sqlite = createDb(":memory:").$client;
+    seedTeam(sqlite);
+    insertIssue(sqlite, "i1", 1);
+    sqlite.exec(`
+      INSERT INTO stored_files (id, uploader_id, filename, mime_type, size_bytes, storage_path, key)
+        VALUES ('f-issue', 'u1', 'a.png', 'image/png', 10, 'i1/a.png', 'file_a'),
+               ('f-row', 'u1', 'b.png', 'image/png', 20, 'rows/row1/b.png', 'file_b'),
+               ('f-loose', 'u1', 'c.png', 'image/png', 30, 'x/c.png', 'file_c');
+      INSERT INTO issue_file_links (id, issue_id, file_id) VALUES ('l1', 'i1', 'f-issue');
+      INSERT INTO row_file_links (id, row_id, file_id) VALUES ('l2', 'row1', 'f-row');
+    `);
+    sqlite.prepare("UPDATE schema_version SET version = 3").run();
+    vi.spyOn(console, "log").mockImplementation(() => {});
+    applySchemaPatches(sqlite);
+    vi.restoreAllMocks();
+
+    expect(getSchemaVersion(sqlite)).toBe(4);
+    const team = sqlite
+      .prepare("SELECT space_type, storage_cap_bytes, space_owner_id FROM teams WHERE id = 't1'")
+      .get();
+    expect(team).toEqual({ space_type: "admin", storage_cap_bytes: null, space_owner_id: null });
+    const files = sqlite.prepare("SELECT id, team_id FROM stored_files ORDER BY id").all();
+    expect(files).toEqual([
+      { id: "f-issue", team_id: "t1" },
+      { id: "f-loose", team_id: null },
+      { id: "f-row", team_id: "t1" },
+    ]);
+  });
+});

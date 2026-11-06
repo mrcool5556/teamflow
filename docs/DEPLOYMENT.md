@@ -13,6 +13,7 @@
 |-----|---------|
 | [AUTH.md](AUTH.md) | Instance admin, roles, PATs, password reset, SMTP |
 | [ATTACHMENTS.md](ATTACHMENTS.md) | Uploads, storage, team files and trash |
+| [SPACES.md](SPACES.md) | Upload caps per team, free spaces, the server admin page |
 | [SERVER-TESTING.md](SERVER-TESTING.md) | Diagnosing a production LXC |
 
 ## Local development
@@ -37,7 +38,7 @@ Open <http://localhost:3000>. At startup the server loads `TEAMFLOW_ENV_FILE` if
 
 ## Schema patches and data maintenance
 
-- On boot the server brings the SQLite schema up to `SCHEMA_VERSION` (`packages/db/src/patches.ts`, currently 3). The version lives in the `schema_version` table; an up-to-date database skips the patch run, an older one runs every patch once inside a single transaction. `pnpm db:migrate` does the same without starting the server.
+- On boot the server brings the SQLite schema up to `SCHEMA_VERSION` (`packages/db/src/patches.ts`, currently 4). Version 4 adds spaces: every existing team becomes an admin space with no upload cap, so nothing changes until an instance admin sets one ([SPACES.md](SPACES.md)). The version lives in the `schema_version` table; an up-to-date database skips the patch run, an older one runs every patch once inside a single transaction. `pnpm db:migrate` does the same without starting the server.
 - A database written by a newer build is left untouched with a warning; update the app.
 - Boot no longer changes user data. These jobs run only on demand:
   - purge issues that have been in the trash for more than 7 days;

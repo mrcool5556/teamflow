@@ -7,7 +7,7 @@ Auth: `Authorization: Bearer <session_jwt | pat_...>`
 ## Errors
 
 Every error response is JSON `{ "error": "<human message>", "code": "<code>" }` with the status
-below. Every response (success or error) carries an `X-Request-Id` header; send one in and it is
+below; a few codes add fields beside them (listed in the table). Every response (success or error) carries an `X-Request-Id` header; send one in and it is
 echoed back. Unexpected failures return a generic `Internal Server Error` and are logged on the
 server together with the request id.
 
@@ -19,11 +19,14 @@ server together with the request id.
 | 403 | `forbidden` | Not a member, PAT scoped to another team, missing permission or write scope, instance admin required |
 | 404 | `not_found` | Team, row, column, issue, comment, file, invite, role or member does not exist |
 | 409 | `conflict` | Email already registered, column/row still has issues, last row on a board |
+| 409 | `free_space_limit` | The user already owns the most free spaces allowed; body adds `owned`, `limit` ([SPACES.md](SPACES.md)) |
 | 410 | `gone` | Removed endpoint |
 | 413 | `payload_too_large` | Body over the JSON (1 MB), attachment or bundle limit |
+| 413 | `space_storage_full` | The upload does not fit in the space's cap; body adds `usedBytes`, `capBytes`, `fileBytes`, `remainingBytes` |
 | 429 | `rate_limited` | Too many login/register/forgot-password attempts (see `Retry-After`) |
 | 500 | `internal_error` | Unexpected server error |
 | 503 | `service_unavailable` | Feature disabled on this host (e.g. bot config endpoint without `TEAMFLOW_BOT_CONFIG_KEY`) |
+| 507 | `server_storage_low` | The server's upload disk is under the free-disk floor; uploads are paused for every space |
 
 Server code throws `ApiError` from `apps/server/src/lib/errors.ts` (`badRequest`, `forbidden`,
 `notFound`, `conflict`, ...); one `onError` handler renders it.
@@ -34,7 +37,7 @@ Server code throws `ApiError` from `apps/server/src/lib/errors.ts` (`badRequest`
 
 <!-- BEGIN GENERATED ROUTES (scripts/gen-api-docs.mjs) -->
 
-## Routes (94)
+## Routes (106)
 
 Generated from `apps/server/src/routes/*.ts` by `pnpm docs:api`; do not edit by hand.
 
@@ -173,6 +176,24 @@ Server maintenance: status, backups, updates (instance admin only).
 | POST | `/teams/:teamId/server/maintenance/update` | bearer | yes | member | `server.maintenance.run` + instance admin | body `runMaintenanceUpdateSchema` |
 | POST | `/teams/:teamId/server/maintenance/job/dismiss` | bearer | yes | member | `server.maintenance.run` + instance admin |  |
 
+### Instance admin and spaces
+
+Instance admin page (web /admin): server status, spaces, caps and space settings.
+
+| Method | Path | Auth | Write | Team | Permission | Input |
+|--------|------|------|-------|------|------------|-------|
+| GET | `/instance/overview` | bearer |  |  | instance admin |  |
+| GET | `/instance/checks/public-url` | bearer |  |  | instance admin |  |
+| GET | `/instance/settings` | bearer |  |  | instance admin |  |
+| PATCH | `/instance/settings` | bearer | yes |  | instance admin | body `updateSpaceSettingsSchema` |
+| GET | `/instance/users` | bearer |  |  | instance admin | query `listInstanceUsersQuerySchema` |
+| GET | `/instance/spaces` | bearer |  |  | instance admin |  |
+| POST | `/instance/spaces` | bearer | yes |  | instance admin | body `createSpaceSchema` |
+| GET | `/instance/spaces/:teamId` | bearer |  |  | instance admin |  |
+| PATCH | `/instance/spaces/:teamId` | bearer | yes |  | instance admin | body `updateSpaceSchema` |
+| POST | `/instance/spaces/:teamId/empty-trash` | bearer | yes |  | instance admin |  |
+| POST | `/instance/spaces/:teamId/cancel-uploads` | bearer | yes |  | instance admin |  |
+
 ### Team files
 
 Team file library: list, rename, trash, restore.
@@ -180,6 +201,7 @@ Team file library: list, rename, trash, restore.
 | Method | Path | Auth | Write | Team | Permission | Input |
 |--------|------|------|-------|------|------------|-------|
 | GET | `/teams/:teamId/files` | bearer |  | member |  | query `listTeamFilesQuerySchema` |
+| GET | `/teams/:teamId/storage` | bearer |  | member |  |  |
 | PATCH | `/teams/:teamId/files/:fileId` | bearer | yes | member | `board.edit` | body `renameTeamFileSchema` |
 | DELETE | `/teams/:teamId/files/:fileId` | bearer | yes | member | `board.edit` |  |
 | POST | `/teams/:teamId/files/:fileId/restore` | bearer | yes | member | `board.edit` |  |

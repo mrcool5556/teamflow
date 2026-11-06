@@ -27,6 +27,8 @@ Defaults, set in the server environment, restart to apply:
 
 Over the limit the API answers `413 payload_too_large`.
 
+On top of the per-file limits each team is a **space** with an upload cap (free spaces 1 GB by default, admin spaces whatever the admin sets, or none) and the server keeps a free-disk floor (2 GB by default). An upload that would pass the cap is refused before it is written with `413 space_storage_full` (the body adds `usedBytes`, `capBytes`, `fileBytes`, `remainingBytes`); under the floor every upload gets `507 server_storage_low`. Files in the trash count until purged. `GET /teams/:teamId/storage` returns the cap and usage for any member. Details: [SPACES.md](SPACES.md).
+
 ## Permissions
 
 Reading files needs team membership. Uploading, linking, moving, renaming, trashing and restoring need `board.edit` (Viewers are read-only; see [AUTH.md](AUTH.md#editing-the-board-boardedit)). A team-scoped PAT only reaches its own team's files.
@@ -117,7 +119,8 @@ Trashed files are deleted for good after **7 days**; the purge runs when the ser
 
 - **Issue drawer → Attachments:** choose a file or drop it on the zone. Image thumbnails open a lightbox; videos play with seek and speed controls. Large files upload in chunks with progress.
 - **Row → Files:** files shared by a whole row; link one into an issue without re-uploading.
-- **Files drawer:** every team file, rename, trash and restore, copy a file ref.
+- **Files drawer:** every team file, rename, trash and restore, copy a file ref. A storage meter at the top shows the space's usage against its cap.
+- **Upload zones** (issue drawer, row files) say how much room is left from 80% of the cap; when the space or the server disk is full they say so, what still works and how to make room, and Choose file is disabled. A file bigger than what is left is refused before it is sent.
 - **Downloads** (file name in the drawers, Download in the Files drawer and lightboxes, Settings → Team → Download bundle): the control shows a spinner and "Starting…" while the token is fetched and the browser takes over, then a toast says "Downloading <name> — progress is in your browser's downloads". If the download cannot start, an error toast offers Retry.
 
 Viewers see all of these read-only.

@@ -1,0 +1,593 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Teamflow admin and Spaces v1</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600&family=Space+Grotesk:wght@500;700&display=swap" rel="stylesheet" />
+<!-- Same tokens the app uses (dark default, :root[data-theme="light"] overrides). -->
+<link rel="stylesheet" href="../../apps/web/src/styles/tokens.css" />
+<style>
+  /* Mock-only colour for the "near the limit" state; the build would add it to tokens.css. */
+  :root { --warn: #e3c34f; }
+  :root[data-theme="light"] { --warn: #a07800; }
+
+  /* ---------- page chrome (mock-up document, not the app) ---------- */
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text); font-family: "JetBrains Mono", monospace; font-size: 14px; line-height: 1.5; }
+  h1, h2, h3, h4 { font-family: "Space Grotesk", sans-serif; margin: 0 0 var(--space-2); }
+  a { color: var(--accent-text); }
+  code { font-size: .92em; color: var(--text-soft); }
+  .doc-head { position: sticky; top: 0; z-index: 50; display: flex; gap: var(--space-4); align-items: center; flex-wrap: wrap; padding: var(--space-3) var(--space-6); background: var(--surface); border-bottom: 1px solid var(--border); }
+  .doc-head nav { display: flex; gap: var(--space-2); flex-wrap: wrap; font-size: var(--font-size-sm); }
+  .doc-head nav a { text-decoration: none; padding: 2px 8px; border: 1px solid var(--border); border-radius: var(--radius-sm); }
+  .doc-head .spacer { flex: 1; }
+  main { max-width: 1500px; margin: 0 auto; padding: var(--space-6); }
+  section.item { border-top: 1px solid var(--border); padding: var(--space-6) 0; }
+  .eyebrow { color: var(--accent-text); letter-spacing: .18em; font-size: var(--font-size-xs); text-transform: uppercase; margin: 0 0 var(--space-1); }
+  .lead { color: var(--text-soft); max-width: 86ch; }
+  .changes { margin: var(--space-3) 0 0; padding-left: 1.2rem; font-size: var(--font-size-sm); max-width: 100ch; }
+  .changes li { margin-bottom: 4px; }
+  .changes li::marker { color: var(--done); }
+  .mocks { display: flex; flex-wrap: wrap; gap: var(--space-5); align-items: flex-start; margin-top: var(--space-4); }
+  .note { font-size: var(--font-size-xs); color: var(--muted); margin-top: var(--space-2); }
+  table.list { border-collapse: collapse; width: 100%; font-size: var(--font-size-sm); }
+  table.list td, table.list th { border-bottom: 1px solid var(--border); padding: 6px 8px; text-align: left; vertical-align: top; }
+  table.list th { color: var(--muted); font-weight: 400; font-size: var(--font-size-xs); text-transform: uppercase; letter-spacing: .1em; }
+  table.list td:first-child { color: var(--accent-text); white-space: nowrap; }
+  .qa { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: var(--space-4); margin-top: var(--space-4); }
+  @media (max-width: 1000px) { .qa { grid-template-columns: 1fr; } }
+  .qa > div { border: 1px solid var(--border); border-radius: var(--radius-sm); padding: var(--space-3) var(--space-4); background: var(--surface); }
+  .qa h4 { font-size: 15px; }
+  .qa p { margin: 0 0 6px; color: var(--text-soft); font-size: var(--font-size-sm); }
+  .qa .rec { color: var(--text); }
+  .qa .rec::before { content: "Recommend: "; color: var(--done); font-weight: 600; }
+  .scroll-x { overflow-x: auto; }
+
+  /* ---------- device frame: content authored at real px, scaled down ---------- */
+  .frame { --s: .56; width: calc(var(--w) * var(--s) * 1px); height: calc(var(--h) * var(--s) * 1px); overflow: hidden; border: 1px solid var(--border-strong); border-radius: var(--radius-sm); background: var(--bg); position: relative; flex: none; max-width: 100%; }
+  .frame > .vp { width: calc(var(--w) * 1px); height: calc(var(--h) * 1px); transform: scale(var(--s)); transform-origin: 0 0; position: relative; overflow: hidden; background: var(--bg); }
+  .frame.phone { --s: .62; }
+  .frame-cap { font-size: var(--font-size-xs); color: var(--muted); margin-top: 4px; }
+  @media (max-width: 760px) { .frame { --s: .26; } .frame.phone { --s: .7; } }
+
+  /* ---------- mock app parts (built from app tokens) ---------- */
+  .m-btn { display: inline-flex; align-items: center; gap: 6px; font: inherit; font-size: 13px; padding: 6px 10px; border-radius: var(--radius-sm); border: 1px solid var(--border); background: transparent; color: var(--text); white-space: nowrap; }
+  .m-btn.primary { background: var(--primary); color: var(--chrome-btn-text); border: var(--chrome-btn-border-width) solid var(--chrome-btn-border-color); box-shadow: var(--chrome-btn-shadow); }
+  .m-btn.danger { border-color: var(--danger); color: var(--danger-text); }
+  .m-btn.sm { font-size: 12px; padding: 3px 8px; }
+  .m-badge { font-size: 11px; padding: 0 6px; border-radius: 99px; background: var(--panel); border: 1px solid var(--border-strong); color: var(--text-soft); white-space: nowrap; }
+  .m-type { font-size: 11px; padding: 1px 7px; border-radius: var(--radius-xs); border: 1px solid; white-space: nowrap; }
+  .m-type.admin { color: var(--accent-text); border-color: color-mix(in srgb, var(--accent) 55%, transparent); background: color-mix(in srgb, var(--accent) 8%, transparent); }
+  .m-type.free { color: var(--done); border-color: color-mix(in srgb, var(--done) 55%, transparent); background: color-mix(in srgb, var(--done) 8%, transparent); }
+  .m-input { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 7px 10px; border: var(--chrome-input-border-width) solid var(--border-strong); border-radius: var(--radius-sm); background: var(--cell); color: var(--text); font-size: 13px; }
+  .m-input.ph { color: var(--muted); }
+  .m-top { display: flex; align-items: center; gap: 10px; height: 56px; padding: 0 20px; border-bottom: 1px solid var(--border); background: var(--surface); }
+  .m-top .grow { flex: 1; }
+  .m-logo { font-family: "Space Grotesk", sans-serif; font-weight: 700; color: var(--accent-text); letter-spacing: .12em; font-size: 12px; }
+  .m-team { display: inline-flex; align-items: center; gap: 8px; padding: 6px 10px; border: 1px solid var(--border-strong); border-radius: var(--radius-sm); font-weight: 600; font-size: 14px; }
+  .m-team .key { font-size: 11px; color: var(--accent-text); border: 1px solid var(--accent); border-radius: 3px; padding: 0 4px; }
+  .m-avatar { width: 30px; height: 30px; border-radius: 50%; background: var(--accent); color: #111; display: grid; place-items: center; font-weight: 600; font-size: 12px; flex: none; }
+  .m-crumb { font-family: "Space Grotesk", sans-serif; font-weight: 700; font-size: 15px; }
+  .m-crumb small { font-family: "JetBrains Mono", monospace; font-weight: 400; color: var(--muted); font-size: 11px; margin-left: 8px; }
+
+  .m-admin { display: grid; grid-template-columns: 220px minmax(0, 1fr); height: calc(100% - 56px); }
+  .m-snav { border-right: 1px solid var(--border); padding: 14px 10px; font-size: 13px; }
+  .m-snav .back { color: var(--text-soft); margin-bottom: 14px; display: block; }
+  .m-snav .h { font-size: 10px; letter-spacing: .14em; color: var(--muted); text-transform: uppercase; margin: 10px 8px 4px; }
+  .m-snav .it { display: flex; justify-content: space-between; padding: 6px 10px; border-radius: var(--radius-xs); color: var(--text-soft); }
+  .m-snav .it.on { background: color-mix(in srgb, var(--accent) 14%, transparent); color: var(--text); box-shadow: inset 2px 0 0 var(--accent); }
+  .m-content { padding: 22px 30px; overflow: hidden; }
+  .m-content h2 { font-size: 24px; margin-bottom: 2px; }
+  .m-content > p.sub { color: var(--text-soft); font-size: 13px; margin: 0 0 16px; }
+  .m-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+  .m-grid .wide { grid-column: span 3; }
+  .m-tile { border: var(--chrome-surface-border-width) solid var(--border); border-radius: var(--radius-sm); padding: 12px 14px; background: var(--surface); box-shadow: var(--chrome-surface-shadow); font-size: 12px; }
+  .m-tile .th { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
+  .m-tile .th b { font-family: "Space Grotesk", sans-serif; font-size: 15px; }
+  .m-tile .th .grow { flex: 1; }
+  .m-tile dl { display: grid; grid-template-columns: auto 1fr; gap: 3px 12px; margin: 0; }
+  .m-tile dt { color: var(--muted); white-space: nowrap; }
+  .m-tile dd { margin: 0; color: var(--text-soft); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .m-tile .acts { display: flex; gap: 6px; margin-top: 10px; flex-wrap: wrap; }
+  .dot { width: 9px; height: 9px; border-radius: 50%; display: inline-block; flex: none; }
+  .dot.ok { background: var(--done); } .dot.warn { background: var(--warn); } .dot.bad { background: var(--danger); } .dot.off { background: var(--muted); }
+  .st { font-size: 11px; padding: 0 6px; border-radius: 99px; border: 1px solid; }
+  .st.ok { color: var(--done); } .st.warn { color: var(--warn); } .st.bad { color: var(--danger-text); }
+
+  .bar { height: 8px; border-radius: 99px; background: var(--panel); border: 1px solid var(--border); overflow: hidden; display: flex; }
+  .bar > i { display: block; height: 100%; background: var(--accent); }
+  .bar > i.warn { background: var(--warn); } .bar > i.full { background: var(--danger); } .bar > i.free { background: var(--done); }
+  .bar > i.b2 { background: color-mix(in srgb, var(--accent) 55%, var(--panel)); } .bar > i.b3 { background: var(--muted); } .bar > i.b4 { background: repeating-linear-gradient(45deg, var(--accent) 0 3px, transparent 3px 6px); }
+  .bar.tall { height: 14px; border-radius: var(--radius-xs); }
+  .legend { display: flex; gap: 14px; flex-wrap: wrap; font-size: 11px; color: var(--text-soft); margin-top: 6px; }
+  .legend span::before { content: ""; display: inline-block; width: 9px; height: 9px; border-radius: 2px; margin-right: 5px; vertical-align: -1px; background: var(--c); }
+
+  .m-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+  .m-table th { text-align: left; font-weight: 400; color: var(--muted); font-size: 10px; letter-spacing: .12em; text-transform: uppercase; padding: 6px 8px; border-bottom: 1px solid var(--border-strong); }
+  .m-table td { padding: 8px; border-bottom: 1px solid var(--border); vertical-align: middle; }
+  .m-table td.n { font-weight: 600; }
+  .m-table td.n small { display: block; font-weight: 400; color: var(--muted); }
+  .m-table .use { width: 210px; }
+  .m-table .use .lbl { display: flex; justify-content: space-between; font-size: 11px; color: var(--text-soft); margin-bottom: 3px; }
+  .m-table tr.hl td { background: color-mix(in srgb, var(--accent) 7%, transparent); }
+  .m-filters { display: flex; gap: 8px; align-items: center; margin-bottom: 10px; flex-wrap: wrap; }
+  .m-chip { font-size: 12px; padding: 3px 10px; border: 1px solid var(--border); border-radius: 99px; color: var(--text-soft); }
+  .m-chip.on { border-color: var(--accent); color: var(--accent-text); background: color-mix(in srgb, var(--accent) 10%, transparent); }
+  .m-filters .grow { flex: 1; }
+
+  .m-scrim { position: absolute; inset: 0; background: color-mix(in srgb, #000 55%, transparent); }
+  .m-dialog { position: absolute; background: var(--panel); border: var(--chrome-frame-border-width) solid var(--border-strong); border-radius: var(--radius-md); box-shadow: var(--chrome-modal-shadow); padding: 18px 20px; font-size: 13px; }
+  .m-dialog h3 { font-size: 20px; }
+  .m-f { margin-bottom: 12px; }
+  .m-f label { display: block; font-size: 10px; letter-spacing: .12em; text-transform: uppercase; color: var(--muted); margin-bottom: 4px; }
+  .m-f .hint { font-size: 11px; color: var(--muted); margin-top: 4px; }
+  .m-row2 { display: grid; grid-template-columns: 2fr 1fr; gap: 12px; }
+  .m-choice { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .m-choice > div { border: 1px solid var(--border-strong); border-radius: var(--radius-sm); padding: 9px 10px; font-size: 12px; color: var(--text-soft); }
+  .m-choice > div b { display: block; color: var(--text); font-size: 13px; margin-bottom: 2px; }
+  .m-choice > div.on { border-color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent); background: color-mix(in srgb, var(--accent) 8%, transparent); }
+  .m-seg { display: inline-flex; border: 1px solid var(--border-strong); border-radius: var(--radius-sm); overflow: hidden; font-size: 12px; flex-wrap: wrap; }
+  .m-seg span { padding: 5px 10px; border-right: 1px solid var(--border); }
+  .m-seg span:last-child { border-right: 0; }
+  .m-seg span.on { background: var(--accent); color: #111; }
+  .m-check { display: flex; gap: 8px; align-items: center; font-size: 12px; color: var(--text-soft); }
+  .m-check i { width: 14px; height: 14px; border: 1px solid var(--border-strong); border-radius: 3px; display: inline-grid; place-items: center; font-style: normal; font-size: 10px; }
+  .m-check i.on { background: var(--accent); color: #111; border-color: var(--accent); }
+  .m-foot { display: flex; justify-content: flex-end; gap: 8px; margin-top: 14px; }
+  .m-callout { border: 1px solid var(--border); border-left: 4px solid var(--accent); border-radius: var(--radius-sm); padding: 8px 10px; font-size: 12px; color: var(--text-soft); background: color-mix(in srgb, var(--accent) 5%, transparent); }
+  .m-callout.warn { border-left-color: var(--warn); background: color-mix(in srgb, var(--warn) 7%, transparent); }
+  .m-callout.full { border-left-color: var(--danger); background: color-mix(in srgb, var(--danger) 8%, transparent); }
+  .m-callout b { color: var(--text); }
+
+  .m-drawer { position: absolute; top: 0; right: 0; bottom: 0; background: var(--surface); border-left: 1px solid var(--border-strong); box-shadow: var(--chrome-modal-shadow); display: flex; flex-direction: column; }
+  .m-dh { display: flex; align-items: center; gap: 10px; padding: 14px 18px; border-bottom: 1px solid var(--border); }
+  .m-dh h3 { font-size: 20px; margin: 0; flex: 1; }
+  .m-db { padding: 14px 18px; overflow: hidden; flex: 1; font-size: 13px; }
+  .m-meter { border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 10px 12px; margin-bottom: 12px; background: var(--cell); }
+  .m-meter .top { display: flex; justify-content: space-between; align-items: baseline; font-size: 12px; margin-bottom: 6px; }
+  .m-meter .top b { font-size: 13px; }
+  .m-meter .sub { font-size: 11px; color: var(--muted); margin-top: 6px; }
+  .m-file { display: flex; align-items: center; gap: 10px; padding: 8px 0; border-bottom: 1px solid var(--border); font-size: 12px; }
+  .m-file .ic { width: 30px; height: 30px; border-radius: var(--radius-xs); background: var(--panel); border: 1px solid var(--border); display: grid; place-items: center; font-size: 10px; color: var(--muted); flex: none; }
+  .m-file .nm { flex: 1; min-width: 0; }
+  .m-file .nm small { display: block; color: var(--muted); }
+  .m-drop { border: 2px dashed var(--border-strong); border-radius: var(--radius-sm); padding: 18px 12px; text-align: center; color: var(--muted); font-size: 12px; }
+  .m-drop.off { border-color: color-mix(in srgb, var(--danger) 60%, transparent); background: color-mix(in srgb, var(--danger) 6%, transparent); color: var(--danger-text); }
+  .m-tabs2 { display: flex; gap: 4px; margin-bottom: 12px; font-size: 12px; }
+  .m-tabs2 span { padding: 4px 10px; border-radius: var(--radius-xs); color: var(--text-soft); }
+  .m-tabs2 span.on { background: var(--panel); color: var(--text); }
+
+  .m-toasts { position: absolute; right: 16px; bottom: 16px; display: flex; flex-direction: column; gap: 8px; width: 360px; z-index: 6; }
+  .m-toast { display: flex; gap: 10px; align-items: flex-start; padding: 10px 12px; border-radius: var(--radius-sm); background: var(--panel); border: 1px solid var(--border-strong); border-left: 4px solid var(--accent); font-size: 12px; box-shadow: var(--chrome-modal-shadow); }
+  .m-toast.err { border-left-color: var(--danger); }
+  .m-toast .x { margin-left: auto; color: var(--muted); }
+
+  .m-mob-top { display: flex; align-items: center; gap: 8px; height: 52px; padding: 0 12px; border-bottom: 1px solid var(--border); background: var(--surface); }
+  .m-tabs { display: flex; gap: 6px; overflow: hidden; padding: 8px 12px; border-bottom: 1px solid var(--border); font-size: 12px; white-space: nowrap; }
+  .m-tabs span { padding: 4px 10px; border: 1px solid var(--border); border-radius: 99px; }
+  .m-tabs span.on { border-color: var(--accent); color: var(--accent-text); background: color-mix(in srgb, var(--accent) 10%, transparent); }
+  .m-mcard { border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 10px 12px; margin: 0 0 10px; background: var(--surface); font-size: 12px; }
+  .m-mcard .t { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
+  .m-mcard .t b { font-family: "Space Grotesk", sans-serif; font-size: 15px; flex: 1; }
+  .m-mcard .meta { color: var(--muted); font-size: 11px; margin-top: 6px; }
+</style>
+</head>
+<body>
+<header class="doc-head">
+  <strong style="font-family:'Space Grotesk'">Teamflow · admin page and Spaces v1 mock-up</strong>
+  <nav>
+    <a href="#today">0 Today</a><a href="#model">1 Model</a><a href="#overview">2 Overview</a><a href="#spaces">3 Spaces</a><a href="#create">4 Create</a><a href="#detail">5 Detail</a><a href="#meter">6 Files meter</a><a href="#limit">7 At the limit</a><a href="#plan">8 Build plan</a>
+  </nav>
+  <span class="spacer"></span>
+  <button class="m-btn" id="theme" type="button">☀ Light</button>
+</header>
+
+<main>
+  <h1>Admin page and Spaces</h1>
+  <p class="lead">George's idea (docs/IDEAS.md, "Admin page and Spaces with storage limits"): a server admin page that creates <b>spaces</b>. Admin spaces get the upload allowance the admin sets; <b>free spaces</b> anyone can create, make issues freely, but have a 1&nbsp;GB upload cap so the server does not bloat. The same page shows server, Discord bot, update, backup and disk status. Nothing is built yet. Frames are drawn with the app's own tokens at real pixel sizes, scaled down. Numbers in the frames are examples, except the disk figures, which were read from production on 2026-11-04.</p>
+
+  <!-- ===================== 0 TODAY ===================== -->
+  <section class="item" id="today">
+    <p class="eyebrow">0 · What exists today</p>
+    <h2>Inventory</h2>
+    <div class="scroll-x">
+    <table class="list">
+      <tr><th>Area</th><th>Today</th><th>What Spaces needs</th></tr>
+      <tr><td>Teams</td><td><code>teams</code> has name, key, issue counter, workspace. <code>POST /teams</code> lets any signed-in user create one (they become Owner). Registering also creates a personal <b>General</b> team (key GEN).</td><td>A space type and a cap on the team row. Free-space rules on both creation paths (New team and registration).</td></tr>
+      <tr><td>Instance admin</td><td><code>users.is_instance_admin</code>; George is the only one. Gates Updates, bot secrets and bot service. Those routes are mounted under <code>/teams/:teamId/…</code> and also need a team permission.</td><td>New <code>/admin/*</code> routes that need only the instance-admin flag, not a team.</td></tr>
+      <tr><td>Upload bytes</td><td>On disk under <code>data/uploads/</code>: issue files in <code>&lt;issueId&gt;/</code>, row files in <code>rows/&lt;rowId&gt;/</code>, chunk parts in <code>.tmp/</code>. One <code>stored_files</code> row per file with <code>size_bytes</code>; linked to issues and rows by <code>issue_file_links</code> / <code>row_file_links</code>.</td><td><b><code>stored_files</code> has no team column.</b> A team's files are found only through its links (<code>getFileTeamId</code>, <code>listTeamFiles</code>). Add <code>stored_files.team_id</code>, backfilled from links, so usage is one indexed SUM.</td></tr>
+      <tr><td>Trash</td><td>Files drawer trash sets <code>deleted_at</code>; bytes stay until purged after 7 days at server start. Issues in the issue trash keep their file links until <code>db:maintenance</code> purges them.</td><td>Trashed files still use disk, so they count until purged. Admin "Empty trash now" per space.</td></tr>
+      <tr><td>Chunked uploads</td><td><code>upload_sessions</code> (issue or row, <code>total_bytes</code>, 48 h expiry) and <code>upload_chunks</code>. Size limit checked at session start only.</td><td>Check the cap at session start (with the full size reserved) and again at complete.</td></tr>
+      <tr><td>Other upload paths</td><td><code>POST /issues/:id/attachments</code>, <code>POST /rows/:id/attachments</code>, chunked sessions for both, and <code>POST /teams/:id/import</code> (bundle with files). Link and move copy no bytes.</td><td>Quota check on all five; link and move stay free.</td></tr>
+      <tr><td>Limits</td><td>4&nbsp;GB per file by type (<code>ATTACHMENT_MAX_*</code>), no per-team quota, no disk-free check.</td><td>Per-space cap plus a server-wide "keep N GB free" floor.</td></tr>
+      <tr><td>Updates panel</td><td>Settings → Updates: version, update check, run update, backups list and run backup (<code>MaintenanceStatusPublic</code>).</td><td>Overview tiles reuse the same data; the full panel moves under the admin page.</td></tr>
+      <tr><td>Integrations</td><td>Settings → Integrations: bot secrets and the <code>teamflow-discord</code> service (state, unit, sudo, log tail).</td><td>Overview tile reuses <code>DiscordBotServiceStatusPublic</code>; per-team Discord settings stay in team Settings.</td></tr>
+      <tr><td>Production disk</td><td>CT998 root 30&nbsp;GB, 12&nbsp;GB used (37%), 19&nbsp;GB free. <code>data/uploads</code> 4.1&nbsp;GB, <code>teamflow.db</code> 473&nbsp;KB.</td><td>Room for about 19 free spaces at 1&nbsp;GB each if all filled, so a per-user free-space count limit matters. Port and service listing was not read (that SSH command was refused).</td></tr>
+    </table>
+    </div>
+  </section>
+
+  <!-- ===================== 1 MODEL ===================== -->
+  <section class="item" id="model">
+    <p class="eyebrow">1 · The model in plain words</p>
+    <h2>A space is a team with a type and an upload allowance</h2>
+    <p class="lead">Every team becomes a space. Nothing about boards, roles or invites changes. Each space has a <b>type</b> (Admin or Free) and an <b>upload cap</b> (a number of bytes, or no limit). Only uploads are capped: issues, comments, rows and links never are.</p>
+    <div class="qa">
+      <div><h4>Same thing as a team, or a layer above?</h4><p>A layer above teams would mean a second membership model, second invites and a migration of every route.</p><p class="rec">Same thing. Add <code>teams.space_type</code> and <code>teams.storage_cap_bytes</code>. The UI says "space" on the admin page; team Settings keeps saying "team".</p></div>
+      <div><h4>The two kinds</h4><p><b>Admin space</b>: made by an instance admin on the admin page, with an owner and an allowance the admin types (or no limit). <b>Free space</b>: made by anyone with New team, and each new user's General; gets the default cap.</p><p class="rec">Default free cap 1&nbsp;GB, editable on the admin page. Each user may own at most 3 free spaces (General included), also editable, or the cap is easy to dodge.</p></div>
+      <div><h4>What counts against the cap</h4><p>Bytes this space keeps on disk.</p><p class="rec">Count each stored file once (however many issues link it), files in the Files trash until purged, files on issues in the issue trash, and uploads in progress at their full size. Do not count the database, backups or exports: those are server-level and shown under Disk.</p></div>
+      <div><h4>Near and at the limit</h4><p>Users should never lose an upload halfway.</p><p class="rec">At 80% the Files drawer meter turns amber and upload zones say how much is left. At 100%, or when a file would not fit, the upload is refused before any bytes are sent, with a message that says what to do. Issues, comments, moves and linking existing files keep working.</p></div>
+      <div><h4>Can an admin change type or cap?</h4><p>Yes, any time, from Space detail.</p><p class="rec">Lowering the cap below current use deletes nothing; it only blocks new uploads until the space is under. Free → Admin stops it counting toward the owner's 3 free spaces. Changes are written to the activity log.</p></div>
+      <div><h4>Existing teams</h4><p>Production has the Axiom board and personal General teams.</p><p class="rec">Schema version 4 makes every existing team an Admin space with no limit, so nothing breaks. George can then set caps by hand. Only teams created after the upgrade can be Free.</p></div>
+      <div><h4>Server safety floor (extra)</h4><p>Caps alone do not stop admin spaces with no limit from filling the disk.</p><p class="rec">Refuse every upload when the disk would drop under 2&nbsp;GB free (<code>TEAMFLOW_MIN_FREE_DISK</code>), with its own message. The Overview shows the sum of all caps against free disk.</p></div>
+      <div><h4>Where the page lives</h4><p>The Updates and bot panels now sit in team Settings although they are server-wide.</p><p class="rec">New route <code>/admin</code>, opened from the avatar menu as "Server admin", visible to instance admins only. Settings → Updates becomes a link to it; old API routes keep working.</p></div>
+    </div>
+  </section>
+
+  <!-- ===================== 2 OVERVIEW ===================== -->
+  <section class="item" id="overview">
+    <p class="eyebrow">2 · Admin page · Overview</p>
+    <h2>Server, bot, updates, backups and disk on one page</h2>
+    <ul class="changes">
+      <li>Five status tiles, each with a coloured dot and one or two actions. Details open the existing panels.</li>
+      <li>Server tile does service and port detection: the port the server listens on, whether <code>PUBLIC_URL</code> answers <code>/health</code>, and the systemd or NSSM service state.</li>
+      <li>Disk tile splits uploads, database, backups and the rest (the build measures the backup folder too), and compares allocated caps with free space.</li>
+      <li>"Common fixes" lists how-tos matched to what the checks found (for example, bot stopped → Start bot, sudo not set up → the command to run).</li>
+    </ul>
+    <div class="mocks">
+      <div>
+        <div class="frame" style="--w:1280;--h:800"><div class="vp">
+          <div class="m-top"><span class="m-logo">TEAMFLOW</span><span class="m-crumb">Server admin <small>instance admin only</small></span><span class="grow"></span><span class="m-badge">v0.9.2 · 1d99913</span><span class="m-avatar">G</span></div>
+          <div class="m-admin">
+            <nav class="m-snav">
+              <span class="back">← Back to board</span>
+              <div class="h">Server</div>
+              <div class="it on">Overview</div>
+              <div class="it">Spaces <span class="m-badge">6</span></div>
+              <div class="it">Updates &amp; backups</div>
+              <div class="it">Discord bot</div>
+              <div class="h">Help</div>
+              <div class="it">How-tos &amp; fixes</div>
+              <div class="h">Settings</div>
+              <div class="it">Space defaults</div>
+            </nav>
+            <div class="m-content">
+              <h2>Overview</h2>
+              <p class="sub">Checked 12 seconds ago · <u>Check again</u></p>
+              <div class="m-grid">
+                <div class="m-tile">
+                  <div class="th"><span class="dot ok"></span><b>Server</b><span class="grow"></span><span class="st ok">running</span></div>
+                  <dl><dt>Service</dt><dd>teamflow.service · active 6 d</dd><dt>Listening</dt><dd>0.0.0.0:3000</dd><dt>Public URL</dt><dd>teamflow.toasterland.org ✓ /health</dd><dt>Node</dt><dd>20.19.2 · SQLite</dd></dl>
+                </div>
+                <div class="m-tile">
+                  <div class="th"><span class="dot ok"></span><b>Discord bot</b><span class="grow"></span><span class="st ok">running</span></div>
+                  <dl><dt>Service</dt><dd>teamflow-discord · enabled</dd><dt>Credentials</dt><dd>saved · config key set</dd><dt>Talks to</dt><dd>http://127.0.0.1:3000</dd><dt>Last log</dt><dd>Logged in as Teamflow#4410</dd></dl>
+                  <div class="acts"><span class="m-btn sm">Restart</span><span class="m-btn sm">Stop</span><span class="m-btn sm">Log</span></div>
+                </div>
+                <div class="m-tile">
+                  <div class="th"><span class="dot warn"></span><b>Updates</b><span class="grow"></span><span class="st warn">2 behind</span></div>
+                  <dl><dt>Running</dt><dd>1d99913 · main</dd><dt>Latest</dt><dd>a41c07e · 2 commits</dd><dt>Last update</dt><dd>2026-11-03 21:40 · ok</dd><dt>Scripts</dt><dd>update ✓ · sudo ✓</dd></dl>
+                  <div class="acts"><span class="m-btn sm primary">Update…</span><span class="m-btn sm">What's new</span></div>
+                </div>
+                <div class="m-tile">
+                  <div class="th"><span class="dot ok"></span><b>Backups</b><span class="grow"></span><span class="st ok">18 h ago</span></div>
+                  <dl><dt>Last</dt><dd>2026-11-03 21:39 · database only</dd><dt>Last full</dt><dd>never · uploads not backed up</dd><dt>Folder</dt><dd>/var/backups/teamflow · 14 files</dd></dl>
+                  <div class="acts"><span class="m-btn sm">Back up database</span><span class="m-btn sm">Full backup</span></div>
+                </div>
+                <div class="m-tile" style="grid-column: span 2">
+                  <div class="th"><span class="dot ok"></span><b>Disk</b><span class="grow"></span><span class="st ok">19 GB free of 30 GB</span></div>
+                  <div class="bar tall"><i style="width:13.7%"></i><i class="b2" style="width:.1%"></i><i class="b3" style="width:26.3%"></i></div>
+                  <div class="legend"><span style="--c:var(--accent)">Uploads 4.1 GB</span><span style="--c:color-mix(in srgb,var(--accent) 55%,var(--panel))">Database 0.5 MB</span><span style="--c:var(--muted)">Everything else (system, app, backups) 7.9 GB</span></div>
+                  <p style="margin:8px 0 0;color:var(--text-soft)">Caps allocated: <b>4 GB</b> across 3 free spaces · 3 admin spaces have no limit · uploads stop for everyone below <b>2 GB</b> free.</p>
+                </div>
+                <div class="m-tile wide">
+                  <div class="th"><b>Common fixes</b><span class="grow"></span><span class="m-badge">from today's checks</span></div>
+                  <dl><dt style="color:var(--warn)">Uploads are not in any backup</dt><dd>Run a Full backup, or add <code>sudo teamflow-backup</code> to cron. <u>How-to</u></dd>
+                  <dt>502 after an update</dt><dd>Check the service log: <code>journalctl -u teamflow -n 50</code>. <u>How-to</u></dd>
+                  <dt>Bot says "unauthorized"</dt><dd>Its PAT was revoked: make a new one in Settings → API tokens, then Restart bot. <u>How-to</u></dd></dl>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div></div>
+        <div class="frame-cap">Desktop 1280 × 800</div>
+      </div>
+      <div>
+        <div class="frame phone" style="--w:375;--h:812"><div class="vp">
+          <div class="m-mob-top"><span class="m-btn sm">←</span><span class="m-crumb" style="flex:1">Server admin</span><span class="m-avatar">G</span></div>
+          <div class="m-tabs"><span class="on">Overview</span><span>Spaces</span><span>Updates</span><span>Bot</span><span>Help</span></div>
+          <div style="padding:12px">
+            <div class="m-mcard"><div class="t"><span class="dot ok"></span><b>Server</b><span class="st ok">running</span></div><div style="color:var(--text-soft)">:3000 · public URL ✓ · active 6 d</div></div>
+            <div class="m-mcard"><div class="t"><span class="dot ok"></span><b>Discord bot</b><span class="st ok">running</span></div><div style="color:var(--text-soft)">teamflow-discord · enabled</div></div>
+            <div class="m-mcard"><div class="t"><span class="dot warn"></span><b>Updates</b><span class="st warn">2 behind</span></div><div style="color:var(--text-soft)">1d99913 → a41c07e</div><div style="margin-top:8px"><span class="m-btn sm primary">Update…</span></div></div>
+            <div class="m-mcard"><div class="t"><span class="dot ok"></span><b>Backups</b><span class="st ok">18 h ago</span></div><div style="color:var(--text-soft)">Database only · uploads never backed up</div></div>
+            <div class="m-mcard"><div class="t"><span class="dot ok"></span><b>Disk</b><span class="st ok">19 GB free</span></div><div class="bar"><i style="width:13.7%"></i><i class="b3" style="width:26.3%"></i></div><div class="meta">Uploads 4.1 GB · everything else 7.9 GB</div></div>
+            <div class="m-callout warn"><b>Uploads are not in any backup.</b> Run a Full backup. <u>How-to</u></div>
+          </div>
+        </div></div>
+        <div class="frame-cap">Phone 375 × 812: tiles stack, tabs replace the side nav</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===================== 3 SPACES LIST ===================== -->
+  <section class="item" id="spaces">
+    <p class="eyebrow">3 · Admin page · Spaces</p>
+    <h2>Every space with type, cap, usage, members and issues</h2>
+    <ul class="changes">
+      <li>Usage bar per space: accent under 80%, amber from 80%, red at the cap. "No limit" spaces show bytes used with a grey bar against free disk.</li>
+      <li>Filters: All, Admin, Free, Near limit (80%+). Sort by any column; default is most used first.</li>
+      <li>Row click opens Space detail. "New space" opens the Create dialog.</li>
+    </ul>
+    <div class="mocks">
+      <div>
+        <div class="frame" style="--w:1280;--h:640"><div class="vp">
+          <div class="m-top"><span class="m-logo">TEAMFLOW</span><span class="m-crumb">Server admin</span><span class="grow"></span><span class="m-avatar">G</span></div>
+          <div class="m-admin">
+            <nav class="m-snav"><span class="back">← Back to board</span><div class="h">Server</div><div class="it">Overview</div><div class="it on">Spaces <span class="m-badge">6</span></div><div class="it">Updates &amp; backups</div><div class="it">Discord bot</div><div class="h">Help</div><div class="it">How-tos &amp; fixes</div><div class="h">Settings</div><div class="it">Space defaults</div></nav>
+            <div class="m-content">
+              <div style="display:flex;align-items:center;gap:10px"><h2 style="flex:1">Spaces</h2><span class="m-btn primary">+ New space</span></div>
+              <p class="sub">6 spaces · 4.1 GB uploaded · free-space default cap 1 GB, 3 per user</p>
+              <div class="m-filters"><span class="m-chip on">All 6</span><span class="m-chip">Admin 3</span><span class="m-chip">Free 3</span><span class="m-chip">Near limit 2</span><span class="grow"></span><span class="m-input ph" style="width:220px">Search spaces…</span></div>
+              <table class="m-table">
+                <tr><th>Space</th><th>Type</th><th>Owner</th><th>Members</th><th>Issues</th><th>Storage</th><th>Cap</th></tr>
+                <tr><td class="n">Axiom <small>AXIOM</small></td><td><span class="m-type admin">Admin</span></td><td>George</td><td>4</td><td>212</td><td class="use"><div class="lbl"><span>3.2 GB</span><span>no limit</span></div><div class="bar"><i class="b3" style="width:17%"></i></div></td><td>No limit</td></tr>
+                <tr class="hl"><td class="n">Design crit <small>DES</small></td><td><span class="m-type free">Free</span></td><td>Sam</td><td>3</td><td>41</td><td class="use"><div class="lbl"><span>1.00 GB</span><span style="color:var(--danger-text)">100% · full</span></div><div class="bar"><i class="full" style="width:100%"></i></div></td><td>1 GB</td></tr>
+                <tr><td class="n">Mod pack <small>MOD</small></td><td><span class="m-type free">Free</span></td><td>Jules</td><td>2</td><td>18</td><td class="use"><div class="lbl"><span>812 MB</span><span style="color:var(--warn)">81%</span></div><div class="bar"><i class="warn" style="width:81%"></i></div></td><td>1 GB</td></tr>
+                <tr><td class="n">Video upscaler <small>VUP</small></td><td><span class="m-type admin">Admin</span></td><td>George</td><td>1</td><td>37</td><td class="use"><div class="lbl"><span>640 MB</span><span>13%</span></div><div class="bar"><i style="width:13%"></i></div></td><td>5 GB</td></tr>
+                <tr><td class="n">General <small>GEN</small></td><td><span class="m-type admin">Admin</span></td><td>George</td><td>1</td><td>9</td><td class="use"><div class="lbl"><span>12 MB</span><span>no limit</span></div><div class="bar"><i class="b3" style="width:1%"></i></div></td><td>No limit</td></tr>
+                <tr><td class="n">General <small>GEN · Sam</small></td><td><span class="m-type free">Free</span></td><td>Sam</td><td>1</td><td>2</td><td class="use"><div class="lbl"><span>0 B</span><span>0%</span></div><div class="bar"><i style="width:0%"></i></div></td><td>1 GB</td></tr>
+              </table>
+            </div>
+          </div>
+        </div></div>
+        <div class="frame-cap">Desktop 1280 × 640</div>
+      </div>
+      <div>
+        <div class="frame phone" style="--w:375;--h:812"><div class="vp">
+          <div class="m-mob-top"><span class="m-btn sm">←</span><span class="m-crumb" style="flex:1">Server admin</span><span class="m-btn sm primary">+ New</span></div>
+          <div class="m-tabs"><span>Overview</span><span class="on">Spaces</span><span>Updates</span><span>Bot</span><span>Help</span></div>
+          <div style="padding:12px">
+            <div class="m-filters"><span class="m-chip on">All</span><span class="m-chip">Admin</span><span class="m-chip">Free</span><span class="m-chip">Near limit</span></div>
+            <div class="m-mcard"><div class="t"><b>Axiom</b><span class="m-type admin">Admin</span></div><div class="bar"><i class="b3" style="width:17%"></i></div><div class="meta">3.2 GB · no limit · George · 4 members · 212 issues</div></div>
+            <div class="m-mcard" style="border-color:color-mix(in srgb,var(--danger) 50%,var(--border))"><div class="t"><b>Design crit</b><span class="m-type free">Free</span></div><div class="bar"><i class="full" style="width:100%"></i></div><div class="meta"><span style="color:var(--danger-text)">1.00 GB of 1 GB · full</span> · Sam · 3 members · 41 issues</div></div>
+            <div class="m-mcard"><div class="t"><b>Mod pack</b><span class="m-type free">Free</span></div><div class="bar"><i class="warn" style="width:81%"></i></div><div class="meta"><span style="color:var(--warn)">812 MB of 1 GB · 81%</span> · Jules · 2 members · 18 issues</div></div>
+            <div class="m-mcard"><div class="t"><b>Video upscaler</b><span class="m-type admin">Admin</span></div><div class="bar"><i style="width:13%"></i></div><div class="meta">640 MB of 5 GB · George · 1 member · 37 issues</div></div>
+            <div class="m-mcard"><div class="t"><b>General</b><span class="m-type admin">Admin</span></div><div class="bar"><i class="b3" style="width:1%"></i></div><div class="meta">12 MB · no limit · George</div></div>
+          </div>
+        </div></div>
+        <div class="frame-cap">Phone: one card per space</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===================== 4 CREATE ===================== -->
+  <section class="item" id="create">
+    <p class="eyebrow">4 · Create space dialog</p>
+    <h2>Name, key, type, allowance, owner</h2>
+    <ul class="changes">
+      <li>Type is two cards. Admin space: the allowance field is enabled, with presets and a "No limit" tick. Free space: the allowance is fixed to the default (1 GB) and the field explains it.</li>
+      <li>Owner defaults to you; pick any user. The owner gets the Owner role, same as New team today.</li>
+      <li>The shared Dialog primitive; on phones it is a full-screen sheet.</li>
+    </ul>
+    <div class="mocks">
+      <div>
+        <div class="frame" style="--w:1280;--h:720"><div class="vp">
+          <div class="m-top"><span class="m-logo">TEAMFLOW</span><span class="m-crumb">Server admin</span><span class="grow"></span><span class="m-avatar">G</span></div>
+          <div class="m-scrim"></div>
+          <div class="m-dialog" style="left:360px;top:90px;width:560px">
+            <h3>New space</h3>
+            <div class="m-row2" style="margin-top:12px"><div class="m-f"><label>Name</label><div class="m-input">Client portal</div></div><div class="m-f"><label>Key</label><div class="m-input">CLI</div></div></div>
+            <div class="m-f"><label>Type</label>
+              <div class="m-choice"><div class="on"><b>Admin space</b>You set the upload allowance, or no limit.</div><div><b>Free space</b>Default cap (1 GB). Counts toward the owner's 3 free spaces.</div></div>
+            </div>
+            <div class="m-f"><label>Upload allowance</label>
+              <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap"><div class="m-input" style="width:130px">10 <span style="color:var(--muted)">GB</span></div><div class="m-seg"><span>1 GB</span><span>5 GB</span><span class="on">10 GB</span><span>25 GB</span></div><span class="m-check"><i></i>No limit</span></div>
+              <div class="hint">19 GB free on the server now; 4 GB already allocated to other caps.</div>
+            </div>
+            <div class="m-f"><label>Owner</label><div class="m-input">George (you) <span style="color:var(--muted)">▾</span></div></div>
+            <div class="m-foot"><span class="m-btn">Cancel</span><span class="m-btn primary">Create space</span></div>
+          </div>
+        </div></div>
+        <div class="frame-cap">Desktop dialog</div>
+      </div>
+      <div>
+        <div class="frame phone" style="--w:375;--h:812"><div class="vp">
+          <div class="m-mob-top"><span class="m-btn sm">✕</span><span class="m-crumb" style="flex:1">New space</span></div>
+          <div style="padding:14px;font-size:13px">
+            <div class="m-f"><label>Name</label><div class="m-input">Client portal</div></div>
+            <div class="m-f"><label>Key</label><div class="m-input">CLI</div></div>
+            <div class="m-f"><label>Type</label><div class="m-choice" style="grid-template-columns:1fr"><div><b>Admin space</b>You set the allowance.</div><div class="on"><b>Free space</b>Default cap, 1 GB.</div></div></div>
+            <div class="m-f"><label>Upload allowance</label><div class="m-input ph">1 GB · free-space default</div><div class="hint">Change the default in Space defaults, or pick Admin space for a custom allowance.</div></div>
+            <div class="m-f"><label>Owner</label><div class="m-input">Sam <span style="color:var(--muted)">▾</span></div><div class="hint">Sam owns 1 of 3 free spaces.</div></div>
+          </div>
+          <div style="position:absolute;left:0;right:0;bottom:0;padding:12px 14px;border-top:1px solid var(--border);background:var(--surface);display:flex;gap:8px;justify-content:flex-end"><span class="m-btn">Cancel</span><span class="m-btn primary">Create space</span></div>
+        </div></div>
+        <div class="frame-cap">Phone sheet, Free space picked</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===================== 5 DETAIL ===================== -->
+  <section class="item" id="detail">
+    <p class="eyebrow">5 · Space detail</p>
+    <h2>Usage breakdown, cap editing, type change</h2>
+    <ul class="changes">
+      <li>Breakdown bar: issue files, row files, Files trash, uploads in progress. Trash shows when it will purge, with "Empty trash now".</li>
+      <li>Cap editor: presets, custom number, No limit. Setting it under current use shows a warning; nothing is deleted.</li>
+      <li>Type switch with a one-line consequence. Every change goes to the activity log, shown at the bottom.</li>
+      <li>Largest files list, so the admin can see what is filling the space; "Open as member" opens its board.</li>
+    </ul>
+    <div class="mocks">
+      <div>
+        <div class="frame" style="--w:1280;--h:800"><div class="vp">
+          <div class="m-top"><span class="m-logo">TEAMFLOW</span><span class="m-crumb">Server admin <small>Spaces › Mod pack</small></span><span class="grow"></span><span class="m-avatar">G</span></div>
+          <div class="m-admin">
+            <nav class="m-snav"><span class="back">← Back to board</span><div class="h">Server</div><div class="it">Overview</div><div class="it on">Spaces <span class="m-badge">6</span></div><div class="it">Updates &amp; backups</div><div class="it">Discord bot</div><div class="h">Help</div><div class="it">How-tos &amp; fixes</div><div class="h">Settings</div><div class="it">Space defaults</div></nav>
+            <div class="m-content">
+              <div style="display:flex;align-items:center;gap:10px"><h2>Mod pack</h2><span class="m-type free">Free</span><span class="m-badge">MOD</span><span style="flex:1"></span><span class="m-btn">Open as member</span></div>
+              <p class="sub">Owner Jules · 2 members · 18 issues · created 2026-11-10</p>
+              <div class="m-grid">
+                <div class="m-tile" style="grid-column: span 2">
+                  <div class="th"><b>Storage</b><span class="grow"></span><span style="color:var(--warn)">812 MB of 1 GB · 81%</span></div>
+                  <div class="bar tall"><i style="width:52%"></i><i class="b2" style="width:14%"></i><i class="b3" style="width:12%"></i><i class="b4" style="width:3%"></i></div>
+                  <div class="legend"><span style="--c:var(--accent)">Issue files 520 MB</span><span style="--c:color-mix(in srgb,var(--accent) 55%,var(--panel))">Row files 140 MB</span><span style="--c:var(--muted)">Trash 120 MB · purges 2026-11-14</span><span style="--c:var(--accent)">Uploading 32 MB</span></div>
+                  <div class="acts"><span class="m-btn sm danger">Empty trash now</span><span class="m-btn sm">Cancel stale uploads</span></div>
+                  <div style="margin-top:12px;font-size:11px;color:var(--muted);letter-spacing:.12em;text-transform:uppercase">Largest files</div>
+                  <div class="m-file"><span class="ic">ZIP</span><span class="nm">modpack-v3.zip<small>MOD-12 · Jules · 2026-11-12</small></span><span>310 MB</span></div>
+                  <div class="m-file"><span class="ic">MP4</span><span class="nm">trailer-draft.mp4<small>Row "Release" · Jules</small></span><span>140 MB</span></div>
+                  <div class="m-file" style="border:0"><span class="ic">ZIP</span><span class="nm">old-build.zip<small>In trash · purges 2026-11-14</small></span><span>120 MB</span></div>
+                </div>
+                <div class="m-tile">
+                  <div class="th"><b>Upload cap</b></div>
+                  <div class="m-seg" style="margin-bottom:8px"><span class="on">1 GB</span><span>2 GB</span><span>5 GB</span><span>Custom</span><span>No limit</span></div>
+                  <div class="m-input" style="width:140px">1 <span style="color:var(--muted)">GB</span></div>
+                  <p style="color:var(--muted);margin:6px 0 10px">Free-space default is 1 GB. Lowering below 812 MB blocks new uploads; nothing is deleted.</p>
+                  <div class="th" style="margin-top:4px"><b>Type</b></div>
+                  <div class="m-seg"><span>Admin</span><span class="on">Free</span></div>
+                  <p style="color:var(--muted);margin:6px 0 10px">Admin: keeps this cap, stops counting toward Jules's 3 free spaces.</p>
+                  <div class="acts"><span class="m-btn sm primary">Save</span><span class="m-btn sm">Reset</span></div>
+                </div>
+                <div class="m-tile wide">
+                  <div class="th"><b>History</b></div>
+                  <dl><dt>2026-11-12</dt><dd>Reached 80% · owner and admins were shown the warning</dd><dt>2026-11-10</dt><dd>Created by Jules as a Free space · cap 1 GB</dd></dl>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div></div>
+        <div class="frame-cap">Desktop 1280 × 800</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===================== 6 METER ===================== -->
+  <section class="item" id="meter">
+    <p class="eyebrow">6 · User side · Files drawer</p>
+    <h2>A storage meter every member sees</h2>
+    <ul class="changes">
+      <li>At the top of the Files drawer: used, cap, percent and a bar. "No limit" spaces show bytes used only.</li>
+      <li>Under 80%: plain. From 80%: amber, with "Emptying the trash frees 120 MB" when the trash holds anything. At the cap: red, see item 7.</li>
+      <li>Upload zones in the issue drawer and row files show "188 MB left" from 80%.</li>
+    </ul>
+    <div class="mocks">
+      <div>
+        <div class="frame" style="--w:1280;--h:720"><div class="vp">
+          <div class="m-top"><span class="m-logo">TEAMFLOW</span><span class="m-team"><span class="key">MOD</span>Mod pack</span><span class="grow"></span><span class="m-btn">Files</span><span class="m-avatar">J</span></div>
+          <div class="m-scrim"></div>
+          <div class="m-drawer" style="width:720px">
+            <div class="m-dh"><h3>Files</h3><span class="m-btn sm">✕</span></div>
+            <div class="m-db">
+              <div class="m-meter">
+                <div class="top"><b>Storage</b><span style="color:var(--warn)">812 MB of 1 GB · 81%</span></div>
+                <div class="bar"><i class="warn" style="width:81%"></i></div>
+                <div class="sub">188 MB left in this free space. Emptying the trash frees 120 MB. Need more? Ask a server admin.</div>
+              </div>
+              <div class="m-tabs2"><span class="on">Files 14</span><span>Trash 1 · 120 MB</span></div>
+              <div class="m-file"><span class="ic">ZIP</span><span class="nm">modpack-v3.zip<small>MOD-12 · 2 links</small></span><span>310 MB</span></div>
+              <div class="m-file"><span class="ic">MP4</span><span class="nm">trailer-draft.mp4<small>Row "Release"</small></span><span>140 MB</span></div>
+              <div class="m-file"><span class="ic">PNG</span><span class="nm">cover.png<small>MOD-3</small></span><span>2.1 MB</span></div>
+            </div>
+          </div>
+        </div></div>
+        <div class="frame-cap">Desktop · amber state (81%)</div>
+      </div>
+      <div>
+        <div class="frame phone" style="--w:375;--h:812"><div class="vp">
+          <div class="m-mob-top"><span class="m-crumb" style="flex:1">Files</span><span class="m-btn sm">✕</span></div>
+          <div style="padding:12px">
+            <div class="m-meter"><div class="top"><b>Storage</b><span>240 MB of 1 GB · 24%</span></div><div class="bar"><i style="width:24%"></i></div><div class="sub">Free space · 784 MB left</div></div>
+            <div class="m-tabs2"><span class="on">Files 6</span><span>Trash 0</span></div>
+            <div class="m-file"><span class="ic">MP4</span><span class="nm">clip.mp4<small>DES-4</small></span><span>210 MB</span></div>
+            <div class="m-file"><span class="ic">PNG</span><span class="nm">board.png<small>DES-9</small></span><span>4 MB</span></div>
+          </div>
+        </div></div>
+        <div class="frame-cap">Phone · normal state (24%)</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===================== 7 AT LIMIT ===================== -->
+  <section class="item" id="limit">
+    <p class="eyebrow">7 · At the limit</p>
+    <h2>Uploads stop, with a clear reason; everything else keeps working</h2>
+    <ul class="changes">
+      <li>The web checks the space's remaining bytes before it starts, so a 300 MB file is refused at once, not after 290 MB of chunks.</li>
+      <li>The server checks too (every upload path), answering <code>413</code> with code <code>space_storage_full</code> and <code>{ usedBytes, capBytes, fileBytes }</code>. MCP, CLI and the Discord bot pass that message on.</li>
+      <li>The upload zone is disabled with the reason. Creating issues, comments, moving and linking existing files are untouched.</li>
+      <li>The server floor uses its own message: "The server is almost out of disk. Uploads are paused for everyone; a server admin has been told."</li>
+    </ul>
+    <div class="mocks">
+      <div>
+        <div class="frame" style="--w:1280;--h:720"><div class="vp">
+          <div class="m-top"><span class="m-logo">TEAMFLOW</span><span class="m-team"><span class="key">DES</span>Design crit</span><span class="grow"></span><span class="m-btn">Files</span><span class="m-avatar">S</span></div>
+          <div class="m-scrim"></div>
+          <div class="m-drawer" style="width:720px">
+            <div class="m-dh"><span class="m-badge">DES-41</span><h3>Final poster round</h3><span class="m-btn sm">✕</span></div>
+            <div class="m-db">
+              <div style="font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);margin-bottom:6px">Attachments</div>
+              <div class="m-drop off"><b>This space is full: 1.00 GB of 1 GB.</b><br />New uploads are paused. Issues, comments and linking existing files still work.<br /><span style="color:var(--text-soft)">Free room: empty the trash or remove files in <u>Files</u> · or ask a server admin for more.</span></div>
+              <div style="display:flex;gap:8px;margin-top:10px"><span class="m-btn sm">Link an existing file</span><span class="m-btn sm">Open Files</span></div>
+              <div class="m-file" style="margin-top:10px"><span class="ic">PNG</span><span class="nm">poster-v2.png<small>Sam · yesterday</small></span><span>8 MB</span></div>
+            </div>
+          </div>
+          <div class="m-toasts">
+            <div class="m-toast err"><div><b>poster-v3.psd (340 MB) won't fit</b><br />Design crit has 188 MB left of its 1 GB. Remove files or ask a server admin.</div><span class="x">✕</span></div>
+          </div>
+        </div></div>
+        <div class="frame-cap">Desktop · issue drawer when full, and the toast when a file is bigger than what's left</div>
+      </div>
+      <div>
+        <div class="frame phone" style="--w:375;--h:812"><div class="vp">
+          <div class="m-mob-top"><span class="m-crumb" style="flex:1">Files</span><span class="m-btn sm">✕</span></div>
+          <div style="padding:12px">
+            <div class="m-meter" style="border-color:color-mix(in srgb,var(--danger) 50%,var(--border))"><div class="top"><b>Storage</b><span style="color:var(--danger-text)">1.00 GB of 1 GB · full</span></div><div class="bar"><i class="full" style="width:100%"></i></div><div class="sub">Uploads are paused in this space. Issues and comments still work.</div></div>
+            <div class="m-callout full"><b>Make room</b><br />Trash holds 64 MB: <u>Empty trash</u>. Or remove files below. A server admin can raise the cap.</div>
+            <div class="m-tabs2" style="margin-top:12px"><span class="on">Files 23</span><span>Trash 2 · 64 MB</span></div>
+            <div class="m-file"><span class="ic">MP4</span><span class="nm">walkthrough.mp4<small>DES-12</small></span><span>420 MB</span></div>
+            <div class="m-file"><span class="ic">ZIP</span><span class="nm">fonts.zip<small>Row "Brand"</small></span><span>96 MB</span></div>
+          </div>
+        </div></div>
+        <div class="frame-cap">Phone · Files drawer when full</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===================== 8 PLAN ===================== -->
+  <section class="item" id="plan">
+    <p class="eyebrow">8 · Build plan</p>
+    <h2>Numbered items, one commit each, in order</h2>
+    <p class="lead">Each item ships with its tests and the doc lines it touches. Items 1 to 5 are the server core; 6 to 12 can be picked separately.</p>
+    <div class="scroll-x">
+    <table class="list">
+      <tr><th>#</th><th>Item</th><th>Size</th></tr>
+      <tr><td>1</td><td>Schema version 4: <code>teams.space_type</code>, <code>teams.storage_cap_bytes</code>, <code>stored_files.team_id</code> backfilled from links; existing teams become Admin spaces with no limit.</td><td>Small</td></tr>
+      <tr><td>2</td><td>Core: space types, <code>space_storage_full</code> error, space defaults (free cap 1 GB, 3 free spaces per user, 2 GB disk floor) in env and an admin setting.</td><td>Small</td></tr>
+      <tr><td>3</td><td>Server: per-space usage (each file once, trash, issue trash, uploads in progress) with tests.</td><td>Small</td></tr>
+      <tr><td>4</td><td>Quota and disk-floor checks on every upload path: issue upload, row upload, chunked start and complete, bundle import with files.</td><td>Medium</td></tr>
+      <tr><td>5</td><td>Free-space rules: New team and registration's General create Free spaces with the default cap, limited per user.</td><td>Small</td></tr>
+      <tr><td>6</td><td>Admin API <code>/admin/*</code> (instance admin only): overview with service and port checks, spaces list, create, change type and cap, empty trash.</td><td>Medium</td></tr>
+      <tr><td>7</td><td>Usage on the team API and api-client, plus the error message in MCP, CLI and the bot.</td><td>Small</td></tr>
+      <tr><td>8</td><td>Web: <code>/admin</code> route, "Server admin" in the avatar menu, Overview tiles; Settings → Updates links there.</td><td>Medium</td></tr>
+      <tr><td>9</td><td>Web: Spaces list and Create space dialog.</td><td>Medium</td></tr>
+      <tr><td>10</td><td>Web: Space detail with breakdown, cap and type editing, history.</td><td>Medium</td></tr>
+      <tr><td>11</td><td>Web: Files drawer meter, "left" hint on upload zones, at-limit message and toast with a pre-check.</td><td>Medium</td></tr>
+      <tr><td>12</td><td>Web: How-tos and common fixes matched to the Overview checks.</td><td>Small</td></tr>
+      <tr><td>13</td><td>Docs: new <code>docs/SPACES.md</code>; AUTH, ATTACHMENTS, LARGE-FILES, API, ARCHITECTURE and IDEAS updated.</td><td>Small</td></tr>
+    </table>
+    </div>
+    <p class="note">Open questions for George: is 3 free spaces per user right; should a new user's General be Free (recommended) or Admin; should the 80% warning also go to the space owner by email or Discord later.</p>
+  </section>
+</main>
+<script>
+  const root = document.documentElement, btn = document.getElementById("theme");
+  btn.addEventListener("click", () => {
+    const light = root.dataset.theme !== "light";
+    root.dataset.theme = light ? "light" : "dark";
+    btn.textContent = light ? "☾ Dark" : "☀ Light";
+  });
+</script>
+</body>
+</html>

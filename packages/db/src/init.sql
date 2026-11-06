@@ -26,7 +26,25 @@ CREATE TABLE IF NOT EXISTS teams (
   name TEXT NOT NULL,
   key TEXT NOT NULL,
   issue_counter INTEGER NOT NULL DEFAULT 0,
+  space_type TEXT NOT NULL DEFAULT 'admin',
+  storage_cap_bytes INTEGER,
+  space_owner_id TEXT REFERENCES users(id) ON DELETE SET NULL,
   created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+CREATE TABLE IF NOT EXISTS space_events (
+  id TEXT PRIMARY KEY,
+  team_id TEXT NOT NULL REFERENCES teams(id) ON DELETE CASCADE,
+  actor_id TEXT REFERENCES users(id) ON DELETE SET NULL,
+  kind TEXT NOT NULL,
+  detail TEXT,
+  created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+CREATE TABLE IF NOT EXISTS instance_settings (
+  key TEXT PRIMARY KEY,
+  value TEXT NOT NULL,
+  updated_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
 CREATE TABLE IF NOT EXISTS team_members (

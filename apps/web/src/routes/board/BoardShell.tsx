@@ -24,6 +24,7 @@ import { UserMenu } from "../../components/UserMenu";
 import type { SettingsPanel } from "../../components/SettingsNav";
 import { useChangeHistory } from "../../hooks/useChangeHistory";
 import {
+  adminPath,
   boardPath,
   isSettingsPanel,
   issuePath,
@@ -409,7 +410,8 @@ export function BoardShell() {
     void goToRef(entry.ref, { skipBackPush: true });
   }
 
-  const settingsOpen = route.settingsOpen;
+  // The admin page shares the settings workspace (and closes like it).
+  const settingsOpen = route.settingsOpen || (route.adminOpen && isInstanceAdmin);
   const roadmapOpen = route.planOpen && canSeePlan;
   if (settingsOpen && isSettingsPanel(route.settingsPanel)) {
     lastSettingsPanelRef.current = route.settingsPanel;
@@ -510,6 +512,9 @@ export function BoardShell() {
   // Non-admins go to the board. Wait for GET /auth/me first so a stale cached user does not
   // bounce an admin off the plan, and render nothing meanwhile so the plan never flashes.
   if (route.planOpen && !canSeePlan) {
+    return sessionReady ? <Navigate to={boardPath(route.teamKey)} replace /> : null;
+  }
+  if (route.adminOpen && !isInstanceAdmin) {
     return sessionReady ? <Navigate to={boardPath(route.teamKey)} replace /> : null;
   }
 
@@ -643,6 +648,7 @@ export function BoardShell() {
                     : []),
                 ]}
                 onSettings={() => navigate(settingsPath(teamKey, lastSettingsPanelRef.current))}
+                onServerAdmin={isInstanceAdmin ? () => navigate(adminPath(teamKey)) : undefined}
                 onAbout={() => setAboutOpen(true)}
                 onLogout={logout}
               />

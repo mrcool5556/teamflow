@@ -3,7 +3,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { Command } from "commander";
-import { TeamflowClient } from "@teamflow/api-client";
+import { TeamflowApiError, TeamflowClient, formatStorageBytes } from "@teamflow/api-client";
 
 type Config = {
   baseUrl: string;
@@ -208,4 +208,32 @@ board
     }
   });
 
-program.parse();
+board
+  .command("storage")
+  .description("Upload allowance and usage of a team's space")
+  .requiredOption("--team <teamId>", "Team UUID")
+  .action(async (opts) => {
+    const client = getClient();
+    const { storage } = await client.getTeamStorage(opts.team);
+    const cap = storage.capBytes === null ? "no limit" : formatStorageBytes(storage.capBytes);
+    console.log(`${storage.spaceType} space · ${formatStorageBytes(storage.usedBytes)} of ${cap}`);
+    if (storage.remainingBytes !== null) {
+      console.log(`${formatStorageBytes(storage.remainingBytes)} left (${storage.state})`);
+    }
+    const b = storage.breakdown;
+    console.log(
+      `issue files ${formatStorageBytes(b.issueFilesBytes)} · row files ${formatStorageBytes(b.rowFilesBytes)} · ` +
+        `trash ${formatStorageBytes(b.trashBytes)} · uploading ${formatStorageBytes(b.uploadingBytes)}`,
+    );
+    if (storage.diskLow) console.log("The server disk is almost full: uploads are paused.");
+  });
+
+program.parseAsync().catch((err: unknown) => {
+  // API refusals (full space, free-space limit, permissions) print the server's own message.
+  if (err instanceof TeamflowApiError) {
+    console.error(`Error: ${err.message}${err.code ? ` (${err.code})` : ""}`);
+  } else {
+    console.error(err instanceof Error ? err.message : err);
+  }
+  process.exit(1);
+});

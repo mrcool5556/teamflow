@@ -52,6 +52,21 @@ import type {
   UserPublic,
 } from "@teamflow/core";
 import type { UserProfile, UserProfileExport, UserProfilePatch } from "@teamflow/core";
+import type {
+  CreateSpaceInput,
+  InstanceOverviewPublic,
+  InstanceSpaceDetailPublic,
+  InstanceSpacePublic,
+  InstanceUserPublic,
+  PublicUrlCheckPublic,
+  SpaceSettingsPublic,
+  SpaceStoragePublic,
+  UpdateSpaceInput,
+  UpdateSpaceSettingsInput,
+} from "@teamflow/core";
+
+/** Byte formatting shared with the server messages, for apps that only depend on the client. */
+export { formatStorageBytes } from "@teamflow/core";
 
 export type TeamflowClientOptions = {
   baseUrl: string;
@@ -62,12 +77,18 @@ export type TeamflowClientOptions = {
 export class TeamflowApiError extends Error {
   status: number;
   code?: string;
+  /**
+   * The whole JSON error body. Some errors carry numbers beside `error` and `code`, for example
+   * `space_storage_full` adds usedBytes, capBytes, fileBytes and remainingBytes.
+   */
+  details: Record<string, unknown>;
 
-  constructor(message: string, status: number, code?: string) {
+  constructor(message: string, status: number, code?: string, details: object = {}) {
     super(message);
     this.name = "TeamflowApiError";
     this.status = status;
     this.code = code;
+    this.details = { ...details };
   }
 }
 
@@ -127,6 +148,7 @@ export class TeamflowClient {
         payload.error ?? response.statusText,
         response.status,
         payload.code,
+        payload,
       );
     }
 
@@ -485,6 +507,7 @@ export class TeamflowClient {
         payload.error ?? response.statusText,
         response.status,
         payload.code,
+        payload,
       );
     }
 
@@ -643,7 +666,9 @@ export class TeamflowClient {
           return;
         }
 
-        reject(new TeamflowApiError(payload.error ?? xhr.statusText, xhr.status, payload.code));
+        reject(
+          new TeamflowApiError(payload.error ?? xhr.statusText, xhr.status, payload.code, payload),
+        );
       });
 
       xhr.addEventListener("error", () => {
@@ -707,7 +732,9 @@ export class TeamflowClient {
           return;
         }
 
-        reject(new TeamflowApiError(payload.error ?? xhr.statusText, xhr.status, payload.code));
+        reject(
+          new TeamflowApiError(payload.error ?? xhr.statusText, xhr.status, payload.code, payload),
+        );
       });
 
       xhr.addEventListener("error", () => reject(new TeamflowApiError("Upload failed", 0)));
@@ -837,6 +864,7 @@ export class TeamflowClient {
         payload.error ?? response.statusText,
         response.status,
         payload.code,
+        payload,
       );
     }
 
@@ -871,6 +899,74 @@ export class TeamflowClient {
       attachments: IssueAttachmentPublic[];
       limits: AttachmentLimitsPublic;
     }>(`/rows/${rowId}/attachments`);
+  }
+
+  /** The space's upload cap and usage (Files drawer meter). Any member. */
+  getTeamStorage(teamId: string) {
+    return this.request<{ storage: SpaceStoragePublic }>(`/teams/${teamId}/storage`);
+  }
+
+  /* ---------- instance admin (/instance/*, instance admins only) ---------- */
+
+  getInstanceOverview() {
+    return this.request<{ overview: InstanceOverviewPublic }>("/instance/overview");
+  }
+
+  checkPublicUrl() {
+    return this.request<{ check: PublicUrlCheckPublic }>("/instance/checks/public-url");
+  }
+
+  getSpaceSettings() {
+    return this.request<{ settings: SpaceSettingsPublic }>("/instance/settings");
+  }
+
+  updateSpaceSettings(input: UpdateSpaceSettingsInput) {
+    return this.request<{ settings: SpaceSettingsPublic }>("/instance/settings", {
+      method: "PATCH",
+      body: JSON.stringify(input),
+    });
+  }
+
+  listInstanceUsers(query?: string) {
+    const q = query ? `?q=${encodeURIComponent(query)}` : "";
+    return this.request<{ users: InstanceUserPublic[] }>(`/instance/users${q}`);
+  }
+
+  listSpaces() {
+    return this.request<{ spaces: InstanceSpacePublic[] }>("/instance/spaces");
+  }
+
+  createSpace(input: CreateSpaceInput) {
+    return this.request<{ space: InstanceSpaceDetailPublic }>("/instance/spaces", {
+      method: "POST",
+      body: JSON.stringify(input),
+    });
+  }
+
+  getSpace(teamId: string) {
+    return this.request<{ space: InstanceSpaceDetailPublic }>(`/instance/spaces/${teamId}`);
+  }
+
+  updateSpace(teamId: string, input: UpdateSpaceInput) {
+    return this.request<{ space: InstanceSpaceDetailPublic }>(`/instance/spaces/${teamId}`, {
+      method: "PATCH",
+      body: JSON.stringify(input),
+    });
+  }
+
+  emptySpaceTrash(teamId: string) {
+    return this.request<{
+      deletedFiles: number;
+      freedBytes: number;
+      space: InstanceSpaceDetailPublic;
+    }>(`/instance/spaces/${teamId}/empty-trash`, { method: "POST" });
+  }
+
+  cancelSpaceUploads(teamId: string) {
+    return this.request<{ cancelledUploads: number; space: InstanceSpaceDetailPublic }>(
+      `/instance/spaces/${teamId}/cancel-uploads`,
+      { method: "POST" },
+    );
   }
 
   listTeamFiles(teamId: string, options?: { trash?: boolean }) {
@@ -948,7 +1044,9 @@ export class TeamflowClient {
           return;
         }
 
-        reject(new TeamflowApiError(payload.error ?? xhr.statusText, xhr.status, payload.code));
+        reject(
+          new TeamflowApiError(payload.error ?? xhr.statusText, xhr.status, payload.code, payload),
+        );
       });
 
       xhr.addEventListener("error", () => {
