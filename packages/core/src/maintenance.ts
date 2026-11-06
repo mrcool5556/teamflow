@@ -140,6 +140,11 @@ export type MaintenanceStatusPublic = {
   backupScript: string | null;
   updateScript: string | null;
   sudoReady: boolean;
+  /**
+   * A backup or update job is running, so the sudo check waits (update.sh reinstalls the
+   * scripts and sudoers rule mid-run). The web shows "Update in progress" instead of an error.
+   */
+  sudoPending: boolean;
   sudoDetail: string | null;
   backupDir: string | null;
   backups: MaintenanceBackupPublic[];
