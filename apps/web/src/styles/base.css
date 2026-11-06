@@ -114,28 +114,32 @@ select {
   font: inherit;
 }
 
+/* Plain, ghost and danger buttons read --btn-* variables, which the Buttons aspect sets
+   (styles/aspects.css); without it they fall back to the UI style's chrome tokens. */
 button {
-  background: var(--primary);
-  color: var(--chrome-btn-text);
-  border: var(--chrome-btn-border-width) solid var(--chrome-btn-border-color);
+  background: var(--btn-bg, var(--primary));
+  color: var(--btn-text, var(--chrome-btn-text));
+  border: var(--btn-border-w, var(--chrome-btn-border-width)) solid
+    var(--btn-border, var(--chrome-btn-border-color));
   padding: 0.55rem 0.9rem;
   cursor: pointer;
-  box-shadow: var(--chrome-btn-shadow);
-  border-radius: var(--radius-control);
+  box-shadow: var(--btn-shadow, var(--chrome-btn-shadow));
+  border-radius: var(--btn-radius, var(--radius-control));
+  transform: var(--btn-transform, none);
 }
 
 button.ghost {
-  background: transparent;
-  color: var(--text);
-  border-color: var(--border);
-  box-shadow: none;
+  background: var(--btn-quiet-bg, transparent);
+  color: var(--btn-quiet-text, var(--text));
+  border-color: var(--btn-quiet-border, var(--border));
+  box-shadow: var(--btn-quiet-shadow, none);
 }
 
 button.danger {
-  background: transparent;
+  background: var(--btn-danger-bg, transparent);
   color: var(--danger);
-  border-color: var(--danger);
-  box-shadow: none;
+  border-color: var(--btn-danger-border, var(--danger));
+  box-shadow: var(--btn-danger-shadow, none);
 }
 
 button.danger:hover {

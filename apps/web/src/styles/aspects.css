@@ -246,6 +246,222 @@
   -webkit-backdrop-filter: none;
 }
 
+/* ── Buttons (data-buttons) ──
+   Plain buttons are the primary face; ghost buttons the quiet face; danger keeps its red.
+   Buttons with their own classes (segments, icons, chips) keep their own look. */
+[data-buttons] {
+  --btn-text: var(--chrome-btn-text);
+  --btn-border-w: 1px;
+  --btn-border: transparent;
+  --btn-quiet-text: var(--text);
+  --btn-quiet-border: var(--border);
+  --btn-danger-border: var(--danger);
+}
+
+[data-buttons="flat"] {
+  --btn-bg: var(--primary);
+  --btn-shadow: none;
+  --btn-quiet-bg: transparent;
+  --btn-quiet-shadow: none;
+  --btn-danger-bg: transparent;
+  --btn-danger-shadow: none;
+}
+
+[data-buttons="raised"] {
+  --btn-bg: var(--primary);
+  --btn-shadow: var(--shadow-bevel), 0 2px 0 rgba(0, 0, 0, 0.18);
+  --btn-quiet-bg: var(--surface);
+  --btn-quiet-border: transparent;
+  --btn-quiet-shadow: var(--btn-shadow);
+  --btn-danger-bg: var(--surface);
+  --btn-danger-border: transparent;
+  --btn-danger-shadow: var(--btn-shadow);
+  --btn-press-shadow: var(--shadow-inset);
+  --btn-press-transform: translateY(1px);
+}
+
+[data-buttons="inset"] {
+  --btn-bg: color-mix(in srgb, var(--primary) 18%, var(--surface));
+  --btn-text: color-mix(in srgb, var(--primary) 55%, var(--text));
+  --btn-shadow: var(--shadow-inset);
+  --btn-quiet-bg: var(--cell);
+  --btn-quiet-border: transparent;
+  --btn-quiet-shadow: var(--shadow-inset);
+  --btn-danger-bg: var(--cell);
+  --btn-danger-border: transparent;
+  --btn-danger-shadow: var(--shadow-inset);
+  --btn-press-shadow: var(--shadow-inset), inset 0 2px 6px rgba(0, 0, 0, 0.25);
+}
+
+/* Lipped: a metal rim drawn as the border box behind the face. */
+[data-buttons="lipped"] {
+  --lip-metal: linear-gradient(
+    180deg,
+    #fff1b0 0%,
+    #f0c75c 14%,
+    #e6b84a 38%,
+    #c9972c 66%,
+    #8f6a1d 90%,
+    #5a4012 100%
+  );
+  --btn-border-w: 3px;
+  --btn-bg:
+    linear-gradient(var(--primary), var(--primary)) padding-box, var(--lip-metal) border-box;
+  --btn-shadow: var(--lip-shadow, none);
+  --btn-quiet-bg:
+    linear-gradient(var(--surface), var(--surface)) padding-box, var(--lip-metal) border-box;
+  --btn-quiet-border: transparent;
+  --btn-quiet-shadow: var(--lip-shadow, none);
+  --btn-danger-bg: var(--btn-quiet-bg);
+  --btn-danger-border: transparent;
+  --btn-danger-shadow: var(--lip-shadow, none);
+  --btn-press-shadow: var(--lip-shadow-pressed, none), inset 0 2px 3px rgba(0, 0, 0, 0.35);
+  --btn-press-transform: translateY(1px);
+}
+
+[data-lip="gold"] {
+  --lip-metal: linear-gradient(
+    180deg,
+    #fff1b0 0%,
+    #f0c75c 14%,
+    #e6b84a 38%,
+    #c9972c 66%,
+    #8f6a1d 90%,
+    #5a4012 100%
+  );
+}
+
+[data-lip="silver"] {
+  --lip-metal: linear-gradient(
+    180deg,
+    #fff 0%,
+    #e4e8eb 16%,
+    #c6ccd1 44%,
+    #9aa3aa 74%,
+    #5f676e 100%
+  );
+}
+
+[data-lip="bronze"] {
+  --lip-metal: linear-gradient(
+    180deg,
+    #ffe0c4 0%,
+    #e3a06c 16%,
+    #c27a47 44%,
+    #8e4f25 76%,
+    #4f2a12 100%
+  );
+}
+
+[data-lip="ink"] {
+  --lip-metal: linear-gradient(180deg, #5b6168 0%, #2d3237 30%, #16191c 100%);
+}
+
+[data-lip="accent"] {
+  --lip-metal:
+    linear-gradient(
+      180deg,
+      rgba(255, 255, 255, 0.6) 0%,
+      rgba(255, 255, 255, 0) 30%,
+      rgba(0, 0, 0, 0) 60%,
+      rgba(0, 0, 0, 0.38) 100%
+    ),
+    var(--primary);
+}
+
+[data-lip-shadow="drop"] {
+  --lip-shadow: 0 0 0 1px rgba(0, 0, 0, 0.45), 0 2px 3px rgba(0, 0, 0, 0.35);
+  --lip-shadow-pressed: 0 0 0 1px rgba(0, 0, 0, 0.5);
+}
+
+[data-buttons="cut-paper"] {
+  --btn-border-w: 0px;
+  --btn-radius: 2px;
+  --btn-bg: var(--fiber) 0 0 / 240px 240px, var(--primary);
+  --btn-shadow: 0 1px 0 rgba(30, 18, 4, 0.45), 4px 4px 0 rgba(30, 18, 4, 0.3);
+  --btn-transform: rotate(-0.6deg);
+  --btn-quiet-bg: var(--fiber) 0 0 / 240px 240px, var(--cell);
+  --btn-quiet-border: transparent;
+  --btn-quiet-shadow: var(--btn-shadow);
+  --btn-danger-bg: var(--btn-quiet-bg);
+  --btn-danger-border: transparent;
+  --btn-danger-shadow: var(--btn-shadow);
+  --btn-press-shadow: 0 1px 0 rgba(30, 18, 4, 0.5), 1px 1px 0 rgba(30, 18, 4, 0.3);
+  --btn-press-transform: rotate(-0.6deg) translate(2px, 2px);
+}
+
+[data-buttons="neon"] {
+  --btn-border-w: 2px;
+  --btn-bg: var(--primary);
+  --btn-border: var(--primary);
+  --btn-shadow:
+    0 0 14px var(--primary), 0 0 30px color-mix(in srgb, var(--primary) 30%, transparent);
+  --btn-quiet-bg: transparent;
+  --btn-quiet-text: var(--primary);
+  --btn-quiet-border: var(--primary);
+  --btn-quiet-shadow:
+    0 0 8px color-mix(in srgb, var(--primary) 35%, transparent),
+    inset 0 0 8px color-mix(in srgb, var(--primary) 25%, transparent);
+  --btn-danger-bg: transparent;
+  --btn-danger-shadow: 0 0 8px var(--danger);
+}
+
+[data-buttons="bevel95"] {
+  --btn-border-w: 0px;
+  --btn-radius: 0;
+  --btn-bg: var(--primary);
+  --btn-shadow:
+    inset -1px -1px rgba(0, 0, 0, 0.65), inset 1px 1px rgba(255, 255, 255, 0.85),
+    inset -2px -2px rgba(0, 0, 0, 0.3), inset 2px 2px rgba(255, 255, 255, 0.35);
+  --btn-quiet-bg: var(--cell);
+  --btn-quiet-border: transparent;
+  --btn-quiet-shadow: var(--btn-shadow);
+  --btn-danger-bg: var(--cell);
+  --btn-danger-border: transparent;
+  --btn-danger-shadow: var(--btn-shadow);
+  --btn-press-shadow:
+    inset 1px 1px rgba(0, 0, 0, 0.65), inset -1px -1px rgba(255, 255, 255, 0.85),
+    inset 2px 2px rgba(0, 0, 0, 0.3), inset -2px -2px rgba(255, 255, 255, 0.35);
+}
+
+[data-buttons="bevel95"] button:is(:not([class]), .ghost, .danger) {
+  font-weight: 700;
+}
+
+/* The board's row and column header buttons have their own classes; give them the quiet face. */
+:root[data-buttons][data-theme] :is(.row-bar-action, .column-label-actions .row-edit-menu-trigger) {
+  background: var(--btn-quiet-bg);
+  color: var(--btn-quiet-text);
+  border-color: var(--btn-quiet-border);
+  border-width: var(--btn-border-w);
+  box-shadow: var(--btn-quiet-shadow);
+  border-radius: var(--btn-radius, var(--radius-control));
+  transform: var(--btn-transform, none);
+}
+
+[data-buttons="cut-paper"] button:is(:not([class]), .ghost, .danger, .row-bar-action) {
+  background-blend-mode: multiply;
+}
+
+/* Pressing sinks plain, ghost and danger buttons in the styles that have a pressed look. */
+:is(
+    [data-buttons="raised"],
+    [data-buttons="inset"],
+    [data-buttons="lipped"],
+    [data-buttons="cut-paper"],
+    [data-buttons="bevel95"]
+  )
+  button:is(:not([class]), .ghost, .danger):active:not(:disabled) {
+  transform: var(--btn-press-transform, var(--btn-transform, none));
+  box-shadow: var(--btn-press-shadow, var(--btn-shadow));
+}
+
+[data-buttons="neon"] button.ghost:hover:not(:disabled) {
+  box-shadow:
+    0 0 16px var(--primary),
+    inset 0 0 12px color-mix(in srgb, var(--primary) 30%, transparent);
+}
+
 /* ── Cheap glass: no backdrop blur when the device asks for less transparency or is
    low-powered (profile.ts sets data-low-power from CPU cores and memory). ── */
 @media (prefers-reduced-transparency: reduce) {
