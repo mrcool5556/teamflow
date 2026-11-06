@@ -74,6 +74,7 @@ const SHAPE_LABELS: Record<ShapePreset, string> = {
   soft: "Slightly rounded",
   round: "Rounded",
   octagon: "Octagon",
+  pill: "Pill",
 };
 
 const TEXT_CONTRAST_LABELS: Record<TextContrastPreset, string> = {

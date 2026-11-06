@@ -8,7 +8,7 @@ Each user's look lives in their profile (`appearance` in `packages/core/src/prof
 |---|---|---|
 | `theme` | dark, light, system | `data-theme` (always dark or light) |
 | `colorPreset` + `customColors` | default, sunset, ocean, forest, custom | `data-color-preset`, inline `--primary` / `--accent` |
-| `shape` | sharp, soft, round, octagon | `data-shape` |
+| `shape` | sharp, soft, round, octagon, pill | `data-shape` |
 | `chromeStyle` (UI style) | industrial, minimal, soft, classic, glass, terminal, paper, neon | `data-chrome-style` |
 | `textContrast`, `semanticContrast` | see the schema | `data-text-contrast`, `data-semantic-contrast` |
 
@@ -47,3 +47,7 @@ The accent colour setting (`colorPreset`) overrides a theme: "default" means the
 `styles/fonts.css` declares the library's font sets on `data-font`: Studio (Bricolage Grotesque, Atkinson Hyperlegible, JetBrains Mono), Machined (Encode Sans Semi Condensed, Manrope, IBM Plex Mono), Paper (Special Elite, Atkinson Hyperlegible, Caveat for notebook fields), Pixel (Pixelify Sans, VT323) and Neon (Orbitron, Atkinson Hyperlegible). Choosing any set also replaces the Paper UI style's serif headings.
 
 The files are self-hosted in `apps/web/src/assets/fonts`, one folder per family with its licence (SIL OFL 1.1; Special Elite is Apache 2.0) and a README listing the sources. Vite bundles them into `/assets`, and `@font-face` only downloads a file when a set that uses it is chosen, so unused sets cost nothing. VT323 is scaled up 25% (`size-adjust`) to match the other sets. `tests/fontSets.test.ts` checks every `@font-face` file exists and every family has a licence.
+
+## Corners
+
+`shape` sets the radius tokens in `tokens.css`. Two extra tokens let Pill round controls fully without turning cards into capsules: `--radius-control` (buttons, fields, search boxes, segmented controls) and `--radius-chip` (issue id, due and priority chips). They follow `--radius-sm` and `--radius-xs` for the other shapes; Pill sets both to 999px and gives boxes larger radii (8 to 28px).

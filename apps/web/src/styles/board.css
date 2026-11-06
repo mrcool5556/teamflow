@@ -918,7 +918,7 @@ body.board-pan-active {
   font-size: 0.72rem;
   background: var(--surface);
   border: 1px solid var(--border);
-  border-radius: var(--radius-sm);
+  border-radius: var(--radius-control);
   color: var(--text);
 }
 
@@ -1072,7 +1072,7 @@ body.board-pan-active {
   background: var(--panel);
   color: var(--text-soft);
   border: 1px solid var(--border-strong);
-  border-radius: var(--radius-sm);
+  border-radius: var(--radius-control);
   box-shadow: none;
 }
 

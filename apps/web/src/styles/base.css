@@ -121,7 +121,7 @@ button {
   padding: 0.55rem 0.9rem;
   cursor: pointer;
   box-shadow: var(--chrome-btn-shadow);
-  border-radius: var(--radius-sm);
+  border-radius: var(--radius-control);
 }
 
 button.ghost {
@@ -149,7 +149,7 @@ select {
   color: var(--text);
   border: var(--chrome-input-border-width) solid var(--border);
   padding: 0.55rem 0.75rem;
-  border-radius: var(--radius-sm);
+  border-radius: var(--radius-control);
 }
 
 .eyebrow {
@@ -273,7 +273,7 @@ select {
   display: inline-flex;
   width: fit-content;
   border: 1px solid var(--border-strong);
-  border-radius: var(--radius-sm);
+  border-radius: var(--radius-control);
   overflow: hidden;
 }
 
@@ -372,7 +372,7 @@ select {
   background: var(--panel);
   color: var(--text-soft);
   border: 1px solid var(--border);
-  border-radius: var(--radius-sm);
+  border-radius: var(--radius-control);
   cursor: pointer;
 }
 

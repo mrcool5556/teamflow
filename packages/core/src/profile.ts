@@ -10,7 +10,7 @@ export type ResolvedTheme = Exclude<ThemeMode, "system">;
 export const COLOR_PRESETS = ["default", "sunset", "ocean", "forest", "custom"] as const;
 export type ColorPreset = (typeof COLOR_PRESETS)[number];
 
-export const SHAPE_PRESETS = ["sharp", "soft", "round", "octagon"] as const;
+export const SHAPE_PRESETS = ["sharp", "soft", "round", "octagon", "pill"] as const;
 export type ShapePreset = (typeof SHAPE_PRESETS)[number];
 
 export const CHROME_STYLES = [
