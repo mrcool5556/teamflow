@@ -10,7 +10,9 @@ import {
   createStoredFileFromPath,
   getAttachmentLimits,
   getUploadTempDir,
+  teamIdForUploadTarget,
 } from "./attachments.js";
+import { assertSpaceHasRoom } from "./spaceStorage.js";
 
 const SESSION_TTL_MS = 48 * 60 * 60 * 1000;
 
@@ -58,6 +60,10 @@ export async function createUploadSession(
   if (input.totalBytes > maxBytes) {
     throw new AttachmentError(`File exceeds limit for ${input.filename}`, 413);
   }
+
+  // Reserve the whole file now so the user learns at once, not after uploading most of it.
+  const teamId = await teamIdForUploadTarget(db, target);
+  await assertSpaceHasRoom(db, teamId, input.totalBytes, { filename: input.filename });
 
   const chunkSize = limits.chunkBytes;
   const totalChunks = computeTotalChunks(input.totalBytes, chunkSize);
@@ -191,9 +197,6 @@ export async function completeUploadSession(db: Db, sessionId: string, uploaderI
     throw new AttachmentError("Upload session not found", 404);
   }
 
-  const assembledPath = path.join(row.tempDir, "assembled");
-  await assembleChunksToFile(row.tempDir, row.totalChunks, assembledPath);
-
   const target =
     row.issueId != null
       ? { issueId: row.issueId }
@@ -202,6 +205,16 @@ export async function completeUploadSession(db: Db, sessionId: string, uploaderI
         : null;
 
   if (!target) throw new AttachmentError("Upload session has no target", 400);
+
+  // Checked again before assembling: the cap may have been lowered, or the disk filled, since
+  // the session began. A refusal keeps the session, so the user can retry after making room.
+  await assertSpaceHasRoom(db, await teamIdForUploadTarget(db, target), row.totalBytes, {
+    filename: row.filename,
+    excludeSessionId: row.id,
+  });
+
+  const assembledPath = path.join(row.tempDir, "assembled");
+  await assembleChunksToFile(row.tempDir, row.totalChunks, assembledPath);
 
   const attachment = await createStoredFileFromPath(
     db,

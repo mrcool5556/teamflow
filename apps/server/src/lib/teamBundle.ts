@@ -24,6 +24,7 @@ import type { Db, DbExecutor } from "@teamflow/db";
 import { schema } from "@teamflow/db";
 import { filterValidTeamMemberIds, setBoardRowAssignees, setIssueAssignees } from "./assignees.js";
 import { getUploadDir } from "./attachments.js";
+import { assertSpaceHasRoom } from "./spaceStorage.js";
 import { uniqueColumnKey, uniqueRowKey } from "./board.js";
 import { config } from "../config.js";
 import { ApiError } from "./errors.js";
@@ -669,6 +670,12 @@ async function importTeamBundleExtracted(
 
   const memberEmails = await loadTeamMemberEmails(db, teamId);
 
+  const importBytes = filesData.files.reduce(
+    (sum, file) => sum + (extracted.files.get(file.zipPath)?.size ?? 0),
+    0,
+  );
+  if (importBytes > 0) await assertSpaceHasRoom(db, teamId, importBytes);
+
   // Copy attachment payloads into the upload dir before touching the database; the transaction
   // below only records them. If it rolls back, the copies are deleted again.
   const uploadDir = getUploadDir();
@@ -931,6 +938,7 @@ function writeImport(
         sizeBytes: planned.size,
         storagePath: planned.relativePath,
         key: fileKey,
+        teamId,
         createdAt: new Date().toISOString(),
       })
       .run();

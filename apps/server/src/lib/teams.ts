@@ -1,11 +1,13 @@
-import { eq, inArray, sql } from "drizzle-orm";
+import { and, eq, inArray, sql } from "drizzle-orm";
+import { SPACE_ERROR_CODES, type SpaceType } from "@teamflow/core";
 import type { Db, DbExecutor } from "@teamflow/db";
 import { schema } from "@teamflow/db";
 import { userHasTeamPermission } from "./permissions.js";
 import { findTeamRoleBySlug, seedDefaultTeamRoles } from "./roles.js";
 import { createDefaultBoardRow } from "./board.js";
 import { removeStoredFilesFromDisk } from "./attachments.js";
-import { forbidden, internalError, notFound } from "./errors.js";
+import { ApiError, forbidden, internalError, notFound } from "./errors.js";
+import { getSpaceSettings } from "./spaceSettings.js";
 
 export function personalWorkspaceSlug(userId: string) {
   return `ws-${userId.slice(0, 8)}`;
@@ -35,15 +37,32 @@ export function getOrCreatePersonalWorkspace(db: DbExecutor, userId: string, use
  * Create a team with its system roles, the given member as `role`, and a default board row.
  * Synchronous: callers run it inside db.transaction so a failure leaves nothing behind.
  */
+export type NewSpace = {
+  spaceType: SpaceType;
+  /** null = no limit. */
+  storageCapBytes: number | null;
+  /** The account a free space counts against. */
+  spaceOwnerId: string | null;
+};
+
 export function createTeamWithOwner(
   db: DbExecutor,
-  input: { userId: string; userName: string; name: string; key: string; role: "owner" | "admin" },
+  input: {
+    userId: string;
+    userName: string;
+    name: string;
+    key: string;
+    role: "owner" | "admin";
+    /** Omitted: an admin space with no cap (what every team was before spaces). */
+    space?: NewSpace;
+  },
 ) {
   const workspaceId = getOrCreatePersonalWorkspace(db, input.userId, input.userName);
 
   const teamId = crypto.randomUUID();
+  const space = input.space ?? { spaceType: "admin", storageCapBytes: null, spaceOwnerId: null };
   db.insert(schema.teams)
-    .values({ id: teamId, workspaceId, name: input.name, key: input.key })
+    .values({ id: teamId, workspaceId, name: input.name, key: input.key, ...space })
     .run();
 
   seedDefaultTeamRoles(db, teamId);
@@ -59,6 +78,49 @@ export function createTeamWithOwner(
   createDefaultBoardRow(db, teamId);
 
   return db.select().from(schema.teams).where(eq(schema.teams.id, teamId)).get()!;
+}
+
+/** Free spaces counting against `userId` (their General included). */
+export function countOwnedFreeSpaces(db: DbExecutor, userId: string) {
+  const row = db
+    .select({ count: sql<number>`count(*)` })
+    .from(schema.teams)
+    .where(and(eq(schema.teams.spaceOwnerId, userId), eq(schema.teams.spaceType, "free")))
+    .get();
+  return Number(row?.count ?? 0);
+}
+
+/**
+ * The space a user's own New team (or registration's General) gets. Instance admins make admin
+ * spaces with no cap; everyone else makes free spaces with the free-space cap, at most
+ * `freeSpacesPerUser` of them. `firstSpace` (registration) is never refused, so signing up works
+ * even with a limit of 0.
+ */
+export function spaceForUserCreatedTeam(
+  db: DbExecutor,
+  input: { userId: string; isInstanceAdmin: boolean; firstSpace?: boolean },
+): NewSpace {
+  if (input.isInstanceAdmin) {
+    return { spaceType: "admin", storageCapBytes: null, spaceOwnerId: input.userId };
+  }
+  const settings = getSpaceSettings(db);
+  if (!input.firstSpace) {
+    const owned = countOwnedFreeSpaces(db, input.userId);
+    if (owned >= settings.freeSpacesPerUser) {
+      throw new ApiError(
+        409,
+        `You already have ${owned} free space${owned === 1 ? "" : "s"}, the most allowed. ` +
+          "Delete one you no longer need, or ask a server admin to make a space for you.",
+        SPACE_ERROR_CODES.freeSpaceLimit,
+        { owned, limit: settings.freeSpacesPerUser },
+      );
+    }
+  }
+  return {
+    spaceType: "free",
+    storageCapBytes: settings.freeSpaceCapBytes,
+    spaceOwnerId: input.userId,
+  };
 }
 
 export async function countUserTeams(db: Db, userId: string) {

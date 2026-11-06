@@ -18,6 +18,7 @@ export const API_PATH_PREFIXES = [
   "/rows",
   "/integrations",
   "/discord",
+  "/instance",
 ];
 
 export function isApiPath(pathname: string) {

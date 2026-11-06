@@ -1,6 +1,7 @@
 import { z } from "zod";
 import type { AttachmentKind } from "./attachments.js";
 import { TEAM_PERMISSIONS } from "./permissions.js";
+import type { SpaceType } from "./spaces.js";
 
 export * from "./about.js";
 export * from "./attachments.js";
@@ -11,6 +12,8 @@ export * from "./maintenance.js";
 export * from "./discordBotService.js";
 export * from "./permissions.js";
 export * from "./teamBundle.js";
+export * from "./spaces.js";
+export * from "./instanceAdmin.js";
 
 export const PRIORITIES = ["none", "low", "medium", "high", "urgent"] as const;
 export type Priority = (typeof PRIORITIES)[number];
@@ -323,6 +326,10 @@ export type TeamPublic = {
   name: string;
   key: string;
   createdAt: string;
+  /** "admin" or "free"; see SpaceType. */
+  spaceType: SpaceType;
+  /** Upload cap in bytes; null = no limit. */
+  storageCapBytes: number | null;
 };
 
 export type ProjectPublic = {

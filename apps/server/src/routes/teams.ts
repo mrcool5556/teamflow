@@ -13,7 +13,8 @@ import { eq } from "drizzle-orm";
 import { db } from "../db.js";
 import { requireAuth, requireWrite } from "../middleware/auth.js";
 import { loadTeam, requirePermission } from "../middleware/team.js";
-import { createTeamWithOwner, deleteTeam } from "../lib/teams.js";
+import { createTeamWithOwner, deleteTeam, spaceForUserCreatedTeam } from "../lib/teams.js";
+import { userIsInstanceAdmin } from "../lib/auth.js";
 import { resolveTeamRefDetailed } from "../lib/refs.js";
 import { importTeamBundle, streamTeamBundle } from "../lib/teamBundle.js";
 import { Readable } from "node:stream";
@@ -34,6 +35,8 @@ routes.get("/teams", requireAuth, async (c) => {
       name: schema.teams.name,
       key: schema.teams.key,
       createdAt: schema.teams.createdAt,
+      spaceType: schema.teams.spaceType,
+      storageCapBytes: schema.teams.storageCapBytes,
     })
     .from(schema.teams)
     .innerJoin(schema.teamMembers, eq(schema.teamMembers.teamId, schema.teams.id))
@@ -53,6 +56,7 @@ routes.post("/teams", requireAuth, requireWrite, async (c) => {
     .where(eq(schema.users.id, auth.userId))
     .limit(1);
 
+  const isInstanceAdmin = await userIsInstanceAdmin(db, auth.userId);
   const team = db.transaction((tx) =>
     createTeamWithOwner(tx, {
       userId: auth.userId,
@@ -60,6 +64,7 @@ routes.post("/teams", requireAuth, requireWrite, async (c) => {
       name: body.name,
       key: body.key,
       role: "admin",
+      space: spaceForUserCreatedTeam(tx, { userId: auth.userId, isInstanceAdmin }),
     }),
   );
 

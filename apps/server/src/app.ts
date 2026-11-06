@@ -9,6 +9,7 @@ import { commentsRoutes } from "./routes/comments.js";
 import { discordRoutes } from "./routes/discord.js";
 import { filesRoutes } from "./routes/files.js";
 import { healthRoutes } from "./routes/health.js";
+import { instanceRoutes } from "./routes/instance.js";
 import { invitesRoutes } from "./routes/invites.js";
 import { issuesRoutes } from "./routes/issues.js";
 import { maintenanceRoutes } from "./routes/maintenance.js";
@@ -33,6 +34,7 @@ export const API_ROUTES = [
   rolesRoutes,
   discordRoutes,
   maintenanceRoutes,
+  instanceRoutes,
   filesRoutes,
   projectsRoutes,
   issuesRoutes,

@@ -1,7 +1,7 @@
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { z } from "zod";
-import { DEFAULT_ATTACHMENT_LIMITS } from "@teamflow/core";
+import { DEFAULT_ATTACHMENT_LIMITS, SPACE_DEFAULTS } from "@teamflow/core";
 import { findRepoRoot } from "@teamflow/db";
 
 /* ---------- Secret validation (lane 2 refusal rules) ---------- */
@@ -147,6 +147,9 @@ const envSchema = z.object({
   UPLOAD_DIR: optionalString,
   TEAMFLOW_BUNDLE_MAX_ENTRIES: intVar(5000),
   TEAMFLOW_BUNDLE_MAX_BYTES: intVar(2 * 1024 * 1024 * 1024),
+  TEAMFLOW_FREE_SPACE_CAP_BYTES: intVar(SPACE_DEFAULTS.freeSpaceCapBytes, { min: 0 }),
+  TEAMFLOW_FREE_SPACES_PER_USER: intVar(SPACE_DEFAULTS.freeSpacesPerUser, { min: 0 }),
+  TEAMFLOW_MIN_FREE_DISK_BYTES: intVar(SPACE_DEFAULTS.minFreeDiskBytes, { min: 0 }),
   TEAMFLOW_MAINTENANCE_ENABLED: boolVar(false),
   TEAMFLOW_MAINTENANCE_SUDO: boolVar(true),
   TEAMFLOW_APP_DIR: optionalString,
@@ -206,6 +209,8 @@ export type AppConfig = {
   /** Absolute path. */
   uploadDir: string;
   bundle: { maxEntries: number; maxBytes: number };
+  /** Defaults for space settings; the admin page can override them (instance_settings). */
+  spaces: { freeSpaceCapBytes: number; freeSpacesPerUser: number; minFreeDiskBytes: number };
   /** Absolute path of the checkout the maintenance scripts operate on. */
   appDir: string;
   maintenance: {
@@ -307,6 +312,11 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
     },
     uploadDir: resolveFrom(repoRoot, e.UPLOAD_DIR) ?? path.join(repoRoot, "data", "uploads"),
     bundle: { maxEntries: e.TEAMFLOW_BUNDLE_MAX_ENTRIES, maxBytes: e.TEAMFLOW_BUNDLE_MAX_BYTES },
+    spaces: {
+      freeSpaceCapBytes: e.TEAMFLOW_FREE_SPACE_CAP_BYTES,
+      freeSpacesPerUser: e.TEAMFLOW_FREE_SPACES_PER_USER,
+      minFreeDiskBytes: e.TEAMFLOW_MIN_FREE_DISK_BYTES,
+    },
     appDir,
     maintenance: {
       enabled: e.TEAMFLOW_MAINTENANCE_ENABLED,

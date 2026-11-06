@@ -1,3 +1,4 @@
+import { config } from "../config.js";
 import { Hono } from "hono";
 import type { AppEnv } from "../types.js";
 import { parseBody, parseWith, readJson } from "../lib/validation.js";
@@ -31,7 +32,7 @@ import {
   assertInviteAcceptable,
   isInviteOnlyRegistration,
 } from "../lib/invites.js";
-import { createTeamWithOwner } from "../lib/teams.js";
+import { createTeamWithOwner, spaceForUserCreatedTeam } from "../lib/teams.js";
 import {
   buildProfileExport,
   getUserProfile,
@@ -94,12 +95,15 @@ routes.post("/auth/register", async (c) => {
       })
       .run();
 
+    const isInstanceAdmin =
+      isFirstUser || config.instanceAdminEmails.includes(body.email.toLowerCase());
     createTeamWithOwner(tx, {
       userId,
       userName: body.name,
       name: "General",
       key: "GEN",
       role: "owner",
+      space: spaceForUserCreatedTeam(tx, { userId, isInstanceAdmin, firstSpace: true }),
     });
 
     if (inviteToken) {
