@@ -37,7 +37,9 @@ describe("space schemas", () => {
     expect(createSpaceSchema.parse({ name: "F", key: "FR", spaceType: "free" }).capBytes).toBe(
       undefined,
     );
-    expect(() => createSpaceSchema.parse({ name: "x", key: "lower", spaceType: "admin" })).toThrow();
+    expect(() =>
+      createSpaceSchema.parse({ name: "x", key: "lower", spaceType: "admin" }),
+    ).toThrow();
   });
 
   it("needs at least one change", () => {

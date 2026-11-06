@@ -291,7 +291,7 @@ export async function getAttachmentForDownload(db: Db, linkId: string) {
   return row;
 }
 
-async function hardDeleteStoredFile(db: Db, fileId: string) {
+export async function hardDeleteStoredFile(db: Db, fileId: string) {
   const [file] = await db
     .select()
     .from(schema.storedFiles)
@@ -519,7 +519,10 @@ export async function getStoredFileByRef(db: Db, teamId: string, ref: string) {
 }
 
 /** The team (space) an upload target belongs to; its allowance pays for the file. */
-export async function teamIdForUploadTarget(db: Db, target: { issueId: string } | { rowId: string }) {
+export async function teamIdForUploadTarget(
+  db: Db,
+  target: { issueId: string } | { rowId: string },
+) {
   if ("issueId" in target) {
     const [issue] = await db
       .select({ teamId: schema.issues.teamId })

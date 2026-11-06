@@ -12,6 +12,7 @@ export * from "./discordBotService.js";
 export * from "./permissions.js";
 export * from "./teamBundle.js";
 export * from "./spaces.js";
+export * from "./instanceAdmin.js";
 
 export const PRIORITIES = ["none", "low", "medium", "high", "urgent"] as const;
 export type Priority = (typeof PRIORITIES)[number];

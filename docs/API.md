@@ -34,7 +34,7 @@ Server code throws `ApiError` from `apps/server/src/lib/errors.ts` (`badRequest`
 
 <!-- BEGIN GENERATED ROUTES (scripts/gen-api-docs.mjs) -->
 
-## Routes (95)
+## Routes (106)
 
 Generated from `apps/server/src/routes/*.ts` by `pnpm docs:api`; do not edit by hand.
 
@@ -172,6 +172,24 @@ Server maintenance: status, backups, updates (instance admin only).
 | POST | `/teams/:teamId/server/maintenance/backup` | bearer | yes | member | `server.maintenance.run` + instance admin | body `runMaintenanceBackupSchema` |
 | POST | `/teams/:teamId/server/maintenance/update` | bearer | yes | member | `server.maintenance.run` + instance admin | body `runMaintenanceUpdateSchema` |
 | POST | `/teams/:teamId/server/maintenance/job/dismiss` | bearer | yes | member | `server.maintenance.run` + instance admin |  |
+
+### Instance admin and spaces
+
+Instance admin page (web /admin): server status, spaces, caps and space settings.
+
+| Method | Path | Auth | Write | Team | Permission | Input |
+|--------|------|------|-------|------|------------|-------|
+| GET | `/instance/overview` | bearer |  |  | instance admin |  |
+| GET | `/instance/checks/public-url` | bearer |  |  | instance admin |  |
+| GET | `/instance/settings` | bearer |  |  | instance admin |  |
+| PATCH | `/instance/settings` | bearer | yes |  | instance admin | body `updateSpaceSettingsSchema` |
+| GET | `/instance/users` | bearer |  |  | instance admin | query `listInstanceUsersQuerySchema` |
+| GET | `/instance/spaces` | bearer |  |  | instance admin |  |
+| POST | `/instance/spaces` | bearer | yes |  | instance admin | body `createSpaceSchema` |
+| GET | `/instance/spaces/:teamId` | bearer |  |  | instance admin |  |
+| PATCH | `/instance/spaces/:teamId` | bearer | yes |  | instance admin | body `updateSpaceSchema` |
+| POST | `/instance/spaces/:teamId/empty-trash` | bearer | yes |  | instance admin |  |
+| POST | `/instance/spaces/:teamId/cancel-uploads` | bearer | yes |  | instance admin |  |
 
 ### Team files
 
