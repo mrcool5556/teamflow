@@ -266,6 +266,8 @@ export function acceptTeamInvite(
       name: row.team.name,
       key: row.team.key,
       createdAt: row.team.createdAt,
+      spaceType: row.team.spaceType === "free" ? "free" : "admin",
+      storageCapBytes: row.team.storageCapBytes,
     },
     alreadyMember,
   };

@@ -103,6 +103,16 @@ server.tool(
 );
 
 server.tool(
+  "get_team_storage",
+
+  "Upload allowance of a team's space: cap, bytes used, what is left, and whether uploads are paused",
+
+  { teamId: z.string().uuid() },
+
+  async ({ teamId }) => json(await client.getTeamStorage(teamId)),
+);
+
+server.tool(
   "list_projects",
 
   "List projects, optionally filtered by teamId",

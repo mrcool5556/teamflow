@@ -52,6 +52,7 @@ teamflow login --url http://localhost:3000 --email you@example.com --password '.
 | `teamflow issues comment <issueId>` | `--body <text>` (required) | Comment timestamp |
 | `teamflow board rows` | `--team <teamId>` (required) | Row id, position, assignee, color, name |
 | `teamflow board summary` | `--team <teamId>` (required) | Per row: open / total and count per column |
+| `teamflow board storage` | `--team <teamId>` (required) | Space type, upload usage against its cap, breakdown, disk warning |
 | `teamflow --version`, `teamflow --help` | — | |
 
 All ids are UUIDs (not `ENG-42` identifiers). Writes need a token with `write` scope and the `board.edit` permission on the team.
@@ -70,3 +71,5 @@ Row ids come from `teamflow board rows`; status ids from `GET /teams/:teamId/sta
 
 - No `teams list`, no issue delete/restore, no assignee or row on `issues create`, no `--description` on `issues update`.
 - Errors surface as unhandled promise rejections with a stack trace rather than a short message.
+
+API refusals print the server's message and code, for example `Error: You already have 3 free spaces, the most allowed. … (free_space_limit)`, and exit with status 1.

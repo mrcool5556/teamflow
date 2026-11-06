@@ -54,7 +54,8 @@ All ids are UUIDs. Results are JSON text.
 
 | Tool | Parameters | Description |
 |------|------------|-------------|
-| `list_teams` | — | Teams the token's user belongs to |
+| `list_teams` | — | Teams the token's user belongs to, with each space's type and upload cap |
+| `get_team_storage` | `teamId` | Space upload cap, bytes used, what is left, whether uploads are paused |
 | `list_projects` | `teamId?` | Projects, optionally for one team |
 | `list_rows` | `teamId` | Board rows (swimlanes) |
 | `list_statuses` | `teamId`, `rowId?` | Workflow columns for the whole team, or only one row's columns when `rowId` is given |

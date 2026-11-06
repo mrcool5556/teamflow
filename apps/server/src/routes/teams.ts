@@ -35,6 +35,8 @@ routes.get("/teams", requireAuth, async (c) => {
       name: schema.teams.name,
       key: schema.teams.key,
       createdAt: schema.teams.createdAt,
+      spaceType: schema.teams.spaceType,
+      storageCapBytes: schema.teams.storageCapBytes,
     })
     .from(schema.teams)
     .innerJoin(schema.teamMembers, eq(schema.teamMembers.teamId, schema.teams.id))

@@ -49,6 +49,15 @@ describe("free-space rules", () => {
     }
   });
 
+  it("lists each team's space type and cap", async () => {
+    const user = await registerUser(app);
+    const res = await api(app, "GET", "/teams", { token: user.token });
+    const { teams } = await json<{ teams: { spaceType: string; storageCapBytes: number }[] }>(
+      res,
+    );
+    expect(teams[0]).toMatchObject({ spaceType: "free", storageCapBytes: GIB });
+  });
+
   it("gives an admin listed in TEAMFLOW_INSTANCE_ADMINS an admin General", async () => {
     const listed = await registerUser(app, { email: envAdminEmail });
     expect((await space(listed.teamId))?.spaceType).toBe("admin");

@@ -122,6 +122,8 @@ export function seedDb(roleSlug: "owner" | "member" | "viewer" = "owner"): FakeD
       name: "Engineering",
       key: "ENG",
       createdAt: now,
+      spaceType: "admin",
+      storageCapBytes: null,
     },
     {
       id: "00000000-0000-4000-8000-00000000e002",
@@ -129,6 +131,8 @@ export function seedDb(roleSlug: "owner" | "member" | "viewer" = "owner"): FakeD
       name: "Operations",
       key: "OPS",
       createdAt: now,
+      spaceType: "free",
+      storageCapBytes: 1024 * 1024 * 1024,
     },
   ];
   const [eng, ops] = teams as [TeamPublic, TeamPublic];
