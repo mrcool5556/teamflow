@@ -62,7 +62,38 @@ export const teams = sqliteTable("teams", {
   name: text("name").notNull(),
   key: text("key").notNull(),
   issueCounter: integer("issue_counter").notNull().default(0),
+  /** "admin" (made by an instance admin, cap set by hand) or "free" (made by any user). */
+  spaceType: text("space_type").notNull().default("admin"),
+  /** Upload allowance in bytes; null means no limit. */
+  storageCapBytes: integer("storage_cap_bytes"),
+  /** The account a free space counts against (free spaces per user). */
+  spaceOwnerId: text("space_owner_id").references(() => users.id, { onDelete: "set null" }),
   createdAt: text("created_at")
+    .notNull()
+    .default(sql`(datetime('now'))`),
+});
+
+/** Admin and space changes worth showing as history (cap changes, type changes, trash emptied). */
+export const spaceEvents = sqliteTable("space_events", {
+  id: text("id")
+    .primaryKey()
+    .$defaultFn(() => crypto.randomUUID()),
+  teamId: text("team_id")
+    .notNull()
+    .references(() => teams.id, { onDelete: "cascade" }),
+  actorId: text("actor_id").references(() => users.id, { onDelete: "set null" }),
+  kind: text("kind").notNull(),
+  detail: text("detail"),
+  createdAt: text("created_at")
+    .notNull()
+    .default(sql`(datetime('now'))`),
+});
+
+/** Server-wide settings an instance admin changes in the app (key -> JSON value). */
+export const instanceSettings = sqliteTable("instance_settings", {
+  key: text("key").primaryKey(),
+  value: text("value").notNull(),
+  updatedAt: text("updated_at")
     .notNull()
     .default(sql`(datetime('now'))`),
 });
@@ -374,6 +405,8 @@ export const storedFiles = sqliteTable("stored_files", {
   sizeBytes: integer("size_bytes").notNull(),
   storagePath: text("storage_path").notNull(),
   key: text("key").notNull().unique(),
+  /** The space whose upload allowance this file uses. */
+  teamId: text("team_id").references(() => teams.id, { onDelete: "set null" }),
   deletedAt: text("deleted_at"),
   createdAt: text("created_at")
     .notNull()

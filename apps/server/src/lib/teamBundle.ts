@@ -931,6 +931,7 @@ function writeImport(
         sizeBytes: planned.size,
         storagePath: planned.relativePath,
         key: fileKey,
+        teamId,
         createdAt: new Date().toISOString(),
       })
       .run();
