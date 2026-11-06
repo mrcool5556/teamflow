@@ -313,6 +313,7 @@
 }
 
 .admin-chips button {
+  white-space: nowrap;
   padding: 3px 10px;
   border: 1px solid var(--border);
   border-radius: 99px;
@@ -437,6 +438,19 @@
 
   .admin-table td.admin-cell-usage::before {
     content: none;
+  }
+
+  .admin-table tr.admin-row--full {
+    border-color: color-mix(in srgb, var(--danger) 50%, var(--border));
+    background: color-mix(in srgb, var(--danger) 6%, var(--surface));
+  }
+
+  .admin-table tr.admin-row--full td {
+    background: none;
+  }
+
+  .admin-search {
+    width: 100%;
   }
 }
 
