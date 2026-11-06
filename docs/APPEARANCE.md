@@ -69,3 +69,7 @@ Plain, ghost and danger buttons in `base.css` read `--btn-*` variables (face, te
 Fields (`input`, `select` in `base.css`) read `--field-*` variables. `inputs` values: Boxed (strong border), Sunk (sunken fill), Underline (a line under the text) and Notebook (handwriting in Caveat on a ruled line, in the theme's link colour). Fields with their own look keep it.
 
 `toggles` values restyle the on/off switch (`.appearance-switch`): Pill, Paper flap (a fibre card reading OFF that flips to ON) and Retro box (a sunken 90s check box). Any choice also colours native checkboxes with the accent; Retro box draws them as sunken boxes too.
+
+## Looks
+
+`lib/appearanceLooks.ts` lists the Looks. Each one is a full mix: theme, accent colour, UI style, corners and every design aspect, so picking a look sets all of them (text contrast and team colours stay). Teamflow, Daylight, Calm, Paper, Terminal and Neon leave the aspects on auto. Machined, Paper desk, Retro 95 and Synth night are the design library's presets (Gold arcade, Paper desk, Retro 95, Synth night). A profile matches a look when every setting matches (lip metal and rim shadow only count for lipped buttons); "Back to …" is offered while all but three settings still match.

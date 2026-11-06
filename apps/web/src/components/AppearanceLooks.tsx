@@ -22,7 +22,7 @@ function swatchStyle(look: Look) {
   } as CSSProperties;
 }
 
-/** Named looks: one click sets theme, colour, style and corners together. */
+/** Named looks: one click sets a whole mix (colours, fonts, style, corners and aspects). */
 export function AppearanceLooks({ profile, onProfileChange }: AppearanceLooksProps) {
   const current = activeLook(profile.appearance);
   const nearest = current ? null : nearestLook(profile.appearance);
