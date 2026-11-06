@@ -15,7 +15,20 @@ describe("maintenance sudo layout", () => {
   it("installs root-owned copies under /usr/local/lib/teamflow with mode 755", () => {
     expect(sudoScript).toMatch(/LIB_DIR="\/usr\/local\/lib\/teamflow"/);
     expect(sudoScript).toMatch(/install -d -m 755 -o root -g root "\$LIB_DIR"/);
-    expect(sudoScript).toMatch(/install -m 755 -o root -g root "\$UPDATE_REPO" "\$UPDATE_BIN"/);
+    expect(sudoScript).toMatch(/install -m 755 -o root -g root "\$src" "\$tmp"/);
+    expect(sudoScript).toMatch(/install_atomic "\$UPDATE_REPO" "\$UPDATE_BIN"/);
+  });
+
+  it("replaces scripts and the sudoers rule by rename, so a probe never finds them missing", () => {
+    // Temp file in the same directory, then mv: atomic, and an in-flight update.sh keeps its inode.
+    expect(sudoScript).toMatch(/local tmp="\$dest\.tmp\.\$\$"/);
+    expect(sudoScript).toMatch(/mv -f "\$tmp" "\$dest"/);
+    // The sudoers temp name has a dot, so sudo's #includedir ignores it until it is validated.
+    expect(sudoScript).toMatch(/SUDOERS_TMP="\$SUDOERS_FILE\.tmp\.\$\$"/);
+    expect(sudoScript).toMatch(/visudo -cf "\$SUDOERS_TMP"/);
+    expect(sudoScript).toMatch(/mv -f "\$SUDOERS_TMP" "\$SUDOERS_FILE"/);
+    expect(sudoScript).not.toMatch(/cat >"\$SUDOERS_FILE"/);
+    expect(sudoScript).not.toMatch(/rm -f "\$SUDOERS_FILE"/);
   });
 
   it("sudoers rule points only at the root-owned directory and keeps no env", () => {

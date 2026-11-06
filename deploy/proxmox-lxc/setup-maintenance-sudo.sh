@@ -38,9 +38,27 @@ fix_script "$DISCORD_REPO"
 
 # Root-owned copies: directory 755, files 755, owner root. The app user can execute but not edit.
 install -d -m 755 -o root -g root "$LIB_DIR"
-install -m 755 -o root -g root "$BACKUP_REPO" "$BACKUP_BIN"
-install -m 755 -o root -g root "$UPDATE_REPO" "$UPDATE_BIN"
-install -m 755 -o root -g root "$DISCORD_REPO" "$DISCORD_BIN"
+
+# Every file is written to a temp path in its own directory and then renamed over the old one.
+# A rename is atomic, so a `sudo -n` probe from the app (Settings → Updates checks while update.sh
+# re-runs this script) always finds a complete file, never a missing or half-written one.
+TMP_FILES=()
+cleanup_tmp() {
+  if [[ ${#TMP_FILES[@]} -gt 0 ]]; then rm -f "${TMP_FILES[@]}"; fi
+}
+trap cleanup_tmp EXIT
+
+install_atomic() {
+  local src=$1 dest=$2
+  local tmp="$dest.tmp.$$"
+  TMP_FILES+=("$tmp")
+  install -m 755 -o root -g root "$src" "$tmp"
+  mv -f "$tmp" "$dest"
+}
+
+install_atomic "$BACKUP_REPO" "$BACKUP_BIN"
+install_atomic "$UPDATE_REPO" "$UPDATE_BIN"
+install_atomic "$DISCORD_REPO" "$DISCORD_BIN"
 
 # Convenience names for humans on the box; sudoers does not reference these.
 ln -sf "$UPDATE_BIN" /usr/local/bin/teamflow-update
@@ -49,20 +67,25 @@ ln -sf "$DISCORD_BIN" /usr/local/bin/teamflow-discord
 ln -sf "$UPDATE_BIN" /usr/local/bin/update
 
 # No Defaults line preserving the caller environment: the scripts use arguments and their own defaults.
-cat >"$SUDOERS_FILE" <<EOF
+# Written to a temp name first: it contains a dot, so sudo's #includedir ignores it until it is
+# renamed into place, and a file that fails validation is dropped while the working one stays.
+SUDOERS_TMP="$SUDOERS_FILE.tmp.$$"
+TMP_FILES+=("$SUDOERS_TMP")
+cat >"$SUDOERS_TMP" <<EOF
 # Teamflow in-app maintenance (Settings → Updates) and Discord bot service (Settings → Integrations)
 # Only the root-owned copies under $LIB_DIR are allowed. Re-run setup-maintenance-sudo.sh after
 # changing the scripts in the repo; update.sh does this automatically.
 $APP_USER ALL=(root) NOPASSWD: $BACKUP_BIN *, $UPDATE_BIN *, $DISCORD_BIN *
 EOF
 
-chmod 440 "$SUDOERS_FILE"
+chown root:root "$SUDOERS_TMP"
+chmod 440 "$SUDOERS_TMP"
 
-if ! visudo -cf "$SUDOERS_FILE"; then
-  echo "sudoers validation failed — removed $SUDOERS_FILE"
-  rm -f "$SUDOERS_FILE"
+if ! visudo -cf "$SUDOERS_TMP"; then
+  echo "sudoers validation failed — kept the existing $SUDOERS_FILE"
   exit 1
 fi
+mv -f "$SUDOERS_TMP" "$SUDOERS_FILE"
 
 echo "Installed root-owned maintenance scripts in $LIB_DIR and passwordless sudo for $APP_USER:"
 echo "  $SUDOERS_FILE"
