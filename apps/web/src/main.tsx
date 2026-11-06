@@ -8,6 +8,7 @@ import { createQueryClient } from "./queries/keys";
 import { createAppRouter } from "./router";
 // Order matters: later files win ties in the cascade.
 import "./styles/tokens.css";
+import "./styles/themes.css";
 import "./styles/base.css";
 import "./styles/topbar.css";
 import "./styles/board.css";

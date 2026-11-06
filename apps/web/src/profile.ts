@@ -2,6 +2,7 @@ import {
   boardColumnWidthMode,
   clampBoardColumnWidth,
   clampCardMinHeight,
+  COLOR_THEME_FIXED_MODE,
   createDefaultUserProfile,
   PRIORITY_COLOR_DEFAULTS,
   resolveUiColors,
@@ -48,6 +49,9 @@ function applyUiColorOverrides(profile: UserProfile, root: HTMLElement) {
 
   const { appearance } = profile;
 
+  // On a colour theme other than Teamflow's, "default" means the theme's own accent colours.
+  if (appearance.colorTheme !== "teamflow" && appearance.colorPreset === "default") return;
+
   const { primary, accent } = resolveUiColors(appearance);
 
   root.style.setProperty("--primary", primary);
@@ -68,6 +72,11 @@ export function resolveTheme(theme: ThemeMode): ResolvedTheme {
   if (theme !== "system") return theme;
   if (typeof window.matchMedia !== "function") return "dark";
   return window.matchMedia("(prefers-color-scheme: light)").matches ? "light" : "dark";
+}
+
+/** The mode to paint: a colour theme with only one mode (Arcade, Cozy, Retro Console) keeps it. */
+export function paintedTheme(appearance: Pick<UserProfile["appearance"], "theme" | "colorTheme">) {
+  return COLOR_THEME_FIXED_MODE[appearance.colorTheme] ?? resolveTheme(appearance.theme);
 }
 
 let systemThemeProfile: UserProfile | null = null;
@@ -112,7 +121,7 @@ export function applyUserProfile(profile: UserProfile) {
 
   const { appearance } = profile;
 
-  root.dataset.theme = resolveTheme(appearance.theme);
+  root.dataset.theme = paintedTheme(appearance);
   followSystemTheme(profile);
 
   root.dataset.colorPreset = appearance.colorPreset;
