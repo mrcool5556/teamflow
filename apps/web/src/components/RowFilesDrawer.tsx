@@ -13,6 +13,7 @@ import { AttachmentVideoThumbnail, isVideoAttachment } from "./AttachmentVideoPl
 import { FileRefCopyButton } from "./FileRefCopyButton";
 import { LinkFromFileRef } from "./LinkFromFileRef";
 import { RefCopyButton } from "./RefCopyButton";
+import { SpaceStorageNotice } from "./SpaceStorageMeter";
 
 type RowFilesDrawerProps = {
   row: BoardRowPublic;
@@ -173,6 +174,7 @@ export function RowFilesDrawer({ row, onClose, onNavigateRef }: RowFilesDrawerPr
                 ? `Uploading ${files.uploadName ?? "file"}…`
                 : "Drop a file here or choose one"}
             </p>
+            <SpaceStorageNotice notice={files.storageNotice} />
             {files.uploading ? (
               <div className="issue-attachment-progress" aria-hidden>
                 <div
@@ -184,7 +186,7 @@ export function RowFilesDrawer({ row, onClose, onNavigateRef }: RowFilesDrawerPr
             <button
               type="button"
               className="secondary"
-              disabled={!canEdit || files.uploading}
+              disabled={!canEdit || files.uploading || files.uploadBlocked}
               onClick={files.chooseFile}
             >
               Choose file

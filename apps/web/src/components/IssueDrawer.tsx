@@ -32,6 +32,7 @@ import { AttachmentVideoThumbnail, isVideoAttachment } from "./AttachmentVideoPl
 import { LinkRowFilePanel } from "./LinkRowFilePanel";
 import { DueDatePicker } from "./DueDatePicker";
 import { describeAttachmentLimits, formatFileSize, formatTimestamp, initials } from "../lib/format";
+import { SpaceStorageNotice } from "./SpaceStorageMeter";
 
 const NO_COMMENTS: CommentPublic[] = [];
 
@@ -487,6 +488,7 @@ export function IssueDrawer({
                 ? `Uploading ${files.uploadName ?? "file"}…`
                 : `Drop a file here or choose one (${describeAttachmentLimits(files.limits)}).`}
             </p>
+            <SpaceStorageNotice notice={files.storageNotice} />
             {files.uploading ? (
               <div
                 className="issue-attachment-progress"
@@ -511,7 +513,7 @@ export function IssueDrawer({
             <button
               type="button"
               className="ghost"
-              disabled={!canEdit || files.uploading}
+              disabled={!canEdit || files.uploading || files.uploadBlocked}
               onClick={files.chooseFile}
             >
               Choose file

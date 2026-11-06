@@ -21,6 +21,7 @@ import { filePreviewAttachment, TeamFilePreview } from "./TeamFilePreview";
 import { formatFileSize } from "../lib/format";
 import { useFileDownload } from "../hooks/useFileDownload";
 import { DownloadStarting } from "./DownloadStarting";
+import { SpaceStorageMeter } from "./SpaceStorageMeter";
 
 function formatPurgeDate(iso: string | null | undefined) {
   if (!iso) return null;
@@ -217,6 +218,8 @@ export function TeamFilesDrawer({ teamId, open, onClose, onNavigateRef }: TeamFi
           ✕
         </button>
       </header>
+
+      <SpaceStorageMeter teamId={teamId} />
 
       <div className="segmented team-files-tabs" role="group" aria-label="Show">
         <button

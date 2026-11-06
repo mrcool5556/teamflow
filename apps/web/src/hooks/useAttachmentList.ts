@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type ChangeEvent, type DragEvent } from "react";
+import { useContext, useEffect, useMemo, useState, type ChangeEvent, type DragEvent } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import type { AttachmentLimitsPublic, IssueAttachmentPublic } from "@teamflow/core";
 import {
@@ -12,7 +12,10 @@ import { isVideoAttachment } from "../components/AttachmentVideoPlayer";
 import { useFileDownload } from "./useFileDownload";
 import { useErrorSink } from "../lib/errorSink";
 import { formatFileSize } from "../lib/format";
+import { useTeamStorageQuery } from "../queries/instance";
 import { queryKeys } from "../queries/keys";
+import { storageNotice, uploadRefusal } from "../lib/spaceStorage";
+import { ShellContext } from "../routes/board/shellContext";
 import { useConfirm } from "../ui/confirmContext";
 
 /** Whose attachments: an issue's own files or a row's shared files. */
@@ -63,6 +66,14 @@ export function useAttachmentList(
   });
   const attachments = query.data?.attachments ?? NO_ATTACHMENTS;
   const limits = query.data?.limits ?? DEFAULT_ATTACHMENT_LIMITS;
+  // The space's room, for a refusal before any bytes are sent; the board shell knows the team.
+  const teamId = useContext(ShellContext)?.team?.id ?? null;
+  const storageQuery = useTeamStorageQuery(teamId);
+  const storage = storageQuery.data;
+  const notice = storageNotice(storage);
+  const refreshStorage = () => {
+    if (teamId) void queryClient.invalidateQueries({ queryKey: queryKeys.teamStorage(teamId) });
+  };
 
   const [uploading, setUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState<number | null>(null);
@@ -121,6 +132,11 @@ export function useAttachmentList(
       );
       return;
     }
+    const refusal = uploadRefusal(storage, file);
+    if (refusal) {
+      show(refusal);
+      return;
+    }
     setUploading(true);
     setUploadProgress(0);
     setUploadName(file.name);
@@ -136,6 +152,8 @@ export function useAttachmentList(
     } catch (error) {
       report(error, "Upload failed");
     } finally {
+      // Success, a full space or a full disk all change what the meter should show.
+      refreshStorage();
       setUploading(false);
       setUploadProgress(null);
       setUploadName(null);
@@ -158,6 +176,7 @@ export function useAttachmentList(
     try {
       await api.remove(attachment.id);
       update((prev) => prev.filter((item) => item.id !== attachment.id));
+      refreshStorage();
     } catch (error) {
       report(error, "Could not remove the file");
     } finally {
@@ -219,6 +238,10 @@ export function useAttachmentList(
     uploading,
     uploadProgress,
     uploadName,
+    /** What the upload zone should say about the space's room (null: nothing to say). */
+    storageNotice: notice,
+    /** The space or the server disk is full; uploads are refused before sending. */
+    uploadBlocked: notice?.blocked ?? false,
     deletingId,
     dragOver,
     dropZoneProps,
