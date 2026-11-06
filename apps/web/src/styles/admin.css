@@ -582,3 +582,55 @@
   color: var(--muted);
   font-size: var(--font-size-xs);
 }
+
+/* ---------- space detail ---------- */
+
+.admin-subhead {
+  margin: var(--space-2) 0 0;
+  font-size: var(--font-size-xs);
+  font-weight: 400;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.admin-files {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.admin-files li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding: var(--space-2) 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.admin-files li:last-child {
+  border-bottom: none;
+}
+
+.admin-file-name {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.admin-file-name small {
+  display: block;
+  color: var(--muted);
+}
+
+.admin-seg-field {
+  margin: 0;
+  padding: 0;
+  border: none;
+  display: grid;
+  gap: var(--space-2);
+}
+
+.admin-bar > i.admin-bar-issues {
+  background: var(--accent);
+}
