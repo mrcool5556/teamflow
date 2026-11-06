@@ -4,6 +4,7 @@ import { RouteMarker } from "./components/RouteMarker";
 import { RootLayout } from "./routes/RootLayout";
 import { AdminLayout } from "./routes/admin/AdminLayout";
 import { DefaultsPanel } from "./routes/admin/DefaultsPanel";
+import { HelpPanel } from "./routes/admin/HelpPanel";
 import { OverviewPanel } from "./routes/admin/OverviewPanel";
 import { SpaceDetailPanel } from "./routes/admin/SpaceDetailPanel";
 import { SpacesPanel } from "./routes/admin/SpacesPanel";
@@ -48,6 +49,7 @@ const adminRoute: RouteObject = {
     { path: "spaces/:spaceId", element: <SpaceDetailPanel /> },
     { path: "updates", element: <AdminUpdatesPanel /> },
     { path: "bot", element: <AdminBotPanel /> },
+    { path: "help", element: <HelpPanel /> },
     { path: "defaults", element: <DefaultsPanel /> },
     { path: "*", element: <Navigate to="../overview" replace /> },
   ],

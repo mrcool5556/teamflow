@@ -52,7 +52,7 @@ describe("admin spaces list", () => {
 describe("create space dialog", () => {
   it("creates an admin space with the allowance typed, owned by the admin", async () => {
     const user = userEvent.setup();
-    const { calls } = setup("/t/ENG/admin/spaces");
+    const { calls, path } = setup("/t/ENG/admin/spaces");
     await screen.findByRole("table");
     await user.click(screen.getByRole("button", { name: "+ New space" }));
     const dialog = await screen.findByRole("dialog", { name: "New space" });
@@ -73,7 +73,11 @@ describe("create space dialog", () => {
       ),
     );
     expect(screen.queryByRole("dialog", { name: "New space" })).not.toBeInTheDocument();
-    expect(await screen.findByText("Client portal")).toBeInTheDocument();
+    // The new space's detail page opens.
+    await waitFor(() =>
+      expect(path()).toBe("/t/ENG/admin/spaces/00000000-0000-4000-8000-0000000000c1"),
+    );
+    expect(await screen.findByRole("heading", { name: "Client portal" })).toBeInTheDocument();
   });
 
   it("sends no cap for a free space and can make it for another user", async () => {

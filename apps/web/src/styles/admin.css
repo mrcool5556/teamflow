@@ -703,3 +703,47 @@
   color: var(--text-soft);
   font-size: var(--font-size-xs);
 }
+
+/* ---------- how-tos ---------- */
+
+.admin-howtos {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.admin-howto {
+  padding: var(--space-3) var(--space-4);
+  border: var(--chrome-surface-border-width) solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  font-size: var(--font-size-sm);
+  scroll-margin-top: var(--space-4);
+}
+
+.admin-howto--active {
+  border-color: color-mix(in srgb, var(--warn) 50%, var(--border));
+}
+
+.admin-howto ol {
+  margin: var(--space-2) 0 0;
+  padding-left: 1.2rem;
+}
+
+.admin-howto li {
+  margin-bottom: var(--space-2);
+}
+
+.admin-command {
+  display: block;
+  width: fit-content;
+  max-width: 100%;
+  margin-top: var(--space-1);
+  padding: 2px var(--space-2);
+  overflow-x: auto;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-xs);
+  background: var(--cell);
+  white-space: pre;
+  color: var(--text);
+}
