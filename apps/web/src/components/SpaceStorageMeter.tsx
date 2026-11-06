@@ -25,7 +25,7 @@ export function SpaceStorageMeter({ teamId }: { teamId: string }) {
     if (state === "warn") {
       sub +=
         breakdown.trashBytes > 0
-          ? ` The trash holds ${formatStorageBytes(breakdown.trashBytes)}, which counts until it is purged.`
+          ? ` The trash holds ${formatStorageBytes(breakdown.trashBytes)}, which counts until it is purged; Delete forever in the trash frees it now.`
           : " Need more? Ask a server admin.";
     }
   }

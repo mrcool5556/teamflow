@@ -14,7 +14,7 @@ export const DISK_LOW_TEXT =
   "The server is almost out of disk space, so uploads are paused for everyone. Issues and comments still work.";
 
 export const MAKE_ROOM_HELP =
-  "Removing a file from its issues and rows frees the space at once. Files in the trash still count until they are purged after 7 days; a server admin can empty the trash or raise the cap.";
+  "Removing a file from its issues and rows frees the space at once. Files in the trash still count until they are purged after 7 days, or until you delete them forever from the Files trash. A server admin can raise the cap.";
 
 /** What an upload zone should say about the space's room, or null when there is nothing to say. */
 export function storageNotice(storage: SpaceStoragePublic | undefined): StorageNotice | null {
