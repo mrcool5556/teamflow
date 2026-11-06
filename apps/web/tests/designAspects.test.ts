@@ -1,4 +1,11 @@
-import { createDefaultUserProfile, mergeUserProfile, parseUserProfile } from "@teamflow/core";
+import {
+  BUTTON_STYLES,
+  createDefaultUserProfile,
+  LIP_METALS,
+  mergeUserProfile,
+  parseUserProfile,
+  SURFACE_STYLES,
+} from "@teamflow/core";
 import { describe, expect, it } from "vitest";
 import { resetAppearance } from "../src/lib/appearanceReset";
 import { applyUserProfile, markLowPowerDevice } from "../src/profile";
@@ -117,5 +124,18 @@ describe("cheap glass", () => {
       .filter((selector) => /\.issue-card|\.column\.cell/.test(selector));
     expect(blurredCards).toEqual([]);
     expect(cardCss).not.toMatch(/\.issue-card[^{]*\{[^}]*backdrop-filter:\s*blur/);
+  });
+});
+
+describe("aspect CSS", () => {
+  it("has rules for every surface, button style and lip metal", () => {
+    for (const value of SURFACE_STYLES.filter((v) => v !== "auto")) {
+      expect(aspectsCss).toContain(`[data-surface="${value}"] {`);
+    }
+    for (const value of BUTTON_STYLES.filter((v) => v !== "auto")) {
+      expect(aspectsCss).toContain(`[data-buttons="${value}"] {`);
+    }
+    for (const value of LIP_METALS) expect(aspectsCss).toContain(`[data-lip="${value}"] {`);
+    expect(aspectsCss).toContain('[data-lip-shadow="drop"] {');
   });
 });
