@@ -89,3 +89,7 @@ Appearance stays short: Looks (with Reset all), Quick changes (Light or dark, Ac
 The profile keeps up to 12 named mixes (`mixes`, `savedMixSchema` in core): each is an id, a name (up to 40 characters) and a full appearance. They sync with the profile like everything else. A broken or over-long list loads as its valid first 12 instead of failing. On the Design page, Your mixes saves the current look by name and lists the mixes with Use (or "in use"), Rename and Delete (with Undo); Appearance shows them as chips under the Looks. `lib/savedMixes.ts` holds the helpers.
 
 Share moved to the Design page as "Share this mix". A shared look carries one appearance and the board size, never the list of saved mixes.
+
+## Heads-up
+
+`lib/designHeadsUp.ts` lists weak pairings for the Design page, shown under the preview as "Heads up:" lines (or "No heads-up for this mix."). They never block a choice. From the design library: glass windows without a Glass colour theme, paper surface or cut-paper buttons on a dark theme, neon buttons on a light theme, notebook fields without the Paper font, the retro box switch without 90s bevel buttons. Teamflow's own: a gold or silver lip on a light theme, the Pixel font with columns narrower than 400px, the Glass or Neon UI style under a different surface, an accent under 3:1 on the page, and button text under 4.5:1 on the accent (both read from the painted colours; values that are not plain hex are skipped).

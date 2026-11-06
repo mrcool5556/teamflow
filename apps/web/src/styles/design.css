@@ -172,6 +172,30 @@
   background: var(--bg);
 }
 
+/* Weak pairings: a short note under the preview, never a block. */
+.design-headsup {
+  font-size: var(--font-size-sm);
+  color: var(--text-soft);
+}
+
+.design-headsup strong {
+  color: var(--text);
+}
+
+.design-headsup ul {
+  margin: var(--space-1) 0 0;
+  padding-left: 1.1rem;
+}
+
+.design-headsup li + li {
+  margin-top: 0.15rem;
+}
+
+.design-headsup-none {
+  color: var(--muted);
+  font-size: var(--font-size-xs);
+}
+
 /* The sample app inside the frame. */
 .design-preview-app {
   position: relative;

@@ -13,6 +13,7 @@ import { ProfileSaveStatus } from "../../components/ProfileSaveStatus";
 import { SavedMixes } from "../../components/SavedMixes";
 import { NARROW_SCREEN, useMediaQuery } from "../../hooks/useMediaQuery";
 import { settingsPath, useAppRoute } from "../../lib/appRoute";
+import { designHeadsUps, readPaintedColours } from "../../lib/designHeadsUp";
 import {
   ACCENT_OPTIONS,
   BUTTON_OPTIONS,
@@ -147,6 +148,9 @@ export function DesignPanel() {
   const painted = paintedTheme(a);
   const colour = currentColourChoice(a, painted);
   const lipped = a.buttons === "lipped";
+  // The page is repainted before this render, so the painted colours match the profile.
+  const colours = readPaintedColours();
+  const headsUps = designHeadsUps(profile, painted, colours);
 
   return (
     <div className="settings-panel design-panel">
@@ -206,6 +210,20 @@ export function DesignPanel() {
           </div>
           <div className="design-preview-frame board-preview-surface" aria-hidden="true">
             <DesignPreview view={view} />
+          </div>
+          <div className="design-headsup" role="status" aria-label="Heads-up">
+            {headsUps.length ? (
+              <>
+                <strong>Heads up:</strong>
+                <ul>
+                  {headsUps.map((item) => (
+                    <li key={item.id}>{item.text}</li>
+                  ))}
+                </ul>
+              </>
+            ) : (
+              <span className="design-headsup-none">No heads-up for this mix.</span>
+            )}
           </div>
         </section>
 
