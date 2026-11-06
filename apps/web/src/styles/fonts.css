@@ -1,0 +1,133 @@
+/*
+ * Font sets from the UI/UX design library, self-hosted (src/assets/fonts, each family with its
+ * licence: SIL OFL 1.1, Special Elite Apache 2.0). A file downloads only when a set that uses
+ * it is chosen. data-font is the profile's fontSet; without it Teamflow's own fonts stay.
+ */
+@font-face {
+  font-family: "Atkinson Hyperlegible";
+  src: url("../assets/fonts/atkinson-hyperlegible/atkinson-hyperlegible-400.woff2") format("woff2");
+  font-weight: 400 500;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Atkinson Hyperlegible";
+  src: url("../assets/fonts/atkinson-hyperlegible/atkinson-hyperlegible-700.woff2") format("woff2");
+  font-weight: 600 800;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Bricolage Grotesque";
+  src: url("../assets/fonts/bricolage-grotesque/bricolage-grotesque-600-700.woff2") format("woff2");
+  font-weight: 500 800;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Encode Sans Semi Condensed";
+  src: url("../assets/fonts/encode-sans-semi-condensed/encode-sans-semi-condensed-600.woff2")
+    format("woff2");
+  font-weight: 500 800;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: Manrope;
+  src: url("../assets/fonts/manrope/manrope-400.woff2") format("woff2");
+  font-weight: 400 500;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: Manrope;
+  src: url("../assets/fonts/manrope/manrope-600.woff2") format("woff2");
+  font-weight: 600 800;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "IBM Plex Mono";
+  src: url("../assets/fonts/ibm-plex-mono/ibm-plex-mono-400.woff2") format("woff2");
+  font-weight: 400;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "IBM Plex Mono";
+  src: url("../assets/fonts/ibm-plex-mono/ibm-plex-mono-500.woff2") format("woff2");
+  font-weight: 500 700;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Special Elite";
+  src: url("../assets/fonts/special-elite/special-elite-400.woff2") format("woff2");
+  font-weight: 400 800;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: Caveat;
+  src: url("../assets/fonts/caveat/caveat-500-700.woff2") format("woff2");
+  font-weight: 400 700;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Pixelify Sans";
+  src: url("../assets/fonts/pixelify-sans/pixelify-sans-400-700.woff2") format("woff2");
+  font-weight: 400 700;
+  font-display: swap;
+}
+
+/* VT323 draws small for its size; scale it so codes and counts match the other sets. */
+@font-face {
+  font-family: VT323;
+  src: url("../assets/fonts/vt323/vt323-400.woff2") format("woff2");
+  font-weight: 400 800;
+  font-display: swap;
+  size-adjust: 125%;
+}
+
+@font-face {
+  font-family: Orbitron;
+  src: url("../assets/fonts/orbitron/orbitron-500-900.woff2") format("woff2");
+  font-weight: 500 900;
+  font-display: swap;
+}
+
+[data-font] {
+  /* A chosen set also replaces the Paper UI style's serif headings. */
+  --font-serif: var(--font-display);
+}
+
+[data-font="studio"] {
+  --font-display: "Bricolage Grotesque", "Segoe UI", system-ui, sans-serif;
+  --font-body: "Atkinson Hyperlegible", "Segoe UI", system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", Consolas, ui-monospace, monospace;
+}
+
+[data-font="machined"] {
+  --font-display: "Encode Sans Semi Condensed", "Segoe UI", sans-serif;
+  --font-body: Manrope, "Segoe UI", sans-serif;
+  --font-mono: "IBM Plex Mono", Consolas, monospace;
+}
+
+[data-font="paper"] {
+  --font-display: "Special Elite", "Courier New", monospace;
+  --font-body: "Atkinson Hyperlegible", "Segoe UI", sans-serif;
+  --font-mono: "Special Elite", "Courier New", monospace;
+}
+
+[data-font="pixel"] {
+  --font-display: "Pixelify Sans", monospace;
+  --font-body: "Pixelify Sans", monospace;
+  --font-mono: VT323, "Courier New", monospace;
+}
+
+[data-font="neon"] {
+  --font-display: Orbitron, "Segoe UI", sans-serif;
+  --font-body: "Atkinson Hyperlegible", "Segoe UI", sans-serif;
+  --font-mono: "JetBrains Mono", Consolas, monospace;
+}
