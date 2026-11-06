@@ -1,6 +1,7 @@
 import { z } from "zod";
 import type { AttachmentKind } from "./attachments.js";
 import { TEAM_PERMISSIONS } from "./permissions.js";
+import type { SpaceType } from "./spaces.js";
 
 export * from "./about.js";
 export * from "./attachments.js";
@@ -325,6 +326,10 @@ export type TeamPublic = {
   name: string;
   key: string;
   createdAt: string;
+  /** "admin" or "free"; see SpaceType. */
+  spaceType: SpaceType;
+  /** Upload cap in bytes; null = no limit. */
+  storageCapBytes: number | null;
 };
 
 export type ProjectPublic = {
