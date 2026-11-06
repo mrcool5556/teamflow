@@ -63,3 +63,9 @@ Glass stays cheap: backdrop blur only on the topbar, drawers, dialogs and Appear
 ## Buttons
 
 Plain, ghost and danger buttons in `base.css` read `--btn-*` variables (face, text, border, shadow, radius, tilt), falling back to the UI style's chrome tokens, so with no `data-buttons` nothing changes. Each Buttons value sets those variables: Flat, Raised (bevel shadow, sinks when pressed), Inset (tinted, sunken), Lipped (a metal rim painted as the border box behind the face; `data-lip` picks gold, silver, bronze, ink or the theme colour, and `data-lip-shadow="drop"` adds a dark edge), Cut paper (fibre texture, offset shadow, a slight tilt), Neon (glowing outline) and 90s bevel. Plain buttons get the primary face and ghost buttons the quiet face; the board's row and column header buttons also take the quiet face. Buttons with their own look (segments, chips, icon buttons) keep it.
+
+## Text fields and switches
+
+Fields (`input`, `select` in `base.css`) read `--field-*` variables. `inputs` values: Boxed (strong border), Sunk (sunken fill), Underline (a line under the text) and Notebook (handwriting in Caveat on a ruled line, in the theme's link colour). Fields with their own look keep it.
+
+`toggles` values restyle the on/off switch (`.appearance-switch`): Pill, Paper flap (a fibre card reading OFF that flips to ON) and Retro box (a sunken 90s check box). Any choice also colours native checkboxes with the accent; Retro box draws them as sunken boxes too.

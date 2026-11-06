@@ -146,14 +146,18 @@ button.danger:hover {
   background: color-mix(in srgb, var(--danger) 12%, transparent);
 }
 
+/* Fields read --field-* variables, which the Text fields aspect sets (styles/aspects.css). */
 input,
 select {
   width: 100%;
-  background: var(--surface);
-  color: var(--text);
-  border: var(--chrome-input-border-width) solid var(--border);
+  background: var(--field-bg, var(--surface));
+  color: var(--field-text, var(--text));
+  border-style: solid;
+  border-width: var(--field-bw, var(--chrome-input-border-width));
+  border-color: var(--field-border, var(--border));
+  box-shadow: var(--field-shadow, none);
   padding: 0.55rem 0.75rem;
-  border-radius: var(--radius-control);
+  border-radius: var(--field-radius, var(--radius-control));
 }
 
 .eyebrow {

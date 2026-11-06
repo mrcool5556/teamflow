@@ -1,10 +1,12 @@
 import {
   BUTTON_STYLES,
   createDefaultUserProfile,
+  INPUT_STYLES,
   LIP_METALS,
   mergeUserProfile,
   parseUserProfile,
   SURFACE_STYLES,
+  TOGGLE_STYLES,
 } from "@teamflow/core";
 import { describe, expect, it } from "vitest";
 import { resetAppearance } from "../src/lib/appearanceReset";
@@ -137,5 +139,14 @@ describe("aspect CSS", () => {
     }
     for (const value of LIP_METALS) expect(aspectsCss).toContain(`[data-lip="${value}"] {`);
     expect(aspectsCss).toContain('[data-lip-shadow="drop"] {');
+  });
+
+  it("has rules for every text field and switch style", () => {
+    for (const value of INPUT_STYLES.filter((v) => v !== "auto")) {
+      expect(aspectsCss).toContain(`[data-inputs="${value}"]`);
+    }
+    for (const value of TOGGLE_STYLES.filter((v) => v !== "auto")) {
+      expect(aspectsCss).toContain(`[data-toggles="${value}"] .appearance-switch-track`);
+    }
   });
 });
