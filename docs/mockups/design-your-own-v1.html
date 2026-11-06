@@ -1,0 +1,434 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Teamflow design your own v1</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600&family=Space+Grotesk:wght@500;700&family=Manrope:wght@400;600;800&family=Encode+Sans+Semi+Condensed:wght@600;700&family=IBM+Plex+Mono:wght@400;500&family=Special+Elite&family=Caveat:wght@700&family=Pixelify+Sans:wght@400;600&family=VT323&family=Orbitron:wght@500;900&family=Atkinson+Hyperlegible:wght@400;700&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="../../apps/web/src/styles/tokens.css" />
+<style>
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text); font-family: "JetBrains Mono", monospace; font-size: 14px; line-height: 1.5; }
+  h1, h2, h3, h4 { font-family: "Space Grotesk", sans-serif; margin: 0 0 var(--space-2); }
+  a { color: var(--accent-text); }
+  code { font-size: .92em; }
+  .doc-head { position: sticky; top: 0; z-index: 50; display: flex; gap: var(--space-4); align-items: center; flex-wrap: wrap; padding: var(--space-3) var(--space-6); background: var(--surface); border-bottom: 1px solid var(--border); }
+  .doc-head nav { display: flex; gap: var(--space-2); flex-wrap: wrap; font-size: var(--font-size-sm); }
+  .doc-head nav a { text-decoration: none; padding: 2px 8px; border: 1px solid var(--border); border-radius: var(--radius-sm); }
+  .spacer { flex: 1; }
+  main { max-width: 1500px; margin: 0 auto; padding: var(--space-6); }
+  section.item { border-top: 1px solid var(--border); padding: var(--space-6) 0; }
+  .eyebrow { color: var(--accent-text); letter-spacing: .18em; font-size: var(--font-size-xs); text-transform: uppercase; margin: 0 0 var(--space-1); }
+  .lead { color: var(--text-soft); max-width: 90ch; }
+  .changes, .problems { margin: var(--space-3) 0 0; padding-left: 1.2rem; font-size: var(--font-size-sm); }
+  .changes li::marker { color: var(--done); }
+  .problems { color: var(--text-soft); }
+  .problems li::marker { color: #e3c34f; }
+  table.list { border-collapse: collapse; width: 100%; font-size: var(--font-size-sm); }
+  table.list td, table.list th { border-bottom: 1px solid var(--border); padding: 6px 8px; text-align: left; vertical-align: top; }
+  table.list th { color: var(--muted); font-weight: 400; font-size: var(--font-size-xs); text-transform: uppercase; letter-spacing: .1em; }
+  table.list td:first-child { color: var(--accent-text); white-space: nowrap; }
+  .has { color: var(--done); } .new { color: #e3c34f; } .part { color: #7cc4ff; }
+  .frame { --s: .5; width: calc(var(--w) * var(--s) * 1px); height: calc(var(--h) * var(--s) * 1px); overflow: hidden; border: 1px solid var(--border-strong); border-radius: var(--radius-sm); position: relative; flex: none; }
+  .frame > .vp { width: calc(var(--w) * 1px); height: calc(var(--h) * 1px); transform: scale(var(--s)); transform-origin: 0 0; position: relative; overflow: hidden; background: var(--bg); }
+  .cap { font-size: var(--font-size-xs); color: var(--muted); margin-top: 4px; max-width: 70ch; }
+  .row { display: flex; flex-wrap: wrap; gap: var(--space-5); align-items: flex-start; }
+  .mixes { display: grid; grid-template-columns: repeat(auto-fit, minmax(330px, 1fr)); gap: var(--space-4); }
+
+  /* ---------- app chrome in the mock (Teamflow tokens) ---------- */
+  .tf-top { display: flex; align-items: center; gap: 10px; height: 56px; padding: 0 20px; border-bottom: 1px solid var(--border); background: var(--surface); }
+  .tf-logo { font-family: "Space Grotesk"; font-weight: 700; color: var(--accent-text); letter-spacing: .12em; font-size: 12px; }
+  .tf-team { padding: 6px 10px; border: 1px solid var(--border-strong); border-radius: var(--radius-sm); font-weight: 600; }
+  .tf-avatar { width: 30px; height: 30px; border-radius: 50%; background: var(--accent); color: #111; display: grid; place-items: center; font-size: 12px; font-weight: 600; }
+  .tf-btn { display: inline-flex; align-items: center; gap: 6px; font: inherit; font-size: 13px; padding: 5px 10px; border: 1px solid var(--border); border-radius: var(--radius-sm); background: transparent; color: var(--text); white-space: nowrap; }
+  .tf-btn.primary { background: var(--primary); color: var(--chrome-btn-text); border: var(--chrome-btn-border-width) solid var(--chrome-btn-border-color); box-shadow: var(--chrome-btn-shadow); }
+  .tf-link { color: var(--accent-text); text-decoration: underline; font-size: 12px; }
+  .tf-sec { border: 1px solid var(--border); border-radius: var(--radius-md); background: var(--surface); padding: 14px 16px; margin-bottom: 12px; }
+  .tf-sec h4 { display: flex; justify-content: space-between; align-items: baseline; font-size: 16px; }
+  .tf-sec h4 small { font-family: "JetBrains Mono"; font-weight: 400; font-size: 11px; color: var(--muted); }
+  .tf-seg { display: inline-flex; border: 1px solid var(--border-strong); border-radius: var(--radius-sm); overflow: hidden; font-size: 12px; }
+  .tf-seg span { padding: 4px 10px; } .tf-seg span + span { border-left: 1px solid var(--border-strong); }
+  .tf-seg span.on { background: var(--accent); color: #111; }
+  .tf-line { display: grid; grid-template-columns: 120px 1fr; gap: 10px; align-items: center; margin: 9px 0; font-size: 12px; }
+  .tf-line > span:first-child { color: var(--text-soft); }
+  .tf-chipset { display: flex; flex-wrap: wrap; gap: 6px; }
+  .tf-chip { font-size: 11px; padding: 3px 9px; border: 1px solid var(--border); border-radius: 99px; color: var(--text-soft); }
+  .tf-chip.on { border-color: var(--accent); color: var(--text); box-shadow: 0 0 0 1px var(--accent); }
+  .tf-warn { font-size: 12px; padding: 8px 10px; border: 1px solid #f59e0b; border-left-width: 4px; border-radius: var(--radius-sm); color: var(--text); background: color-mix(in srgb, #f59e0b 10%, transparent); }
+  .tf-warn b { color: #f59e0b; }
+  .tf-looks { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+  .tf-look { border: 1px solid var(--border); border-radius: var(--radius-md); padding: 6px; font-size: 12px; font-weight: 600; }
+  .tf-look.on { border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent); }
+  .tf-look .pv { height: 46px; border-radius: 6px; margin-bottom: 5px; display: grid; grid-template-columns: 1fr 1fr; gap: 4px; padding: 5px; }
+  .tf-look .pv i { border-radius: 4px; }
+  .tf-switch { display: inline-flex; align-items: center; gap: 8px; font-size: 12px; }
+  .tf-switch i { width: 30px; height: 16px; border-radius: 99px; background: var(--accent); position: relative; }
+  .tf-switch i::after { content: ""; position: absolute; right: 2px; top: 2px; width: 12px; height: 12px; border-radius: 50%; background: #111; }
+  .tf-switch i.off { background: var(--border-strong); } .tf-switch i.off::after { left: 2px; right: auto; background: var(--text); }
+
+  /* ---------- sample board, painted by one "mix" ---------- */
+  .mix { --r-sm: 6px; --r-md: 10px; --r-lg: 14px; font-family: var(--f-sans); color: var(--ink); background: var(--s0); padding: 12px; border-radius: 10px; position: relative; overflow: hidden; }
+  .mix .sb-top { display: flex; align-items: center; gap: 8px; padding: 8px 10px; margin: -12px -12px 12px; background: var(--s1); border-bottom: 1px solid var(--line); font-size: 12px; }
+  .mix .sb-brand { font-family: var(--f-display); font-weight: 700; color: var(--accent); letter-spacing: .08em; font-size: 12px; }
+  .mix .sb-row { font-family: var(--f-display); font-weight: 700; font-size: 13px; padding: 6px 10px; margin-bottom: 8px; border-left: 4px solid #2dd4bf; background: color-mix(in srgb, #2dd4bf 16%, var(--s1)); border-radius: var(--r-md); }
+  .mix .sb-cols { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .mix .sb-colh { font-size: 11px; font-weight: 700; letter-spacing: .06em; padding: 4px 8px; margin-bottom: 6px; color: var(--ink-muted); text-transform: uppercase; }
+  .mix .sb-card { padding: 8px 10px; margin-bottom: 8px; border-radius: var(--r-lg); background: var(--s1); border: 1px solid var(--line); }
+  .mix .sb-card .ref { font-family: var(--f-mono); font-size: 10px; color: var(--accent-ink); }
+  .mix .sb-card b { display: block; font-family: var(--f-display); font-size: 13px; margin-top: 2px; }
+  .mix .sb-card .due { font-size: 10px; padding: 0 5px; border: 1px solid var(--line-strong); border-radius: var(--r-sm); color: var(--ink-muted); }
+  .mix .sb-card .due.late { color: var(--danger); border-color: var(--danger); }
+  .mix .sb-actions { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-top: 4px; }
+  .mix .sb-btn { font: 700 12px/16px var(--f-sans); padding: 6px 12px; border-radius: var(--r-md); border: 1px solid var(--line-strong); background: var(--s1); color: var(--ink); --face: var(--s1); }
+  .mix .sb-btn.primary { --face: var(--accent); background: var(--accent); color: var(--on-accent); border-color: var(--accent); }
+  .mix .sb-field { flex: 1 1 120px; min-width: 110px; font: 400 12px/16px var(--f-sans); padding: 6px 8px; border-radius: var(--r-md); border: 1px solid var(--line-strong); background: var(--s1); color: var(--ink-muted); }
+  .mix .sb-toggle { width: 34px; height: 20px; border-radius: 99px; background: var(--accent); position: relative; flex: none; }
+  .mix .sb-toggle::after { content: ""; position: absolute; right: 3px; top: 3px; width: 14px; height: 14px; border-radius: 50%; background: var(--on-accent); }
+  .mix .sb-drawer { position: absolute; top: 44px; right: 0; bottom: 0; width: 34%; padding: 10px; background: var(--s1); border-left: 1px solid var(--line-strong); font-size: 11px; }
+  .mix .sb-drawer b { font-family: var(--f-display); font-size: 13px; display: block; margin-bottom: 6px; }
+  .mix .sb-drawer .sb-field { display: block; margin: 4px 0 8px; }
+  .mix-name { display: flex; justify-content: space-between; font-size: 12px; margin-top: 6px; }
+  .mix-name span { color: var(--muted); }
+
+  /* shapes */
+  .mix[data-shape="sharp"] { --r-sm: 2px; --r-md: 3px; --r-lg: 4px; }
+  .mix[data-shape="pill"] { --r-sm: 999px; --r-md: 999px; --r-lg: 22px; }
+  /* surfaces (ported idea: variables on the attribute, components read them) */
+  .mix[data-surface="soft-inset"] .sb-card, .mix[data-surface="soft-inset"] .sb-drawer { background: transparent; border: 0; box-shadow: inset 5px 8px 22px var(--soft-lo), inset -3px -5px 14px var(--soft-hi), 0 1px 0 var(--soft-rim), 0 -1px 0 var(--soft-lo); }
+  .mix[data-surface="paper"] .sb-card, .mix[data-surface="paper"] .sb-drawer { border: 0; box-shadow: 0 1px 0 rgba(30,18,4,.4), 3px 4px 0 rgba(30,18,4,.22); background-image: repeating-linear-gradient(0deg, rgba(0,0,0,.025) 0 1px, transparent 1px 3px); }
+  .mix[data-surface="bevel"] .sb-card, .mix[data-surface="bevel"] .sb-drawer { border: 0; box-shadow: inset 1px 1px 0 rgba(255,255,255,.9), inset -1px -1px 0 rgba(0,0,0,.45), 1px 1px 0 rgba(0,0,0,.3); }
+  .mix[data-surface="glass"] .sb-card, .mix[data-surface="glass"] .sb-drawer { backdrop-filter: blur(14px) saturate(140%); box-shadow: inset 0 1px 0 rgba(255,255,255,.16); }
+  .mix[data-surface="glass"] { background: radial-gradient(ellipse 80% 60% at 10% 0%, rgba(212,245,60,.18), transparent 60%), radial-gradient(ellipse 70% 60% at 100% 100%, rgba(124,196,255,.2), transparent 60%), var(--s0); }
+  /* buttons */
+  .mix[data-buttons="lipped"] .sb-btn { border: 3px solid transparent; background: linear-gradient(var(--face), var(--face)) padding-box, linear-gradient(180deg, #fff1b0 0%, #f0c75c 14%, #e6b84a 38%, #c9972c 66%, #8f6a1d 90%, #5a4012 100%) border-box; }
+  .mix[data-buttons="cut-paper"] .sb-btn { border: 0; border-radius: 2px; box-shadow: 0 1px 0 rgba(30,18,4,.45), 4px 4px 0 rgba(30,18,4,.3); transform: rotate(-.6deg); }
+  .mix[data-buttons="bevel95"] .sb-btn { border: 0; border-radius: 0; box-shadow: inset -1px -1px rgba(0,0,0,.65), inset 1px 1px rgba(255,255,255,.85), inset -2px -2px rgba(0,0,0,.3), inset 2px 2px rgba(255,255,255,.35); }
+  .mix[data-buttons="bevel95"] .sb-btn.primary { background: var(--s1); color: var(--ink); }
+  .mix[data-buttons="neon"] .sb-btn { background: transparent; color: var(--accent); border: 2px solid var(--accent); box-shadow: 0 0 8px var(--accent-soft), inset 0 0 8px var(--accent-soft); }
+  .mix[data-buttons="neon"] .sb-btn.primary { background: var(--accent); color: var(--on-accent); box-shadow: 0 0 14px var(--accent), 0 0 30px var(--accent-soft); }
+  /* inputs */
+  .mix[data-inputs="sunk"] .sb-field { background: var(--s2); border-color: transparent; box-shadow: inset 0 2px 4px rgba(0,0,0,.35); }
+  .mix[data-inputs="notebook"] .sb-field { border: 0; border-radius: 0; font: 700 17px/22px Caveat, cursive; color: var(--info); background: linear-gradient(transparent calc(100% - 2px), var(--line-strong) calc(100% - 2px)), var(--s1); }
+  .mix[data-inputs="underline"] .sb-field { background: transparent; border: 0; border-bottom: 2px solid var(--line-strong); border-radius: 0; }
+  /* toggles */
+  .mix[data-toggles="flap"] .sb-toggle { width: 44px; border-radius: 3px; background: var(--accent); }
+  .mix[data-toggles="flap"] .sb-toggle::after { content: "ON"; inset: 3px; width: auto; height: auto; border-radius: 2px; background: transparent; color: var(--on-accent); font: 700 9px/14px var(--f-mono); text-align: center; }
+  .mix[data-toggles="retro"] .sb-toggle { width: 16px; height: 16px; border-radius: 0; background: var(--s1); box-shadow: inset 1px 1px rgba(0,0,0,.65), inset -1px -1px rgba(255,255,255,.85); }
+  .mix[data-toggles="retro"] .sb-toggle::after { content: "\2713"; inset: 0; width: auto; height: auto; background: none; color: var(--ink); font: 700 12px/16px sans-serif; text-align: center; }
+
+  /* the four mixes (UIX token values copied from project/tokens.json) */
+  .mix--machined { --s0:#07090c; --s1:#11161c; --s2:#0c1015; --line:rgba(236,233,225,.07); --line-strong:#6e7984; --ink:#f2efe8; --ink-muted:#aab3bc; --accent:#e6b84a; --on-accent:#14100a; --accent-soft:rgba(211,161,55,.2); --accent-ink:#e6b84a; --danger:#e5484d; --info:#00cfea;
+    --soft-lo:rgba(0,0,0,.5); --soft-hi:rgba(255,255,255,.035); --soft-rim:rgba(255,255,255,.07); --f-display:"Encode Sans Semi Condensed", sans-serif; --f-sans: Manrope, sans-serif; --f-mono:"IBM Plex Mono", monospace; }
+  .mix--paper { --s0:#fbf4ec; --s1:#fffaf4; --s2:#f3e6d8; --line:#e6d6c4; --line-strong:#94785f; --ink:#2e211a; --ink-muted:#6b574a; --accent:#b0440f; --on-accent:#fff; --accent-soft:#f8dccb; --accent-ink:#8c360b; --danger:#a3271d; --info:#2b5d8a;
+    --f-display:"Special Elite", monospace; --f-sans:"Atkinson Hyperlegible", sans-serif; --f-mono:"Special Elite", monospace; }
+  .mix--retro { --s0:#c4c4c8; --s1:#d6d6d9; --s2:#b4b4b9; --line:#a9a9ae; --line-strong:#5f5f66; --ink:#1e1e22; --ink-muted:#404047; --accent:#4a3f8c; --on-accent:#fff; --accent-soft:#d9d5ee; --accent-ink:#3a3070; --danger:#8e1b1b; --info:#1f4f86;
+    --f-display:"Pixelify Sans", monospace; --f-sans:"Pixelify Sans", monospace; --f-mono: VT323, monospace; }
+  .mix--synth { --s0:#0d0f10; --s1:rgba(255,255,255,.07); --s2:rgba(255,255,255,.12); --line:rgba(255,255,255,.12); --line-strong:rgba(255,255,255,.42); --ink:#f2f4ee; --ink-muted:#a7aca3; --accent:#d4f53c; --on-accent:#151a00; --accent-soft:rgba(212,245,60,.16); --accent-ink:#e3fa7a; --danger:#ff7a6e; --info:#7cc4ff;
+    --f-display: Orbitron, sans-serif; --f-sans:"Atkinson Hyperlegible", sans-serif; --f-mono:"JetBrains Mono", monospace; }
+  .mix--teamflow { --s0:#0f0f0f; --s1:#1f1f1f; --s2:#141414; --line:#2e2e2e; --line-strong:#444; --ink:#ececec; --ink-muted:#b8b8b8; --accent:#ff5500; --on-accent:#111; --accent-soft:rgba(0,216,255,.2); --accent-ink:#00d8ff; --danger:#ff4d4d; --info:#00d8ff;
+    --f-display:"Space Grotesk", sans-serif; --f-sans:"JetBrains Mono", monospace; --f-mono:"JetBrains Mono", monospace; }
+  .mix--teamflow .sb-btn { border: 3px solid #111; box-shadow: 3px 3px 0 #000; }
+
+  /* Design page parts */
+  .dp { display: grid; grid-template-columns: 260px minmax(0, 1fr) 260px; height: calc(100% - 56px); }
+  .dp-aspects { border-right: 1px solid var(--border); padding: 14px; overflow: hidden; background: var(--surface); }
+  .dp-aspects h5 { margin: 12px 0 6px; font: 11px "JetBrains Mono"; letter-spacing: .14em; text-transform: uppercase; color: var(--muted); }
+  .dp-stage { padding: 18px 22px; overflow: hidden; }
+  .dp-side { border-left: 1px solid var(--border); padding: 14px; background: var(--surface); font-size: 12px; }
+  .dp-saved { display: flex; justify-content: space-between; padding: 6px 8px; border: 1px solid var(--border); border-radius: var(--radius-sm); margin-bottom: 6px; }
+  .dp-saved.on { border-color: var(--accent); }
+</style>
+</head>
+<body>
+<header class="doc-head">
+  <strong style="font-family:'Space Grotesk'">Teamflow · design your own look · v1</strong>
+  <nav>
+    <a href="#map">1 Map</a><a href="#simple">2 Simple</a><a href="#design">3 Design page</a><a href="#phone">4 Phone</a><a href="#mixes">5 Mixes</a><a href="#boxes">6 Per-box</a><a href="#risks">7 Risks</a><a href="#plan">8 Build plan</a>
+  </nav>
+  <span class="spacer"></span>
+  <button class="tf-btn" id="theme" type="button">☀ Light</button>
+</header>
+
+<main>
+  <p class="eyebrow">Design your own · phase 1 · 2026-11-05</p>
+  <h1>Bring the UIX "make it yours" model into Teamflow</h1>
+  <p class="lead">George's idea (IDEAS.md, "Customisation idea: design your own look from the UIX library"): use the UIX design library's aspects so people can design their own Teamflow look, with "simple but advanced" editing. This page maps UIX onto what Teamflow already has, then mocks the simple panel, a Design page (desktop and phone), four mixes on a sample board, and the heads-up line. Nothing in the app has changed. The light/dark toggle above only switches this page's chrome; the mixes keep their own colours.</p>
+
+  <!-- 1 MAP -->
+  <section class="item" id="map">
+    <p class="eyebrow">1</p><h2>What Teamflow has, what UIX adds, and how it ports</h2>
+    <table class="list">
+      <tr><th>Aspect</th><th>Teamflow today</th><th>UIX</th><th>Status</th><th>How it maps into Teamflow</th></tr>
+      <tr><td>Colours</td><td>Theme Dark / Light / Match system; palette Default · Sunset · Ocean · Forest · Custom (primary + accent); text contrast</td><td><code>data-theme</code>: 9 themes (Studio Light/Dark, Arcade, Cozy, Night Glass, Lavender Glass, Retro Console, Machined, Machined Light), 20 tokens each</td><td class="part">partly</td><td>Add the 9 as colour themes next to Teamflow Dark/Light. Map tokens: surface-000→<code>--bg</code>, surface-100→<code>--surface</code>/<code>--panel</code>, surface-200→<code>--cell</code>, line→<code>--border</code>, line-strong→<code>--border-strong</code>, ink→<code>--text</code>, ink-muted→<code>--text-soft</code>/<code>--muted</code>, accent→<code>--primary</code>, focus/info→<code>--accent</code>, danger→<code>--danger</code>. Palette and custom colours stay as an accent override on any theme.</td></tr>
+      <tr><td>Fonts</td><td>Fixed: JetBrains Mono body, Space Grotesk headings (31 hard-coded <code>font-family</code> rules)</td><td><code>data-font</code>: Studio, Machined, Paper (typewriter + Caveat hand), Pixel, Neon</td><td class="new">new</td><td>First swap the 31 literals for <code>--font-display/--font-sans/--font-mono</code>, then add "Teamflow" (today's) plus the 5 UIX sets.</td></tr>
+      <tr><td>Corners</td><td><code>data-shape</code>: sharp, soft, round, octagon</td><td><code>data-shape</code>: sharp, rounded, pill</td><td class="has">has</td><td>Keep Teamflow's four; add <code>pill</code>. (UIX rounded ≈ Teamflow round.)</td></tr>
+      <tr><td>Windows and cards</td><td>Part of UI style (8 <code>data-chrome-style</code> looks: Industrial, Minimal, Soft, Classic, Glass, Terminal, Paper, Neon; 119 selectors)</td><td><code>data-surface</code>: flat, soft-inset, indented, glass, paper (fibre), bevel</td><td class="part">partly</td><td>New aspect with an extra value <b>Auto</b> = follow the UI style. Applies to <code>.issue-card</code>, <code>.column</code>, <code>.board-row</code>, <code>.drawer</code>, <code>.dialog</code>, <code>.appearance-group</code>, <code>.topbar</code>.</td></tr>
+      <tr><td>Buttons</td><td>Part of UI style (chrome tokens <code>--chrome-btn-*</code>)</td><td><code>data-buttons</code>: flat, raised, inset, lipped, cut-paper, neon, 90s bevel; <code>data-lip</code> 5 metals + rim shadow</td><td class="new">new</td><td>New aspect (Auto + 7) on <code>button</code> (primary), <code>.ghost</code>, <code>.danger</code>. Lip metal shows only for Lipped.</td></tr>
+      <tr><td>Text fields</td><td>One look (<code>input, select, textarea</code> in base.css)</td><td><code>data-inputs</code>: boxed, sunk, underline, notebook (handwriting)</td><td class="new">new</td><td>New aspect on the base field rules and <code>.go-to-ref-input</code>, drawer fields, settings fields.</td></tr>
+      <tr><td>Switches</td><td>One <code>.appearance-switch</code>; checkboxes are native</td><td><code>data-toggles</code>: pill, paper flap, retro box</td><td class="new">new</td><td>Small: Teamflow has few switches. Apply to <code>.appearance-switch</code> and the settings checkboxes.</td></tr>
+      <tr><td>Team colours</td><td>Keep exact team colours switch</td><td>n/a</td><td class="has">has</td><td>Stays under Colours.</td></tr>
+      <tr><td>Board size</td><td>Column width (Auto/Custom), card height</td><td>n/a</td><td class="has">has</td><td>Stays under Board.</td></tr>
+      <tr><td>Presets</td><td>6 Looks (Teamflow, Daylight, Calm, Paper, Terminal, Neon)</td><td><code>STYLE_PRESETS</code>: Studio, Gold arcade, Paper desk, Retro 95, Synth night</td><td class="part">partly</td><td>Looks become full mixes (every aspect). Add the UIX presets as Looks.</td></tr>
+      <tr><td>Saved mixes</td><td>Share this look (one look, export/import)</td><td>Saved mixes by name (localStorage)</td><td class="new">new</td><td>Named mixes in the user profile (synced across devices), up to 12; Share exports one mix.</td></tr>
+      <tr><td>Warnings</td><td>none</td><td>Heads-up lines, never blocking</td><td class="new">new</td><td>Port the mixer's 5 rules, plus Teamflow ones (contrast of custom accent, glass on a flat theme).</td></tr>
+    </table>
+    <ul class="changes">
+      <li><b>Port, don't load:</b> copy the aspect rules into Teamflow's CSS (a new <code>styles/aspects.css</code>) written against Teamflow's own classes and tokens. Loading <code>bundle.css</code>/<code>bundle.js</code> at runtime would bring <code>.uix-*</code> classes Teamflow doesn't use, React components it doesn't need, a Google Fonts <code>@import</code> on every page, and a second token system.</li>
+      <li><b>Nearest box wins:</b> UIX writes rules like <code>[data-surface="glass"] .uix-card</code>. With a page set to glass and a drawer set to flat, both selectors match and the later rule wins, not the nearer box. In Teamflow each aspect value should set CSS variables on the box that carries the attribute (<code>[data-surface="glass"] { --surface-bg: …; --surface-shadow: …; }</code>) and components read the variables, so inheritance makes the nearest box win.</li>
+      <li><b>Fonts:</b> all are free to ship. Encode Sans Semi Condensed, Manrope, IBM Plex Mono, Caveat, Pixelify Sans, VT323, Orbitron, Bricolage Grotesque and JetBrains Mono are SIL OFL 1.1; Special Elite is Apache 2.0; Atkinson Hyperlegible has its own free licence (and an OFL "Next" version). The UIX <code>fonts/</code> folder has the five Machined woff2 files (~81 KB together) but no licence files, so Teamflow should add <code>OFL.txt</code> next to them. Self-host every set in <code>apps/web/public/fonts</code> (no Google request from a self-hosted app); <code>@font-face</code> only downloads a file when that font set is in use, so unused sets cost nothing. Rough size: 15–40 KB per weight, under 400 KB for everything.</li>
+    </ul>
+  </section>
+
+  <!-- 2 SIMPLE -->
+  <section class="item" id="simple">
+    <p class="eyebrow">2</p><h2>Simple: the Appearance panel most people use</h2>
+    <div class="row">
+      <div>
+        <div class="frame" style="--w:900;--h:820;--s:.62"><div class="vp" style="padding:20px 26px">
+          <div style="display:flex;align-items:baseline;gap:10px"><h2 style="font-size:24px;margin:0">Appearance</h2><span style="font-size:11px;color:var(--done);border:1px solid var(--done);border-radius:99px;padding:0 8px">✓ Saved</span><span class="spacer"></span><span class="tf-link">Reset all to default</span></div>
+          <p style="color:var(--text-soft);font-size:13px">Pick a look, then change a few things. Want every detail? Open the Design page.</p>
+          <div class="tf-sec"><h4>Looks <small>Current look: Machined · customised</small></h4>
+            <div class="tf-looks">
+              <div class="tf-look"><div class="pv" style="background:#0f0f0f"><i style="background:#1f1f1f;border:2px solid #444"></i><i style="background:#ff5500"></i></div>Teamflow</div>
+              <div class="tf-look"><div class="pv" style="background:#f3f3f3"><i style="background:#fff;border:2px solid #a3a3a3"></i><i style="background:#ff5500"></i></div>Daylight</div>
+              <div class="tf-look on"><div class="pv" style="background:#07090c"><i style="background:#0c1015;box-shadow:inset 3px 5px 10px rgba(0,0,0,.6)"></i><i style="background:#e6b84a;border-radius:99px"></i></div>Machined</div>
+              <div class="tf-look"><div class="pv" style="background:#fbf4ec"><i style="background:#fffaf4;box-shadow:2px 3px 0 rgba(30,18,4,.25)"></i><i style="background:#b0440f"></i></div>Paper desk</div>
+              <div class="tf-look"><div class="pv" style="background:#c4c4c8"><i style="background:#d6d6d9;box-shadow:inset 1px 1px #fff,inset -1px -1px #555"></i><i style="background:#4a3f8c"></i></div>Retro 95</div>
+              <div class="tf-look"><div class="pv" style="background:#0d0f10"><i style="background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.2)"></i><i style="background:#d4f53c;box-shadow:0 0 10px #d4f53c"></i></div>Synth night</div>
+            </div>
+            <p style="font-size:11px;color:var(--muted);margin:8px 0 0">+ your saved mixes: <span class="tf-chip">Gold desk</span> <span class="tf-chip">Night shift</span></p>
+          </div>
+          <div class="tf-sec"><h4>Quick changes</h4>
+            <div class="tf-line"><span>Light or dark</span><span class="tf-seg"><span class="on">Dark</span><span>Light</span><span>Match system</span></span></div>
+            <div class="tf-line"><span>Accent colour</span><span class="tf-chipset"><span class="tf-chip on">Theme's own</span><span class="tf-chip">Orange</span><span class="tf-chip">Ocean</span><span class="tf-chip">Forest</span><span class="tf-chip">Custom…</span></span></div>
+            <div class="tf-line"><span>Corners</span><span class="tf-seg"><span>Sharp</span><span>Slight</span><span>Round</span><span class="on">Pill</span></span></div>
+            <div class="tf-line"><span>Text</span><span class="tf-seg"><span>Softer</span><span class="on">Normal</span><span>Stronger</span></span></div>
+            <div class="tf-line"><span>Board</span><span class="tf-seg"><span class="on">Auto width</span><span>Custom</span></span></div>
+          </div>
+          <div class="tf-sec" style="display:flex;justify-content:space-between;align-items:center"><span><b>Design your own</b><br><span style="font-size:12px;color:var(--text-soft)">Fonts, windows, buttons, fields, switches, saved mixes</span></span><span class="tf-btn primary">Open Design page →</span></div>
+        </div></div>
+        <p class="cap">Appearance stays short: Looks (presets + your saved mixes), five quick switches, a link to the Design page. Share moves to the Design page.</p>
+      </div>
+      <ul class="changes" style="max-width:520px">
+        <li>"Light or dark" picks the light or dark partner of the current colour theme (Machined ↔ Machined Light, Studio Dark ↔ Light, Night Glass ↔ Lavender Glass, Teamflow Dark ↔ Light). Themes without a partner (Arcade, Cozy, Retro Console) keep their own and the switch shows that.</li>
+        <li>"Accent colour" is today's palette, now an override on top of any theme ("Theme's own" by default).</li>
+        <li>Corners and Text map to today's controls; Board keeps column width and card height.</li>
+        <li>Looks show the current mix's name, or "&lt;look&gt; · customised" with Back to … (as now).</li>
+      </ul>
+    </div>
+  </section>
+
+  <!-- 3 DESIGN PAGE -->
+  <section class="item" id="design">
+    <p class="eyebrow">3</p><h2>Advanced: the Design page (Settings → Appearance → Design)</h2>
+    <div class="frame" style="--w:1440;--h:900;--s:.86"><div class="vp">
+      <div class="tf-top"><span class="tf-logo">TEAMFLOW</span><span class="tf-team">ENG — Engineering ▾</span><span class="spacer"></span><span class="tf-avatar">DU</span></div>
+      <div class="dp">
+        <div class="dp-aspects">
+          <span class="tf-btn" style="width:100%">← Appearance</span>
+          <h5>Colours</h5>
+          <div class="tf-chipset"><span class="tf-chip">Teamflow Dark</span><span class="tf-chip">Teamflow Light</span><span class="tf-chip">Studio Dark</span><span class="tf-chip">Arcade</span><span class="tf-chip">Cozy</span><span class="tf-chip">Night Glass</span><span class="tf-chip">Lavender Glass</span><span class="tf-chip">Retro Console</span><span class="tf-chip on">Machined</span><span class="tf-chip">Machined Light</span></div>
+          <div class="tf-line" style="grid-template-columns:90px 1fr"><span>Accent</span><span class="tf-chip on" style="width:fit-content">Theme's own</span></div>
+          <h5>Fonts</h5>
+          <div class="tf-chipset"><span class="tf-chip">Teamflow</span><span class="tf-chip">Studio</span><span class="tf-chip on">Machined</span><span class="tf-chip">Paper</span><span class="tf-chip">Pixel</span><span class="tf-chip">Neon</span></div>
+          <h5>Corners</h5>
+          <div class="tf-chipset"><span class="tf-chip">Sharp</span><span class="tf-chip">Slight</span><span class="tf-chip">Round</span><span class="tf-chip">Octagon</span><span class="tf-chip on">Pill</span></div>
+          <h5>Windows and cards</h5>
+          <div class="tf-chipset"><span class="tf-chip">Auto</span><span class="tf-chip">Flat</span><span class="tf-chip on">Soft inset</span><span class="tf-chip">Indented</span><span class="tf-chip">Glass</span><span class="tf-chip">Paper</span><span class="tf-chip">Bevel</span></div>
+          <h5>Buttons</h5>
+          <div class="tf-chipset"><span class="tf-chip">Auto</span><span class="tf-chip">Flat</span><span class="tf-chip">Raised</span><span class="tf-chip">Inset</span><span class="tf-chip on">Lipped</span><span class="tf-chip">Cut paper</span><span class="tf-chip">Neon</span><span class="tf-chip">90s bevel</span></div>
+          <div class="tf-line" style="grid-template-columns:90px 1fr"><span>Lip metal</span><span class="tf-chipset"><span class="tf-chip on">Gold</span><span class="tf-chip">Silver</span><span class="tf-chip">Bronze</span><span class="tf-chip">Ink</span><span class="tf-chip">Theme</span></span></div>
+          <h5>Text fields</h5>
+          <div class="tf-chipset"><span class="tf-chip">Boxed</span><span class="tf-chip on">Sunk</span><span class="tf-chip">Underline</span><span class="tf-chip">Notebook</span></div>
+          <h5>Switches</h5>
+          <div class="tf-chipset"><span class="tf-chip on">Pill</span><span class="tf-chip">Paper flap</span><span class="tf-chip">Retro box</span></div>
+          <h5>Base UI style</h5>
+          <div class="tf-chipset"><span class="tf-chip on">Industrial</span><span class="tf-chip">Minimal</span><span class="tf-chip">Soft</span><span class="tf-chip">…</span></div>
+        </div>
+        <div class="dp-stage">
+          <div style="display:flex;align-items:baseline;gap:10px;margin-bottom:10px"><h2 style="margin:0;font-size:22px">Design</h2><span style="font-size:11px;color:var(--muted);border:1px solid var(--border);border-radius:99px;padding:0 8px">Saving…</span><span class="spacer"></span><span class="tf-seg"><span class="on">Board</span><span>Drawer open</span><span>Settings</span></span></div>
+          <div class="mix mix--machined" data-shape="pill" data-surface="soft-inset" data-buttons="lipped" data-inputs="sunk" data-toggles="pill" style="height:440px">
+            <div class="sb-top"><span class="sb-brand">TEAMFLOW</span><span style="flex:1"></span><span class="sb-btn">Files</span><span class="sb-btn">Plan</span></div>
+            <div class="sb-row" style="width:62%">Release 2.0</div>
+            <div class="sb-cols" style="width:62%">
+              <div><div class="sb-colh">Todo · 2</div>
+                <div class="sb-card"><span class="ref">ENG-41</span> <span class="due late">Yesterday</span><b>Fix the login redirect</b></div>
+                <div class="sb-card"><span class="ref">ENG-42</span> <span class="due">Fri 7</span><b>Write the release notes</b></div></div>
+              <div><div class="sb-colh">Doing · 1</div>
+                <div class="sb-card"><span class="ref">ENG-43</span><b>Board tips popover</b></div>
+                <div class="sb-actions"><span class="sb-btn primary">+ Add issue</span></div></div>
+            </div>
+            <div class="sb-drawer"><b>ENG-43</b>Status<span class="sb-field">Doing ▾</span>Due<span class="sb-field">Fri 7 Nov · 17:00</span><div class="sb-actions"><span class="sb-toggle"></span> Keep exact colours</div><div class="sb-actions" style="margin-top:10px"><span class="sb-btn primary">Mark done</span><span class="sb-btn">Close</span></div></div>
+          </div>
+          <div style="margin-top:10px;font-size:12px;color:var(--muted)">No heads-up for this mix. When a pairing is weak, a line appears here (see the phone view and the last mix in section 5); you can always keep your choice.</div>
+        </div>
+        <div class="dp-side">
+          <b style="font-family:'Space Grotesk';font-size:15px">Your mixes</b>
+          <div class="dp-saved on" style="margin-top:8px"><span>Gold desk</span><span style="color:var(--muted)">in use</span></div>
+          <div class="dp-saved"><span>Night shift</span><span class="tf-link">Use</span></div>
+          <div class="dp-saved"><span>Paper notes</span><span class="tf-link">Use</span></div>
+          <span class="tf-btn primary" style="margin:6px 0 14px">Save as new mix…</span><br>
+          <span class="tf-btn">Rename</span> <span class="tf-btn">Delete</span>
+          <hr style="border:0;border-top:1px solid var(--border);margin:16px 0">
+          <b style="font-family:'Space Grotesk';font-size:15px">Share this mix</b>
+          <p style="color:var(--text-soft)">Download or copy it, or import one someone sent you (previewed first).</p>
+          <span class="tf-btn">⇩ Download</span> <span class="tf-btn">⧉ Copy</span><br><span class="tf-btn" style="margin-top:6px">⇪ Import…</span>
+          <hr style="border:0;border-top:1px solid var(--border);margin:16px 0">
+          <span class="tf-link" style="color:var(--muted)">Reset this mix to its look</span>
+        </div>
+      </div>
+    </div></div>
+    <p class="cap">Every aspect on the left (chips, one row each, values that do not apply greyed out, like Lip metal unless Buttons = Lipped). The middle is a large live preview built from the real components (topbar, row, cards with due chips, a primary button, an open drawer with fields and a switch), with views for Board, Drawer open and Settings. Saved mixes and Share on the right. The heads-up line sits under the preview.</p>
+  </section>
+
+  <!-- 4 PHONE -->
+  <section class="item" id="phone">
+    <p class="eyebrow">4</p><h2>Design page on a phone</h2>
+    <div class="row">
+      <div>
+        <div class="frame" style="--w:375;--h:812;--s:.7"><div class="vp">
+          <div style="display:flex;gap:8px;align-items:center;padding:10px 12px;border-bottom:1px solid var(--border);background:var(--surface)"><span class="tf-btn">← Appearance</span><b style="font-family:'Space Grotesk'">Design</b><span class="spacer"></span><span style="font-size:11px;color:var(--done)">✓ Saved</span></div>
+          <div style="position:sticky;top:0;padding:8px 12px;border-bottom:1px solid var(--border);background:var(--bg)">
+            <div class="mix mix--paper" data-shape="sharp" data-surface="paper" data-buttons="cut-paper" data-inputs="notebook" data-toggles="flap" style="height:170px;padding:10px;--f-display:'Atkinson Hyperlegible', sans-serif">
+              <div class="sb-top" style="padding:6px 8px;margin:-10px -10px 8px"><span class="sb-brand">TEAMFLOW</span></div>
+              <div class="sb-cols"><div><div class="sb-card"><span class="ref">ENG-42</span><b>Release notes</b></div></div><div><div class="sb-actions"><span class="sb-btn primary">+ Add issue</span></div><div class="sb-actions" style="margin-top:8px"><span class="sb-field">Due Friday</span></div></div></div>
+            </div>
+            <div style="display:flex;justify-content:space-between;font-size:11px;margin-top:6px"><span class="tf-chip on">Board</span><span class="tf-link">Bigger preview</span></div>
+          </div>
+          <div style="padding:12px">
+            <div class="tf-warn" style="margin-bottom:10px"><b>Heads up:</b> Notebook fields write in handwriting, which looks most at home with the Paper font set.</div>
+            <div class="tf-sec"><h4>Colours <small>Cozy ▾</small></h4></div>
+            <div class="tf-sec"><h4>Fonts <small>Studio ▾</small></h4></div>
+            <div class="tf-sec"><h4>Windows and cards <small>Paper</small></h4><div class="tf-chipset"><span class="tf-chip">Auto</span><span class="tf-chip">Flat</span><span class="tf-chip">Soft inset</span><span class="tf-chip on">Paper</span><span class="tf-chip">Bevel</span></div></div>
+            <div class="tf-sec"><h4>Buttons <small>Cut paper ▾</small></h4></div>
+            <div class="tf-sec"><h4>Your mixes <small>3 ▾</small></h4></div>
+          </div>
+        </div></div>
+        <p class="cap">Phone: the preview sticks to the top (small, "Bigger preview" to expand), aspects are a stack of collapsed sections showing their current value, the heads-up line sits right under the preview.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- 5 MIXES -->
+  <section class="item" id="mixes">
+    <p class="eyebrow">5</p><h2>Mixes on the sample board</h2>
+    <p class="lead">Each tile is the same sample board painted by one mix. Colours are the UIX tokens; surfaces, buttons, fields and switches are the UIX aspect rules ported to plain classes.</p>
+    <div class="mixes">
+      <div>
+        <div class="mix mix--teamflow" style="height:300px">
+          <div class="sb-top"><span class="sb-brand">TEAMFLOW</span></div>
+          <div class="sb-row">Release 2.0</div>
+          <div class="sb-cols"><div><div class="sb-card"><span class="ref">ENG-41</span> <span class="due late">Yesterday</span><b>Fix the login redirect</b></div><div class="sb-card"><span class="ref">ENG-42</span><b>Release notes</b></div></div>
+          <div><div class="sb-card"><span class="ref">ENG-43</span><b>Board tips</b></div><div class="sb-actions"><span class="sb-btn primary">+ Add issue</span><span class="sb-btn">Clear</span></div><div class="sb-actions" style="margin-top:8px"><span class="sb-field">Search</span><span class="sb-toggle"></span></div></div></div>
+        </div>
+        <div class="mix-name"><b>Teamflow (today)</b><span>dark · Industrial · slight corners</span></div>
+      </div>
+      <div>
+        <div class="mix mix--machined" data-shape="pill" data-surface="soft-inset" data-buttons="lipped" data-inputs="sunk" data-toggles="pill" style="height:300px">
+          <div class="sb-top"><span class="sb-brand">TEAMFLOW</span></div>
+          <div class="sb-row">Release 2.0</div>
+          <div class="sb-cols"><div><div class="sb-card"><span class="ref">ENG-41</span> <span class="due late">Yesterday</span><b>Fix the login redirect</b></div><div class="sb-card"><span class="ref">ENG-42</span><b>Release notes</b></div></div>
+          <div><div class="sb-card"><span class="ref">ENG-43</span><b>Board tips</b></div><div class="sb-actions"><span class="sb-btn primary">+ Add issue</span><span class="sb-btn">Clear</span></div><div class="sb-actions" style="margin-top:8px"><span class="sb-field">Search</span><span class="sb-toggle"></span></div></div></div>
+        </div>
+        <div class="mix-name"><b>Machined + soft inset</b><span>gold lipped buttons · pill · sunk fields</span></div>
+      </div>
+      <div>
+        <div class="mix mix--paper" data-shape="sharp" data-surface="paper" data-buttons="cut-paper" data-inputs="notebook" data-toggles="flap" style="height:300px">
+          <div class="sb-top"><span class="sb-brand">TEAMFLOW</span></div>
+          <div class="sb-row">Release 2.0</div>
+          <div class="sb-cols"><div><div class="sb-card"><span class="ref">ENG-41</span> <span class="due late">Yesterday</span><b>Fix the login redirect</b></div><div class="sb-card"><span class="ref">ENG-42</span><b>Release notes</b></div></div>
+          <div><div class="sb-card"><span class="ref">ENG-43</span><b>Board tips</b></div><div class="sb-actions"><span class="sb-btn primary">+ Add issue</span><span class="sb-btn">Clear</span></div><div class="sb-actions" style="margin-top:8px"><span class="sb-field">Search</span><span class="sb-toggle"></span></div></div></div>
+        </div>
+        <div class="mix-name"><b>Paper desk</b><span>Cozy · typewriter · cut paper · notebook · flap</span></div>
+      </div>
+      <div>
+        <div class="mix mix--retro" data-shape="sharp" data-surface="bevel" data-buttons="bevel95" data-inputs="sunk" data-toggles="retro" style="height:300px">
+          <div class="sb-top"><span class="sb-brand">TEAMFLOW</span></div>
+          <div class="sb-row">Release 2.0</div>
+          <div class="sb-cols"><div><div class="sb-card"><span class="ref">ENG-41</span> <span class="due late">Yesterday</span><b>Fix the login redirect</b></div><div class="sb-card"><span class="ref">ENG-42</span><b>Release notes</b></div></div>
+          <div><div class="sb-card"><span class="ref">ENG-43</span><b>Board tips</b></div><div class="sb-actions"><span class="sb-btn primary">+ Add issue</span><span class="sb-btn">Clear</span></div><div class="sb-actions" style="margin-top:8px"><span class="sb-field">Search</span><span class="sb-toggle"></span></div></div></div>
+        </div>
+        <div class="mix-name"><b>Retro 95</b><span>Retro Console · pixel · bevel · 90s buttons · retro box</span></div>
+      </div>
+      <div>
+        <div class="mix mix--synth" data-shape="rounded" data-surface="glass" data-buttons="neon" data-inputs="underline" data-toggles="pill" style="height:300px">
+          <div class="sb-top"><span class="sb-brand">TEAMFLOW</span></div>
+          <div class="sb-row">Release 2.0</div>
+          <div class="sb-cols"><div><div class="sb-card"><span class="ref">ENG-41</span> <span class="due late">Yesterday</span><b>Fix the login redirect</b></div><div class="sb-card"><span class="ref">ENG-42</span><b>Release notes</b></div></div>
+          <div><div class="sb-card"><span class="ref">ENG-43</span><b>Board tips</b></div><div class="sb-actions"><span class="sb-btn primary">+ Add issue</span><span class="sb-btn">Clear</span></div><div class="sb-actions" style="margin-top:8px"><span class="sb-field">Search</span><span class="sb-toggle"></span></div></div></div>
+        </div>
+        <div class="mix-name"><b>Synth night</b><span>Night Glass · Orbitron · glass · neon · underline</span></div>
+      </div>
+      <div>
+        <div class="mix mix--paper" data-shape="sharp" data-surface="paper" data-buttons="neon" data-inputs="notebook" data-toggles="retro" style="height:300px">
+          <div class="sb-top"><span class="sb-brand">TEAMFLOW</span></div>
+          <div class="sb-row">Release 2.0</div>
+          <div class="sb-cols"><div><div class="sb-card"><span class="ref">ENG-41</span><b>Fix the login redirect</b></div></div>
+          <div><div class="sb-actions"><span class="sb-btn primary">+ Add issue</span><span class="sb-btn">Clear</span></div><div class="sb-actions" style="margin-top:8px"><span class="sb-field">Search</span><span class="sb-toggle"></span></div></div></div>
+          <div class="tf-warn" style="position:absolute;left:10px;right:10px;bottom:10px;font-family:'JetBrains Mono';background:#fff7e6;color:#2e211a"><b>Heads up:</b> Neon glow is faint on a light background. · The retro box switch pairs best with 90s bevel buttons.</div>
+        </div>
+        <div class="mix-name"><b>A weak pairing</b><span>allowed, with the heads-up line</span></div>
+      </div>
+    </div>
+    <h3 style="margin-top:var(--space-6)">Heads-up rules (warn, never block)</h3>
+    <ul class="changes">
+      <li>From the UIX mixer: glass without a see-through theme; paper surface or cut-paper buttons on a dark theme; neon buttons on a light theme; notebook fields without the Paper font; retro box switch without 90s bevel buttons.</li>
+      <li>Teamflow's own: a custom accent that reads under 3:1 on the theme's background (buttons) or 4.5:1 (text on accent); lipped buttons on a light theme; Pixel font with a dense board (cards get taller); Base UI style "Glass" or "Neon" fighting a different surface choice.</li>
+    </ul>
+  </section>
+
+  <!-- 6 PER-BOX -->
+  <section class="item" id="boxes">
+    <p class="eyebrow">6</p><h2>Per-box overrides</h2>
+    <ul class="changes" style="max-width:100ch">
+      <li><b>How:</b> the same attributes on a part instead of <code>&lt;html&gt;</code>: <code>.drawer[data-surface="paper"]</code>, <code>.topbar[data-buttons="flat"]</code>. With aspects written as variables (section 1), the nearest box wins and everything else is inherited.</li>
+      <li><b>Where it makes sense in Teamflow:</b> three parts only: <b>Topbar</b>, <b>Cards</b> and <b>Drawers and dialogs</b>, each with Surface and Buttons (for example a paper drawer over a machined board, or flat buttons only in the topbar).</li>
+      <li><b>Worth it?</b> Later. It doubles the Design page (every aspect × 4 targets), most mixes look best with one surface, and the variable-based CSS from step 1 is what makes it possible anyway. Recommend: build the variable approach now, ship whole-app aspects first, add a "Parts" tab with the three targets as a follow-up if George wants it.</li>
+    </ul>
+  </section>
+
+  <!-- 7 RISKS -->
+  <section class="item" id="risks">
+    <p class="eyebrow">7</p><h2>Risks</h2>
+    <ul class="problems" style="max-width:110ch">
+      <li><b>Contrast:</b> UIX themes pass 4.5:1 for their own token pairs (checked by <code>tools/contrast.py</code>), but Teamflow uses tokens UIX doesn't have (<code>--cell</code>, semantic row/column tints, priority colours, the due chip's amber). Each new theme needs Teamflow's own pairs checked; plan a small contrast test over all 11 themes. Machined Light's gold is 3.9:1 on its page colour.</li>
+      <li><b>Fonts:</b> Pixel and Neon (Orbitron) change line heights and widths; card titles wrap more and headers can clip. Needs a visual pass at 1440/1024/375 per font set. Self-hosting means adding ~10 woff2 files (OFL/Apache, licences must ship alongside).</li>
+      <li><b>Performance:</b> Glass (<code>backdrop-filter</code>) on every card in a board of 200+ cards is expensive; apply glass to rows, drawers and dialogs, and give cards a cheaper translucent fill. The paper fibre is one SVG data URL (cached), fine. Soft-inset is pure box-shadow, fine.</li>
+      <li><b>How much CSS changes:</b> the 8 UI styles live in 119 <code>data-chrome-style</code> selectors across 10 files, and 31 hard-coded font families. Plan: keep UI style as the base (no rewrite), tokenise fonts, add one new <code>styles/aspects.css</code> (~400–600 lines) whose aspects override the base only when set. New profile fields need a schema default (Auto) so old profiles look identical.</li>
+      <li><b>Scope creep:</b> 11 colour themes × 6 fonts × 5 corners × 7 surfaces × 8 buttons × 4 fields × 3 switches is ~220,000 mixes. Warnings and presets keep it usable; tests should cover each value once, not combinations.</li>
+    </ul>
+  </section>
+
+  <!-- 8 PLAN -->
+  <section class="item" id="plan">
+    <p class="eyebrow">8</p><h2>Build plan (one commit each)</h2>
+    <table class="list">
+      <tr><th>#</th><th>Item</th><th>Size</th></tr>
+      <tr><td>1</td><td>Tokenise fonts: replace 31 hard-coded font families with <code>--font-display/--font-sans/--font-mono</code> (no visual change).</td><td>S</td></tr>
+      <tr><td>2</td><td>Profile: new appearance fields (colour theme, font, surface, buttons, lip, inputs, toggles) defaulting to today's look; old profiles load unchanged (tests).</td><td>M</td></tr>
+      <tr><td>3</td><td>Colours: the 9 UIX themes as Teamflow token sets, plus "Light or dark" partner switching; contrast test over every theme.</td><td>M</td></tr>
+      <tr><td>4</td><td>Fonts: self-host the 5 UIX font sets with licence files; <code>data-font</code> rules.</td><td>M</td></tr>
+      <tr><td>5</td><td>Corners: add Pill.</td><td>S</td></tr>
+      <tr><td>6</td><td>Windows and cards: <code>data-surface</code> (Auto + 6) as variables on Teamflow's cards, columns, rows, drawers, dialogs, topbar.</td><td>M</td></tr>
+      <tr><td>7</td><td>Buttons: <code>data-buttons</code> (Auto + 7) and lip metal + rim shadow.</td><td>M</td></tr>
+      <tr><td>8</td><td>Text fields and switches: <code>data-inputs</code> (4) and <code>data-toggles</code> (3).</td><td>S</td></tr>
+      <tr><td>9</td><td>Looks become full mixes; add Machined, Paper desk, Retro 95, Synth night.</td><td>S</td></tr>
+      <tr><td>10</td><td>Simple Appearance panel: Looks, five quick changes, "Open Design page".</td><td>S</td></tr>
+      <tr><td>11</td><td>Design page: all aspects, large live preview (Board / Drawer open / Settings views), phone layout.</td><td>L</td></tr>
+      <tr><td>12</td><td>Saved mixes by name in the profile (save, use, rename, delete, max 12) and Share moves to the Design page.</td><td>M</td></tr>
+      <tr><td>13</td><td>Heads-up warnings (UIX rules + Teamflow contrast checks), never blocking.</td><td>S</td></tr>
+      <tr><td>14</td><td>(Later, optional) Per-part overrides: Topbar, Cards, Drawers and dialogs.</td><td>M</td></tr>
+    </table>
+  </section>
+</main>
+<script>
+  const root = document.documentElement, btn = document.getElementById("theme");
+  btn.addEventListener("click", () => {
+    const light = root.dataset.theme !== "light";
+    root.dataset.theme = light ? "light" : "dark";
+    btn.textContent = light ? "☾ Dark" : "☀ Light";
+  });
+</script>
+</body>
+</html>
