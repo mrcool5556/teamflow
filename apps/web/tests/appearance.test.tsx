@@ -19,6 +19,17 @@ async function openAppearance(options?: Parameters<typeof installFakeApi>[1]) {
   return db;
 }
 
+/** The Design page, where Share lives. */
+async function openDesign() {
+  const db = seedDb();
+  installFakeApi(db);
+  signIn(db);
+  renderApp("/t/ENG/settings/appearance/design");
+  await waitFor(() => expect(screen.getByLabelText("Workspace")).toBeEnabled());
+  await screen.findByRole("region", { name: "Share this mix" });
+  return db;
+}
+
 describe("appearance panel", () => {
   it("is short: looks, quick changes, board and a way to the Design page", async () => {
     await openAppearance();
@@ -141,11 +152,11 @@ describe("appearance panel", () => {
 
   it("previews an imported look before using it", async () => {
     const user = userEvent.setup();
-    const db = await openAppearance();
+    const db = await openDesign();
     const look = buildLookExport(
       mergeUserProfile(createDefaultUserProfile(), { appearance: { chromeStyle: "neon" } }),
     );
-    const share = screen.getByRole("region", { name: "Share this look" });
+    const share = screen.getByRole("region", { name: "Share this mix" });
     await user.click(within(share).getByRole("button", { name: /Import a look/ }));
     const paste = within(share).getByPlaceholderText("Paste a look here");
     await user.click(paste);
@@ -164,8 +175,8 @@ describe("appearance panel", () => {
 
   it("explains a paste that is not a look", async () => {
     const user = userEvent.setup();
-    await openAppearance();
-    const share = screen.getByRole("region", { name: "Share this look" });
+    await openDesign();
+    const share = screen.getByRole("region", { name: "Share this mix" });
     await user.click(within(share).getByRole("button", { name: /Import a look/ }));
     await user.type(within(share).getByPlaceholderText("Paste a look here"), "hello");
     await user.click(within(share).getByRole("button", { name: "Preview" }));

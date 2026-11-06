@@ -22,7 +22,6 @@ import { paintedTheme } from "../profile";
 import { Toast } from "../ui/BottomDock";
 import { AppearanceBoardControls } from "./AppearanceBoardControls";
 import { AppearanceLooks } from "./AppearanceLooks";
-import { AppearanceShare } from "./AppearanceShare";
 import { CustomColorField } from "./CustomColorField";
 import { DesignPageLink } from "./DesignPageLink";
 
@@ -306,10 +305,6 @@ export function AppearanceSettingsSection({
       </AppearanceGroup>
 
       <DesignPageLink />
-
-      <AppearanceGroup title="Share this look" collapsible>
-        <AppearanceShare />
-      </AppearanceGroup>
 
       {undo ? (
         <Toast onDismiss={() => setUndo(null)}>

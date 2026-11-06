@@ -83,3 +83,9 @@ The preview (`components/DesignPreview.tsx`) is a sample app built from the real
 ## Appearance (simple panel)
 
 Appearance stays short: Looks (with Reset all), Quick changes (Light or dark, Accent colour, Corners, Text), Board (column width and card height), a link to the Design page, and Share. Light or dark is off for a colour theme with one mode, with a line saying why. "Theme's own" is the accent setting that leaves the colour theme's accent in place. The UI style tiles and the exact team colours switch moved to the Design page.
+
+## Saved mixes
+
+The profile keeps up to 12 named mixes (`mixes`, `savedMixSchema` in core): each is an id, a name (up to 40 characters) and a full appearance. They sync with the profile like everything else. A broken or over-long list loads as its valid first 12 instead of failing. On the Design page, Your mixes saves the current look by name and lists the mixes with Use (or "in use"), Rename and Delete (with Undo); Appearance shows them as chips under the Looks. `lib/savedMixes.ts` holds the helpers.
+
+Share moved to the Design page as "Share this mix". A shared look carries one appearance and the board size, never the list of saved mixes.

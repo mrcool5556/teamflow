@@ -4,11 +4,13 @@ import {
   mergeUserProfile,
   type UserProfile,
 } from "@teamflow/core";
-import { useRef, useState, type CSSProperties, type ReactNode } from "react";
+import { useLayoutEffect, useRef, useState, type CSSProperties, type ReactNode } from "react";
 import { useNavigate } from "react-router";
 import { CustomColorField } from "../../components/CustomColorField";
 import { DesignPreview, type DesignPreviewView } from "../../components/DesignPreview";
+import { AppearanceShare } from "../../components/AppearanceShare";
 import { ProfileSaveStatus } from "../../components/ProfileSaveStatus";
+import { SavedMixes } from "../../components/SavedMixes";
 import { NARROW_SCREEN, useMediaQuery } from "../../hooks/useMediaQuery";
 import { settingsPath, useAppRoute } from "../../lib/appRoute";
 import {
@@ -135,7 +137,9 @@ export function DesignPanel() {
   const [bigPreview, setBigPreview] = useState(false);
   const a = profile.appearance;
   const customDraftRef = useRef({ ...a.customColors });
-  customDraftRef.current = { ...a.customColors };
+  useLayoutEffect(() => {
+    customDraftRef.current = { ...a.customColors };
+  }, [a.customColors]);
 
   const patch = (next: Partial<Appearance>) =>
     updateProfile(mergeUserProfile(profile, { appearance: next }));
@@ -204,6 +208,17 @@ export function DesignPanel() {
             <DesignPreview view={view} />
           </div>
         </section>
+
+        <aside className="design-side" aria-label="Your mixes and sharing">
+          <section className="design-side-group" aria-labelledby="design-mixes-title">
+            <h3 id="design-mixes-title">Your mixes</h3>
+            <SavedMixes />
+          </section>
+          <section className="design-side-group" aria-labelledby="design-share-title">
+            <h3 id="design-share-title">Share this mix</h3>
+            <AppearanceShare />
+          </section>
+        </aside>
 
         <div className="design-aspects">
           <Aspect title="Colours" current={colour.label} narrow={narrow}>

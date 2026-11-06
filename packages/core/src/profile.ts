@@ -171,6 +171,28 @@ export const userProfileAppearanceSchema = z.object({
   toggles: z.enum(TOGGLE_STYLES).default("auto").catch("auto"),
 });
 
+/** Named looks a user saved on the Design page; synced with the profile. */
+export const MAX_SAVED_MIXES = 12;
+export const MAX_MIX_NAME_LENGTH = 40;
+
+export const savedMixSchema = z.object({
+  id: z.string().min(1).max(64),
+  name: z.string().trim().min(1).max(MAX_MIX_NAME_LENGTH),
+  appearance: userProfileAppearanceSchema,
+});
+
+/** Saved mixes; a broken list (or one too long) loads as the valid first 12, never an error. */
+export const savedMixesSchema = z
+  .array(z.unknown())
+  .catch([])
+  .transform((items) =>
+    items
+      .map((item) => savedMixSchema.safeParse(item))
+      .filter((result) => result.success)
+      .map((result) => result.data)
+      .slice(0, MAX_SAVED_MIXES),
+  );
+
 export const userProfileUiSchema = z.object({
   lastTeamId: z.string().uuid().nullable().optional(),
 });
@@ -180,12 +202,15 @@ export const userProfileSchema = z.object({
   appearance: userProfileAppearanceSchema.default({}),
   board: userProfileBoardSchema,
   ui: userProfileUiSchema.default({}),
+  mixes: savedMixesSchema.default([]),
 });
 
 export const userProfilePatchSchema = z.object({
   appearance: userProfileAppearanceSchema.partial().optional(),
   board: userProfileBoardSchema.partial().optional(),
   ui: userProfileUiSchema.partial().optional(),
+  /** Replaces the whole list. */
+  mixes: z.array(savedMixSchema).max(MAX_SAVED_MIXES).optional(),
 });
 
 export const userProfileExportSchema = z.object({
@@ -204,6 +229,7 @@ export type UserProfile = z.infer<typeof userProfileSchema>;
 export type UserProfilePatch = z.infer<typeof userProfilePatchSchema>;
 export type UserProfileExport = z.infer<typeof userProfileExportSchema>;
 export type UserProfileCustomColors = z.infer<typeof userProfileCustomColorsSchema>;
+export type SavedMix = z.infer<typeof savedMixSchema>;
 
 export function clampBoardColumnWidth(value: number) {
   return Math.min(
@@ -257,6 +283,7 @@ export function createDefaultUserProfile(): UserProfile {
       rowHeadersVisible: {},
     },
     ui: {},
+    mixes: [],
   });
 }
 
@@ -283,6 +310,7 @@ export function mergeUserProfile(current: UserProfile, patch: UserProfilePatch):
       ...current.ui,
       ...patch.ui,
     },
+    mixes: patch.mixes ?? current.mixes,
   });
 }
 
@@ -332,6 +360,7 @@ export function parseUserProfile(input: unknown): UserProfile {
       cardMinHeight: clampCardMinHeight(board.cardMinHeight),
     },
     ui,
+    mixes: raw.mixes,
   });
 }
 
