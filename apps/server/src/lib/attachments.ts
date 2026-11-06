@@ -517,6 +517,26 @@ export async function getStoredFileByRef(db: Db, teamId: string, ref: string) {
   return file;
 }
 
+/** The team (space) an upload target belongs to; its allowance pays for the file. */
+export async function teamIdForUploadTarget(db: Db, target: { issueId: string } | { rowId: string }) {
+  if ("issueId" in target) {
+    const [issue] = await db
+      .select({ teamId: schema.issues.teamId })
+      .from(schema.issues)
+      .where(eq(schema.issues.id, target.issueId))
+      .limit(1);
+    if (!issue) throw new AttachmentError("Issue not found", 404);
+    return issue.teamId;
+  }
+  const [row] = await db
+    .select({ teamId: schema.boardRows.teamId })
+    .from(schema.boardRows)
+    .where(eq(schema.boardRows.id, target.rowId))
+    .limit(1);
+  if (!row) throw new AttachmentError("Row not found", 404);
+  return row.teamId;
+}
+
 export async function createStoredFileFromPath(
   db: Db,
   uploaderId: string,
@@ -547,6 +567,7 @@ export async function createStoredFileFromPath(
     sizeBytes,
     storagePath: relativePath,
     key: fileKey,
+    teamId: await teamIdForUploadTarget(db, target),
     createdAt: now,
   });
 
@@ -637,6 +658,7 @@ export async function saveIssueAttachment(
     sizeBytes: buffer.length,
     storagePath: relativePath,
     key: fileKey,
+    teamId: await teamIdForUploadTarget(db, { issueId }),
     createdAt: now,
   });
   await db.insert(schema.issueFileLinks).values({
@@ -733,6 +755,7 @@ export async function saveRowAttachment(
     sizeBytes: buffer.length,
     storagePath: relativePath,
     key: fileKey,
+    teamId: await teamIdForUploadTarget(db, { rowId }),
     createdAt: now,
   });
   await db.insert(schema.rowFileLinks).values({
