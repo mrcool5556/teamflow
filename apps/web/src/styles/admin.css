@@ -634,3 +634,72 @@
 .admin-bar > i.admin-bar-issues {
   background: var(--accent);
 }
+
+/* ---------- storage meter (Files drawer) and upload-zone notice ---------- */
+
+.space-meter {
+  display: grid;
+  gap: var(--space-2);
+  margin: 0 var(--space-4) var(--space-3);
+  padding: var(--space-3);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--cell);
+  font-size: var(--font-size-sm);
+}
+
+.space-meter--warn {
+  border-color: color-mix(in srgb, var(--warn) 50%, var(--border));
+}
+
+.space-meter--full {
+  border-color: color-mix(in srgb, var(--danger) 55%, var(--border));
+}
+
+.space-meter-top {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: var(--space-2);
+}
+
+.space-meter--warn .space-meter-top span {
+  color: var(--warn);
+}
+
+.space-meter--full .space-meter-top span {
+  color: var(--danger-text);
+}
+
+.space-meter-sub {
+  margin: 0;
+  font-size: var(--font-size-xs);
+  color: var(--muted);
+}
+
+.space-notice {
+  margin: var(--space-2) 0;
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--border);
+  border-left: 4px solid var(--warn);
+  border-radius: var(--radius-sm);
+  background: color-mix(in srgb, var(--warn) 7%, transparent);
+  font-size: var(--font-size-sm);
+  text-align: left;
+}
+
+.space-notice--full {
+  border-left-color: var(--danger);
+  background: color-mix(in srgb, var(--danger) 8%, transparent);
+  color: var(--danger-text);
+}
+
+.space-notice p {
+  margin: 0;
+}
+
+.space-notice .space-notice-help {
+  margin-top: var(--space-1);
+  color: var(--text-soft);
+  font-size: var(--font-size-xs);
+}
