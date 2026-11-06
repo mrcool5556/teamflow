@@ -25,6 +25,7 @@ A 2 GB video uploads as about 63 chunks of 32 MB. Each chunk is a separate `PUT`
 Rules:
 
 - All steps need `board.edit` on the team; only the user who started a session can send its chunks or complete it.
+- The space's upload cap and the server's free-disk floor are checked when the session starts (the whole `totalBytes` is reserved, so it counts against the cap while the upload runs) and again at complete. A refused complete keeps the session, so it can finish once there is room ([SPACES.md](SPACES.md)).
 - Partial data sits in `data/uploads/.tmp/`. Sessions expire after **48 hours**; expired ones are cleaned up when the server starts.
 - Small files still use `POST /issues/:issueId/attachments` (one request).
 

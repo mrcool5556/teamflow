@@ -238,6 +238,7 @@ Full list with comments: root [`.env.example`](../.env.example). The ones a prod
 | `TEAMFLOW_BOT_CONFIG_KEY` | Discord bot | Generated when bot credentials are saved |
 | `SMTP_HOST`, `SMTP_PORT`, `SMTP_SECURE`, `SMTP_USER`, `SMTP_PASS`, `SMTP_FROM` | for email reset | Provider settings |
 | `ATTACHMENT_MAX_*`, `UPLOAD_CHUNK_*`, `UPLOAD_DIR` | no | See [ATTACHMENTS.md](ATTACHMENTS.md) |
+| `TEAMFLOW_FREE_SPACE_CAP_BYTES`, `TEAMFLOW_FREE_SPACES_PER_USER`, `TEAMFLOW_MIN_FREE_DISK_BYTES` | no | Free-space cap (1 GB), free spaces per user (3), free-disk floor (2 GB). See [SPACES.md](SPACES.md) |
 | `PORT` / `HOST` | no | Default `3000` / `0.0.0.0` |
 | `NODE_ENV` | no | `production` drops the localhost dev origins; `development` allows a dev secret |
 

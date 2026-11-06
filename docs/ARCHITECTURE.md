@@ -67,9 +67,11 @@ middleware/
   http.ts       CORS allowlist, X-Content-Type-Options: nosniff, body size caps, auth rate limit
   error.ts      handleError: ApiError → { error, code }; anything else → 500 internal_error
 routes/         one Hono sub-app per area (auth, tokens, teams, board, members, invites, roles,
-                discord, maintenance, files, projects, issues, comments, attachments, uploads, health, spa)
+                discord, maintenance, instance, files, projects, issues, comments, attachments, uploads,
+                health, spa); instance = /instance/* for the server admin page (instance admins only)
 lib/            domain helpers (issues, board, attachments, chunkedUpload, teamBundle, roles, invites,
-                passwordReset, mail, secretsCrypto, hostScripts, maintenance, discordBotService, ...)
+                passwordReset, mail, secretsCrypto, hostScripts, maintenance, discordBotService,
+                spaceStorage (usage, cap and disk-floor checks), spaceSettings, instanceAdmin, disk, ...)
 lib/errors.ts   ApiError(status, message, code) and helpers (badRequest, forbidden, notFound, conflict, ...)
 lib/validation.ts parseBody / parseQuery with the Zod schemas from core; malformed JSON is 400
 ```
@@ -94,16 +96,18 @@ Conventions:
 ```text
 main.tsx        QueryClientProvider + RouterProvider; imports styles/* in cascade order
 router.tsx      URL map: /login /register /reset /invite/:token, /t/:teamKey, /t/:teamKey/issue/:ref,
-                /t/:teamKey/settings/<panel>, /t/:teamKey/plan (legacy ?ref= ?invite= ?reset= are redirected)
+                /t/:teamKey/settings/<panel>, /t/:teamKey/admin/<section> (server admin, instance admins),
+                /t/:teamKey/plan (legacy ?ref= ?invite= ?reset= are redirected)
 session/        SessionProvider: token + user from localStorage, login/logout
-routes/         RootLayout, auth/ (LoginScreen, InviteRoute), board/ (BoardShell, actions), settings/ (one panel per section)
+routes/         RootLayout, auth/ (LoginScreen, InviteRoute), board/ (BoardShell, actions), settings/ (one panel per section),
+                admin/ (server admin: Overview, Spaces, Space detail, How-tos, Space defaults)
 queries/        TanStack Query hooks per area; keys.ts holds every cache key; boardMutations.ts is the one
                 optimistic update + rollback path; the board refetches every 15 s
 ui/             primitives: Dialog/Drawer, Popover (@floating-ui/react), ConfirmDialog/useConfirm, BottomDock,
                 layerStack (one Escape stack, focus trap and restore)
 components/     feature components (KanbanBoard parts, IssueDrawer, pickers, settings sections, RoadmapPanel)
 hooks/ lib/     shared hooks and helpers (useAttachmentList, useInlineRename, errorSink, teamPermissions, format)
-styles/         tokens, base, topbar, board, card, drawer, dialog, popover, settings, plan, auth (order matters)
+styles/         tokens, base, topbar, board, card, drawer, dialog, popover, settings, admin, plan, auth (order matters)
 data/roadmap.ts hand-maintained content of the Plan view (instance admins only; others are redirected to the board)
 ```
 
@@ -162,7 +166,7 @@ sequenceDiagram
 ## Database and migrations
 
 - The schema has three sources that must agree: `packages/db/src/schema.ts` (Drizzle types), `init.sql` (a fresh database) and `patches.ts` (upgrades).
-- `createDb()` applies `init.sql` when the `users` table is missing, then `applySchemaPatches()`. Patches are keyed by `SCHEMA_VERSION` (currently 3) and the `schema_version` table: an up-to-date database skips them, an older one runs every idempotent patch once inside one transaction, and a database newer than the build is left alone with a warning (update the app). `pnpm db:migrate` does the same from the command line.
+- `createDb()` applies `init.sql` when the `users` table is missing, then `applySchemaPatches()`. Patches are keyed by `SCHEMA_VERSION` (currently 4: spaces, see [SPACES.md](SPACES.md)) and the `schema_version` table: an up-to-date database skips them, an older one runs every idempotent patch once inside one transaction, and a database newer than the build is left alone with a warning (update the app). `pnpm db:migrate` does the same from the command line.
 - To change the schema: edit `schema.ts` and `init.sql`, add the idempotent patch, bump `SCHEMA_VERSION`, and add a test in `packages/db/tests`.
 - Boot never changes user data. Upkeep (purge issues in the trash for more than 7 days, re-grant Owner permissions, promote an Admin where a team has no Owner, renumber duplicate issue numbers) runs only through `pnpm db:maintenance` or nightly at 03:00 with `TEAMFLOW_DB_MAINTENANCE_NIGHTLY=true`. Trashed team files (7 days) and stale upload sessions are purged at server start.
 - Attachments live on disk under `data/uploads/` (or `UPLOAD_DIR`), not in SQLite. Back up both.

@@ -112,6 +112,7 @@ Create a PAT in **Settings → API tokens**. Tools and details: [docs/MCP.md](do
 | [docs/API.md](docs/API.md) | HTTP API reference (generated) |
 | [docs/ATTACHMENTS.md](docs/ATTACHMENTS.md) | Issue and row files, team files, trash |
 | [docs/LARGE-FILES.md](docs/LARGE-FILES.md) | Chunked upload, streaming, move and link |
+| [docs/SPACES.md](docs/SPACES.md) | Upload caps per team (spaces), free spaces, the server admin page |
 | [docs/MCP.md](docs/MCP.md) | MCP tools for AI assistants |
 | [docs/CLI.md](docs/CLI.md) | CLI commands |
 | [docs/discord-bot.md](docs/discord-bot.md) | Discord bot setup |
