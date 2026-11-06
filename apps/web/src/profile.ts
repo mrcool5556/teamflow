@@ -156,6 +156,21 @@ export function applyUserProfile(profile: UserProfile) {
   );
 }
 
+/**
+ * Mark low-powered devices (4 or fewer CPU cores, or 4 GB or less memory) so glass surfaces
+ * drop their backdrop blur (styles/aspects.css).
+ */
+export function markLowPowerDevice(
+  nav: { hardwareConcurrency: number; deviceMemory?: number } = navigator,
+) {
+  const memory = nav.deviceMemory;
+  const cores = nav.hardwareConcurrency;
+  const low = (cores > 0 && cores <= 4) || (memory !== undefined && memory <= 4);
+  if (low) document.documentElement.dataset.lowPower = "true";
+  else delete document.documentElement.dataset.lowPower;
+  return low;
+}
+
 export function mergeWithLegacyDefaults(profile: UserProfile): {
   profile: UserProfile;
 

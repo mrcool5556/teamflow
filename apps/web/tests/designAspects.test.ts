@@ -1,7 +1,9 @@
 import { createDefaultUserProfile, mergeUserProfile, parseUserProfile } from "@teamflow/core";
 import { describe, expect, it } from "vitest";
 import { resetAppearance } from "../src/lib/appearanceReset";
-import { applyUserProfile } from "../src/profile";
+import { applyUserProfile, markLowPowerDevice } from "../src/profile";
+import aspectsCss from "../src/styles/aspects.css?raw";
+import cardCss from "../src/styles/card.css?raw";
 
 const ASPECT_ATTRS = [
   "palette",
@@ -95,5 +97,25 @@ describe("design-your-own profile fields", () => {
     );
     expect(resetAppearance(custom, "shape").appearance.colorTheme).toBe("cozy");
     expect(resetAppearance(custom, "colour").appearance.fontSet).toBe("paper");
+  });
+});
+
+describe("cheap glass", () => {
+  it("marks devices with few cores or little memory as low-powered", () => {
+    const root = document.documentElement;
+    expect(markLowPowerDevice({ hardwareConcurrency: 4 })).toBe(true);
+    expect(root.dataset.lowPower).toBe("true");
+    expect(markLowPowerDevice({ hardwareConcurrency: 12, deviceMemory: 2 })).toBe(true);
+    expect(markLowPowerDevice({ hardwareConcurrency: 12, deviceMemory: 16 })).toBe(false);
+    expect(root.dataset.lowPower).toBeUndefined();
+  });
+
+  it("never blurs issue cards or column cells", () => {
+    const blurredCards = [...aspectsCss.matchAll(/([^{}]+)\{([^{}]*)\}/g)]
+      .filter((m) => /(^|[^-])backdrop-filter: (?!none)/.test(m[2]!))
+      .map((m) => m[1]!)
+      .filter((selector) => /\.issue-card|\.column\.cell/.test(selector));
+    expect(blurredCards).toEqual([]);
+    expect(cardCss).not.toMatch(/\.issue-card[^{]*\{[^}]*backdrop-filter:\s*blur/);
   });
 });
