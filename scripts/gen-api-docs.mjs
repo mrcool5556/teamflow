@@ -29,6 +29,7 @@ const SECTIONS = [
   ["roles", "Roles"],
   ["discord", "Discord integration"],
   ["maintenance", "Server maintenance"],
+  ["instance", "Instance admin and spaces"],
   ["files", "Team files"],
   ["projects", "Projects"],
   ["issues", "Issues"],

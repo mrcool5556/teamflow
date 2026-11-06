@@ -70,9 +70,7 @@ describe("free-space rules", () => {
       body: { name: "Four", key: "FOUR" },
     });
     expect(refused.status).toBe(409);
-    const body = await json<{ code: string; error: string; owned: number; limit: number }>(
-      refused,
-    );
+    const body = await json<{ code: string; error: string; owned: number; limit: number }>(refused);
     expect(body).toMatchObject({ code: "free_space_limit", owned: 3, limit: 3 });
     expect(body.error).toMatch(/already have 3 free spaces/);
 

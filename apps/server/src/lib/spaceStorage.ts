@@ -135,7 +135,6 @@ export function getAllSpaceUsage(db: Db): Map<string, number> {
   return usage;
 }
 
-
 /**
  * Refuse an upload of `fileBytes` into `teamId` before any bytes are written:
  * - 507 `server_storage_low` when the upload disk would drop under the free-disk floor;
@@ -171,7 +170,9 @@ export async function assertSpaceHasRoom(
 
   const remainingBytes = Math.max(0, capBytes - usedBytes);
   const cap = formatStorageBytes(capBytes);
-  const name = options.filename ? `${options.filename} (${formatStorageBytes(fileBytes)})` : "This file";
+  const name = options.filename
+    ? `${options.filename} (${formatStorageBytes(fileBytes)})`
+    : "This file";
   const message =
     remainingBytes === 0
       ? `This space is full (${formatStorageBytes(usedBytes)} of ${cap}). New uploads are paused; ` +
