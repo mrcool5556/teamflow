@@ -553,7 +553,7 @@
 }
 
 .board-layout-preview .preview-label {
-  font-family: "Space Grotesk", sans-serif;
+  font-family: var(--font-display);
 }
 
 .board-preview-cell {
@@ -1031,7 +1031,7 @@
 }
 
 .team-member-role {
-  font-family: "JetBrains Mono", monospace;
+  font-family: var(--font-mono);
   font-size: 0.72rem;
   text-transform: uppercase;
   color: var(--muted);
@@ -1179,7 +1179,7 @@
 .appearance-customise-heading {
   margin: var(--space-6) 0 var(--space-3);
   font-size: var(--font-size-xs);
-  font-family: "JetBrains Mono", monospace;
+  font-family: var(--font-mono);
   font-weight: 400;
   letter-spacing: 0.14em;
   text-transform: uppercase;
@@ -1420,7 +1420,7 @@
 }
 
 .board-layout-preview-drawer-title {
-  font-family: "Space Grotesk", sans-serif;
+  font-family: var(--font-display);
   margin-bottom: var(--space-2);
 }
 
@@ -1500,7 +1500,7 @@
   width: 100%;
   min-height: 8rem;
   resize: vertical;
-  font-family: "JetBrains Mono", monospace;
+  font-family: var(--font-mono);
   font-size: 0.8rem;
   line-height: 1.4;
 }

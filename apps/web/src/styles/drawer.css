@@ -442,7 +442,7 @@
 .issue-drawer-title,
 .row-files-drawer-title {
   width: 100%;
-  font-family: "Space Grotesk", sans-serif;
+  font-family: var(--font-display);
   font-size: 1.45rem;
   font-weight: 600;
   line-height: 1.25;
@@ -500,7 +500,7 @@
 .issue-drawer-group-title {
   margin: 0 0 var(--space-2);
   font-size: var(--font-size-xs);
-  font-family: "JetBrains Mono", monospace;
+  font-family: var(--font-mono);
   font-weight: 400;
   letter-spacing: 0.12em;
   text-transform: uppercase;
@@ -609,7 +609,7 @@
 }
 
 .description-ref {
-  font-family: "JetBrains Mono", monospace;
+  font-family: var(--font-mono);
   color: var(--accent);
 }
 

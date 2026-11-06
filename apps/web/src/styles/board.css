@@ -14,7 +14,7 @@
 
 :root[data-chrome-style="paper"] .row-separator-bar .row-separator-name,
 :root[data-chrome-style="paper"] .column-label-name {
-  font-family: Georgia, "Times New Roman", serif;
+  font-family: var(--font-serif);
   letter-spacing: 0.01em;
 }
 
@@ -371,7 +371,7 @@ body.board-pan-active {
   border: none;
   box-shadow: none;
   padding: 0;
-  font-family: "Space Grotesk", sans-serif;
+  font-family: var(--font-display);
   font-weight: 700;
   letter-spacing: 0.02em;
   font-size: 1rem;
@@ -390,7 +390,7 @@ body.board-pan-active {
 .row-separator-rename-input {
   width: 100%;
   min-width: 0;
-  font-family: "Space Grotesk", sans-serif;
+  font-family: var(--font-display);
   font-weight: 700;
   font-size: 1rem;
   padding: 0.1rem 0.25rem;
@@ -588,7 +588,7 @@ body.board-pan-active {
 }
 
 .row-drag-label {
-  font-family: "Space Grotesk", sans-serif;
+  font-family: var(--font-display);
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.06em;
@@ -612,7 +612,7 @@ body.board-pan-active {
   background: transparent;
   border: none;
   padding: 0;
-  font-family: "Space Grotesk", sans-serif;
+  font-family: var(--font-display);
   font-weight: 700;
   letter-spacing: 0.02em;
   font-size: 1rem;
@@ -690,7 +690,7 @@ body.board-pan-active {
 
 .column-issue-count {
   flex-shrink: 0;
-  font-family: "JetBrains Mono", monospace;
+  font-family: var(--font-mono);
   font-size: 0.68rem;
   font-weight: 600;
   color: rgba(255, 255, 255, 0.94);
@@ -706,7 +706,7 @@ body.board-pan-active {
 .column-label-name {
   all: unset;
   cursor: pointer;
-  font-family: "Space Grotesk", sans-serif;
+  font-family: var(--font-display);
   font-weight: 700;
   font-size: 0.74rem;
   letter-spacing: 0.04em;
@@ -892,7 +892,7 @@ body.board-pan-active {
   background: none;
   color: var(--accent-text);
   font: inherit;
-  font-family: "JetBrains Mono", monospace;
+  font-family: var(--font-mono);
   font-size: 0.92em;
   font-weight: 600;
   text-decoration: underline;
