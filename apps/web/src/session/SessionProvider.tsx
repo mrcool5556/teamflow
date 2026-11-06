@@ -50,7 +50,18 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   const profileLoadingRef = useRef(false);
   const saveAfterLoadRef = useRef(false);
 
+  /** False once unmounted: a late load or save answer must not repaint the page then. */
+  const mountedRef = useRef(true);
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+      if (profileSaveTimerRef.current) clearTimeout(profileSaveTimerRef.current);
+    };
+  }, []);
+
   const applyProfile = useCallback((next: UserProfile) => {
+    if (!mountedRef.current) return;
     profileRef.current = next;
     applyUserProfile(next);
     setProfile(next);
