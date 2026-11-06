@@ -986,6 +986,14 @@ export class TeamflowClient {
     );
   }
 
+  /** Delete a trashed file for good; the space's usage drops at once. */
+  deleteTeamFileForever(teamId: string, fileId: string) {
+    return this.request<{ fileId: string; freedBytes: number }>(
+      `/teams/${teamId}/files/${fileId}/forever`,
+      { method: "DELETE" },
+    );
+  }
+
   restoreTeamFile(teamId: string, fileId: string) {
     return this.request<{ fileId: string }>(`/teams/${teamId}/files/${fileId}/restore`, {
       method: "POST",

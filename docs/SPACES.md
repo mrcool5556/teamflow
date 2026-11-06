@@ -34,7 +34,10 @@ Not counted: the database, backups and team bundle exports (server-level, shown 
 Overview under Disk).
 
 Removing a file from its last issue or row deletes it at once and frees the room. Moving a file
-to the trash does not free room until it is purged; an admin can empty a space's trash now.
+to the trash does not free room until it is purged, so the Files trash has **Delete forever**:
+anyone who may move the file to the trash (`board.edit`) can delete it for good after a confirm
+that says how much it frees, and the usage drops at once (`DELETE /teams/:teamId/files/:fileId/forever`,
+recorded in the space's history). An admin can also empty a space's whole trash.
 
 ## Near and at the limit
 

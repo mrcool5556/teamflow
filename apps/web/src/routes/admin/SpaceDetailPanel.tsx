@@ -25,6 +25,7 @@ const EVENT_LABEL: Record<string, string> = {
   type_changed: "Type changed",
   trash_emptied: "Trash emptied",
   uploads_cancelled: "Uploads cancelled",
+  file_deleted_forever: "File deleted forever",
 };
 
 function StorageTile({
