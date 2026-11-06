@@ -17,7 +17,7 @@ Teamflow uses email + password accounts. Every request authenticates with `Autho
 | GET | `/auth/me` | Current user (Bearer token); `user.isInstanceAdmin` marks server-wide admins |
 | GET | `/auth/config` | `{ inviteOnly, passwordResetEmail }` |
 
-Registering creates the user and a personal team called **General** (key `GEN`) with the new user as Owner, in one transaction. With an `inviteToken` the user also joins the inviting team with the invite's role.
+Registering creates the user and a personal team called **General** (key `GEN`) with the new user as Owner, in one transaction. General is a **free space** with the free-space upload cap (1 GB by default), except for instance admins, whose General has no cap. Any user can make more teams with New team, up to 3 free spaces in all ([SPACES.md](SPACES.md)). With an `inviteToken` the user also joins the inviting team with the invite's role.
 
 Login, register and forgot-password are rate limited per client IP (`TEAMFLOW_AUTH_RATE_LIMIT` per minute, default 10, HTTP 429 with `Retry-After`). Behind a reverse proxy set `TEAMFLOW_TRUST_PROXY=1` so `X-Forwarded-For` is used as the client address.
 
@@ -30,6 +30,8 @@ Team roles are per team. Server-wide actions (Settings → Updates, Discord bot 
 - `TEAMFLOW_INSTANCE_ADMINS=alice@example.com,bob@example.com` grants it to those emails at their next login or registration.
 
 Without the flag those routes return `403 { "error": "Instance admin required", "code": "forbidden" }` even for team Owners, and the web app hides the panels.
+
+Instance admins also get the **server admin page** (account menu → Server admin) and its API under `/instance/*`, which needs only the flag, no team: server, disk, bot, update and backup status, every space with its upload cap, and the space defaults. Teams they create are admin spaces with no upload cap. See [SPACES.md](SPACES.md).
 
 ### Team roles
 

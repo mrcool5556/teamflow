@@ -7,7 +7,7 @@ Auth: `Authorization: Bearer <session_jwt | pat_...>`
 ## Errors
 
 Every error response is JSON `{ "error": "<human message>", "code": "<code>" }` with the status
-below. Every response (success or error) carries an `X-Request-Id` header; send one in and it is
+below; a few codes add fields beside them (listed in the table). Every response (success or error) carries an `X-Request-Id` header; send one in and it is
 echoed back. Unexpected failures return a generic `Internal Server Error` and are logged on the
 server together with the request id.
 
@@ -19,11 +19,14 @@ server together with the request id.
 | 403 | `forbidden` | Not a member, PAT scoped to another team, missing permission or write scope, instance admin required |
 | 404 | `not_found` | Team, row, column, issue, comment, file, invite, role or member does not exist |
 | 409 | `conflict` | Email already registered, column/row still has issues, last row on a board |
+| 409 | `free_space_limit` | The user already owns the most free spaces allowed; body adds `owned`, `limit` ([SPACES.md](SPACES.md)) |
 | 410 | `gone` | Removed endpoint |
 | 413 | `payload_too_large` | Body over the JSON (1 MB), attachment or bundle limit |
+| 413 | `space_storage_full` | The upload does not fit in the space's cap; body adds `usedBytes`, `capBytes`, `fileBytes`, `remainingBytes` |
 | 429 | `rate_limited` | Too many login/register/forgot-password attempts (see `Retry-After`) |
 | 500 | `internal_error` | Unexpected server error |
 | 503 | `service_unavailable` | Feature disabled on this host (e.g. bot config endpoint without `TEAMFLOW_BOT_CONFIG_KEY`) |
+| 507 | `server_storage_low` | The server's upload disk is under the free-disk floor; uploads are paused for every space |
 
 Server code throws `ApiError` from `apps/server/src/lib/errors.ts` (`badRequest`, `forbidden`,
 `notFound`, `conflict`, ...); one `onError` handler renders it.
