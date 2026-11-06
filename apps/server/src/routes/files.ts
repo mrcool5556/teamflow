@@ -7,6 +7,7 @@ import { db } from "../db.js";
 import { requireAuth, requireWrite } from "../middleware/auth.js";
 import { loadTeam, requirePermission } from "../middleware/team.js";
 import {
+  deleteTrashedTeamFileForever,
   listTeamFiles,
   renameTeamFile,
   restoreTeamFile,
@@ -62,6 +63,25 @@ routes.delete(
 
     const deleted = await softDeleteTeamFile(db, teamId, fileId);
     return c.json(deleted);
+  },
+);
+
+/** Delete a trashed file for good (same permission as moving it to the trash). */
+routes.delete(
+  "/teams/:teamId/files/:fileId/forever",
+  requireAuth,
+  requireWrite,
+  validateParams,
+  loadTeam(),
+  requirePermission("board.edit"),
+  async (c) => {
+    const result = await deleteTrashedTeamFileForever(
+      db,
+      c.var.teamId,
+      c.req.param("fileId"),
+      c.var.auth.userId,
+    );
+    return c.json(result);
   },
 );
 

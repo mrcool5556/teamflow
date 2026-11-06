@@ -2,6 +2,7 @@ import { useCallback, useMemo, useState } from "react";
 import type { IssueAttachmentPublic, TeamFilePublic } from "@teamflow/core";
 import {
   FILE_TRASH_RETENTION_DAYS,
+  formatStorageBytes,
   getTeamFileDisplayName,
   isZipAttachmentFile,
 } from "@teamflow/core";
@@ -157,6 +158,27 @@ export function TeamFilesDrawer({ teamId, open, onClose, onNavigateRef }: TeamFi
     try {
       await client.softDeleteTeamFile(teamId, file.fileId);
       await loadFiles();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not delete file");
+    } finally {
+      setBusyFileId(null);
+    }
+  }
+
+  async function deleteForever(file: TeamFilePublic) {
+    const displayName = getTeamFileDisplayName(file);
+    const ok = await confirm({
+      title: `Delete ${displayName} forever?`,
+      message: `This can't be undone. It frees ${formatStorageBytes(file.sizeBytes)} in this space right away.`,
+      confirmLabel: "Delete forever",
+      danger: true,
+    });
+    if (!ok) return;
+    setBusyFileId(file.fileId);
+    try {
+      await client.deleteTeamFileForever(teamId, file.fileId);
+      await loadFiles();
+      await queryClient.invalidateQueries({ queryKey: queryKeys.teamStorage(teamId) });
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not delete file");
     } finally {
@@ -398,6 +420,16 @@ export function TeamFilesDrawer({ teamId, open, onClose, onNavigateRef }: TeamFi
                           {busyFileId === file.fileId ? "…" : "Restore"}
                         </button>
                       )}
+                      {tab === "trash" ? (
+                        <button
+                          type="button"
+                          className="ghost team-files-delete-btn team-files-action-btn"
+                          disabled={busyFileId === file.fileId}
+                          onClick={() => void deleteForever(file)}
+                        >
+                          Delete forever
+                        </button>
+                      ) : null}
                     </div>
                   </div>
                 </li>
