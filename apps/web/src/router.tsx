@@ -3,7 +3,9 @@ import { RoadmapPanel } from "./components/RoadmapPanel";
 import { RouteMarker } from "./components/RouteMarker";
 import { RootLayout } from "./routes/RootLayout";
 import { AdminLayout } from "./routes/admin/AdminLayout";
+import { DefaultsPanel } from "./routes/admin/DefaultsPanel";
 import { OverviewPanel } from "./routes/admin/OverviewPanel";
+import { SpacesPanel } from "./routes/admin/SpacesPanel";
 import { AdminBotPanel, AdminUpdatesPanel } from "./routes/admin/ServerSections";
 import { AuthRoute } from "./routes/auth/AuthRoute";
 import { InviteRoute } from "./routes/auth/InviteRoute";
@@ -41,8 +43,10 @@ const adminRoute: RouteObject = {
   children: [
     { index: true, element: <Navigate to="overview" replace /> },
     { path: "overview", element: <OverviewPanel /> },
+    { path: "spaces", element: <SpacesPanel /> },
     { path: "updates", element: <AdminUpdatesPanel /> },
     { path: "bot", element: <AdminBotPanel /> },
+    { path: "defaults", element: <DefaultsPanel /> },
     { path: "*", element: <Navigate to="../overview" replace /> },
   ],
 };

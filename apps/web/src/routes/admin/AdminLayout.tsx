@@ -10,8 +10,10 @@ const ADMIN_NAV: {
   group: "Server" | "Help" | "Settings";
 }[] = [
   { id: "overview", label: "Overview", group: "Server" },
+  { id: "spaces", label: "Spaces", group: "Server" },
   { id: "updates", label: "Updates & backups", group: "Server" },
   { id: "bot", label: "Discord bot", group: "Server" },
+  { id: "defaults", label: "Space defaults", group: "Settings" },
 ];
 
 const GROUPS = ["Server", "Help", "Settings"] as const;
