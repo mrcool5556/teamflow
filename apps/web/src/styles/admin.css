@@ -1,0 +1,276 @@
+/* Server admin page (/admin) and the space storage meter. Layout reuses settings.css. */
+
+:root {
+  /* "Near the limit" amber; readable on both themes. */
+  --warn: #e3c34f;
+}
+
+:root[data-theme="light"] {
+  --warn: #8a6a00;
+}
+
+.admin-link {
+  padding: 0;
+  border: none;
+  background: none;
+  box-shadow: none;
+  font: inherit;
+  color: var(--accent-text);
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.admin-link:disabled {
+  color: var(--muted);
+  cursor: default;
+}
+
+/* ---------- status bits ---------- */
+
+.admin-dot {
+  display: inline-block;
+  flex: none;
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: var(--muted);
+}
+
+.admin-dot--ok {
+  background: var(--done);
+}
+
+.admin-dot--warn {
+  background: var(--warn);
+}
+
+.admin-dot--bad {
+  background: var(--danger);
+}
+
+.admin-pill {
+  margin-left: auto;
+  padding: 0 var(--space-2);
+  border: 1px solid currentColor;
+  border-radius: 99px;
+  font-size: var(--font-size-xs);
+  white-space: nowrap;
+  color: var(--text-soft);
+}
+
+.admin-pill--ok {
+  color: var(--done);
+}
+
+.admin-pill--warn {
+  color: var(--warn);
+}
+
+.admin-pill--bad {
+  color: var(--danger-text);
+}
+
+.admin-ok {
+  color: var(--done);
+}
+
+.admin-bad {
+  color: var(--danger-text);
+}
+
+/* ---------- overview tiles ---------- */
+
+.admin-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 260px), 1fr));
+  gap: var(--space-3);
+}
+
+.admin-tile {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  min-width: 0;
+  padding: var(--space-3) var(--space-4);
+  border: var(--chrome-surface-border-width) solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  box-shadow: var(--chrome-surface-shadow);
+  font-size: var(--font-size-sm);
+}
+
+.admin-tile--wide {
+  grid-column: span 2;
+}
+
+.admin-tile--full {
+  grid-column: 1 / -1;
+}
+
+@media (max-width: 767px) {
+  .admin-tile--wide {
+    grid-column: 1 / -1;
+  }
+}
+
+.admin-tile-head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.admin-tile-head h3 {
+  margin: 0;
+  font-size: var(--font-size-md);
+}
+
+.admin-tile-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin-top: auto;
+}
+
+.admin-tile-note {
+  margin: 0;
+  color: var(--text-soft);
+}
+
+.admin-facts {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 2px var(--space-3);
+  margin: 0;
+}
+
+.admin-facts > div {
+  display: contents;
+}
+
+.admin-facts dt {
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+.admin-facts dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+  color: var(--text-soft);
+}
+
+/* ---------- usage bars ---------- */
+
+.admin-bar {
+  display: flex;
+  height: 8px;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: 99px;
+  background: var(--panel);
+}
+
+.admin-bar--tall {
+  height: 14px;
+  border-radius: var(--radius-xs);
+}
+
+.admin-bar > i {
+  display: block;
+  height: 100%;
+  background: var(--accent);
+}
+
+.admin-bar > i.admin-bar-database,
+.admin-bar > i.admin-bar-rows {
+  background: color-mix(in srgb, var(--accent) 55%, var(--panel));
+}
+
+.admin-bar > i.admin-bar-backups,
+.admin-bar > i.admin-bar-trash,
+.admin-bar > i.admin-bar-nolimit {
+  background: var(--muted);
+}
+
+.admin-bar > i.admin-bar-other,
+.admin-bar > i.admin-bar-uploading {
+  background: repeating-linear-gradient(
+    45deg,
+    color-mix(in srgb, var(--text-soft) 45%, transparent) 0 3px,
+    transparent 3px 6px
+  );
+}
+
+.admin-bar > i.admin-bar--warn {
+  background: var(--warn);
+}
+
+.admin-bar > i.admin-bar--full {
+  background: var(--danger);
+}
+
+.admin-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1) var(--space-4);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: var(--font-size-xs);
+  color: var(--text-soft);
+}
+
+.admin-legend li::before {
+  content: "";
+  display: inline-block;
+  width: 9px;
+  height: 9px;
+  margin-right: 5px;
+  border-radius: 2px;
+  vertical-align: -1px;
+  background: var(--accent);
+}
+
+.admin-legend .admin-legend-database::before,
+.admin-legend .admin-legend-rows::before {
+  background: color-mix(in srgb, var(--accent) 55%, var(--panel));
+}
+
+.admin-legend .admin-legend-backups::before,
+.admin-legend .admin-legend-trash::before {
+  background: var(--muted);
+}
+
+.admin-legend .admin-legend-other::before,
+.admin-legend .admin-legend-uploading::before {
+  background: repeating-linear-gradient(45deg, var(--text-soft) 0 2px, transparent 2px 4px);
+}
+
+/* ---------- common fixes ---------- */
+
+.admin-fixes {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.admin-fix {
+  display: flex;
+  gap: var(--space-2);
+  align-items: baseline;
+}
+
+.admin-fix p {
+  margin: 2px 0 0;
+  color: var(--text-soft);
+}
+
+.admin-fix--warn strong {
+  color: var(--warn);
+}
+
+.admin-fix--bad strong {
+  color: var(--danger-text);
+}

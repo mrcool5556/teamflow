@@ -16,6 +16,8 @@ type UserMenuProps = {
   tools?: UserMenuTool[];
   email?: string;
   onSettings: () => void;
+  /** Instance admins only: opens the server admin page. */
+  onServerAdmin?: () => void;
   onAbout: () => void;
   onLogout: () => void;
 };
@@ -36,6 +38,7 @@ export function UserMenu({
   tools = [],
   email,
   onSettings,
+  onServerAdmin,
   onAbout,
   onLogout,
 }: UserMenuProps) {
@@ -103,6 +106,16 @@ export function UserMenu({
         >
           <span aria-hidden="true">⚙</span> Settings
         </button>
+        {onServerAdmin ? (
+          <button
+            type="button"
+            role="menuitem"
+            className="user-menu-item"
+            onClick={choose(onServerAdmin)}
+          >
+            <span aria-hidden="true">▣</span> Server admin
+          </button>
+        ) : null}
         <button type="button" role="menuitem" className="user-menu-item" onClick={choose(onAbout)}>
           <span aria-hidden="true">ⓘ</span> About Teamflow
         </button>
