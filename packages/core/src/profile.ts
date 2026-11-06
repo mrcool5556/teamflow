@@ -25,6 +25,67 @@ export const CHROME_STYLES = [
 ] as const;
 export type ChromeStyle = (typeof CHROME_STYLES)[number];
 
+/**
+ * Design-your-own aspects (ported from the UIX "make it yours" model). Each one is set on its
+ * own; "auto" keeps what the UI style (chromeStyle) already draws, so old profiles look the same.
+ */
+/** Colour themes. Most come as a dark and light pair picked by `theme`; three have one mode. */
+export const COLOR_THEMES = [
+  "teamflow",
+  "studio",
+  "glass",
+  "machined",
+  "arcade",
+  "cozy",
+  "retro-console",
+] as const;
+export type ColorTheme = (typeof COLOR_THEMES)[number];
+
+/** The only mode a colour theme has, if it has no light/dark partner. */
+export const COLOR_THEME_FIXED_MODE: Partial<Record<ColorTheme, ResolvedTheme>> = {
+  arcade: "dark",
+  cozy: "light",
+  "retro-console": "light",
+};
+
+export const FONT_SETS = ["auto", "studio", "machined", "paper", "pixel", "neon"] as const;
+export type FontSet = (typeof FONT_SETS)[number];
+
+export const SURFACE_STYLES = [
+  "auto",
+  "flat",
+  "soft-inset",
+  "indented",
+  "glass",
+  "paper",
+  "bevel",
+] as const;
+export type SurfaceStyle = (typeof SURFACE_STYLES)[number];
+
+export const BUTTON_STYLES = [
+  "auto",
+  "flat",
+  "raised",
+  "inset",
+  "lipped",
+  "cut-paper",
+  "neon",
+  "bevel95",
+] as const;
+export type ButtonStyle = (typeof BUTTON_STYLES)[number];
+
+export const LIP_METALS = ["gold", "silver", "bronze", "ink", "accent"] as const;
+export type LipMetal = (typeof LIP_METALS)[number];
+
+export const LIP_SHADOWS = ["none", "drop"] as const;
+export type LipShadow = (typeof LIP_SHADOWS)[number];
+
+export const INPUT_STYLES = ["auto", "boxed", "sunk", "underline", "notebook"] as const;
+export type InputStyle = (typeof INPUT_STYLES)[number];
+
+export const TOGGLE_STYLES = ["auto", "pill", "flap", "retro"] as const;
+export type ToggleStyle = (typeof TOGGLE_STYLES)[number];
+
 export const SEMANTIC_CONTRAST_MODES = ["adapt", "preserve"] as const;
 export type SemanticContrastMode = (typeof SEMANTIC_CONTRAST_MODES)[number];
 
@@ -99,6 +160,15 @@ export const userProfileAppearanceSchema = z.object({
   chromeStyle: z.enum(CHROME_STYLES).default("industrial"),
   semanticContrast: z.enum(SEMANTIC_CONTRAST_MODES).default("adapt"),
   textContrast: z.enum(TEXT_CONTRAST_PRESETS).default("default"),
+  // Design-your-own aspects. An unknown value (from a newer export) falls back to the default.
+  colorTheme: z.enum(COLOR_THEMES).default("teamflow").catch("teamflow"),
+  fontSet: z.enum(FONT_SETS).default("auto").catch("auto"),
+  surface: z.enum(SURFACE_STYLES).default("auto").catch("auto"),
+  buttons: z.enum(BUTTON_STYLES).default("auto").catch("auto"),
+  lip: z.enum(LIP_METALS).default("gold").catch("gold"),
+  lipShadow: z.enum(LIP_SHADOWS).default("none").catch("none"),
+  inputs: z.enum(INPUT_STYLES).default("auto").catch("auto"),
+  toggles: z.enum(TOGGLE_STYLES).default("auto").catch("auto"),
 });
 
 export const userProfileUiSchema = z.object({
@@ -172,6 +242,14 @@ export function createDefaultUserProfile(): UserProfile {
       chromeStyle: "industrial",
       semanticContrast: "adapt",
       textContrast: "default",
+      colorTheme: "teamflow",
+      fontSet: "auto",
+      surface: "auto",
+      buttons: "auto",
+      lip: "gold",
+      lipShadow: "none",
+      inputs: "auto",
+      toggles: "auto",
     },
     board: {
       columnWidth: DEFAULT_BOARD_COLUMN_WIDTH,
