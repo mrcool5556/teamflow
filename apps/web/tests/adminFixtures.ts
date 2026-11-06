@@ -125,7 +125,7 @@ export function makeSpaceDetail(
 ): InstanceSpaceDetailPublic {
   return {
     ...makeSpace({
-      id: "00000000-0000-4000-8000-00000000e002",
+      id: "00000000-0000-4000-8000-0000000000d2",
       name: "Mod pack",
       key: "MOD",
       spaceType: "free",
@@ -171,7 +171,7 @@ export function makeSpaceDetail(
 
 export function makeStorage(extra: Partial<SpaceStoragePublic> = {}): SpaceStoragePublic {
   return {
-    teamId: "00000000-0000-4000-8000-00000000e002",
+    teamId: "00000000-0000-4000-8000-0000000000d2",
     spaceType: "free",
     capBytes: GIB,
     usedBytes: 240 * MIB,
@@ -202,7 +202,7 @@ export function adminRoutes(
     (state.spaces ??= [
       makeSpace(),
       makeSpace({
-        id: "00000000-0000-4000-8000-00000000e002",
+        id: "00000000-0000-4000-8000-0000000000d2",
         name: "Mod pack",
         key: "MOD",
         spaceType: "free",
@@ -287,6 +287,46 @@ export function adminRoutes(
         spaces().push(created);
         state.detail = created;
         return { space: created };
+      },
+    ],
+    [
+      "GET",
+      /^\/instance\/spaces\/([^/]+)$/,
+      ({ params }) => {
+        const detail = (state.detail ??= makeSpaceDetail());
+        if (detail.id !== params[0]) {
+          throw Object.assign(new Error("Space not found"), { status: 404 });
+        }
+        return { space: detail };
+      },
+    ],
+    [
+      "PATCH",
+      /^\/instance\/spaces\/([^/]+)$/,
+      ({ body }) => {
+        const patch = body as { spaceType?: "admin" | "free"; capBytes?: number | null };
+        const detail = (state.detail ??= makeSpaceDetail());
+        state.detail = {
+          ...detail,
+          ...(patch.spaceType ? { spaceType: patch.spaceType } : {}),
+          ...(patch.capBytes !== undefined ? { capBytes: patch.capBytes } : {}),
+        };
+        return { space: state.detail };
+      },
+    ],
+    [
+      "POST",
+      /^\/instance\/spaces\/([^/]+)\/empty-trash$/,
+      () => {
+        const detail = (state.detail ??= makeSpaceDetail());
+        const freedBytes = detail.breakdown.trashBytes;
+        state.detail = {
+          ...detail,
+          usedBytes: detail.usedBytes - freedBytes,
+          breakdown: { ...detail.breakdown, trashBytes: 0 },
+          nextTrashPurgeAt: null,
+        };
+        return { deletedFiles: 1, freedBytes, space: state.detail };
       },
     ],
   ];

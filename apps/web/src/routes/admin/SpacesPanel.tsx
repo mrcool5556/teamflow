@@ -1,6 +1,9 @@
 import { useMemo, useState } from "react";
+import { useNavigate } from "react-router";
 import { formatStorageBytes, type InstanceSpacePublic } from "@teamflow/core";
+import { adminPath } from "../../lib/appRoute";
 import { useSpaceSettingsQuery, useSpacesQuery } from "../../queries/instance";
+import { useShell } from "../board/shellContext";
 import { capText } from "./capBytes";
 import { CreateSpaceDialog } from "./CreateSpaceDialog";
 import { SpaceTypeBadge, SpaceUsageBar } from "./SpaceUsage";
@@ -15,7 +18,10 @@ const FILTERS: { id: Filter; label: string; match: (space: InstanceSpacePublic) 
 ];
 
 /** Every space with its type, cap, usage, owner, members and issues; most used first. */
-export function SpacesPanel({ onOpenSpace }: { onOpenSpace?: (teamId: string) => void }) {
+export function SpacesPanel() {
+  const navigate = useNavigate();
+  const { teamKey } = useShell();
+  const onOpenSpace = (teamId: string) => navigate(adminPath(teamKey, "spaces", teamId));
   const query = useSpacesQuery();
   const settings = useSpaceSettingsQuery().data;
   const [filter, setFilter] = useState<Filter>("all");
@@ -108,17 +114,13 @@ export function SpacesPanel({ onOpenSpace }: { onOpenSpace?: (teamId: string) =>
             {shown.map((space) => (
               <tr key={space.id} className={space.state === "full" ? "admin-row--full" : undefined}>
                 <td className="admin-cell-name">
-                  {onOpenSpace ? (
-                    <button
-                      type="button"
-                      className="admin-link"
-                      onClick={() => onOpenSpace(space.id)}
-                    >
-                      {space.name}
-                    </button>
-                  ) : (
-                    space.name
-                  )}
+                  <button
+                    type="button"
+                    className="admin-link"
+                    onClick={() => onOpenSpace(space.id)}
+                  >
+                    {space.name}
+                  </button>
                   <small>{space.key}</small>
                 </td>
                 <td data-label="Type">
@@ -147,7 +149,7 @@ export function SpacesPanel({ onOpenSpace }: { onOpenSpace?: (teamId: string) =>
           onClose={() => setCreating(false)}
           onCreated={(space) => {
             setCreating(false);
-            onOpenSpace?.(space.id);
+            onOpenSpace(space.id);
           }}
         />
       ) : null}
