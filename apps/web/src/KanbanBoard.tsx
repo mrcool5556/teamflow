@@ -6,24 +6,28 @@ import {
   closestCorners,
   closestCenter,
   pointerWithin,
+  useDndContext,
   useDroppable,
   useSensor,
   useSensors,
   type CollisionDetection,
+  type DropAnimation,
   type DragEndEvent,
+  type DragMoveEvent,
   type DragOverEvent,
   type DragStartEvent,
-  type Over,
 } from "@dnd-kit/core";
 import {
   SortableContext,
   horizontalListSortingStrategy,
   useSortable,
   verticalListSortingStrategy,
+  type SortingStrategy,
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import {
   useCallback,
+  useLayoutEffect,
   useMemo,
   useRef,
   useState,
@@ -52,12 +56,53 @@ import { DueChip, DueDatePicker } from "./components/DueDatePicker";
 import { issueMatchesBoardSearch, buildRefShareUrl } from "./lib/refLinks";
 import { copyTextToClipboard } from "./lib/clipboard";
 import { useInlineRename } from "./hooks/useInlineRename";
+import { useMediaQuery } from "./hooks/useMediaQuery";
+import {
+  reorderMultipleIssueIds,
+  sameOrder,
+  slotForPointer,
+  type CardBox,
+  type DropSlot,
+} from "./lib/boardDrop";
 import { useCanEditBoard } from "./lib/teamPermissions";
 import { useLayer } from "./ui/layerStack";
 import type { Priority } from "@teamflow/core";
 
 export const issueDndId = (issueId: string) => `issue:${issueId}`;
 const NO_SENSORS: ReturnType<typeof useSensors> = [];
+/**
+ * Cards never slide aside to make room while dragging: the dragged cards are lifted out of the
+ * column and a single line shows where they will land.
+ */
+const KEEP_CARDS_IN_PLACE: SortingStrategy = () => null;
+const NO_IDS: ReadonlySet<string> = new Set();
+
+/**
+ * dnd-kit measures droppables when a drag starts. Lifting cards out of their columns moves every
+ * card below them, so measure again whenever the set of lifted cards changes mid-drag.
+ */
+/** Calls `onMeasured` once dnd-kit has measured the card in hand (in the commit it does so). */
+function LiftWhenMeasured({ onMeasured }: { onMeasured: () => void }) {
+  const { active, activeNodeRect } = useDndContext();
+  const measured = active !== null && activeNodeRect !== null;
+  useLayoutEffect(() => {
+    if (measured) onMeasured();
+  }, [measured, onMeasured]);
+  return null;
+}
+
+function RemeasureDroppables({ layout }: { layout: unknown }) {
+  const { active, measureDroppableContainers } = useDndContext();
+  const dragging = active !== null;
+  useLayoutEffect(() => {
+    if (dragging) measureDroppableContainers([]);
+  }, [layout, dragging, measureDroppableContainers]);
+  return null;
+}
+const DROP_ANIMATION_MS = 180;
+const CSS_ESCAPE = (value: string) =>
+  typeof globalThis.CSS?.escape === "function" ? globalThis.CSS.escape(value) : value;
+const REDUCED_MOTION = "(prefers-reduced-motion: reduce)";
 export const rowDndId = (rowId: string) => `row:${rowId}`;
 export const columnDndId = (rowId: string, statusId: string) => `column:${rowId}:${statusId}`;
 export const cellDndId = (rowId: string, statusId: string) => `cell:${rowId}:${statusId}`;
@@ -98,80 +143,19 @@ function parseDndId(id: string): ParsedDndId {
   return { kind: "unknown" };
 }
 
-type IssueInsertHint = {
-  rowId: string;
-  statusId: string;
-  anchorIssueId: string | null;
-  insertAfter: boolean;
-};
+/** The cell a dragged card is over and the slot in it, as the pointer last resolved them. */
+type IssueInsertHint = DropSlot & { rowId: string; statusId: string };
 
-function shouldInsertAfter(active: DragEndEvent["active"], over: Over): boolean {
-  const activeRect = active.rect.current.translated;
-  const overRect = over.rect;
-  if (!activeRect || !overRect) return false;
+const cellKeyOf = (rowId: string, statusId: string) => `${rowId}:${statusId}`;
 
-  const activeMidY = activeRect.top + activeRect.height / 2;
-  const overMidY = overRect.top + overRect.height / 2;
-  return activeMidY > overMidY;
-}
-
-function resolveIssueInsertHint(
-  active: DragEndEvent["active"],
-  over: Over | null,
-  issues: IssuePublic[],
-  defaultRowId: string | null,
-): IssueInsertHint | null {
-  if (!over) return null;
-
-  const activeParsed = parseDndId(String(active.id));
-  if (activeParsed.kind !== "issue") return null;
-
-  const overParsed = parseDndId(String(over.id));
-
-  if (overParsed.kind === "cell" || overParsed.kind === "cell-tail") {
-    return {
-      rowId: overParsed.rowId,
-      statusId: overParsed.statusId,
-      anchorIssueId: null,
-      insertAfter: true,
-    };
-  }
-
-  if (overParsed.kind === "issue") {
-    const overIssue = issues.find((item) => item.id === overParsed.issueId);
-    if (!overIssue) return null;
-
-    const rowId = overIssue.rowId ?? defaultRowId;
-    if (!rowId) return null;
-
-    return {
-      rowId,
-      statusId: overIssue.statusId,
-      anchorIssueId: overIssue.id,
-      insertAfter: shouldInsertAfter(active, over),
-    };
-  }
-
-  return null;
-}
-
-function reorderMultipleIssueIds(
-  orderedIds: string[],
-  draggedIds: string[],
-  overId: string | null,
-  insertAfter: boolean,
-): string[] {
-  const dragSet = new Set(draggedIds);
-  const next = orderedIds.filter((id) => !dragSet.has(id));
-  const block = draggedIds;
-
-  if (!overId) return [...next, ...block];
-
-  let insertIndex = next.indexOf(overId);
-  if (insertIndex < 0) return [...next, ...block];
-  if (insertAfter) insertIndex += 1;
-  next.splice(insertIndex, 0, ...block);
-  return next;
+function sameHint(a: IssueInsertHint | null, b: IssueInsertHint | null): boolean {
+  if (!a || !b) return a === b;
+  return (
+    a.rowId === b.rowId &&
+    a.statusId === b.statusId &&
+    a.anchorIssueId === b.anchorIssueId &&
+    a.insertAfter === b.insertAfter
+  );
 }
 
 function sortIssueIdsByBoardOrder(
@@ -207,27 +191,62 @@ function draggingIssueIds(
   return [activeIssueId];
 }
 
-const issueCollisionDetection: CollisionDetection = (args) => {
-  const activeParsed = parseDndId(String(args.active.id));
-  if (activeParsed.kind === "issue") {
-    const pointerHits = pointerWithin(args);
-    if (pointerHits.length > 0) return pointerHits;
-    return closestCorners(args);
-  }
-  if (activeParsed.kind === "column") {
-    const columnContainers = args.droppableContainers.filter((container) => {
-      const parsed = parseDndId(String(container.id));
-      return parsed.kind === "column";
-    });
-    if (columnContainers.length === 0) return [];
+/**
+ * Collision detection for the board. A dragged card resolves to the cell under the pointer (or
+ * the nearest cell) and then to a slot between the cards that stay in it, so a drop in the gap
+ * between two cards lands between them. The resolved slot is written to `issueTargetRef` because
+ * dnd-kit only carries a droppable id forward.
+ */
+function createBoardCollisionDetection(
+  movingIdsRef: { current: ReadonlySet<string> },
+  issueTargetRef: { current: IssueInsertHint | null },
+): CollisionDetection {
+  return (args) => {
+    const activeParsed = parseDndId(String(args.active.id));
+    if (activeParsed.kind === "issue") {
+      const cellArgs = {
+        ...args,
+        droppableContainers: args.droppableContainers.filter(
+          (container) => parseDndId(String(container.id)).kind === "cell",
+        ),
+      };
+      const cellHit = pointerWithin(cellArgs)[0] ?? closestCorners(cellArgs)[0];
+      const cell = cellHit ? parseDndId(String(cellHit.id)) : null;
+      if (!cellHit || cell?.kind !== "cell") {
+        issueTargetRef.current = null;
+        return [];
+      }
 
-    const columnArgs = { ...args, droppableContainers: columnContainers };
-    const pointerHits = pointerWithin(columnArgs);
-    if (pointerHits.length > 0) return pointerHits;
-    return closestCenter(columnArgs);
-  }
-  return closestCorners(args);
-};
+      const cellKey = cellKeyOf(cell.rowId, cell.statusId);
+      const cards: CardBox[] = [];
+      for (const container of args.droppableContainers) {
+        const parsed = parseDndId(String(container.id));
+        if (parsed.kind !== "issue" || container.data.current?.cellKey !== cellKey) continue;
+        const rect = args.droppableRects.get(container.id);
+        if (rect) cards.push({ id: parsed.issueId, top: rect.top, bottom: rect.bottom });
+      }
+      // The pointer picks the cell; the top edge of the card in hand picks the slot. Using the
+      // edge keeps the starting position a stable "no change" once the lifted card collapses
+      // and the card below slides up under the pointer.
+      const slot = slotForPointer(cards, movingIdsRef.current, args.collisionRect.top);
+      issueTargetRef.current = { rowId: cell.rowId, statusId: cell.statusId, ...slot };
+      return [{ id: slot.anchorIssueId ? issueDndId(slot.anchorIssueId) : cellHit.id }];
+    }
+    if (activeParsed.kind === "column") {
+      const columnContainers = args.droppableContainers.filter((container) => {
+        const parsed = parseDndId(String(container.id));
+        return parsed.kind === "column";
+      });
+      if (columnContainers.length === 0) return [];
+
+      const columnArgs = { ...args, droppableContainers: columnContainers };
+      const pointerHits = pointerWithin(columnArgs);
+      if (pointerHits.length > 0) return pointerHits;
+      return closestCenter(columnArgs);
+    }
+    return closestCorners(args);
+  };
+}
 
 function resolveColumnDropTarget(
   overParsed: ParsedDndId,
@@ -346,6 +365,26 @@ export function KanbanBoard({
   const [contextMenu, setContextMenu] = useState<BoardContextMenu | null>(null);
   const lastSelectedIssueIdRef = useRef<string | null>(null);
   const suppressClickRef = useRef<string | null>(null);
+  const movingIssueIdsRef = useRef<ReadonlySet<string>>(new Set());
+  const issueTargetRef = useRef<IssueInsertHint | null>(null);
+  /** The target the line was last computed for, so moves within one slot do no work. */
+  const lastIssueTargetRef = useRef<IssueInsertHint | null>(null);
+  /** Where the drop animation should land (viewport px), measured as the drop happens. */
+  const dropPointRef = useRef<{ left: number; top: number } | null>(null);
+  /** Dropped cards stay lifted until the overlay has flown into their new place. */
+  const [settlingIssueIds, setSettlingIssueIds] = useState<ReadonlySet<string>>(() => new Set());
+  /**
+   * Cards are lifted only once dnd-kit has measured the active card: the overlay is placed from
+   * that first rect, which must be taken while the card is still in the column.
+   */
+  const [liftReady, setLiftReady] = useState(false);
+  const markLiftReady = useCallback(() => setLiftReady(true), []);
+  const boardRef = useRef<HTMLDivElement>(null);
+  const reducedMotion = useMediaQuery(REDUCED_MOTION);
+  const collisionDetection = useMemo(
+    () => createBoardCollisionDetection(movingIssueIdsRef, issueTargetRef),
+    [],
+  );
 
   const selectedIssues = useMemo(
     () => issues.filter((issue) => selectedIssueIds.has(issue.id)),
@@ -634,6 +673,47 @@ export function KanbanBoard({
 
   const activeDragCount = activeDragIssueIds.size;
 
+  const liftedIssueIds = useMemo(() => {
+    const inHand = liftReady ? activeDragIssueIds : NO_IDS;
+    if (settlingIssueIds.size === 0) return inHand;
+    return new Set([...inHand, ...settlingIssueIds]);
+  }, [liftReady, activeDragIssueIds, settlingIssueIds]);
+
+  const dropAnimation = useMemo<DropAnimation | null>(() => {
+    if (reducedMotion) return null;
+    return ({ active, dragOverlay, transform }) => {
+      const target = dropPointRef.current ?? active.rect;
+      dropPointRef.current = null;
+      const node = dragOverlay.node;
+      if (typeof node.animate !== "function") return;
+      // dragOverlay.rect is where the overlay is drawn now, transform included.
+      const final = {
+        x: transform.x + target.left - dragOverlay.rect.left,
+        y: transform.y + target.top - dragOverlay.rect.top,
+      };
+      const animation = node.animate(
+        [
+          { transform: CSS.Transform.toString(transform) },
+          { transform: `translate3d(${final.x}px, ${final.y}px, 0)` },
+        ],
+        { duration: DROP_ANIMATION_MS, easing: "cubic-bezier(0.2, 0, 0, 1)", fill: "forwards" },
+      );
+      return new Promise<void>((resolve) => {
+        // Animations stall in a hidden tab; the timer settles the drop there too.
+        const fallback = window.setTimeout(() => {
+          animation.finish();
+          resolve();
+        }, DROP_ANIMATION_MS + 120);
+        const done = () => {
+          window.clearTimeout(fallback);
+          resolve();
+        };
+        animation.onfinish = done;
+        animation.oncancel = done;
+      });
+    };
+  }, [reducedMotion]);
+
   const activeRow = useMemo(() => {
     if (!activeId?.startsWith("row:")) return null;
     const rowId = activeId.slice("row:".length);
@@ -650,14 +730,75 @@ export function KanbanBoard({
   }, [activeId, rows, statuses]);
 
   function handleDragStart(event: DragStartEvent) {
+    const parsed = parseDndId(String(event.active.id));
+    movingIssueIdsRef.current = new Set(
+      parsed.kind === "issue"
+        ? draggingIssueIds(parsed.issueId, selectedIssueIds, issues, defaultRowId)
+        : [],
+    );
+    issueTargetRef.current = null;
+    lastIssueTargetRef.current = null;
+    dropPointRef.current = null;
+    setSettlingIssueIds(new Set());
+    setLiftReady(false);
     setActiveId(String(event.active.id));
     setIssueInsertHint(null);
     setColumnDropTargetId(null);
     suppressClickRef.current = String(event.active.id);
   }
 
+  /**
+   * What dropping the active card on `target` would do, or null when it changes nothing (its own
+   * slot, or a status that does not exist in the target row).
+   */
+  function planIssueDrop(activeIssueId: string, target: IssueInsertHint) {
+    const issue = issues.find((item) => item.id === activeIssueId);
+    if (!issue) return null;
+    const movingIds = draggingIssueIds(issue.id, selectedIssueIds, issues, defaultRowId);
+
+    const sourceRowId = issue.rowId ?? defaultRowId;
+    const sourceStatusId = issue.statusId;
+    if (!sourceRowId) return null;
+
+    const targetRowId = target.rowId;
+    let targetStatusId = target.statusId;
+    if (targetRowId !== sourceRowId) {
+      const mappedStatusId = mapStatusToRow(statuses, targetStatusId, targetRowId);
+      if (!mappedStatusId) return null;
+      targetStatusId = mappedStatusId;
+    }
+
+    const { anchorIssueId, insertAfter } = target;
+    if (sourceRowId === targetRowId && sourceStatusId === targetStatusId) {
+      const sourceCell = issuesForCell(sourceRowId, sourceStatusId).map((item) => item.id);
+      const nextCell = reorderMultipleIssueIds(sourceCell, movingIds, anchorIssueId, insertAfter);
+      if (sameOrder(nextCell, sourceCell)) return null;
+      return { kind: "same-cell" as const, movingIds, targetRowId, targetStatusId, nextCell };
+    }
+
+    const targetCell = issuesForCell(targetRowId, targetStatusId)
+      .filter((item) => !movingIds.includes(item.id))
+      .map((item) => item.id);
+    const nextCell = reorderMultipleIssueIds(targetCell, movingIds, anchorIssueId, insertAfter);
+    return { kind: "move" as const, movingIds, targetRowId, targetStatusId, nextCell };
+  }
+
+  /**
+   * Runs on every pointer move: the slot can change without the droppable changing (top half to
+   * bottom half of a card). The line is shown only where a drop would change something.
+   */
+  function handleDragMove(event: DragMoveEvent | DragOverEvent) {
+    const target = issueTargetRef.current;
+    if (sameHint(lastIssueTargetRef.current, target)) return;
+    lastIssueTargetRef.current = target;
+    const parsed = parseDndId(String(event.active.id));
+    const changes =
+      target && parsed.kind === "issue" ? planIssueDrop(parsed.issueId, target) !== null : false;
+    setIssueInsertHint(changes ? target : null);
+  }
+
   function handleDragOver(event: DragOverEvent) {
-    setIssueInsertHint(resolveIssueInsertHint(event.active, event.over, issues, defaultRowId));
+    handleDragMove(event);
 
     const activeParsed = parseDndId(String(event.active.id));
     if (activeParsed.kind !== "column") {
@@ -672,10 +813,18 @@ export function KanbanBoard({
     setColumnDropTargetId(target ? columnDndId(target.rowId, target.statusId) : null);
   }
 
-  function handleDragCancel() {
+  function resetDragState() {
+    movingIssueIdsRef.current = new Set();
+    issueTargetRef.current = null;
+    lastIssueTargetRef.current = null;
     setActiveId(null);
     setIssueInsertHint(null);
     setColumnDropTargetId(null);
+  }
+
+  function handleDragCancel() {
+    dropPointRef.current = null;
+    resetDragState();
     suppressClickRef.current = null;
   }
 
@@ -685,11 +834,51 @@ export function KanbanBoard({
     [statuses],
   );
 
+  /** Viewport position of the insertion line for `hint`, where the dropped card will sit. */
+  function measureDropPoint(hint: IssueInsertHint): { left: number; top: number } | null {
+    const cell = boardRef.current?.querySelector<HTMLElement>(
+      `section.cell[data-status-id="${CSS_ESCAPE(hint.statusId)}"]`,
+    );
+    const body = cell?.querySelector<HTMLElement>(".column-body");
+    if (!cell || !body) return null;
+    const bodyStyle = getComputedStyle(body);
+    if (hint.anchorIssueId) {
+      const anchor = cell.querySelector<HTMLElement>(
+        `[data-issue-id="${CSS_ESCAPE(hint.anchorIssueId)}"]`,
+      );
+      if (!anchor) return null;
+      const box = anchor.getBoundingClientRect();
+      const gap = parseFloat(bodyStyle.rowGap) || 0;
+      return { left: box.left, top: hint.insertAfter ? box.bottom + gap : box.top };
+    }
+    const box = body.getBoundingClientRect();
+    return {
+      left: box.left + (parseFloat(bodyStyle.paddingLeft) || 0),
+      top: box.top + (parseFloat(bodyStyle.paddingTop) || 0),
+    };
+  }
+
   function handleDragEnd(event: DragEndEvent) {
     const { active, over } = event;
-    setActiveId(null);
-    setIssueInsertHint(null);
-    setColumnDropTargetId(null);
+    const issueTarget = issueTargetRef.current;
+    const activeParsed = parseDndId(String(active.id));
+    const issuePlan =
+      activeParsed.kind === "issue" && issueTarget && over
+        ? planIssueDrop(activeParsed.issueId, issueTarget)
+        : null;
+
+    // Fly the overlay to the line and keep the cards lifted until it lands; a drop that changes
+    // nothing flies back to the cards' own place instead.
+    dropPointRef.current = issuePlan && issueTarget ? measureDropPoint(issueTarget) : null;
+    if (issuePlan && dropPointRef.current && !reducedMotion) {
+      const settling = new Set(issuePlan.movingIds);
+      setSettlingIssueIds(settling);
+      window.setTimeout(
+        () => setSettlingIssueIds((prev) => (prev === settling ? new Set() : prev)),
+        DROP_ANIMATION_MS + 40,
+      );
+    }
+    resetDragState();
 
     window.setTimeout(() => {
       suppressClickRef.current = null;
@@ -697,7 +886,6 @@ export function KanbanBoard({
 
     if (!over) return;
 
-    const activeParsed = parseDndId(String(active.id));
     const overParsed = parseDndId(String(over.id));
 
     if (activeParsed.kind === "row" && overParsed.kind === "row") {
@@ -717,48 +905,15 @@ export function KanbanBoard({
       return;
     }
 
-    if (activeParsed.kind !== "issue") return;
+    if (!issuePlan) return;
+    const { movingIds, targetRowId, targetStatusId, nextCell } = issuePlan;
 
-    const issue = issues.find((item) => item.id === activeParsed.issueId);
-    if (!issue) return;
-
-    const movingIds = draggingIssueIds(issue.id, selectedIssueIds, issues, defaultRowId);
-
-    const dropTarget = resolveIssueInsertHint(active, over, issues, defaultRowId);
-    if (!dropTarget) return;
-
-    const sourceRowId = issue.rowId ?? defaultRowId;
-    const sourceStatusId = issue.statusId;
-    if (!sourceRowId) return;
-
-    const targetRowId = dropTarget.rowId;
-    let targetStatusId = dropTarget.statusId;
-    const overIssueId = dropTarget.anchorIssueId;
-    const insertAfter = dropTarget.insertAfter;
-
-    if (targetRowId !== sourceRowId) {
-      const mappedStatusId = mapStatusToRow(statuses, targetStatusId, targetRowId);
-      if (!mappedStatusId) return;
-      targetStatusId = mappedStatusId;
-    }
-
-    const sameCell = sourceRowId === targetRowId && sourceStatusId === targetStatusId;
-
-    if (sameCell) {
-      const sourceCell = issuesForCell(sourceRowId, sourceStatusId).map((item) => item.id);
-      const nextCell = reorderMultipleIssueIds(sourceCell, movingIds, overIssueId, insertAfter);
-      if (nextCell.join("|") === sourceCell.join("|")) return;
+    if (issuePlan.kind === "same-cell") {
       onReorderIssuesInCell(targetRowId, targetStatusId, nextCell);
       return;
     }
 
-    const targetCell = issuesForCell(targetRowId, targetStatusId)
-      .filter((item) => !movingIds.includes(item.id))
-      .map((item) => item.id);
-
-    const nextTargetCell = reorderMultipleIssueIds(targetCell, movingIds, overIssueId, insertAfter);
-
-    onReorderIssuesInCell(targetRowId, targetStatusId, nextTargetCell, {
+    onReorderIssuesInCell(targetRowId, targetStatusId, nextCell, {
       rowId: targetRowId,
       statusId: targetStatusId,
     });
@@ -785,16 +940,22 @@ export function KanbanBoard({
   return (
     <DndContext
       sensors={canEdit ? sensors : NO_SENSORS}
-      collisionDetection={issueCollisionDetection}
+      collisionDetection={collisionDetection}
       onDragStart={handleDragStart}
+      onDragMove={handleDragMove}
       onDragOver={handleDragOver}
       onDragCancel={handleDragCancel}
       onDragEnd={handleDragEnd}
     >
+      <LiftWhenMeasured onMeasured={markLiftReady} />
+      <RemeasureDroppables layout={liftedIssueIds} />
       <div
+        ref={boardRef}
         className={`board-stack ${previewMode ? "board-stack--preview" : ""} ${selectedIssueIds.size > 0 ? "board-stack--selecting" : ""}`}
         onKeyDown={handleBoardKeyDown}
-        onPointerDown={(event) => {
+        // On click, not press: a press on empty space may become a drag-to-pan, which keeps
+        // the selection (the pan swallows its closing click).
+        onClick={(event) => {
           if (previewMode || selectedIssueIds.size === 0) return;
           const target = event.target as HTMLElement;
           if (target.closest(".issue-card")) return;
@@ -857,8 +1018,7 @@ export function KanbanBoard({
                 onIssueCardClick={handleIssueCardClick}
                 onIssueContextMenu={openIssueContextMenu}
                 onRowContextMenu={openRowContextMenu}
-                activeDragIssueIds={activeDragIssueIds}
-                activeId={activeId}
+                liftedIssueIds={liftedIssueIds}
                 columnDropTargetId={columnDropTargetId}
                 previewMode={previewMode}
                 issueInsertHint={issueInsertHint}
@@ -869,7 +1029,7 @@ export function KanbanBoard({
         </SortableContext>
       </div>
 
-      <DragOverlay dropAnimation={null}>
+      <DragOverlay dropAnimation={dropAnimation}>
         {activeIssue ? (
           <div
             className={`issue-card-overlay-stack${activeDragCount > 1 ? " issue-card-overlay-stack--multi" : ""}`}
@@ -880,7 +1040,14 @@ export function KanbanBoard({
                 <div className="issue-card-stack-ghost issue-card-stack-ghost--near" aria-hidden />
               </>
             ) : null}
-            <article className="issue-card issue-card-overlay">
+            <article
+              className={`issue-card issue-card-overlay${activeIssue.color ? " has-card-color" : ""}`}
+              style={
+                activeIssue.color
+                  ? ({ "--card-accent": activeIssue.color } as CSSProperties)
+                  : undefined
+              }
+            >
               {activeDragCount > 1 ? (
                 <span className="issue-card-drag-count issue-card-drag-count--large" aria-hidden>
                   {activeDragCount}
@@ -888,6 +1055,14 @@ export function KanbanBoard({
               ) : null}
               <div className="issue-card-header">
                 <span className="issue-id">{activeIssue.identifier}</span>
+                <div className="issue-card-header-meta">
+                  <DueChip value={activeIssue.dueDate} done={Boolean(activeIssue.completedAt)} />
+                </div>
+                {activeIssue.priority !== "none" ? (
+                  <span className="issue-card-overlay-priority">
+                    {PRIORITY_LABELS[activeIssue.priority]}
+                  </span>
+                ) : null}
               </div>
               <h3 className="issue-card-title">{activeIssue.title}</h3>
             </article>
@@ -1158,8 +1333,7 @@ function SortableBoardRow({
   onGoToRef,
   selectedIssueIds = new Set(),
   onIssueCardClick,
-  activeDragIssueIds = new Set(),
-  activeId = null,
+  liftedIssueIds = new Set(),
   columnDropTargetId = null,
   previewMode = false,
   issueInsertHint = null,
@@ -1205,8 +1379,8 @@ function SortableBoardRow({
     event: React.MouseEvent,
     cellIssues: IssuePublic[],
   ) => void;
-  activeDragIssueIds?: Set<string>;
-  activeId?: string | null;
+  /** Cards being dragged (or settling after a drop): taken out of their column. */
+  liftedIssueIds?: ReadonlySet<string>;
   columnDropTargetId?: string | null;
   previewMode?: boolean;
   issueInsertHint?: IssueInsertHint | null;
@@ -1409,17 +1583,18 @@ function SortableBoardRow({
                         ) : null}
                         {cellIssues.map((issue) => (
                           <Fragment key={issue.id}>
-                            {columnHint?.anchorIssueId === issue.id && !columnHint.insertAfter && (
-                              <IssueDropIndicator />
-                            )}
                             <SortableIssueCard
                               issue={issue}
+                              cellKey={cellKeyOf(row.id, status.id)}
                               members={members}
                               selected={selectedIssueIds.has(issue.id)}
-                              draggingCompanion={
-                                activeDragIssueIds.has(issue.id) &&
-                                activeDragIssueIds.size > 1 &&
-                                activeId !== issueDndId(issue.id)
+                              lifted={liftedIssueIds.has(issue.id)}
+                              dropLine={
+                                columnHint?.anchorIssueId === issue.id
+                                  ? columnHint.insertAfter
+                                    ? "after"
+                                    : "before"
+                                  : null
                               }
                               highlighted={highlightedIssueId === issue.id}
                               suppressClickRef={suppressClickRef}
@@ -1433,9 +1608,6 @@ function SortableBoardRow({
                               onGoToRef={onGoToRef}
                               onContextMenu={(event) => onIssueContextMenu?.(issue, event)}
                             />
-                            {columnHint?.anchorIssueId === issue.id && columnHint.insertAfter && (
-                              <IssueDropIndicator />
-                            )}
                           </Fragment>
                         ))}
                         {columnHint &&
@@ -1519,7 +1691,7 @@ function BoardCell({
       data-status-id={statusId}
       data-column-key={columnKey}
     >
-      <SortableContext items={issueIds} strategy={verticalListSortingStrategy}>
+      <SortableContext items={issueIds} strategy={KEEP_CARDS_IN_PLACE}>
         <div className="column-body">
           {children}
           <ColumnDropTail rowId={rowId} statusId={statusId} />
@@ -1557,9 +1729,11 @@ function IssueDropIndicator() {
 
 function SortableIssueCard({
   issue,
+  cellKey,
   members,
   selected = false,
-  draggingCompanion = false,
+  lifted = false,
+  dropLine = null,
   highlighted = false,
   suppressClickRef,
   layoutAnimationDisabled = false,
@@ -1573,9 +1747,14 @@ function SortableIssueCard({
   onContextMenu,
 }: {
   issue: IssuePublic;
+  /** Which board cell the card is rendered in; collision detection groups cards by it. */
+  cellKey: string;
   members: TeamMemberPublic[];
   selected?: boolean;
-  draggingCompanion?: boolean;
+  /** Being dragged: removed from the column while the overlay copy follows the pointer. */
+  lifted?: boolean;
+  /** Draw the insertion line in the gap above or below this card. */
+  dropLine?: "before" | "after" | null;
   highlighted?: boolean;
   suppressClickRef: React.MutableRefObject<string | null>;
   layoutAnimationDisabled?: boolean;
@@ -1591,16 +1770,15 @@ function SortableIssueCard({
   const canEdit = useCanEditBoard();
   // The whole card stays a pointer drag source, but it is not a button: dnd-kit's
   // role/tabIndex attributes are left off so the card's own buttons are not nested in one.
-  const { listeners, setNodeRef, transform, transition, isDragging } = useSortable({
+  const { listeners, setNodeRef, transform, transition } = useSortable({
     id: issueDndId(issue.id),
+    data: { cellKey },
     ...(layoutAnimationDisabled ? { animateLayoutChanges: () => false } : {}),
   });
 
   const style = {
     transform: CSS.Transform.toString(transform),
     transition,
-    opacity: isDragging ? 0.35 : draggingCompanion ? 0.5 : 1,
-    ...(draggingCompanion ? { filter: "brightness(0.92)" } : {}),
     ...(issue.color ? { "--card-accent": issue.color } : {}),
   } as CSSProperties;
 
@@ -1609,7 +1787,7 @@ function SortableIssueCard({
       ref={setNodeRef}
       style={style}
       data-issue-id={issue.id}
-      className={`issue-card ${issue.color ? "has-card-color" : ""} ${isDragging ? "issue-card-dragging" : ""} ${draggingCompanion ? "issue-card-dragging-companion" : ""} ${highlighted ? "issue-card--highlighted" : ""} ${selected ? "issue-card--selected" : ""}`}
+      className={`issue-card ${issue.color ? "has-card-color" : ""} ${lifted ? "issue-card--lifted" : ""} ${dropLine ? `issue-card--drop-${dropLine}` : ""} ${highlighted ? "issue-card--highlighted" : ""} ${selected ? "issue-card--selected" : ""}`}
       {...listeners}
       onClick={(event) => {
         if (suppressClickRef.current === issueDndId(issue.id)) return;

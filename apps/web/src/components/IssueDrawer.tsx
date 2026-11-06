@@ -16,6 +16,7 @@ import { client } from "../api";
 import { queryKeys } from "../queries/keys";
 import { useIssueQuery } from "../queries/issue";
 import { useAttachmentList } from "../hooks/useAttachmentList";
+import { useDraftField } from "../hooks/useDraftField";
 import { AttachmentLightboxes } from "./AttachmentLightboxes";
 import { DownloadStarting } from "./DownloadStarting";
 import { DescriptionEditor } from "./DescriptionEditor";
@@ -61,8 +62,6 @@ export function IssueDrawer({
   onDelete,
   onNavigateRef,
 }: IssueDrawerProps) {
-  const [title, setTitle] = useState(issue.title);
-  const [description, setDescription] = useState(issue.description ?? "");
   const queryClient = useQueryClient();
   const confirm = useConfirm();
   // Without board.edit the drawer is for reading: every control that writes is disabled.
@@ -85,8 +84,6 @@ export function IssueDrawer({
     dismissOffer: dismissCommentLinkOffer,
   } = useLinkPasteOffer(commentDraft, setCommentDraft, commentTextareaRef);
   const [saving, setSaving] = useState(false);
-  const titleTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const descriptionTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [refNavActive, setRefNavActive] = useState(false);
   const prevIssueIdRef = useRef(issue.id);
   const refNavTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -112,10 +109,18 @@ export function IssueDrawer({
     [onPatch],
   );
 
-  useEffect(() => {
-    setTitle(issue.title);
-    setDescription(issue.description ?? "");
-  }, [issue.id, issue.title, issue.description]);
+  const titleField = useDraftField({
+    serverValue: issue.title,
+    resetKey: issue.id,
+    normalize: (draft) => draft.trim() || null,
+    save: (nextTitle) => void patchIssue({ title: nextTitle }),
+  });
+  const descriptionField = useDraftField({
+    serverValue: issue.description ?? "",
+    resetKey: issue.id,
+    normalize: (draft) => draft.trim(),
+    save: (nextDescription) => void patchIssue({ description: nextDescription }),
+  });
 
   function setComments(update: (prev: CommentPublic[]) => CommentPublic[]) {
     queryClient.setQueryData<{ issue: IssuePublic; comments: CommentPublic[] }>(
@@ -126,8 +131,6 @@ export function IssueDrawer({
 
   useEffect(
     () => () => {
-      if (titleTimerRef.current) clearTimeout(titleTimerRef.current);
-      if (descriptionTimerRef.current) clearTimeout(descriptionTimerRef.current);
       if (refNavTimerRef.current) clearTimeout(refNavTimerRef.current);
     },
     [],
@@ -140,25 +143,6 @@ export function IssueDrawer({
     if (refNavTimerRef.current) clearTimeout(refNavTimerRef.current);
     refNavTimerRef.current = setTimeout(() => setRefNavActive(false), 380);
   }, [issue.id]);
-
-  function queueTitleSave(nextTitle: string) {
-    if (titleTimerRef.current) clearTimeout(titleTimerRef.current);
-    titleTimerRef.current = setTimeout(() => {
-      const trimmed = nextTitle.trim();
-      if (!trimmed || trimmed === issue.title) return;
-      void patchIssue({ title: trimmed });
-    }, 500);
-  }
-
-  function queueDescriptionSave(nextDescription: string) {
-    if (descriptionTimerRef.current) clearTimeout(descriptionTimerRef.current);
-    descriptionTimerRef.current = setTimeout(() => {
-      const normalized = nextDescription.trim();
-      const current = issue.description ?? "";
-      if (normalized === current) return;
-      void patchIssue({ description: normalized || "" });
-    }, 500);
-  }
 
   async function submitComment() {
     const body = commentDraft.trim();
@@ -254,18 +238,11 @@ export function IssueDrawer({
         <div className="issue-drawer-hero">
           <input
             className="issue-drawer-title"
-            value={title}
+            value={titleField.value}
             readOnly={!canEdit}
-            onChange={(e) => {
-              setTitle(e.target.value);
-              queueTitleSave(e.target.value);
-            }}
-            onBlur={() => {
-              const trimmed = title.trim();
-              if (trimmed && trimmed !== issue.title) {
-                void patchIssue({ title: trimmed });
-              }
-            }}
+            onChange={(e) => titleField.onChange(e.target.value)}
+            onFocus={titleField.onFocus}
+            onBlur={titleField.onBlur}
             aria-label="Issue title"
           />
           <p className="issue-drawer-timestamps">
@@ -387,19 +364,11 @@ export function IssueDrawer({
         <section className="issue-drawer-section issue-drawer-section--description">
           <DescriptionEditor
             key={issue.id}
-            value={description}
+            value={descriptionField.value}
             readOnly={!canEdit}
-            onChange={(nextDescription) => {
-              setDescription(nextDescription);
-              queueDescriptionSave(nextDescription);
-            }}
-            onBlur={() => {
-              const normalized = description.trim();
-              const current = issue.description ?? "";
-              if (normalized !== current) {
-                void patchIssue({ description: normalized || "" });
-              }
-            }}
+            onChange={descriptionField.onChange}
+            onFocus={descriptionField.onFocus}
+            onBlur={descriptionField.onBlur}
             onNavigateRef={onNavigateRef}
           />
         </section>

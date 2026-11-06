@@ -11,6 +11,7 @@ type DescriptionEditorProps = {
   value: string;
   onChange: (value: string) => void;
   onBlur?: () => void;
+  onFocus?: () => void;
   onNavigateRef?: (ref: string) => void;
   /** Show the description without the click-to-edit affordance. */
   readOnly?: boolean;
@@ -123,6 +124,7 @@ export function DescriptionEditor({
   value,
   onChange,
   onBlur,
+  onFocus,
   onNavigateRef,
   readOnly = false,
 }: DescriptionEditorProps) {
@@ -228,6 +230,7 @@ export function DescriptionEditor({
               clearOfferOnEdit();
             }}
             onPaste={handlePaste}
+            onFocus={onFocus}
             onBlur={exitEdit}
             placeholder="Add a description… Pasted links are clickable automatically."
             rows={8}
