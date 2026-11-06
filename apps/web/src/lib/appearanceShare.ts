@@ -22,6 +22,8 @@ export function buildLookExport(
       ...profile,
       board: { ...profile.board, rowHeadersVisible: {} },
       ui: {},
+      // One look is shared, not the list of saved mixes.
+      mixes: [],
     },
   };
 }
