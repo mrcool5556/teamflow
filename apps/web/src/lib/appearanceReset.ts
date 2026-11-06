@@ -19,8 +19,19 @@ export function resetAppearance(profile: UserProfile, scope: ResetScope): UserPr
     customColors: {},
     textContrast: a.textContrast,
     semanticContrast: a.semanticContrast,
+    colorTheme: a.colorTheme,
   };
-  const shape = { chromeStyle: a.chromeStyle, shape: a.shape };
+  const shape = {
+    chromeStyle: a.chromeStyle,
+    shape: a.shape,
+    fontSet: a.fontSet,
+    surface: a.surface,
+    buttons: a.buttons,
+    lip: a.lip,
+    lipShadow: a.lipShadow,
+    inputs: a.inputs,
+    toggles: a.toggles,
+  };
   const board = {
     columnWidth: defaults.board.columnWidth,
     columnWidthMode: "auto" as const,

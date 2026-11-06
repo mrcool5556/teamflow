@@ -45,6 +45,9 @@
   --radius-sm: 6px;
   --radius-md: 10px;
   --radius-lg: 14px;
+  /* Buttons, fields and search boxes; chips (issue id, due, priority). Pill rounds these fully. */
+  --radius-control: var(--radius-sm);
+  --radius-chip: var(--radius-xs);
   --clip-chamfer-sm: none;
   --clip-chamfer-md: none;
   --clip-chamfer-lg: none;
@@ -70,7 +73,14 @@
   --chrome-card-shadow-hover: 0 2px 0 #000;
   --chrome-modal-shadow: 8px 8px 0 #000;
   --chrome-drag-shadow: 6px 6px 0 #000;
-  font-family: "JetBrains Mono", monospace;
+  /* Font sets: every font-family in the app reads one of these. Body text, headings, codes
+     and counts (mono), the Paper UI style's serif headings, and handwriting (notebook fields). */
+  --font-body: "JetBrains Mono", monospace;
+  --font-display: "Space Grotesk", sans-serif;
+  --font-mono: "JetBrains Mono", monospace;
+  --font-serif: Georgia, "Times New Roman", serif;
+  --font-hand: Caveat, "Segoe Print", "Bradley Hand", cursive;
+  font-family: var(--font-body);
 }
 
 @media (min-width: 1200px) {
@@ -213,6 +223,18 @@
   --radius-sm: 10px;
   --radius-md: 14px;
   --radius-lg: 20px;
+  --clip-chamfer-sm: none;
+  --clip-chamfer-md: none;
+  --clip-chamfer-lg: none;
+}
+
+:root[data-shape="pill"] {
+  --radius-xs: 8px;
+  --radius-sm: 12px;
+  --radius-md: 18px;
+  --radius-lg: 28px;
+  --radius-control: 999px;
+  --radius-chip: 999px;
   --clip-chamfer-sm: none;
   --clip-chamfer-md: none;
   --clip-chamfer-lg: none;

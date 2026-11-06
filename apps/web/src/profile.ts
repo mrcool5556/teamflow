@@ -2,6 +2,7 @@ import {
   boardColumnWidthMode,
   clampBoardColumnWidth,
   clampCardMinHeight,
+  COLOR_THEME_FIXED_MODE,
   createDefaultUserProfile,
   PRIORITY_COLOR_DEFAULTS,
   resolveUiColors,
@@ -48,6 +49,9 @@ function applyUiColorOverrides(profile: UserProfile, root: HTMLElement) {
 
   const { appearance } = profile;
 
+  // On a colour theme other than Teamflow's, "default" means the theme's own accent colours.
+  if (appearance.colorTheme !== "teamflow" && appearance.colorPreset === "default") return;
+
   const { primary, accent } = resolveUiColors(appearance);
 
   root.style.setProperty("--primary", primary);
@@ -70,6 +74,11 @@ export function resolveTheme(theme: ThemeMode): ResolvedTheme {
   return window.matchMedia("(prefers-color-scheme: light)").matches ? "light" : "dark";
 }
 
+/** The mode to paint: a colour theme with only one mode (Arcade, Cozy, Retro Console) keeps it. */
+export function paintedTheme(appearance: Pick<UserProfile["appearance"], "theme" | "colorTheme">) {
+  return COLOR_THEME_FIXED_MODE[appearance.colorTheme] ?? resolveTheme(appearance.theme);
+}
+
 let systemThemeProfile: UserProfile | null = null;
 let systemThemeListening = false;
 
@@ -85,12 +94,34 @@ function followSystemTheme(profile: UserProfile) {
   });
 }
 
+/**
+ * Design-your-own aspects become data-* attributes on <html>; "auto" removes the attribute so
+ * the UI style's own look shows. styles/aspects.css reads them.
+ */
+function applyDesignAspects(appearance: UserProfile["appearance"], root: HTMLElement) {
+  const set = (key: string, value: string | null) => {
+    if (value === null) delete root.dataset[key];
+    else root.dataset[key] = value;
+  };
+  const auto = (value: string) => (value === "auto" ? null : value);
+  set("palette", appearance.colorTheme === "teamflow" ? null : appearance.colorTheme);
+  set("font", auto(appearance.fontSet));
+  set("surface", auto(appearance.surface));
+  set("buttons", auto(appearance.buttons));
+  // Lip metal and rim shadow only mean something on lipped buttons.
+  const lipped = appearance.buttons === "lipped";
+  set("lip", lipped ? appearance.lip : null);
+  set("lipShadow", lipped ? appearance.lipShadow : null);
+  set("inputs", auto(appearance.inputs));
+  set("toggles", auto(appearance.toggles));
+}
+
 export function applyUserProfile(profile: UserProfile) {
   const root = document.documentElement;
 
   const { appearance } = profile;
 
-  root.dataset.theme = resolveTheme(appearance.theme);
+  root.dataset.theme = paintedTheme(appearance);
   followSystemTheme(profile);
 
   root.dataset.colorPreset = appearance.colorPreset;
@@ -102,6 +133,8 @@ export function applyUserProfile(profile: UserProfile) {
   root.dataset.semanticContrast = appearance.semanticContrast;
 
   root.dataset.textContrast = appearance.textContrast;
+
+  applyDesignAspects(appearance, root);
 
   applyUiColorOverrides(profile, root);
 
@@ -121,6 +154,21 @@ export function applyUserProfile(profile: UserProfile) {
 
     `${clampCardMinHeight(profile.board.cardMinHeight)}px`,
   );
+}
+
+/**
+ * Mark low-powered devices (4 or fewer CPU cores, or 4 GB or less memory) so glass surfaces
+ * drop their backdrop blur (styles/aspects.css).
+ */
+export function markLowPowerDevice(
+  nav: { hardwareConcurrency: number; deviceMemory?: number } = navigator,
+) {
+  const memory = nav.deviceMemory;
+  const cores = nav.hardwareConcurrency;
+  const low = (cores > 0 && cores <= 4) || (memory !== undefined && memory <= 4);
+  if (low) document.documentElement.dataset.lowPower = "true";
+  else delete document.documentElement.dataset.lowPower;
+  return low;
 }
 
 export function mergeWithLegacyDefaults(profile: UserProfile): {

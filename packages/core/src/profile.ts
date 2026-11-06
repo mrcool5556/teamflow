@@ -10,7 +10,7 @@ export type ResolvedTheme = Exclude<ThemeMode, "system">;
 export const COLOR_PRESETS = ["default", "sunset", "ocean", "forest", "custom"] as const;
 export type ColorPreset = (typeof COLOR_PRESETS)[number];
 
-export const SHAPE_PRESETS = ["sharp", "soft", "round", "octagon"] as const;
+export const SHAPE_PRESETS = ["sharp", "soft", "round", "octagon", "pill"] as const;
 export type ShapePreset = (typeof SHAPE_PRESETS)[number];
 
 export const CHROME_STYLES = [
@@ -24,6 +24,67 @@ export const CHROME_STYLES = [
   "neon",
 ] as const;
 export type ChromeStyle = (typeof CHROME_STYLES)[number];
+
+/**
+ * Design-your-own aspects (ported from the UIX "make it yours" model). Each one is set on its
+ * own; "auto" keeps what the UI style (chromeStyle) already draws, so old profiles look the same.
+ */
+/** Colour themes. Most come as a dark and light pair picked by `theme`; three have one mode. */
+export const COLOR_THEMES = [
+  "teamflow",
+  "studio",
+  "glass",
+  "machined",
+  "arcade",
+  "cozy",
+  "retro-console",
+] as const;
+export type ColorTheme = (typeof COLOR_THEMES)[number];
+
+/** The only mode a colour theme has, if it has no light/dark partner. */
+export const COLOR_THEME_FIXED_MODE: Partial<Record<ColorTheme, ResolvedTheme>> = {
+  arcade: "dark",
+  cozy: "light",
+  "retro-console": "light",
+};
+
+export const FONT_SETS = ["auto", "studio", "machined", "paper", "pixel", "neon"] as const;
+export type FontSet = (typeof FONT_SETS)[number];
+
+export const SURFACE_STYLES = [
+  "auto",
+  "flat",
+  "soft-inset",
+  "indented",
+  "glass",
+  "paper",
+  "bevel",
+] as const;
+export type SurfaceStyle = (typeof SURFACE_STYLES)[number];
+
+export const BUTTON_STYLES = [
+  "auto",
+  "flat",
+  "raised",
+  "inset",
+  "lipped",
+  "cut-paper",
+  "neon",
+  "bevel95",
+] as const;
+export type ButtonStyle = (typeof BUTTON_STYLES)[number];
+
+export const LIP_METALS = ["gold", "silver", "bronze", "ink", "accent"] as const;
+export type LipMetal = (typeof LIP_METALS)[number];
+
+export const LIP_SHADOWS = ["none", "drop"] as const;
+export type LipShadow = (typeof LIP_SHADOWS)[number];
+
+export const INPUT_STYLES = ["auto", "boxed", "sunk", "underline", "notebook"] as const;
+export type InputStyle = (typeof INPUT_STYLES)[number];
+
+export const TOGGLE_STYLES = ["auto", "pill", "flap", "retro"] as const;
+export type ToggleStyle = (typeof TOGGLE_STYLES)[number];
 
 export const SEMANTIC_CONTRAST_MODES = ["adapt", "preserve"] as const;
 export type SemanticContrastMode = (typeof SEMANTIC_CONTRAST_MODES)[number];
@@ -99,7 +160,38 @@ export const userProfileAppearanceSchema = z.object({
   chromeStyle: z.enum(CHROME_STYLES).default("industrial"),
   semanticContrast: z.enum(SEMANTIC_CONTRAST_MODES).default("adapt"),
   textContrast: z.enum(TEXT_CONTRAST_PRESETS).default("default"),
+  // Design-your-own aspects. An unknown value (from a newer export) falls back to the default.
+  colorTheme: z.enum(COLOR_THEMES).default("teamflow").catch("teamflow"),
+  fontSet: z.enum(FONT_SETS).default("auto").catch("auto"),
+  surface: z.enum(SURFACE_STYLES).default("auto").catch("auto"),
+  buttons: z.enum(BUTTON_STYLES).default("auto").catch("auto"),
+  lip: z.enum(LIP_METALS).default("gold").catch("gold"),
+  lipShadow: z.enum(LIP_SHADOWS).default("none").catch("none"),
+  inputs: z.enum(INPUT_STYLES).default("auto").catch("auto"),
+  toggles: z.enum(TOGGLE_STYLES).default("auto").catch("auto"),
 });
+
+/** Named looks a user saved on the Design page; synced with the profile. */
+export const MAX_SAVED_MIXES = 12;
+export const MAX_MIX_NAME_LENGTH = 40;
+
+export const savedMixSchema = z.object({
+  id: z.string().min(1).max(64),
+  name: z.string().trim().min(1).max(MAX_MIX_NAME_LENGTH),
+  appearance: userProfileAppearanceSchema,
+});
+
+/** Saved mixes; a broken list (or one too long) loads as the valid first 12, never an error. */
+export const savedMixesSchema = z
+  .array(z.unknown())
+  .catch([])
+  .transform((items) =>
+    items
+      .map((item) => savedMixSchema.safeParse(item))
+      .filter((result) => result.success)
+      .map((result) => result.data)
+      .slice(0, MAX_SAVED_MIXES),
+  );
 
 export const userProfileUiSchema = z.object({
   lastTeamId: z.string().uuid().nullable().optional(),
@@ -110,12 +202,15 @@ export const userProfileSchema = z.object({
   appearance: userProfileAppearanceSchema.default({}),
   board: userProfileBoardSchema,
   ui: userProfileUiSchema.default({}),
+  mixes: savedMixesSchema.default([]),
 });
 
 export const userProfilePatchSchema = z.object({
   appearance: userProfileAppearanceSchema.partial().optional(),
   board: userProfileBoardSchema.partial().optional(),
   ui: userProfileUiSchema.partial().optional(),
+  /** Replaces the whole list. */
+  mixes: z.array(savedMixSchema).max(MAX_SAVED_MIXES).optional(),
 });
 
 export const userProfileExportSchema = z.object({
@@ -134,6 +229,7 @@ export type UserProfile = z.infer<typeof userProfileSchema>;
 export type UserProfilePatch = z.infer<typeof userProfilePatchSchema>;
 export type UserProfileExport = z.infer<typeof userProfileExportSchema>;
 export type UserProfileCustomColors = z.infer<typeof userProfileCustomColorsSchema>;
+export type SavedMix = z.infer<typeof savedMixSchema>;
 
 export function clampBoardColumnWidth(value: number) {
   return Math.min(
@@ -172,6 +268,14 @@ export function createDefaultUserProfile(): UserProfile {
       chromeStyle: "industrial",
       semanticContrast: "adapt",
       textContrast: "default",
+      colorTheme: "teamflow",
+      fontSet: "auto",
+      surface: "auto",
+      buttons: "auto",
+      lip: "gold",
+      lipShadow: "none",
+      inputs: "auto",
+      toggles: "auto",
     },
     board: {
       columnWidth: DEFAULT_BOARD_COLUMN_WIDTH,
@@ -179,6 +283,7 @@ export function createDefaultUserProfile(): UserProfile {
       rowHeadersVisible: {},
     },
     ui: {},
+    mixes: [],
   });
 }
 
@@ -205,6 +310,7 @@ export function mergeUserProfile(current: UserProfile, patch: UserProfilePatch):
       ...current.ui,
       ...patch.ui,
     },
+    mixes: patch.mixes ?? current.mixes,
   });
 }
 
@@ -254,6 +360,7 @@ export function parseUserProfile(input: unknown): UserProfile {
       cardMinHeight: clampCardMinHeight(board.cardMinHeight),
     },
     ui,
+    mixes: raw.mixes,
   });
 }
 

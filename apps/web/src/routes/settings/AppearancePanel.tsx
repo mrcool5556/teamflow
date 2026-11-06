@@ -17,7 +17,7 @@ export function AppearancePanel() {
           <ProfileSaveStatus />
         </div>
         <p className="settings-copy settings-lead">
-          Pick a look, then fine-tune it. Changes apply as you go.
+          Pick a look, then change a few things. Every detail is on the Design page.
         </p>
       </header>
 

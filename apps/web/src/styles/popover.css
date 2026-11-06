@@ -717,7 +717,7 @@ body:has(.drawer) .bottom-dock {
 }
 
 .bulk-action-count {
-  font-family: "JetBrains Mono", monospace;
+  font-family: var(--font-mono);
   font-size: 0.78rem;
   font-weight: 700;
   color: var(--accent);
