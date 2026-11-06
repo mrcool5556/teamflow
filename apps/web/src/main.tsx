@@ -3,11 +3,13 @@ import { createRoot } from "react-dom/client";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { RouterProvider } from "react-router/dom";
 import { createDefaultUserProfile } from "@teamflow/core";
-import { applyUserProfile } from "./profile";
+import { applyUserProfile, markLowPowerDevice } from "./profile";
 import { createQueryClient } from "./queries/keys";
 import { createAppRouter } from "./router";
 // Order matters: later files win ties in the cascade.
 import "./styles/tokens.css";
+import "./styles/themes.css";
+import "./styles/fonts.css";
 import "./styles/base.css";
 import "./styles/topbar.css";
 import "./styles/board.css";
@@ -19,8 +21,11 @@ import "./styles/settings.css";
 import "./styles/admin.css";
 import "./styles/plan.css";
 import "./styles/auth.css";
+import "./styles/design.css";
+import "./styles/aspects.css";
 
 applyUserProfile(createDefaultUserProfile());
+markLowPowerDevice();
 
 const router = createAppRouter();
 const queryClient = createQueryClient();

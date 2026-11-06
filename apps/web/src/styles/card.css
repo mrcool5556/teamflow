@@ -1,7 +1,6 @@
+/* No backdrop blur on cards: hundreds of blurred cards make a big board slow. */
 :root[data-chrome-style="glass"] .issue-card {
   background: color-mix(in srgb, var(--surface) 76%, transparent);
-  backdrop-filter: blur(14px) saturate(145%);
-  -webkit-backdrop-filter: blur(14px) saturate(145%);
 }
 
 :root[data-chrome-style="terminal"] .issue-card {
@@ -277,7 +276,7 @@
   letter-spacing: 0.04em;
   line-height: 1.2;
   background: color-mix(in srgb, var(--panel) 94%, var(--surface));
-  border-radius: var(--radius-xs);
+  border-radius: var(--radius-chip);
   box-shadow: var(--issue-id-shadow);
   font-size: 0.68rem;
   color: var(--muted);
@@ -301,7 +300,7 @@
   line-height: 1.2;
   padding: 0.12rem 0.35rem;
   border: 1px solid var(--border);
-  border-radius: var(--radius-xs);
+  border-radius: var(--radius-chip);
   color: var(--text-soft);
   background: color-mix(in srgb, var(--panel) 94%, var(--surface));
 }
@@ -363,7 +362,7 @@
 }
 
 .issue-card-title {
-  font-family: "Space Grotesk", sans-serif;
+  font-family: var(--font-display);
   font-size: 0.94rem;
   font-weight: 600;
   line-height: 1.38;
@@ -487,7 +486,7 @@
   align-items: center;
   padding: 0.05rem 0.4rem;
   border: 1px solid var(--border-strong);
-  border-radius: var(--radius-xs);
+  border-radius: var(--radius-chip);
   background: transparent;
   color: var(--text-soft);
   box-shadow: none;

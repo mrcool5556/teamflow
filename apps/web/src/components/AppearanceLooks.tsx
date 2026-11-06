@@ -1,6 +1,7 @@
 import type { CSSProperties } from "react";
 import { mergeUserProfile, type UserProfile } from "@teamflow/core";
 import { activeLook, applyLook, LOOKS, nearestLook, type Look } from "../lib/appearanceLooks";
+import { applyMix, mixInUse } from "../lib/savedMixes";
 
 type AppearanceLooksProps = {
   profile: UserProfile;
@@ -22,10 +23,12 @@ function swatchStyle(look: Look) {
   } as CSSProperties;
 }
 
-/** Named looks: one click sets theme, colour, style and corners together. */
+/** Named looks: one click sets a whole mix (colours, fonts, style, corners and aspects). */
 export function AppearanceLooks({ profile, onProfileChange }: AppearanceLooksProps) {
   const current = activeLook(profile.appearance);
-  const nearest = current ? null : nearestLook(profile.appearance);
+  const mixInUseNow = profile.mixes.find((m) => mixInUse(profile.appearance, m)) ?? null;
+  const mix = current ? null : mixInUseNow;
+  const nearest = current || mix ? null : nearestLook(profile.appearance);
 
   const choose = (look: Look) =>
     onProfileChange(mergeUserProfile(profile, { appearance: applyLook(profile.appearance, look) }));
@@ -36,6 +39,10 @@ export function AppearanceLooks({ profile, onProfileChange }: AppearanceLooksPro
         {current ? (
           <>
             Current look: <strong>{current.name}</strong>
+          </>
+        ) : mix ? (
+          <>
+            Your mix: <strong>{mix.name}</strong>
           </>
         ) : (
           <>
@@ -78,6 +85,25 @@ export function AppearanceLooks({ profile, onProfileChange }: AppearanceLooksPro
           );
         })}
       </div>
+      {profile.mixes.length > 0 ? (
+        <div className="appearance-mixes" role="group" aria-label="Your mixes">
+          <span className="appearance-mixes-label">Your mixes</span>
+          {profile.mixes.map((saved) => {
+            const inUse = mixInUseNow?.id === saved.id;
+            return (
+              <button
+                key={saved.id}
+                type="button"
+                aria-pressed={inUse}
+                className={`design-chip${inUse ? " active" : ""}`}
+                onClick={() => onProfileChange(applyMix(profile, saved))}
+              >
+                {saved.name}
+              </button>
+            );
+          })}
+        </div>
+      ) : null}
     </>
   );
 }

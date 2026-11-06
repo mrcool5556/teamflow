@@ -13,6 +13,7 @@ import { AuthRoute } from "./routes/auth/AuthRoute";
 import { InviteRoute } from "./routes/auth/InviteRoute";
 import { BoardShell } from "./routes/board/BoardShell";
 import { AppearancePanel } from "./routes/settings/AppearancePanel";
+import { DesignPanel } from "./routes/settings/DesignPanel";
 import { GeneralPanel } from "./routes/settings/GeneralPanel";
 import { IntegrationsPanel } from "./routes/settings/IntegrationsPanel";
 import { RolesPanel } from "./routes/settings/RolesPanel";
@@ -29,6 +30,7 @@ const settingsRoute: RouteObject = {
     { index: true, element: <Navigate to="general" replace /> },
     { path: "general", element: <GeneralPanel /> },
     { path: "appearance", element: <AppearancePanel /> },
+    { path: "appearance/design", element: <DesignPanel /> },
     { path: "team", element: <TeamPanel /> },
     { path: "roles", element: <RolesPanel /> },
     { path: "integrations", element: <IntegrationsPanel /> },

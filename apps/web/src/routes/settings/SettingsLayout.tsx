@@ -7,7 +7,7 @@ import { useLayer } from "../../ui/layerStack";
 /** Settings as a page: grouped navigation on the left, the panel in a readable column. */
 export function SettingsLayout() {
   const navigate = useNavigate();
-  const { settingsPanel } = useAppRoute();
+  const { settingsPanel, settingsSubpage } = useAppRoute();
   const { team, teamKey, access, closeSettings } = useShell();
   const panel = isSettingsPanel(settingsPanel) ? settingsPanel : "general";
 
@@ -34,7 +34,9 @@ export function SettingsLayout() {
         />
       </aside>
       <main className="settings-main">
-        <div className={`settings-column${panel === "appearance" ? " settings-column--wide" : ""}`}>
+        <div
+          className={`settings-column${panel === "appearance" ? " settings-column--wide" : ""}${settingsSubpage === "design" ? " settings-column--full" : ""}`}
+        >
           <Outlet />
         </div>
       </main>

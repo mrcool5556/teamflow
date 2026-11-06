@@ -1,85 +1,41 @@
-import type {
-  ChromeStyle,
-  ColorPreset,
-  ShapePreset,
-  TextContrastPreset,
-  ThemeMode,
-  UserProfile,
-} from "@teamflow/core";
+import type { ColorPreset, ThemeMode, UserProfile } from "@teamflow/core";
 import {
-  CHROME_STYLES,
   COLOR_PRESETS,
   DEFAULT_UI_ACCENT,
   DEFAULT_UI_PRIMARY,
   SHAPE_PRESETS,
-  TEXT_CONTRAST_PRESETS,
   UI_COLOR_PRESET_PALETTES,
   mergeUserProfile,
 } from "@teamflow/core";
 import { useEffect, useRef, useState, type ReactNode } from "react";
-import { RESET_LABELS, resetAppearance, type ResetScope } from "../lib/appearanceReset";
-import { Toast } from "../ui/BottomDock";
 import { NARROW_SCREEN, useMediaQuery } from "../hooks/useMediaQuery";
+import { RESET_LABELS, resetAppearance, type ResetScope } from "../lib/appearanceReset";
+import {
+  ACCENT_OPTIONS,
+  CORNER_OPTIONS,
+  currentColourChoice,
+  hasPartner,
+  labelOf,
+  TEXT_OPTIONS,
+} from "../lib/designAspects";
+import { paintedTheme } from "../profile";
+import { Toast } from "../ui/BottomDock";
 import { AppearanceBoardControls } from "./AppearanceBoardControls";
 import { AppearanceLooks } from "./AppearanceLooks";
-import { AppearanceShare } from "./AppearanceShare";
 import { CustomColorField } from "./CustomColorField";
+import { DesignPageLink } from "./DesignPageLink";
 
 type AppearanceSettingsSectionProps = {
   profile: UserProfile;
   onProfileChange: (profile: UserProfile) => void;
 };
 
-const COLOR_PRESET_LABELS: Record<ColorPreset, string> = {
-  default: "Default",
-  sunset: "Sunset",
-  ocean: "Ocean",
-  forest: "Forest",
-  custom: "Custom",
-};
-
-/** Primary then accent; custom shows a colour wheel until its colours are picked. */
-const COLOR_PRESET_SWATCHES: Record<ColorPreset, [string, string] | null> = {
-  default: [DEFAULT_UI_PRIMARY, DEFAULT_UI_ACCENT],
+/** Primary then accent for the preset swatches; custom shows a colour wheel. */
+const COLOR_PRESET_SWATCHES: Record<Exclude<ColorPreset, "default">, [string, string] | null> = {
   sunset: [UI_COLOR_PRESET_PALETTES.sunset.primary, UI_COLOR_PRESET_PALETTES.sunset.accent],
   ocean: [UI_COLOR_PRESET_PALETTES.ocean.primary, UI_COLOR_PRESET_PALETTES.ocean.accent],
   forest: [UI_COLOR_PRESET_PALETTES.forest.primary, UI_COLOR_PRESET_PALETTES.forest.accent],
   custom: null,
-};
-
-const CHROME_STYLE_LABELS: Record<ChromeStyle, string> = {
-  industrial: "Industrial",
-  minimal: "Minimal",
-  soft: "Soft",
-  classic: "Classic",
-  glass: "Glass",
-  terminal: "Terminal",
-  paper: "Paper",
-  neon: "Neon",
-};
-
-const CHROME_STYLE_HINTS: Record<ChromeStyle, string> = {
-  industrial: "Thick borders and offset shadows — the default Teamflow look.",
-  minimal: "Flat panels, thin borders, no drop shadows.",
-  soft: "Light borders with gentle elevation shadows.",
-  classic: "Balanced 2px chrome — closer to typical SaaS boards.",
-  glass: "Frosted translucent panels over a soft color wash.",
-  terminal: "Glow-accented borders — retro CLI control room.",
-  paper: "Warm editorial surfaces with ink-like borders.",
-  neon: "Dark stage with accent glow on interactive chrome.",
-};
-
-const SHAPE_LABELS: Record<ShapePreset, string> = {
-  sharp: "Hard edge",
-  soft: "Slightly rounded",
-  round: "Rounded",
-  octagon: "Octagon",
-};
-
-const TEXT_CONTRAST_LABELS: Record<TextContrastPreset, string> = {
-  default: "Default",
-  high: "High",
-  muted: "Muted",
 };
 
 function patchAppearance(profile: UserProfile, appearance: Partial<UserProfile["appearance"]>) {
@@ -98,6 +54,7 @@ function AppearanceSegmentGroup<T extends string>({
   onChange,
   ariaLabel,
   className = "appearance-block",
+  disabled = false,
 }: {
   label: string;
   value: T;
@@ -105,6 +62,7 @@ function AppearanceSegmentGroup<T extends string>({
   onChange: (value: T) => void;
   ariaLabel: string;
   className?: string;
+  disabled?: boolean;
 }) {
   return (
     <div className={className}>
@@ -116,6 +74,7 @@ function AppearanceSegmentGroup<T extends string>({
             type="button"
             role="radio"
             aria-checked={value === option.value}
+            disabled={disabled}
             className={`appearance-segment-btn ${value === option.value ? "active" : ""}`}
             onClick={() => onChange(option.value)}
           >
@@ -175,6 +134,10 @@ export function AppearanceGroup({
   );
 }
 
+/**
+ * Appearance, the simple panel: pick a look, then a few quick changes. Everything else (fonts,
+ * windows and cards, buttons, fields, switches, UI style) is on the Design page.
+ */
 export function AppearanceSettingsSection({
   profile,
   onProfileChange,
@@ -182,8 +145,6 @@ export function AppearanceSettingsSection({
   const { appearance } = profile;
   const custom = appearance.customColors;
   const customDraftRef = useRef({ ...custom });
-  const showCustomColors = appearance.colorPreset === "custom";
-
   customDraftRef.current = { ...custom };
 
   const [undo, setUndo] = useState<{ label: string; previous: UserProfile } | null>(null);
@@ -198,11 +159,11 @@ export function AppearanceSettingsSection({
     onProfileChange(resetAppearance(profile, scope));
   };
 
-  const resetButton = (scope: Exclude<ResetScope, "all">, label: string) => (
-    <button type="button" className="link-btn appearance-group-reset" onClick={() => reset(scope)}>
-      {label}
-    </button>
-  );
+  const painted = paintedTheme(appearance);
+  const colour = currentColourChoice(appearance, painted);
+  const paired = hasPartner(appearance.colorTheme);
+  // "Theme's own" shows the colour theme's own accent and page colour.
+  const ownSwatch: [string, string] = [colour.swatch[3], colour.swatch[0]];
 
   return (
     <div className="appearance-settings">
@@ -221,27 +182,33 @@ export function AppearanceSettingsSection({
         <AppearanceLooks profile={profile} onProfileChange={onProfileChange} />
       </AppearanceGroup>
 
-      <h3 className="appearance-customise-heading">Customise</h3>
-      <AppearanceGroup title="Colour" collapsible actions={resetButton("colour", "Reset colour")}>
+      <AppearanceGroup title="Quick changes" collapsible>
         <AppearanceSegmentGroup
-          label="Theme"
+          label="Light or dark"
           value={appearance.theme}
-          ariaLabel="Theme"
+          ariaLabel="Light or dark"
           options={[
             { value: "dark", label: "Dark" },
             { value: "light", label: "Light" },
             { value: "system", label: "Match system" },
           ]}
+          disabled={!paired}
           onChange={(theme) =>
             onProfileChange(patchAppearance(profile, { theme: theme as ThemeMode }))
           }
         />
+        {paired ? null : (
+          <p className="appearance-quick-note">
+            {colour.label} has only a {painted} side; pick another colour theme on the Design page
+            for light and dark.
+          </p>
+        )}
 
         <div className="appearance-block">
-          <span className="appearance-block-label">UI color</span>
-          <div className="appearance-preset-grid" role="radiogroup" aria-label="UI color">
+          <span className="appearance-block-label">Accent colour</span>
+          <div className="appearance-preset-grid" role="radiogroup" aria-label="Accent colour">
             {COLOR_PRESETS.map((preset) => {
-              const swatch = COLOR_PRESET_SWATCHES[preset];
+              const swatch = preset === "default" ? ownSwatch : COLOR_PRESET_SWATCHES[preset];
               return (
                 <button
                   key={preset}
@@ -262,13 +229,13 @@ export function AppearanceSettingsSection({
                     }
                     aria-hidden="true"
                   />
-                  {COLOR_PRESET_LABELS[preset]}
+                  {labelOf(ACCENT_OPTIONS, preset)}
                 </button>
               );
             })}
           </div>
 
-          {showCustomColors ? (
+          {appearance.colorPreset === "custom" ? (
             <div className="appearance-custom-colors">
               <div className="appearance-color-grid">
                 <CustomColorField
@@ -290,77 +257,10 @@ export function AppearanceSettingsSection({
               </div>
             </div>
           ) : null}
-
-          <AppearanceSegmentGroup
-            label="Text contrast"
-            value={appearance.textContrast}
-            ariaLabel="Text contrast"
-            className="appearance-subblock"
-            options={TEXT_CONTRAST_PRESETS.map((preset) => ({
-              value: preset,
-              label: TEXT_CONTRAST_LABELS[preset],
-            }))}
-            onChange={(textContrast) =>
-              onProfileChange(
-                patchAppearance(profile, { textContrast: textContrast as TextContrastPreset }),
-              )
-            }
-          />
         </div>
-
-        <label className="appearance-switch">
-          <input
-            type="checkbox"
-            role="switch"
-            checked={appearance.semanticContrast === "preserve"}
-            onChange={(e) =>
-              onProfileChange(
-                patchAppearance(profile, {
-                  semanticContrast: e.target.checked ? "preserve" : "adapt",
-                }),
-              )
-            }
-          />
-          <span className="appearance-switch-track" aria-hidden="true" />
-          <span>
-            Keep exact team colours
-            <span className="appearance-switch-hint">
-              Off: row and column colours are toned to suit light or dark. On: they stay exactly as
-              picked.
-            </span>
-          </span>
-        </label>
-      </AppearanceGroup>
-
-      <AppearanceGroup
-        title="Shape & style"
-        collapsible
-        actions={resetButton("shape", "Reset shape & style")}
-      >
-        <div className="appearance-block">
-          <span className="appearance-block-label">UI style</span>
-          <div className="appearance-style-grid" role="radiogroup" aria-label="UI style">
-            {CHROME_STYLES.map((chromeStyle) => (
-              <button
-                key={chromeStyle}
-                type="button"
-                role="radio"
-                aria-checked={appearance.chromeStyle === chromeStyle}
-                title={CHROME_STYLE_HINTS[chromeStyle]}
-                className={`appearance-style-tile${appearance.chromeStyle === chromeStyle ? " active" : ""}`}
-                data-style-preview={chromeStyle}
-                onClick={() => onProfileChange(patchAppearance(profile, { chromeStyle }))}
-              >
-                <span className="appearance-style-swatch" aria-hidden="true" />
-                {CHROME_STYLE_LABELS[chromeStyle]}
-              </button>
-            ))}
-          </div>
-        </div>
-        <p className="muted appearance-style-hint">{CHROME_STYLE_HINTS[appearance.chromeStyle]}</p>
 
         <fieldset className="appearance-fieldset">
-          <legend>Corner style</legend>
+          <legend>Corners</legend>
           <div className="appearance-shape-grid" role="radiogroup" aria-label="Corner style">
             {SHAPE_PRESETS.map((shape) => (
               <button
@@ -373,20 +273,38 @@ export function AppearanceSettingsSection({
                 onClick={() => onProfileChange(patchAppearance(profile, { shape }))}
               >
                 <span className="appearance-shape-swatch" aria-hidden="true" />
-                <span className="appearance-shape-label">{SHAPE_LABELS[shape]}</span>
+                <span className="appearance-shape-label">{labelOf(CORNER_OPTIONS, shape)}</span>
               </button>
             ))}
           </div>
         </fieldset>
+
+        <AppearanceSegmentGroup
+          label="Text"
+          value={appearance.textContrast}
+          ariaLabel="Text"
+          options={TEXT_OPTIONS}
+          onChange={(textContrast) => onProfileChange(patchAppearance(profile, { textContrast }))}
+        />
       </AppearanceGroup>
 
-      <AppearanceGroup title="Board" collapsible actions={resetButton("board", "Reset board")}>
+      <AppearanceGroup
+        title="Board"
+        collapsible
+        actions={
+          <button
+            type="button"
+            className="link-btn appearance-group-reset"
+            onClick={() => reset("board")}
+          >
+            Reset board
+          </button>
+        }
+      >
         <AppearanceBoardControls profile={profile} onProfileChange={onProfileChange} />
       </AppearanceGroup>
 
-      <AppearanceGroup title="Share this look" collapsible>
-        <AppearanceShare />
-      </AppearanceGroup>
+      <DesignPageLink />
 
       {undo ? (
         <Toast onDismiss={() => setUndo(null)}>
