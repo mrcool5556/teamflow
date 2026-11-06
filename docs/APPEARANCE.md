@@ -31,3 +31,13 @@ An unknown value in a saved or imported profile falls back to the default instea
 ## Fonts
 
 Every `font-family` in the app reads a token from `styles/tokens.css`: `--font-body`, `--font-display` (headings), `--font-mono` (codes, counts, labels), `--font-serif` (the Paper UI style's headings) and `--font-hand` (notebook fields).
+
+## Colour themes
+
+`styles/themes.css` holds the nine library themes as Teamflow tokens: Studio Dark/Light, Night Glass/Lavender Glass (`glass`), Machined/Machined Light, Arcade (dark only), Cozy and Retro Console (light only). `theme` (dark, light, system) picks the partner of a paired theme; a single-mode theme keeps its own mode (`COLOR_THEME_FIXED_MODE`), and `data-theme` is set to that mode so the light/dark rules still apply.
+
+Token mapping: surface-000 → `--bg`, surface-100 → `--surface` / `--panel`, surface-200 → `--cell`, line / line-strong → `--border` / `--border-strong`, ink → `--text`, ink-muted → `--muted` (with `--text-soft` between the two), accent → `--primary`, on-accent → `--chrome-btn-text`, info → `--accent` / `--accent-text`, danger → `--danger` / `--danger-text`, success → `--done`. Translucent library values are flattened onto the page colour so menus stay opaque. Text contrast (Stronger, Softer) has its own values per theme.
+
+The accent colour setting (`colorPreset`) overrides a theme: "default" means the theme's own accent, any other choice paints over it. With Teamflow's colours, "default" is still orange and cyan.
+
+`apps/web/tests/colorThemes.test.ts` reads `tokens.css` and `themes.css` and checks, for Teamflow dark and light and every library theme with each text contrast level: body and soft text at 4.5:1 on every background, muted text at 3:1, and for library themes also button text on the accent, accent text, error text (4.5:1) and control borders (3:1). The theme CSS was generated from the library's `tokens.json`; regenerate rather than hand-edit if the library changes.
