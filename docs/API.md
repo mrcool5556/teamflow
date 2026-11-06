@@ -34,7 +34,7 @@ Server code throws `ApiError` from `apps/server/src/lib/errors.ts` (`badRequest`
 
 <!-- BEGIN GENERATED ROUTES (scripts/gen-api-docs.mjs) -->
 
-## Routes (94)
+## Routes (95)
 
 Generated from `apps/server/src/routes/*.ts` by `pnpm docs:api`; do not edit by hand.
 
@@ -180,6 +180,7 @@ Team file library: list, rename, trash, restore.
 | Method | Path | Auth | Write | Team | Permission | Input |
 |--------|------|------|-------|------|------------|-------|
 | GET | `/teams/:teamId/files` | bearer |  | member |  | query `listTeamFilesQuerySchema` |
+| GET | `/teams/:teamId/storage` | bearer |  | member |  |  |
 | PATCH | `/teams/:teamId/files/:fileId` | bearer | yes | member | `board.edit` | body `renameTeamFileSchema` |
 | DELETE | `/teams/:teamId/files/:fileId` | bearer | yes | member | `board.edit` |  |
 | POST | `/teams/:teamId/files/:fileId/restore` | bearer | yes | member | `board.edit` |  |
