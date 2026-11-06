@@ -747,7 +747,7 @@
 
 .appearance-shape-grid {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(5, minmax(0, 1fr));
   gap: 0.35rem;
 }
 
@@ -791,6 +791,10 @@
 
 .appearance-shape-option[data-shape-preview="round"] .appearance-shape-swatch {
   border-radius: 16px;
+}
+
+.appearance-shape-option[data-shape-preview="pill"] .appearance-shape-swatch {
+  border-radius: 999px;
 }
 
 .appearance-shape-option[data-shape-preview="octagon"] .appearance-shape-swatch {

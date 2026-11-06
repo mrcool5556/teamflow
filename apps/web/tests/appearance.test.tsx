@@ -46,6 +46,15 @@ describe("appearance panel", () => {
     expect(document.documentElement.dataset.shape).toBe("round");
   });
 
+  it("offers pill corners", async () => {
+    const user = userEvent.setup();
+    const db = await openAppearance();
+    const corners = await screen.findByRole("radiogroup", { name: "Corner style" });
+    await user.click(within(corners).getByRole("radio", { name: "Pill" }));
+    expect(document.documentElement.dataset.shape).toBe("pill");
+    await waitFor(() => expect(db.profile.appearance.shape).toBe("pill"));
+  });
+
   it("picks a UI style from picture tiles", async () => {
     const user = userEvent.setup();
     await openAppearance();

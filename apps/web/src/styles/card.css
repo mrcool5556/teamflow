@@ -277,7 +277,7 @@
   letter-spacing: 0.04em;
   line-height: 1.2;
   background: color-mix(in srgb, var(--panel) 94%, var(--surface));
-  border-radius: var(--radius-xs);
+  border-radius: var(--radius-chip);
   box-shadow: var(--issue-id-shadow);
   font-size: 0.68rem;
   color: var(--muted);
@@ -301,7 +301,7 @@
   line-height: 1.2;
   padding: 0.12rem 0.35rem;
   border: 1px solid var(--border);
-  border-radius: var(--radius-xs);
+  border-radius: var(--radius-chip);
   color: var(--text-soft);
   background: color-mix(in srgb, var(--panel) 94%, var(--surface));
 }
@@ -487,7 +487,7 @@
   align-items: center;
   padding: 0.05rem 0.4rem;
   border: 1px solid var(--border-strong);
-  border-radius: var(--radius-xs);
+  border-radius: var(--radius-chip);
   background: transparent;
   color: var(--text-soft);
   box-shadow: none;

@@ -172,7 +172,7 @@
   background: var(--cell);
   color: var(--text);
   border: 1px solid var(--border);
-  border-radius: var(--radius-sm);
+  border-radius: var(--radius-control);
   box-shadow: none;
 }
 
