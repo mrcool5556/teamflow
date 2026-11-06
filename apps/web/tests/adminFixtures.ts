@@ -184,12 +184,36 @@ export function makeStorage(extra: Partial<SpaceStoragePublic> = {}): SpaceStora
 }
 
 /** Routes for the admin page backed by mutable state the test can inspect. */
-export function adminRoutes(state: {
-  overview?: InstanceOverviewPublic;
-  spaces?: InstanceSpacePublic[];
-  detail?: InstanceSpaceDetailPublic;
-  settings?: SpaceSettingsPublic;
-}): FakeRoute[] {
+export function adminRoutes(
+  state: {
+    overview?: InstanceOverviewPublic;
+    spaces?: InstanceSpacePublic[];
+    detail?: InstanceSpaceDetailPublic;
+    settings?: SpaceSettingsPublic;
+  } = {},
+): FakeRoute[] {
+  const settings = () =>
+    (state.settings ??= {
+      freeSpaceCapBytes: GIB,
+      freeSpacesPerUser: 3,
+      minFreeDiskBytes: 2 * GIB,
+    });
+  const spaces = () =>
+    (state.spaces ??= [
+      makeSpace(),
+      makeSpace({
+        id: "00000000-0000-4000-8000-00000000e002",
+        name: "Mod pack",
+        key: "MOD",
+        spaceType: "free",
+        capBytes: GIB,
+        usedBytes: 812 * MIB,
+        state: "warn",
+        owner: { id: "user-2", name: "Jules", email: "jules@example.test" },
+        memberCount: 2,
+        issueCount: 18,
+      }),
+    ]);
   return [
     ["GET", /^\/instance\/overview$/, () => ({ overview: state.overview ?? makeOverview() })],
     [
@@ -204,6 +228,66 @@ export function adminRoutes(state: {
           ms: 42,
         },
       }),
+    ],
+    ["GET", /^\/instance\/settings$/, () => ({ settings: settings() })],
+    [
+      "PATCH",
+      /^\/instance\/settings$/,
+      ({ body }) => ({ settings: (state.settings = { ...settings(), ...(body as object) }) }),
+    ],
+    [
+      "GET",
+      /^\/instance\/users$/,
+      () => ({
+        users: [
+          {
+            id: "user-1",
+            name: "Ada",
+            email: "ada@example.test",
+            isInstanceAdmin: true,
+            freeSpaces: 0,
+          },
+          {
+            id: "user-2",
+            name: "Jules",
+            email: "jules@example.test",
+            isInstanceAdmin: false,
+            freeSpaces: 2,
+          },
+        ],
+      }),
+    ],
+    ["GET", /^\/instance\/spaces$/, () => ({ spaces: spaces() })],
+    [
+      "POST",
+      /^\/instance\/spaces$/,
+      ({ body }) => {
+        const input = body as {
+          name: string;
+          key: string;
+          spaceType: "admin" | "free";
+          capBytes?: number | null;
+        };
+        const created = makeSpaceDetail({
+          id: "00000000-0000-4000-8000-0000000000c1",
+          name: input.name,
+          key: input.key,
+          spaceType: input.spaceType,
+          capBytes:
+            input.spaceType === "free" ? settings().freeSpaceCapBytes : (input.capBytes ?? null),
+          usedBytes: 0,
+          state: "ok",
+          owner: { id: "user-1", name: "Ada", email: "ada@example.test" },
+          memberCount: 1,
+          issueCount: 0,
+          breakdown: { issueFilesBytes: 0, rowFilesBytes: 0, trashBytes: 0, uploadingBytes: 0 },
+          largestFiles: [],
+          events: [],
+        });
+        spaces().push(created);
+        state.detail = created;
+        return { space: created };
+      },
     ],
   ];
 }
