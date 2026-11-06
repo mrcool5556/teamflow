@@ -20,11 +20,30 @@ async function openAppearance(options?: Parameters<typeof installFakeApi>[1]) {
 }
 
 describe("appearance panel", () => {
-  it("groups controls into Colour and Shape & style, with no empty advanced box", async () => {
+  it("is short: looks, quick changes, board and a way to the Design page", async () => {
     await openAppearance();
-    expect(await screen.findByRole("region", { name: "Colour" })).toBeInTheDocument();
-    expect(screen.getByRole("region", { name: "Shape & style" })).toBeInTheDocument();
-    expect(screen.queryByText("Advanced chrome tuning")).not.toBeInTheDocument();
+    const quick = await screen.findByRole("region", { name: "Quick changes" });
+    for (const group of ["Light or dark", "Accent colour", "Corner style", "Text"]) {
+      expect(within(quick).getByRole("radiogroup", { name: group })).toBeInTheDocument();
+    }
+    expect(screen.getByRole("region", { name: "Board" })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /Open Design page/ })).toBeInTheDocument();
+    // The detailed controls live on the Design page.
+    expect(screen.queryByRole("radiogroup", { name: "UI style" })).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("switch", { name: /Keep exact team colours/ }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("keeps a one-mode colour theme in its mode and says why", async () => {
+    const db = seedDb();
+    db.profile = mergeUserProfile(db.profile, { appearance: { colorTheme: "cozy" } });
+    installFakeApi(db);
+    signIn(db);
+    renderApp("/t/ENG/settings/appearance");
+    const mode = await screen.findByRole("radiogroup", { name: "Light or dark" });
+    await waitFor(() => expect(within(mode).getByRole("radio", { name: "Dark" })).toBeDisabled());
+    expect(screen.getByText(/Cozy has only a light side/)).toBeInTheDocument();
   });
 
   it("applies a look in one click and offers to go back after a change", async () => {
@@ -40,7 +59,7 @@ describe("appearance panel", () => {
     expect(document.documentElement.dataset.colorPreset).toBe("ocean");
     expect(screen.getByText(/Current look/)).toHaveTextContent("Calm");
 
-    await user.click(screen.getByRole("radio", { name: /Hard edge/ }));
+    await user.click(screen.getByRole("radio", { name: "Sharp" }));
     expect(screen.getByRole("button", { name: "Back to Calm" })).toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "Back to Calm" }));
     expect(document.documentElement.dataset.shape).toBe("round");
@@ -55,32 +74,15 @@ describe("appearance panel", () => {
     await waitFor(() => expect(db.profile.appearance.shape).toBe("pill"));
   });
 
-  it("picks a UI style from picture tiles", async () => {
+  it("offers only primary and accent for custom colours", async () => {
     const user = userEvent.setup();
     await openAppearance();
-    const styles = await screen.findByRole("radiogroup", { name: "UI style" });
-    expect(within(styles).getAllByRole("radio")).toHaveLength(8);
-    await user.click(within(styles).getByRole("radio", { name: "Glass" }));
-    expect(document.documentElement.dataset.chromeStyle).toBe("glass");
-    expect(within(styles).getByRole("radio", { name: "Glass" })).toHaveAttribute(
-      "aria-checked",
-      "true",
-    );
-  });
-
-  it("offers only primary and accent for custom colours, and team colours as a switch", async () => {
-    const user = userEvent.setup();
-    await openAppearance();
-    const palette = await screen.findByRole("radiogroup", { name: "UI color" });
+    const palette = await screen.findByRole("radiogroup", { name: "Accent colour" });
+    expect(within(palette).getByRole("radio", { name: /own/ })).toBeChecked();
     await user.click(within(palette).getByRole("radio", { name: "Custom" }));
     expect(screen.getByText("Primary")).toBeInTheDocument();
     expect(screen.getByText("Accent")).toBeInTheDocument();
     expect(screen.queryByText("Soft text")).not.toBeInTheDocument();
-
-    const exact = screen.getByRole("switch", { name: /Keep exact team colours/ });
-    expect(exact).not.toBeChecked();
-    await user.click(exact);
-    expect(document.documentElement.dataset.semanticContrast).toBe("preserve");
   });
 
   it("has board size under Appearance, not General", async () => {
@@ -120,19 +122,20 @@ describe("appearance panel", () => {
     expect(db.profile.appearance.theme).toBe("light");
   });
 
-  it("resets a group and lets you undo it", async () => {
+  it("resets everything and lets you undo it", async () => {
     const user = userEvent.setup();
     await openAppearance();
-    await user.click(screen.getByRole("radio", { name: "Glass" }));
-    expect(document.documentElement.dataset.chromeStyle).toBe("glass");
+    const looks = await screen.findByRole("radiogroup", { name: "Looks" });
+    await user.click(within(looks).getByRole("radio", { name: /Machined/ }));
+    await waitFor(() => expect(document.documentElement.dataset.surface).toBe("soft-inset"));
 
-    await user.click(screen.getByRole("button", { name: "Reset shape & style" }));
-    expect(document.documentElement.dataset.chromeStyle).toBe("industrial");
+    await user.click(screen.getByRole("button", { name: "Reset all to default" }));
+    expect(document.documentElement.dataset.surface).toBeUndefined();
     const region = screen.getByRole("region", { name: "Notifications" });
-    expect(within(region).getByText(/Shape & style reset to default/)).toBeInTheDocument();
+    expect(within(region).getByText(/Appearance reset to default/)).toBeInTheDocument();
 
     await user.click(within(region).getByRole("button", { name: "Undo" }));
-    expect(document.documentElement.dataset.chromeStyle).toBe("glass");
+    expect(document.documentElement.dataset.surface).toBe("soft-inset");
     expect(within(region).queryByText(/reset to default/)).not.toBeInTheDocument();
   });
 
@@ -181,13 +184,13 @@ describe("appearance panel", () => {
       const user = userEvent.setup();
       await openAppearance();
 
-      const toggle = screen.getByRole("button", { name: /Colour/ });
+      const toggle = screen.getByRole("button", { name: /Quick changes/ });
       expect(toggle).toHaveAttribute("aria-expanded", "false");
-      expect(screen.queryByRole("radiogroup", { name: "UI color" })).not.toBeInTheDocument();
+      expect(screen.queryByRole("radiogroup", { name: "Accent colour" })).not.toBeInTheDocument();
       expect(screen.getByRole("radiogroup", { name: "Looks" })).toBeInTheDocument();
 
       await user.click(toggle);
-      expect(screen.getByRole("radiogroup", { name: "UI color" })).toBeInTheDocument();
+      expect(screen.getByRole("radiogroup", { name: "Accent colour" })).toBeInTheDocument();
 
       const preview = screen.getByRole("complementary", { name: "Preview" });
       expect(preview).toHaveClass("appearance-preview--strip");

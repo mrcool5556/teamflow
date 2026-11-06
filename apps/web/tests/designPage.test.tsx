@@ -111,4 +111,18 @@ describe("Design page", () => {
     await user.click(within(views).getByRole("radio", { name: "Settings" }));
     expect(preview().querySelector(".appearance-group")).not.toBeNull();
   });
+
+  it("holds the base UI style and the exact team colours switch", async () => {
+    const user = userEvent.setup();
+    await openDesign();
+    const styles = screen.getByRole("radiogroup", { name: "Base UI style" });
+    expect(within(styles).getAllByRole("radio")).toHaveLength(8);
+    await user.click(within(styles).getByRole("radio", { name: "Glass" }));
+    await waitFor(() => expect(root().dataset.chromeStyle).toBe("glass"));
+
+    const exact = screen.getByRole("switch", { name: /Keep exact team colours/ });
+    expect(exact).not.toBeChecked();
+    await user.click(exact);
+    await waitFor(() => expect(root().dataset.semanticContrast).toBe("preserve"));
+  });
 });

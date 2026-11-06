@@ -79,3 +79,7 @@ Fields (`input`, `select` in `base.css`) read `--field-*` variables. `inputs` va
 Settings → Appearance → Design (`/settings/appearance/design`, `routes/settings/DesignPanel.tsx`) holds every aspect: Colours (eleven chips, each a colour theme in one mode, plus Light or dark and Accent), Fonts, Corners, Windows and cards, Buttons (with Lip metal and Rim shadow, greyed out unless Lipped), Text fields, Switches, Base UI style and Text. Option labels live in `lib/designAspects.ts`. Changes apply and save as you go, like Appearance.
 
 The preview (`components/DesignPreview.tsx`) is a sample app built from the real class names, so every aspect shows on it, with three views: Board, Drawer open and Settings. On a phone the preview sticks to the top (small, with Bigger preview) and each aspect is a collapsed section showing its current value.
+
+## Appearance (simple panel)
+
+Appearance stays short: Looks (with Reset all), Quick changes (Light or dark, Accent colour, Corners, Text), Board (column width and card height), a link to the Design page, and Share. Light or dark is off for a colour theme with one mode, with a line saying why. "Theme's own" is the accent setting that leaves the colour theme's accent in place. The UI style tiles and the exact team colours switch moved to the Design page.
