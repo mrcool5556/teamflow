@@ -24,7 +24,7 @@
 :root[data-chrome-style="paper"] h1,
 :root[data-chrome-style="paper"] h2,
 :root[data-chrome-style="paper"] h3 {
-  font-family: Georgia, "Times New Roman", serif;
+  font-family: var(--font-serif);
   letter-spacing: 0.01em;
 }
 
@@ -104,7 +104,7 @@ body {
 h1,
 h2,
 h3 {
-  font-family: "Space Grotesk", sans-serif;
+  font-family: var(--font-display);
   margin: 0;
 }
 
@@ -312,7 +312,7 @@ select {
 }
 
 .ref-copy-btn {
-  font-family: "JetBrains Mono", monospace;
+  font-family: var(--font-mono);
   font-size: 0.68rem;
   padding: 0.15rem 0.45rem;
   background: var(--panel);
@@ -365,7 +365,7 @@ select {
 }
 
 .ref-action-btn {
-  font-family: "JetBrains Mono", monospace;
+  font-family: var(--font-mono);
   font-size: 0.72rem;
   line-height: 1;
   padding: 0.18rem 0.38rem;

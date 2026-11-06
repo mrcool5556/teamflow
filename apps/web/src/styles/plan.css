@@ -17,7 +17,7 @@
 
 .roadmap-hero h2 {
   margin: 0.15rem 0 0.35rem;
-  font-family: "Space Grotesk", sans-serif;
+  font-family: var(--font-display);
   font-size: 1.65rem;
 }
 
@@ -48,7 +48,7 @@
 
 .roadmap-stat-value {
   display: block;
-  font-family: "JetBrains Mono", monospace;
+  font-family: var(--font-mono);
   font-size: 1.45rem;
   font-weight: 700;
   color: var(--accent);
@@ -70,7 +70,7 @@
 
 .roadmap-section h3 {
   margin: 0 0 0.5rem;
-  font-family: "Space Grotesk", sans-serif;
+  font-family: var(--font-display);
   font-size: 1.05rem;
 }
 
@@ -114,7 +114,7 @@
 }
 
 .roadmap-priority {
-  font-family: "JetBrains Mono", monospace;
+  font-family: var(--font-mono);
   font-size: 0.72rem;
   font-weight: 700;
   color: var(--accent);
@@ -136,7 +136,7 @@
   display: inline-flex;
   align-items: center;
   padding: 0.12rem 0.4rem;
-  font-family: "JetBrains Mono", monospace;
+  font-family: var(--font-mono);
   font-size: 0.65rem;
   font-weight: 700;
   text-transform: uppercase;
@@ -178,7 +178,7 @@
 }
 
 .roadmap-tag {
-  font-family: "JetBrains Mono", monospace;
+  font-family: var(--font-mono);
   font-size: 0.62rem;
   padding: 0.1rem 0.35rem;
   border: 1px solid var(--border);
@@ -229,7 +229,7 @@
 .roadmap-step-label {
   flex-shrink: 0;
   min-width: 3.25rem;
-  font-family: "JetBrains Mono", monospace;
+  font-family: var(--font-mono);
   font-size: 0.68rem;
   font-weight: 700;
   text-transform: uppercase;
@@ -267,7 +267,7 @@
 }
 
 .roadmap-table th {
-  font-family: "JetBrains Mono", monospace;
+  font-family: var(--font-mono);
   font-size: 0.68rem;
   text-transform: uppercase;
   letter-spacing: 0.04em;
@@ -339,7 +339,7 @@
 
 .roadmap-shipped-date {
   flex-shrink: 0;
-  font-family: "JetBrains Mono", monospace;
+  font-family: var(--font-mono);
   font-size: 0.72rem;
   color: var(--muted);
   min-width: 4.5rem;

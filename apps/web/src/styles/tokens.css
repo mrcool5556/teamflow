@@ -70,7 +70,14 @@
   --chrome-card-shadow-hover: 0 2px 0 #000;
   --chrome-modal-shadow: 8px 8px 0 #000;
   --chrome-drag-shadow: 6px 6px 0 #000;
-  font-family: "JetBrains Mono", monospace;
+  /* Font sets: every font-family in the app reads one of these. Body text, headings, codes
+     and counts (mono), the Paper UI style's serif headings, and handwriting (notebook fields). */
+  --font-body: "JetBrains Mono", monospace;
+  --font-display: "Space Grotesk", sans-serif;
+  --font-mono: "JetBrains Mono", monospace;
+  --font-serif: Georgia, "Times New Roman", serif;
+  --font-hand: "Segoe Print", "Bradley Hand", cursive;
+  font-family: var(--font-body);
 }
 
 @media (min-width: 1200px) {
