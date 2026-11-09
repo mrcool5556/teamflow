@@ -21,7 +21,10 @@ Self-hosted issue tracker for small teams: kanban boards with rows (swimlanes) a
 ## Requirements
 
 - **Node 20** (pinned in `.nvmrc` and `engines`; `better-sqlite3` is built for Node 20, other majors fail to load it). With nvm: `nvm use`. With nvm-windows: `nvm use 20.19.2`.
-- **pnpm 9** (`corepack enable` picks up the `packageManager` field).
+- **pnpm 9** (`corepack enable` picks up the `packageManager` field; pnpm 10 is not tested).
+- **Git**.
+- **Native build tools only if needed:** `pnpm install` downloads a prebuilt `better-sqlite3` for Node 20 on Windows x64, Linux x64/arm64 and macOS. If that download fails (offline, unusual platform) it compiles from source and needs Python 3 and a C++ toolchain: `build-essential` on Debian/Ubuntu, Xcode Command Line Tools on macOS, Visual Studio Build Tools ("Desktop development with C++") on Windows.
+- **Disk:** under 1 GB for the checkout, `node_modules` and builds, plus your data. Uploads pause on every team while the disk holding `data/uploads/` has less than **2 GB** free (`TEAMFLOW_MIN_FREE_DISK_BYTES`, see [docs/SPACES.md](docs/SPACES.md)).
 
 ## Quick start (development)
 
@@ -51,7 +54,9 @@ NODE_ENV=development pnpm dev
 - Web (Vite): <http://localhost:5173>, proxies `/api` to the API
 - API: <http://localhost:3000> (`GET /health`)
 - Database: `data/teamflow.db` in the repo root (override with `DATABASE_URL=file:...`)
-- Demo login (only with `TEAMFLOW_SEED_DEMO=1`): `demo@teamflow.local` / `changeme123`. Without it, register; the first account becomes the instance admin.
+- Demo login (only with `TEAMFLOW_SEED_DEMO=1`): `demo@teamflow.local` / `changeme123`, already an instance admin. Without it, register; the first account becomes the instance admin and finds the **Server admin** page in the account menu (`/admin`).
+- The Vite proxy always targets port 3000; if you change `PORT` for the API, the dev web app will not reach it.
+- A root `.env` is optional in development. If you copy `.env.example`, keep `NODE_ENV=development` set (its `JWT_SECRET` is a placeholder).
 
 Rebuild a package (`pnpm --filter @teamflow/core build`, likewise `db`, `api-client`) after changing it; the apps import its `dist/`.
 
