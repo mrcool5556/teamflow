@@ -54,7 +54,7 @@ NODE_ENV=development pnpm dev
 - Web (Vite): <http://localhost:5173>, proxies `/api` to the API
 - API: <http://localhost:3000> (`GET /health`)
 - Database: `data/teamflow.db` in the repo root (override with `DATABASE_URL=file:...`)
-- Demo login (only with `TEAMFLOW_SEED_DEMO=1`): `demo@teamflow.local` / `changeme123`, already an instance admin. Without it, register; the first account becomes the instance admin and finds the **Server admin** page in the account menu (`/admin`).
+- Demo login (only with `TEAMFLOW_SEED_DEMO=1`): `demo@teamflow.local` / `changeme123`, already an instance admin. Without it, open the setup link the server prints at start (`/setup?code=…`) and create the instance admin; see [docs/SETUP.md](docs/SETUP.md). The admin finds the **Server admin** page in the account menu (`/admin`).
 - The Vite proxy always targets port 3000; if you change `PORT` for the API, the dev web app will not reach it.
 - A root `.env` is optional in development. If you copy `.env.example`, keep `NODE_ENV=development` set (its `JWT_SECRET` is a placeholder).
 

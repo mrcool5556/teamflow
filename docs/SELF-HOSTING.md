@@ -31,7 +31,7 @@ Do these on every production install, and once when upgrading an install from be
 5. **`CORS_ORIGINS`**: only if the web UI is served from a different origin than `PUBLIC_URL` (comma-separated). Default is same-origin only.
 6. **Behind a reverse proxy:** `TEAMFLOW_TRUST_PROXY=1`, so login rate limiting sees real client IPs.
 7. **Setup B only:** run `sudo bash /opt/teamflow/deploy/proxmox-lxc/setup-maintenance-sudo.sh` once after deploying. It installs root-owned copies of the backup, update and Discord bot scripts in `/usr/local/lib/teamflow/` and the only sudoers rule the app user gets. Without it Settings → Updates and the Discord bot service buttons fail. `install.sh` and `sudo update` run it too, but ignore its errors, so check the output.
-8. **Admin account:** there is **no demo user**. The first account registered on a fresh install becomes the **instance admin** (the **Server admin** page in the account menu, Updates, Discord bot secrets and service, spaces). On an upgraded install the oldest account is promoted once. To grant more, set `TEAMFLOW_INSTANCE_ADMINS=you@example.com,other@example.com` (applied at their next login).
+8. **Admin account:** there is **no demo user**. On a fresh install, open the setup link the installer prints or the server logs (`/setup?code=…`, see [SETUP.md](SETUP.md)) and create the **instance admin** account there (the **Server admin** page in the account menu, Updates, Discord bot secrets and service, Flows). Ordinary sign-up opens after that. On an upgraded install the oldest account is promoted once. To grant more, use Server admin → People, or set `TEAMFLOW_INSTANCE_ADMINS=you@example.com,other@example.com` (applied at their next login).
 9. **Trash purge:** issues in the trash are no longer purged at boot. Run `pnpm db:maintenance` now and then, or set `TEAMFLOW_DB_MAINTENANCE_NIGHTLY=true` (03:00 server time). See [DEPLOYMENT.md](DEPLOYMENT.md#schema-patches-and-data-maintenance).
 10. **SMTP** for password reset. Without it, reset links are only logged when `NODE_ENV=development`, so in production nobody can reset a password.
 11. **`.env` permissions** on Linux: `chmod 600`, owned by `teamflow`.
@@ -105,7 +105,7 @@ cd D:\teamflow
 
 The server loads `.env` (set `JWT_SECRET` there first; it refuses to start without one). Variables set in the session override the file.
 
-Open <http://localhost:3000> and register; the first account becomes the instance admin.
+Open the setup link printed in the server log (`http://localhost:3000/setup?code=…`) and create the instance admin account ([SETUP.md](SETUP.md)).
 
 ### Update
 

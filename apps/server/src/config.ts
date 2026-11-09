@@ -133,6 +133,7 @@ const envSchema = z.object({
   TEAMFLOW_INSTANCE_ADMINS: optionalString,
   TEAMFLOW_INVITE_ONLY: boolVar(false),
   TEAMFLOW_SITE_NAME: optionalString,
+  TEAMFLOW_SETUP_CODE: optionalString,
   SMTP_HOST: optionalString,
   SMTP_PORT: intVar(587),
   SMTP_SECURE: boolVar(false),
@@ -196,6 +197,8 @@ export type AppConfig = {
    * force through lib/siteSettings.getPublicUrl(), which adds the value saved on the admin page.
    */
   publicUrl: string;
+  /** TEAMFLOW_SETUP_CODE: an installer-chosen setup code; null means generate one (lib/setup). */
+  setupCode: string | null;
   /** TEAMFLOW_SITE_NAME; null when unset (the admin page or the default decides). */
   siteName: string | null;
   /** Which settings .env sets; those win over the admin page and show as read-only there. */
@@ -305,6 +308,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
     botConfigKey: e.TEAMFLOW_BOT_CONFIG_KEY ?? null,
     publicUrl,
     siteName: e.TEAMFLOW_SITE_NAME ?? null,
+    setupCode: e.TEAMFLOW_SETUP_CODE ?? null,
     envSet: {
       publicUrl: e.PUBLIC_URL !== undefined,
       inviteOnly: Boolean(env.TEAMFLOW_INVITE_ONLY?.trim()),

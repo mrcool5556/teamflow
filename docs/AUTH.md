@@ -17,6 +17,8 @@ Teamflow uses email + password accounts. Every request authenticates with `Autho
 | GET | `/auth/me` | Current user (Bearer token); `user.isInstanceAdmin` marks server-wide admins |
 | GET | `/auth/config` | `{ inviteOnly, passwordResetEmail }` |
 
+On a fresh server the first account is made on `/setup` with the one-time setup code ([SETUP.md](SETUP.md)); `/auth/register` answers `409 setup_required` until then.
+
 Registering creates the user and a personal team called **General** (key `GEN`) with the new user as Owner, in one transaction. General is a **free space** with the free-space upload cap (1 GB by default), except for instance admins, whose General has no cap. Any user can make more teams with New team, up to 3 free spaces in all ([SPACES.md](SPACES.md)). With an `inviteToken` the user also joins the inviting team with the invite's role.
 
 Login, register and forgot-password are rate limited per client IP (`TEAMFLOW_AUTH_RATE_LIMIT` per minute, default 10, HTTP 429 with `Retry-After`). Behind a reverse proxy set `TEAMFLOW_TRUST_PROXY=1` so `X-Forwarded-For` is used as the client address.

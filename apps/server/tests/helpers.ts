@@ -54,7 +54,7 @@ export type RegisteredUser = {
   email: string;
   password: string;
   token: string;
-  /** The "General" team every registration creates (user is Owner). */
+  /** A team the user owns: their first team, or "General" (GEN) made by the helper. */
   teamId: string;
 };
 
@@ -64,16 +64,54 @@ export async function registerUser(
 ): Promise<RegisteredUser> {
   const email = overrides.email ?? uniqueEmail();
   const password = overrides.password ?? "correct-horse-battery";
-  const res = await api(app, "POST", "/auth/register", {
-    body: { email, name: overrides.name ?? "Test User", password },
-  });
+  const name = overrides.name ?? "Test User";
+  let res = await api(app, "POST", "/auth/register", { body: { email, name, password } });
+  if (res.status === 409 && (await res.clone().json()).code === "setup_required") {
+    // A fresh server: the first account is the instance admin, made through setup.
+    res = await api(app, "POST", "/auth/setup/admin", {
+      body: { code: await setupCode(), email, name, password },
+    });
+  }
   if (res.status !== 201) {
     throw new Error(`register failed: ${res.status} ${await res.text()}`);
   }
   const data = await json<{ user: { id: string }; token: string }>(res);
-  const teamsRes = await api(app, "GET", "/teams", { token: data.token });
-  const { teams } = await json<{ teams: { id: string }[] }>(teamsRes);
+  let teams = await listTeams(app, data.token);
+  if (teams.length === 0) {
+    // The setup admin starts with no team; give it the Owner team registration makes.
+    await ownTeam(data.user.id, name);
+    teams = await listTeams(app, data.token);
+  }
   return { id: data.user.id, email, password, token: data.token, teamId: teams[0]!.id };
+}
+
+async function listTeams(app: TestApp, token: string) {
+  const res = await api(app, "GET", "/teams", { token });
+  return (await json<{ teams: { id: string }[] }>(res)).teams;
+}
+
+async function ownTeam(userId: string, userName: string) {
+  const { db } = await import("../src/db.js");
+  const { createTeamWithOwner, spaceForUserCreatedTeam } = await import("../src/lib/teams.js");
+  const { userIsInstanceAdmin } = await import("../src/lib/auth.js");
+  const isInstanceAdmin = await userIsInstanceAdmin(db, userId);
+  db.transaction((tx) =>
+    createTeamWithOwner(tx, {
+      userId,
+      userName,
+      name: "General",
+      key: "GEN",
+      role: "owner",
+      space: spaceForUserCreatedTeam(tx, { userId, isInstanceAdmin, firstSpace: true }),
+    }),
+  );
+}
+
+/** The setup code a fresh test server expects (lib/setup.ts). */
+export async function setupCode() {
+  const { db } = await import("../src/db.js");
+  const { currentSetupCodeForTests } = await import("../src/lib/setup.js");
+  return currentSetupCodeForTests(db) ?? "";
 }
 
 export async function login(app: TestApp, email: string, password: string) {

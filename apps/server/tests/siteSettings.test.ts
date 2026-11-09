@@ -2,7 +2,7 @@ import { normalisePublicUrl } from "@teamflow/core";
 import { schema } from "@teamflow/db";
 import { eq } from "drizzle-orm";
 import { afterEach, beforeAll, describe, expect, it } from "vitest";
-import { api, bootApp, type TestApp } from "./helpers";
+import { api, bootApp, registerUser, type TestApp } from "./helpers";
 
 let app: TestApp;
 type Site = typeof import("../src/lib/siteSettings.js");
@@ -21,6 +21,8 @@ async function reloadWith(env: Record<string, string | undefined>) {
 beforeAll(async () => {
   app = await bootApp();
   site = await import("../src/lib/siteSettings.js");
+  await registerUser(app, { name: "Admin" }); // past setup, so registration is open
+
 });
 
 afterEach(async () => {

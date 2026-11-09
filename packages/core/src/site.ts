@@ -113,3 +113,42 @@ export const SITE_ERROR_CODES = {
   /** The value is set in .env, which wins; change it there. */
   setInEnv: "setting_set_in_env",
 } as const;
+
+/* ---------- first-time setup ---------- */
+
+/**
+ * A fresh server (no accounts) is claimed with a one-time setup code. The installer prints it;
+ * it is also in the server log and in `<data dir>/setup-code`. Contract: docs/SETUP.md.
+ */
+export const SETUP_CODE_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+export const SETUP_CODE_PATTERN = /^[A-Z2-9]{4}-[A-Z2-9]{4}$/;
+
+/** Upper-case and drop spaces and dashes, then re-insert the dash: "k7qm 2pxd" → "K7QM-2PXD". */
+export function normaliseSetupCode(raw: string) {
+  const compact = raw.toUpperCase().replace(/[\s-]/g, "");
+  return compact.length === 8 ? `${compact.slice(0, 4)}-${compact.slice(4)}` : compact;
+}
+
+export type SetupStatusPublic = {
+  /** True only while the server has no accounts at all. */
+  needed: boolean;
+  /** Always true while needed: the admin account needs the setup code. */
+  codeRequired: boolean;
+};
+
+export const setupAdminSchema = z.object({
+  code: z.string().trim().min(1).max(40),
+  name: z.string().trim().min(1).max(120),
+  email: z.string().trim().email(),
+  password: z.string().min(8).max(128),
+});
+export type SetupAdminInput = z.infer<typeof setupAdminSchema>;
+
+export const SETUP_ERROR_CODES = {
+  /** No account exists yet; the first one is made on /setup with the setup code. */
+  required: "setup_required",
+  /** Setup already happened; the setup page is closed for good. */
+  done: "setup_done",
+  /** Wrong or missing setup code. */
+  badCode: "setup_code_invalid",
+} as const;

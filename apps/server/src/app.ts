@@ -55,6 +55,7 @@ export function createApp() {
   app.use("*", bodyLimits);
   app.use("/auth/login", authRateLimit);
   app.use("/auth/register", authRateLimit);
+  app.use("/auth/setup/admin", authRateLimit);
   app.use("/auth/forgot-password", authRateLimit);
 
   for (const routes of API_ROUTES) {

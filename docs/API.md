@@ -37,7 +37,7 @@ Server code throws `ApiError` from `apps/server/src/lib/errors.ts` (`badRequest`
 
 <!-- BEGIN GENERATED ROUTES (scripts/gen-api-docs.mjs) -->
 
-## Routes (107)
+## Routes (109)
 
 Generated from `apps/server/src/routes/*.ts` by `pnpm docs:api`; do not edit by hand.
 
@@ -61,6 +61,8 @@ Registration, login, password reset and the signed-in user's profile.
 | Method | Path | Auth | Write | Team | Permission | Input |
 |--------|------|------|-------|------|------------|-------|
 | GET | `/auth/config` | none |  |  |  |  |
+| GET | `/auth/setup` | none |  |  |  |  |
+| POST | `/auth/setup/admin` | none |  |  |  | body `setupAdminSchema` |
 | POST | `/auth/register` | none |  |  |  | body `registerSchema` |
 | POST | `/auth/login` | none |  |  |  | body `loginSchema` |
 | POST | `/auth/forgot-password` | none |  |  |  | body `forgotPasswordSchema` |

@@ -8,11 +8,13 @@ import {
   parseUserProfileImport,
   registerSchema,
   resetPasswordSchema,
+  SETUP_ERROR_CODES,
+  setupAdminSchema,
   userProfilePatchSchema,
   userProfileSchema,
 } from "@teamflow/core";
 import { schema } from "@teamflow/db";
-import { eq, sql } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 import { db } from "../db.js";
 import { requireAuth, requireWrite } from "../middleware/auth.js";
 import {
@@ -33,6 +35,9 @@ import {
   isInviteOnlyRegistration,
 } from "../lib/invites.js";
 import { createTeamWithOwner, spaceForUserCreatedTeam } from "../lib/teams.js";
+import { ApiError } from "../lib/errors.js";
+import { createSetupAdmin, getSetupStatus, isSetupNeeded } from "../lib/setup.js";
+import { getSiteName } from "../lib/siteSettings.js";
 import {
   buildProfileExport,
   getUserProfile,
@@ -45,13 +50,35 @@ const routes = new Hono<AppEnv>();
 
 routes.get("/auth/config", (c) => {
   return c.json({
+    siteName: getSiteName(),
     inviteOnly: isInviteOnlyRegistration(),
+    setupNeeded: isSetupNeeded(db),
     ...getPasswordResetAuthConfig(),
   });
 });
 
+/** First-time setup: `needed` only while the server has no accounts (see lib/setup.ts). */
+routes.get("/auth/setup", (c) => c.json({ setup: getSetupStatus(db) }));
+
+/** Create the first account as instance admin; needs the setup code; refused once one exists. */
+routes.post("/auth/setup/admin", async (c) => {
+  const body = await parseBody(c, setupAdminSchema);
+  const user = await createSetupAdmin(db, body);
+  const token = await signSessionToken(user.id, user.tokenVersion);
+  return c.json({ user: toUserPublic(user), token }, 201);
+});
+
 routes.post("/auth/register", async (c) => {
   const body = await parseBody(c, registerSchema);
+
+  // On a fresh server the first account is the admin, made on /setup with the setup code.
+  if (isSetupNeeded(db)) {
+    throw new ApiError(
+      409,
+      "This server isn't set up yet. The person installing it creates the first account on /setup.",
+      SETUP_ERROR_CODES.required,
+    );
+  }
 
   const inviteOnly = isInviteOnlyRegistration();
   if (inviteOnly && !body.inviteToken) {
@@ -78,25 +105,12 @@ routes.post("/auth/register", async (c) => {
 
   // User, "General" team (Owner), default board and invite acceptance land together or not at all.
   db.transaction((tx) => {
-    // The first account on a fresh install becomes instance admin (server-wide settings).
-    const userCount = tx
-      .select({ count: sql<number>`count(*)` })
-      .from(schema.users)
-      .get();
-    const isFirstUser = Number(userCount?.count ?? 0) === 0;
-
+    // A fresh server's first account comes from /auth/setup/admin, so this one is never first.
     tx.insert(schema.users)
-      .values({
-        id: userId,
-        email: body.email,
-        name: body.name,
-        passwordHash,
-        isInstanceAdmin: isFirstUser ? 1 : 0,
-      })
+      .values({ id: userId, email: body.email, name: body.name, passwordHash, isInstanceAdmin: 0 })
       .run();
 
-    const isInstanceAdmin =
-      isFirstUser || config.instanceAdminEmails.includes(body.email.toLowerCase());
+    const isInstanceAdmin = config.instanceAdminEmails.includes(body.email.toLowerCase());
     createTeamWithOwner(tx, {
       userId,
       userName: body.name,
