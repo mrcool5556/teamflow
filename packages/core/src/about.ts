@@ -13,6 +13,8 @@ export type SupportLinkConfig = {
   /** Flip to true after setting a real URL (no YOUR_* placeholders). */
   enabled: boolean;
   accent?: boolean;
+  /** Bright coffee-yellow button that stands out in every theme. */
+  highlight?: boolean;
   /** Optional donate QR (e.g. PayPal). Put image in apps/web/public/support/ */
   qrImageUrl?: string | null;
 };
@@ -21,7 +23,7 @@ export type SupportLinkConfig = {
  * Donation links — hidden until enabled and configured.
  *
  * PayPal: set url, enabled: true, optional qrImageUrl: "/support/paypal-qr.png"
- * Ko-fi: set url, enabled: true
+ * Ko-fi ("Buy me a coffee"): set url, enabled: true
  */
 export const TEAMFLOW_SUPPORT = {
   paypal: {
@@ -32,9 +34,10 @@ export const TEAMFLOW_SUPPORT = {
     qrImageUrl: null,
   },
   kofi: {
-    label: "Ko-fi",
+    label: "Buy me a coffee",
     url: "https://ko-fi.com/toters",
     enabled: true,
+    highlight: true,
   },
 } satisfies Record<string, SupportLinkConfig>;
 

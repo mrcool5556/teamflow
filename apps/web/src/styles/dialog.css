@@ -144,6 +144,23 @@
   color: var(--accent-contrast, #000);
 }
 
+/* Fixed coffee yellow (not a theme token) so the support button stands out in every look. */
+.about-link-btn--coffee {
+  gap: 0.45rem;
+  background: #ffdd00;
+  border-color: #000;
+  color: #111;
+}
+
+.about-link-btn--coffee:hover {
+  background: #ffe94d;
+}
+
+.about-link-icon {
+  font-size: 1.05em;
+  line-height: 1;
+}
+
 .about-qr {
   display: grid;
   justify-items: center;

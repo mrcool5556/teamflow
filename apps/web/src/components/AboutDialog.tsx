@@ -70,11 +70,22 @@ export function AboutDialog({ open, version, onClose }: AboutDialogProps) {
         {supportLinks.map((link) => (
           <a
             key={link.label}
-            className={link.accent ? "about-link-btn about-link-btn--accent" : "about-link-btn"}
+            className={
+              link.highlight
+                ? "about-link-btn about-link-btn--coffee"
+                : link.accent
+                  ? "about-link-btn about-link-btn--accent"
+                  : "about-link-btn"
+            }
             href={link.url}
             target="_blank"
             rel="noreferrer"
           >
+            {link.highlight ? (
+              <span aria-hidden="true" className="about-link-icon">
+                ☕
+              </span>
+            ) : null}
             {link.label}
           </a>
         ))}
