@@ -6,10 +6,12 @@ Self-hosted issue tracker for small teams: kanban boards with rows (swimlanes) a
 
 ## Features
 
-- Teams, rows, columns, issues, assignees, comments, due dates, timers, projects
+- Teams, rows, columns, issues, assignees, comments, due dates, projects
 - Web UI: kanban board, issue drawer, full-page settings, responsive layout
+- **Make it yours**: ready-made Looks, a simple Appearance panel, and a Design page to mix colours, fonts, corners, cards, buttons, fields and switches, then save and share your mixes
 - Roles and permissions per team (Owner, Admin, Member, Viewer, plus custom roles); server-wide actions need an instance admin
-- File attachments up to 4 GB with chunked, resumable uploads and seekable video
+- **Spaces**: storage caps per team, free spaces for users (up to 3, 1 GB each), uploads paused when the server runs low on disk, and a server admin page with an overview, how-tos and common fixes
+- File attachments up to 4 GB with chunked, resumable uploads and seekable video; a trash with restore and Delete forever
 - **MCP server** for Cursor / Codex / Claude (list, create, update, complete issues from chat)
 - **CLI** (`teamflow`) for scripts and terminal work
 - **Discord bot**: slash commands, ticket threads to issues, share links
@@ -115,6 +117,7 @@ Create a PAT in **Settings → API tokens**. Tools and details: [docs/MCP.md](do
 | [docs/ATTACHMENTS.md](docs/ATTACHMENTS.md) | Issue and row files, team files, trash |
 | [docs/LARGE-FILES.md](docs/LARGE-FILES.md) | Chunked upload, streaming, move and link |
 | [docs/SPACES.md](docs/SPACES.md) | Upload caps per team (spaces), free spaces, the server admin page |
+| [docs/APPEARANCE.md](docs/APPEARANCE.md) | Looks, the Appearance panel and the Design page |
 | [docs/MCP.md](docs/MCP.md) | MCP tools for AI assistants |
 | [docs/CLI.md](docs/CLI.md) | CLI commands |
 | [docs/discord-bot.md](docs/discord-bot.md) | Discord bot setup |
