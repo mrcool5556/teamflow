@@ -62,21 +62,37 @@ export const HOW_TOS: HowTo[] = [
   },
   {
     id: "public-url",
-    title: "Set PUBLIC_URL",
+    title: "Change the public address",
     fixIds: ["public-url-unset"],
-    when: "Password-reset links and the Discord bot use PUBLIC_URL; it must be the address people open.",
+    when: "Invite links, password-reset links and the Discord bot use it; it must be the address people open.",
     steps: [
       {
-        text: "Edit the server's .env and set the public address, without a trailing slash.",
-        command: "sudo nano /opt/teamflow/.env",
+        text: "Open Site & email, enter the address people use (for example https://teamflow.example.org), press Check, then save. It applies at once.",
       },
       {
-        text: "Restart, then press Check public URL on the Overview.",
-        command: "sudo systemctl restart teamflow",
+        text: "If the field says Set in .env, PUBLIC_URL in .env wins. Either change it there and restart, or delete the line, restart, and set it on the page.",
+        command: "sudo nano /opt/teamflow/.env && sudo systemctl restart teamflow",
       },
       {
         text: "Windows: edit .env in the install folder, then restart the service.",
         command: "nssm restart Teamflow",
+      },
+    ],
+  },
+  {
+    id: "email",
+    title: "Set up email",
+    fixIds: [],
+    when: "Without email, forgotten passwords need an admin (People → Send reset link).",
+    steps: [
+      {
+        text: "Open Site & email. Enter your provider's SMTP server, port and security (587 with STARTTLS is the usual), your login and the sender address.",
+      },
+      {
+        text: "Press Send a test to me. It saves first, then reports what the SMTP server said.",
+      },
+      {
+        text: "Gmail and most providers need an app password, not your normal one. If the field says Set in .env, the SMTP_* lines in .env win.",
       },
     ],
   },

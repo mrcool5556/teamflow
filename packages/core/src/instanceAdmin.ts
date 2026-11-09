@@ -1,3 +1,4 @@
+import { z } from "zod";
 import type { DiscordBotServiceStatusPublic } from "./discordBotService.js";
 import type { MaintenanceStatusPublic } from "./maintenance.js";
 import type {
@@ -128,5 +129,21 @@ export type InstanceUserPublic = {
   name: string;
   email: string;
   isInstanceAdmin: boolean;
+  /** Listed in TEAMFLOW_INSTANCE_ADMINS: admin again at every login, so the page cannot remove it. */
+  adminFromEnv: boolean;
   freeSpaces: number;
+  /** Flows (teams) the person is a member of. */
+  teamCount: number;
+  createdAt: string;
+};
+
+export const updateInstanceUserSchema = z.object({ isInstanceAdmin: z.boolean() }).strict();
+export type UpdateInstanceUserInput = z.infer<typeof updateInstanceUserSchema>;
+
+export type PasswordResetIssuedPublic = {
+  /** The one-hour link; show it so the admin can pass it on. */
+  url: string;
+  expiresAt: string;
+  emailed: boolean;
+  emailError: string | null;
 };

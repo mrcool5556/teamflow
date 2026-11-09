@@ -5,6 +5,7 @@ import {
   normalisePublicUrl,
   sendTestMailSchema,
   updateMailSettingsSchema,
+  updateInstanceUserSchema,
   updateSetupProgressSchema,
   updateSignupSettingsSchema,
   updateSiteSettingsSchema,
@@ -42,14 +43,19 @@ import {
   getSpaceDetail,
   listInstanceUsers,
   listSpaces,
+  setInstanceAdmin,
   updateSpace,
 } from "../lib/instanceAdmin.js";
+import { issuePasswordResetForAdmin } from "../lib/passwordReset.js";
 import { getSpaceSettings, updateSpaceSettings } from "../lib/spaceSettings.js";
 
 /** Instance admin page (web /admin): server status, spaces, caps and space settings. */
 const routes = new Hono<AppEnv>();
 
-const listInstanceUsersQuerySchema = z.object({ q: z.string().max(120).optional() });
+const listInstanceUsersQuerySchema = z.object({
+  q: z.string().max(120).optional(),
+  limit: z.coerce.number().int().min(1).max(1000).optional(),
+});
 
 routes.get("/instance/overview", requireAuth, requireInstanceAdmin, async (c) => {
   return c.json({ overview: await getInstanceOverview(db) });
@@ -174,8 +180,33 @@ routes.patch("/instance/settings", requireAuth, requireWrite, requireInstanceAdm
 /** Users for the owner picker, with how many free spaces each holds. */
 routes.get("/instance/users", requireAuth, requireInstanceAdmin, async (c) => {
   const query = parseQuery(c, listInstanceUsersQuerySchema);
-  return c.json({ users: listInstanceUsers(db, query.q) });
+  return c.json({ users: listInstanceUsers(db, query.q, query.limit) });
 });
+
+/** People panel: make someone a server admin, or stop them being one (never the last). */
+routes.patch(
+  "/instance/users/:userId",
+  requireAuth,
+  requireWrite,
+  requireInstanceAdmin,
+  validateParams,
+  async (c) => {
+    const body = await parseBody(c, updateInstanceUserSchema);
+    return c.json({ user: setInstanceAdmin(db, c.req.param("userId"), body.isInstanceAdmin) });
+  },
+);
+
+/** People panel: a one-hour password reset link, emailed when email is set up and always shown. */
+routes.post(
+  "/instance/users/:userId/reset-link",
+  requireAuth,
+  requireWrite,
+  requireInstanceAdmin,
+  validateParams,
+  async (c) => {
+    return c.json({ reset: await issuePasswordResetForAdmin(db, c.req.param("userId")) });
+  },
+);
 
 routes.get("/instance/spaces", requireAuth, requireInstanceAdmin, async (c) =>
   c.json({ spaces: listSpaces(db) }),

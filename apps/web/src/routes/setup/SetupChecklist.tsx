@@ -1,5 +1,5 @@
 import { Link } from "react-router";
-import type { SetupChecklistItem } from "@teamflow/core";
+import type { SetupChecklistId, SetupChecklistItem } from "@teamflow/core";
 import { useSetupChecklistQuery, useUpdateSetupProgressMutation } from "../../queries/site";
 import { CHECKLIST_LINKS } from "./setupSteps";
 
@@ -14,7 +14,14 @@ const MARKS: Record<SetupChecklistItem["state"], string> = {
  * What's done and what's left after setup. "page" is setup step 5; "card" is the admin Overview
  * card, which lists only open items and can be dismissed.
  */
-export function SetupChecklist({ variant }: { variant: "page" | "card" }) {
+export function SetupChecklist({
+  variant,
+  linkFor = (id) => CHECKLIST_LINKS[id],
+}: {
+  variant: "page" | "card";
+  /** Where an open item is fixed; the admin Overview points at its own panels. */
+  linkFor?: (id: SetupChecklistId) => { to: string; label: string } | null;
+}) {
   const query = useSetupChecklistQuery();
   const dismiss = useUpdateSetupProgressMutation();
   const checklist = query.data;
@@ -50,7 +57,7 @@ export function SetupChecklist({ variant }: { variant: "page" | "card" }) {
       <ul className="setup-checklist-items">
         {items.map((item) => {
           const open = item.state === "todo" || item.state === "skipped";
-          const link = open ? CHECKLIST_LINKS[item.id] : null;
+          const link = open ? linkFor(item.id) : null;
           return (
             <li key={item.id} className={`setup-check setup-check--${item.state}`}>
               <span className="setup-check-mark" aria-hidden="true">

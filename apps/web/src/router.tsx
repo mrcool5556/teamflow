@@ -6,6 +6,8 @@ import { AdminLayout } from "./routes/admin/AdminLayout";
 import { DefaultsPanel } from "./routes/admin/DefaultsPanel";
 import { HelpPanel } from "./routes/admin/HelpPanel";
 import { OverviewPanel } from "./routes/admin/OverviewPanel";
+import { PeoplePanel } from "./routes/admin/PeoplePanel";
+import { SitePanel } from "./routes/admin/SitePanel";
 import { SpaceDetailPanel } from "./routes/admin/SpaceDetailPanel";
 import { SpacesPanel } from "./routes/admin/SpacesPanel";
 import { AdminBotPanel, AdminUpdatesPanel } from "./routes/admin/ServerSections";
@@ -51,6 +53,8 @@ const adminRoute: RouteObject = {
     { path: "overview", element: <OverviewPanel /> },
     { path: "spaces", element: <SpacesPanel /> },
     { path: "spaces/:spaceId", element: <SpaceDetailPanel /> },
+    { path: "people", element: <PeoplePanel /> },
+    { path: "site", element: <SitePanel /> },
     { path: "updates", element: <AdminUpdatesPanel /> },
     { path: "bot", element: <AdminBotPanel /> },
     { path: "help", element: <HelpPanel /> },

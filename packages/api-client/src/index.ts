@@ -59,6 +59,7 @@ import type {
   InstanceSpacePublic,
   InstanceUserPublic,
   MailSettingsPublic,
+  PasswordResetIssuedPublic,
   PublicUrlCheckPublic,
   SendTestMailInput,
   SetupAdminInput,
@@ -68,6 +69,7 @@ import type {
   SiteSettingsAdminPublic,
   SpaceAllowancePublic,
   SpaceSettingsPublic,
+  UpdateInstanceUserInput,
   UpdateMailSettingsInput,
   UpdateSetupProgressInput,
   UpdateSignupSettingsInput,
@@ -1013,9 +1015,28 @@ export class TeamflowClient {
     });
   }
 
-  listInstanceUsers(query?: string) {
-    const q = query ? `?q=${encodeURIComponent(query)}` : "";
+  listInstanceUsers(query?: string, limit?: number) {
+    const parts: string[] = [];
+    if (query) parts.push(`q=${encodeURIComponent(query)}`);
+    if (limit) parts.push(`limit=${limit}`);
+    const q = parts.length ? `?${parts.join("&")}` : "";
     return this.request<{ users: InstanceUserPublic[] }>(`/instance/users${q}`);
+  }
+
+  /** Make someone a server admin, or stop them being one (never the last). */
+  updateInstanceUser(userId: string, input: UpdateInstanceUserInput) {
+    return this.request<{ user: InstanceUserPublic }>(`/instance/users/${userId}`, {
+      method: "PATCH",
+      body: JSON.stringify(input),
+    });
+  }
+
+  /** A one-hour password reset link for someone; emailed when email is set up. */
+  issuePasswordResetLink(userId: string) {
+    return this.request<{ reset: PasswordResetIssuedPublic }>(
+      `/instance/users/${userId}/reset-link`,
+      { method: "POST", body: "{}" },
+    );
   }
 
   listSpaces() {

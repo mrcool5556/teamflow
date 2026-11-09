@@ -11,10 +11,12 @@ const ADMIN_NAV: {
 }[] = [
   { id: "overview", label: "Overview", group: "Server" },
   { id: "spaces", label: "Spaces", group: "Server" },
+  { id: "people", label: "People", group: "Server" },
+  { id: "site", label: "Site & email", group: "Server" },
   { id: "updates", label: "Updates & backups", group: "Server" },
   { id: "bot", label: "Discord bot", group: "Server" },
   { id: "help", label: "How-tos & fixes", group: "Help" },
-  { id: "defaults", label: "Space defaults", group: "Settings" },
+  { id: "defaults", label: "Space defaults & sign-up", group: "Settings" },
 ];
 
 const GROUPS = ["Server", "Help", "Settings"] as const;

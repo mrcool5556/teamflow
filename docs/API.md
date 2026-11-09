@@ -41,7 +41,7 @@ Server code throws `ApiError` from `apps/server/src/lib/errors.ts` (`badRequest`
 
 <!-- BEGIN GENERATED ROUTES (scripts/gen-api-docs.mjs) -->
 
-## Routes (120)
+## Routes (122)
 
 Generated from `apps/server/src/routes/*.ts` by `pnpm docs:api`; do not edit by hand.
 
@@ -204,6 +204,8 @@ Instance admin page (web /admin): server status, spaces, caps and space settings
 | GET | `/instance/settings` | bearer |  |  | instance admin |  |
 | PATCH | `/instance/settings` | bearer | yes |  | instance admin | body `updateSpaceSettingsSchema` |
 | GET | `/instance/users` | bearer |  |  | instance admin | query `listInstanceUsersQuerySchema` |
+| PATCH | `/instance/users/:userId` | bearer | yes |  | instance admin | body `updateInstanceUserSchema` |
+| POST | `/instance/users/:userId/reset-link` | bearer | yes |  | instance admin |  |
 | GET | `/instance/spaces` | bearer |  |  | instance admin |  |
 | POST | `/instance/spaces` | bearer | yes |  | instance admin | body `createSpaceSchema` |
 | GET | `/instance/spaces/:teamId` | bearer |  |  | instance admin |  |

@@ -125,14 +125,15 @@ describe("create space dialog", () => {
 });
 
 describe("space defaults", () => {
-  it("saves the free-space cap, per-user limit and disk floor", async () => {
+  it("saves the free-space cap, per-person limit, disk floor and sign-up", async () => {
     const user = userEvent.setup();
     const { calls } = setup("/t/ENG/admin/defaults");
-    const perUser = await screen.findByLabelText("Free spaces per user");
+    const perUser = await screen.findByLabelText("Flows per person");
     await user.clear(perUser);
     await user.type(perUser, "5");
     await user.click(screen.getByRole("button", { name: "5 GB" }));
-    const floor = screen.getByLabelText("Keep this much disk free (GB)");
+    await user.click(screen.getByRole("button", { name: "Only people with an invite" }));
+    const floor = screen.getByLabelText("Stop uploads below (GB free)");
     await user.clear(floor);
     await user.type(floor, "0");
     await user.click(screen.getByRole("button", { name: "Save defaults" }));
@@ -142,6 +143,11 @@ describe("space defaults", () => {
         calls.find((c) => c.method === "PATCH" && c.path === "/instance/settings")?.body,
       ).toEqual({ freeSpaceCapBytes: 5 * GIB, freeSpacesPerUser: 5, minFreeDiskBytes: 0 }),
     );
-    expect(await screen.findByText(/Space defaults saved/)).toBeInTheDocument();
+    await waitFor(() =>
+      expect(
+        calls.find((c) => c.method === "PATCH" && c.path === "/instance/signup")?.body,
+      ).toEqual({ inviteOnly: true }),
+    );
+    expect(await screen.findByText(/Defaults saved/)).toBeInTheDocument();
   });
 });

@@ -96,7 +96,17 @@ Instance admins open it from the account menu (**Server admin**) at `/t/<team>/a
   the upload folder: uploads, database, backups and the rest, caps allocated, the floor), space
   counts and **common fixes** worked out from those checks. Anything that needs more host access
   than the process has says "not detectable" or "not available" and links a how-to.
-- **Spaces**, **Space detail**, **Space defaults:** above.
+- **Finish setting up** (top of the Overview): the open items of the setup checklist
+  ([SETUP.md](SETUP.md)), each linking to its panel, until they are all done or the card is
+  dismissed.
+- **Spaces**, **Space detail**, **Space defaults & sign-up:** above, plus who can make an
+  account (anyone, or only people with an invite).
+- **People:** every account, with its Flows and how many free spaces it owns. **Make admin** /
+  **Remove admin** (never the last server admin, and not someone `TEAMFLOW_INSTANCE_ADMINS` lists).
+  **Send reset link** makes a one-hour password reset link, emails it when email is set up, and
+  always shows it so the admin can pass it on.
+- **Site & email:** site name, public address (with a reachability check) and outgoing email
+  (with a test send), the same forms as setup steps 2 and 3. Values set in `.env` are read-only.
 - **Updates & backups** and **Discord bot:** the Settings panels, through the current team.
 - **How-tos & fixes:** step-by-step commands (LXC first, Windows where it differs); the ones
   matching the Overview's findings are listed first.
@@ -110,7 +120,10 @@ Instance admin only, no team needed (full list in [API.md](API.md#instance-admin
 | GET | `/instance/overview` | Server, disk, bot, maintenance, space counts, settings, fixes |
 | GET | `/instance/checks/public-url` | Fetch `PUBLIC_URL/health` (5 s timeout) |
 | GET, PATCH | `/instance/settings` | Space defaults |
-| GET | `/instance/users?q=` | Owner picker with each user's free-space count |
+| GET | `/instance/users?q=&limit=` | Accounts (owner picker, People) with free spaces, Flows, admin source |
+| PATCH | `/instance/users/:userId` | `{ isInstanceAdmin }`; never the last admin or an env-listed one |
+| POST | `/instance/users/:userId/reset-link` | One-hour reset link: `{ url, expiresAt, emailed, emailError }` |
+| GET, PATCH | `/instance/site`, `/instance/signup`; GET, PUT, DELETE `/instance/mail` | See [SETUP.md](SETUP.md) |
 | GET, POST | `/instance/spaces` | List; create (`createSpaceSchema`) |
 | GET, PATCH | `/instance/spaces/:teamId` | Detail; change type or cap (`updateSpaceSchema`) |
 | POST | `/instance/spaces/:teamId/empty-trash` | Delete the trash now |
