@@ -22,7 +22,7 @@ Native install inside a Debian/Ubuntu LXC: `apt` + `systemd` + SQLite. (Postgres
 5. Edit `/opt/teamflow/.env`: real `JWT_SECRET` (the service refuses the placeholder), `TEAMFLOW_SECRETS_KEY`, `PUBLIC_URL`, `CORS_ORIGINS` if the web runs on another origin, `TEAMFLOW_TRUST_PROXY=1` behind a proxy. Then `chmod 600 /opt/teamflow/.env`.
 6. **Required once:** `sudo bash /opt/teamflow/deploy/proxmox-lxc/setup-maintenance-sudo.sh` (see [Maintenance sudo](#maintenance-sudo)). `install.sh` already calls it but ignores failures, so run it and read the output.
 7. `systemctl restart teamflow && curl http://localhost:3000/health`
-8. Open `http://<lxc-ip>:3000` and register. The first account becomes the instance admin; there is no demo user. The **Server admin** page (account menu) shows disk space, spaces, updates and backups, and the Discord bot.
+8. Open the setup link the installer prints, `http://<lxc-ip>:3000/setup?code=XXXX-XXXX`, and create the instance admin account there; there is no demo user. Lost it? The code is in `/opt/teamflow/data/setup-code` and the service log ([docs/SETUP.md](../../docs/SETUP.md)). The **Server admin** page (account menu) shows disk space, Flows, people, site and email, updates and backups, and the Discord bot.
 
 Full checklist: [docs/SELF-HOSTING.md](../../docs/SELF-HOSTING.md#production-checklist)
 
@@ -104,7 +104,7 @@ visudo -cf /etc/sudoers.d/teamflow-maintenance
 Needs all of:
 
 - `TEAMFLOW_MAINTENANCE_ENABLED=true` in `.env` (the template sets it);
-- the instance-admin flag on your account (first account, or `TEAMFLOW_INSTANCE_ADMINS`) plus `server.maintenance.view` / `.run` in the team (Owner has them);
+- the instance-admin flag on your account (the account made on `/setup`, someone made admin on Server admin → People, or `TEAMFLOW_INSTANCE_ADMINS`) plus `server.maintenance.view` / `.run` in the team (Owner has them);
 - the maintenance sudo step above.
 
 Opening the panel shows cached status; **Refresh status** runs `git fetch` and the sudo probe.
