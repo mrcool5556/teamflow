@@ -89,3 +89,15 @@ Instance admins only. A value set in `.env` wins; saving over it answers `409 se
 | POST | `/instance/mail/test` | `{ to? }` (default: you). Answers `{ result: { ok, to, error } }` with the SMTP server's message |
 | GET / PATCH | `/instance/signup` | `{ inviteOnly }` |
 | GET / PATCH | `/instance/setup-checklist` | What's done and what's left. PATCH `{ emailSkipped?, storageReviewed?, dismissed? }` |
+
+## Lost the link or the code
+
+- Look in `<data dir>/setup-code` (on LXC `/opt/teamflow/data/setup-code`), or in the service log: `journalctl -u teamflow | grep "Setup code"`. On Windows the server window or `data\setup-code` in the install folder.
+- Deleting the file and restarting makes a new code (the old one stops working).
+- The page only works while the server has **no accounts**. If someone else got there first, stop the service, move the database aside (`data/teamflow.db*`), start again and use the new code.
+
+## Servers that already have accounts
+
+Nothing changes for them: `/setup` is closed, nobody is asked for a code, and every team, role and admin flag stays as it was. Values in `.env` (`PUBLIC_URL`, `SMTP_*`, `TEAMFLOW_INVITE_ONLY`) keep working and show as **Set in .env** on the admin page. Server admins see the setup checklist card on the Overview once and can dismiss it.
+
+Accounts made before the welcome page keep the **General** team registration used to create. New sign-ups get no team; they Create a Flow or Join a Flow on `/welcome`.

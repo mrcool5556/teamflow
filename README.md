@@ -88,7 +88,7 @@ Rebuild a package (`pnpm --filter @teamflow/core build`, likewise `db`, `api-cli
 | **B. Proxmox LXC** | [deploy/proxmox-lxc/README.md](deploy/proxmox-lxc/README.md) | Always-on Linux server (`sudo update`, in-app updates) |
 | Remote access | [deploy/relay/README.md](deploy/relay/README.md) | Tailscale, Caddy or Cloudflare in front of the server |
 
-Production needs a real `JWT_SECRET` (the server refuses placeholders), `PUBLIC_URL`, and on Linux one run of `setup-maintenance-sudo.sh`. See [SELF-HOSTING.md](docs/SELF-HOSTING.md#production-checklist).
+Production needs a real `JWT_SECRET` (the server refuses placeholders) and on Linux one run of `setup-maintenance-sudo.sh`. Everything else (admin account, site name, public address, email, storage rules, who can sign up) is set in the browser on first start: open the `/setup?code=…` link the installer or server log prints ([docs/SETUP.md](docs/SETUP.md)). See [SELF-HOSTING.md](docs/SELF-HOSTING.md#production-checklist).
 
 ## AI integration (MCP)
 
@@ -122,7 +122,8 @@ Create a PAT in **Settings → API tokens**. Tools and details: [docs/MCP.md](do
 | [docs/API.md](docs/API.md) | HTTP API reference (generated) |
 | [docs/ATTACHMENTS.md](docs/ATTACHMENTS.md) | Issue and row files, team files, trash |
 | [docs/LARGE-FILES.md](docs/LARGE-FILES.md) | Chunked upload, streaming, move and link |
-| [docs/SPACES.md](docs/SPACES.md) | Upload caps per team (spaces), free spaces, the server admin page |
+| [docs/SETUP.md](docs/SETUP.md) | First-time setup in the browser, the setup code, the installer contract |
+| [docs/SPACES.md](docs/SPACES.md) | Flows (teams/spaces), upload caps, free Flows, the server admin page |
 | [docs/APPEARANCE.md](docs/APPEARANCE.md) | Looks, the Appearance panel and the Design page |
 | [docs/MCP.md](docs/MCP.md) | MCP tools for AI assistants |
 | [docs/CLI.md](docs/CLI.md) | CLI commands |
