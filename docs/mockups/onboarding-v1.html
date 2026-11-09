@@ -1,0 +1,659 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Teamflow onboarding v1</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link href="https://fonts.googleapis.com/css2?family=Encode+Sans+Semi+Condensed:wght@500;700&family=IBM+Plex+Mono:wght@400;600&family=Manrope:wght@400;600;700&display=swap" rel="stylesheet" />
+<style>
+  /* ---------- the "Machined" look: palette, fonts, lipped gold buttons, sunk inputs ---------- */
+  /* Spacing and radius copied from apps/web/src/styles/tokens.css, colours from themes.css. */
+  :root {
+    --space-1: .25rem; --space-2: .5rem; --space-3: .75rem; --space-4: 1rem; --space-5: 1.25rem; --space-6: 1.5rem;
+    --font-size-xs: .72rem; --font-size-sm: .85rem;
+    --radius-xs: 4px; --radius-sm: 6px; --radius-md: 10px; --radius-lg: 14px;
+    --bg: #07090c; --surface: #11161c; --panel: #0e1318; --cell: #0c1014;
+    --border: #434b52; --border-strong: #6e7984;
+    --text: #f2efe8; --text-soft: #caced0; --muted: #aab3bc;
+    --primary: #e6b84a; --accent: #00cfea; --accent-text: #00cfea;
+    --danger: #e5484d; --danger-text: #ff8a8d; --done: #55bd9c; --warn: #e3c34f;
+    --btn-text: #14100a;
+    --inset: inset 0 0 0 1px rgba(236, 233, 225, .12), inset 0 2px 4px rgba(0, 0, 0, .45);
+    --lip: linear-gradient(180deg, #fff1b0 0%, #f0c75c 14%, #e6b84a 38%, #c9972c 66%, #8f6a1d 90%, #5a4012 100%);
+    --font-display: "Encode Sans Semi Condensed", "Segoe UI", sans-serif;
+    --font-body: Manrope, "Segoe UI", sans-serif;
+    --font-mono: "IBM Plex Mono", Consolas, monospace;
+  }
+  :root[data-theme="light"] {
+    --bg: #f2efe8; --surface: #ffffff; --panel: #f9f8f5; --cell: #f6f4ef;
+    --border: #b6b9bb; --border-strong: #71777d;
+    --text: #15120c; --text-soft: #343536; --muted: #4d5258;
+    --primary: #9a6f15; --accent: #016f80; --accent-text: #016f80;
+    --danger: #c8303a; --danger-text: #c8303a; --done: #1d7a5f; --warn: #a07800;
+    --btn-text: #ffffff;
+    --inset: inset 0 0 0 1px rgba(20, 16, 10, .12), inset 0 2px 3px rgba(0, 0, 0, .08);
+  }
+
+  /* ---------- page chrome (mock-up document, not the app) ---------- */
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text); font-family: var(--font-body); font-size: 14px; line-height: 1.5; }
+  h1, h2, h3, h4 { font-family: var(--font-display); margin: 0 0 var(--space-2); }
+  a { color: var(--accent-text); }
+  code { font-family: var(--font-mono); font-size: .9em; color: var(--text-soft); }
+  .doc-head { position: sticky; top: 0; z-index: 50; display: flex; gap: var(--space-4); align-items: center; flex-wrap: wrap; padding: var(--space-3) var(--space-6); background: var(--surface); border-bottom: 1px solid var(--border); }
+  .doc-head nav { display: flex; gap: var(--space-2); flex-wrap: wrap; font-size: var(--font-size-sm); }
+  .doc-head nav a { text-decoration: none; padding: 2px 10px; border: 1px solid var(--border); border-radius: 99px; }
+  .doc-head .spacer { flex: 1; }
+  .doc-head button { font: inherit; font-size: 12px; background: transparent; color: var(--text); border: 1px solid var(--border-strong); border-radius: 99px; padding: 3px 12px; cursor: pointer; }
+  main { max-width: 1500px; margin: 0 auto; padding: var(--space-6) 16px; }
+  section.item { border-top: 1px solid var(--border); padding: var(--space-6) 0; }
+  .eyebrow { color: var(--accent-text); letter-spacing: .18em; font-size: var(--font-size-xs); text-transform: uppercase; margin: 0 0 var(--space-1); font-family: var(--font-mono); }
+  .lead { color: var(--text-soft); max-width: 90ch; }
+  .changes { margin: var(--space-3) 0 0; padding-left: 1.2rem; font-size: var(--font-size-sm); max-width: 100ch; }
+  .changes li { margin-bottom: 4px; }
+  .changes li::marker { color: var(--done); }
+  .mocks { display: flex; flex-wrap: wrap; gap: var(--space-5); align-items: flex-start; margin-top: var(--space-4); }
+  table.list { border-collapse: collapse; width: 100%; font-size: var(--font-size-sm); }
+  table.list td, table.list th { border-bottom: 1px solid var(--border); padding: 6px 8px; text-align: left; vertical-align: top; }
+  table.list th { color: var(--muted); font-weight: 400; font-size: var(--font-size-xs); text-transform: uppercase; letter-spacing: .1em; }
+  table.list td:first-child { color: var(--accent-text); }
+  td.ok { color: var(--done); } td.miss { color: var(--warn); } td.new { color: var(--accent-text); }
+  .scroll-x { overflow-x: auto; }
+  .qa { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: var(--space-4); margin-top: var(--space-4); }
+  @media (max-width: 1000px) { .qa { grid-template-columns: 1fr; } }
+  .qa > div { border: 1px solid var(--border); border-radius: var(--radius-md); padding: var(--space-3) var(--space-4); background: var(--surface); }
+  .qa h4 { font-size: 16px; }
+  .qa p { margin: 0 0 6px; color: var(--text-soft); font-size: var(--font-size-sm); }
+  .qa .rec { color: var(--text); }
+  .qa .rec::before { content: "Recommend: "; color: var(--done); font-weight: 700; }
+  ol.plan > li { margin-bottom: 10px; }
+  ol.plan small { color: var(--muted); }
+
+  /* ---------- device frame: content authored at real px, scaled down ---------- */
+  .frame { --s: .56; width: calc(var(--w) * var(--s) * 1px); height: calc(var(--h) * var(--s) * 1px); overflow: hidden; border: 1px solid var(--border-strong); border-radius: var(--radius-md); background: var(--bg); position: relative; flex: none; max-width: 100%; }
+  .frame > .vp { width: calc(var(--w) * 1px); height: calc(var(--h) * 1px); transform: scale(var(--s)); transform-origin: 0 0; position: relative; overflow: hidden; background: var(--bg); }
+  .frame.phone { --s: .62; }
+  .frame-cap { font-size: var(--font-size-xs); color: var(--muted); margin-top: 4px; max-width: 720px; }
+  @media (max-width: 760px) { .frame { --s: .26; } .frame.phone { --s: .7; } }
+
+  /* ---------- mock app parts ---------- */
+  .m-btn { display: inline-flex; align-items: center; justify-content: center; gap: 6px; font: inherit; font-size: 14px; font-weight: 600; padding: 8px 18px; border-radius: 99px; border: 1px solid var(--border-strong); background: transparent; color: var(--text); white-space: nowrap; }
+  .m-btn.primary { border: 3px solid transparent; background: linear-gradient(var(--primary), var(--primary)) padding-box, var(--lip) border-box; color: var(--btn-text); }
+  .m-btn.quiet { border: 3px solid transparent; background: linear-gradient(var(--surface), var(--surface)) padding-box, var(--lip) border-box; }
+  .m-btn.link { border: 0; padding: 4px 6px; color: var(--text-soft); font-weight: 400; text-decoration: underline; }
+  .m-btn.sm { font-size: 12px; padding: 4px 12px; }
+  .m-btn.block { width: 100%; }
+  .m-input { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 10px 14px; border-radius: 99px; background: var(--cell); box-shadow: var(--inset); color: var(--text); font-size: 14px; font-family: var(--font-mono); }
+  .m-input.ph { color: var(--muted); }
+  .m-input .tag { font-family: var(--font-body); font-size: 11px; color: var(--accent-text); border: 1px solid color-mix(in srgb, var(--accent) 55%, transparent); border-radius: 99px; padding: 0 8px; white-space: nowrap; }
+  .m-input.bad { box-shadow: inset 0 0 0 1px var(--danger), inset 0 2px 4px rgba(0, 0, 0, .45); }
+  .m-f { margin-bottom: 14px; }
+  .m-f label { display: block; font-size: 11px; letter-spacing: .12em; text-transform: uppercase; color: var(--muted); margin-bottom: 5px; font-family: var(--font-mono); }
+  .m-f .hint { font-size: 12px; color: var(--muted); margin-top: 5px; }
+  .m-f .err { font-size: 12px; color: var(--danger-text); margin-top: 5px; }
+  .m-row2 { display: grid; grid-template-columns: 2fr 1fr; gap: 14px; }
+  .m-row3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 14px; }
+  .m-seg { display: inline-flex; border-radius: 99px; background: var(--cell); box-shadow: var(--inset); padding: 3px; font-size: 13px; flex-wrap: wrap; }
+  .m-seg span { padding: 5px 14px; border-radius: 99px; color: var(--text-soft); }
+  .m-seg span.on { background: var(--accent); color: #06171a; font-weight: 600; }
+  .m-callout { border-radius: var(--radius-md); padding: 10px 14px; font-size: 13px; color: var(--text-soft); background: color-mix(in srgb, var(--accent) 7%, transparent); box-shadow: inset 3px 0 0 var(--accent); }
+  .m-callout.warn { background: color-mix(in srgb, var(--warn) 8%, transparent); box-shadow: inset 3px 0 0 var(--warn); }
+  .m-callout.bad { background: color-mix(in srgb, var(--danger) 9%, transparent); box-shadow: inset 3px 0 0 var(--danger); }
+  .m-callout b { color: var(--text); }
+  .m-foot { display: flex; justify-content: space-between; align-items: center; gap: 10px; margin-top: 18px; flex-wrap: wrap; }
+  .m-foot .r { display: flex; gap: 10px; margin-left: auto; }
+  .m-logo { font-family: var(--font-mono); font-weight: 600; color: var(--accent-text); letter-spacing: .2em; font-size: 12px; }
+  .m-avatar { width: 32px; height: 32px; border-radius: 50%; background: var(--accent); color: #06171a; display: grid; place-items: center; font-weight: 700; font-size: 12px; flex: none; }
+  .m-top { display: flex; align-items: center; gap: 12px; height: 58px; padding: 0 22px; border-bottom: 1px solid var(--border); background: var(--surface); }
+  .m-top .grow { flex: 1; }
+  .ok-t { color: var(--done); } .warn-t { color: var(--warn); } .muted-t { color: var(--muted); }
+
+  /* setup page */
+  .su { display: grid; grid-template-columns: 290px minmax(0, 1fr); height: 100%; }
+  .su-rail { border-right: 1px solid var(--border); padding: 28px 22px; background: var(--panel); display: flex; flex-direction: column; }
+  .su-rail .m-logo { margin-bottom: 28px; }
+  .su-rail .grow { flex: 1; }
+  .su-rail .fine { font-size: 12px; color: var(--muted); }
+  .step { display: grid; grid-template-columns: 30px 1fr; gap: 10px; align-items: center; padding: 9px 10px; border-radius: var(--radius-md); color: var(--text-soft); font-size: 14px; margin-bottom: 4px; }
+  .step i { font-style: normal; width: 28px; height: 28px; border-radius: 50%; display: grid; place-items: center; font-family: var(--font-mono); font-size: 12px; box-shadow: var(--inset); background: var(--cell); }
+  .step small { display: block; font-size: 11px; color: var(--muted); }
+  .step.done i { background: var(--done); color: #06140f; box-shadow: none; }
+  .step.on { background: color-mix(in srgb, var(--accent) 12%, transparent); color: var(--text); }
+  .step.on i { background: var(--accent); color: #06171a; box-shadow: none; }
+  .step.skip i { background: transparent; box-shadow: inset 0 0 0 1px var(--warn); color: var(--warn); }
+  .su-main { padding: 46px 64px; overflow: hidden; }
+  .su-card { max-width: 640px; }
+  .su-card h2 { font-size: 34px; line-height: 1.15; margin-bottom: 6px; }
+  .su-card > p.sub { color: var(--text-soft); margin: 0 0 24px; font-size: 15px; }
+  .su-phone-head { padding: 16px 18px 10px; border-bottom: 1px solid var(--border); background: var(--panel); }
+  .su-phone-head .m-logo { display: block; margin-bottom: 10px; }
+  .pbar { display: flex; gap: 5px; margin-top: 8px; }
+  .pbar i { flex: 1; height: 5px; border-radius: 99px; background: var(--cell); box-shadow: var(--inset); }
+  .pbar i.done { background: var(--done); box-shadow: none; } .pbar i.on { background: var(--accent); box-shadow: none; }
+  .su-phone-body { padding: 20px 18px; }
+  .su-phone-body h2 { font-size: 26px; line-height: 1.15; }
+  .su-phone-body .sub { color: var(--text-soft); font-size: 14px; margin: 0 0 18px; }
+  .phone .m-row2, .phone .m-row3 { grid-template-columns: 1fr; gap: 0; }
+  .phone .m-foot .r { width: 100%; flex-direction: column-reverse; }
+  .phone .m-foot .r .m-btn { width: 100%; }
+
+  .check { list-style: none; margin: 0; padding: 0; }
+  .check li { display: grid; grid-template-columns: 28px 1fr auto; gap: 10px; align-items: center; padding: 11px 0; border-bottom: 1px solid var(--border); font-size: 14px; }
+  .check li i { font-style: normal; width: 22px; height: 22px; border-radius: 50%; display: grid; place-items: center; font-size: 12px; }
+  .check li i.y { background: var(--done); color: #06140f; }
+  .check li i.s { box-shadow: inset 0 0 0 1px var(--warn); color: var(--warn); }
+  .check li i.n { box-shadow: var(--inset); background: var(--cell); }
+  .check li small { display: block; color: var(--muted); font-size: 12px; }
+  .check li a { font-size: 12px; white-space: nowrap; }
+
+  .disk { font-size: 12px; color: var(--text-soft); margin-top: 6px; }
+  .bar { height: 8px; border-radius: 99px; background: var(--cell); box-shadow: var(--inset); overflow: hidden; display: flex; margin-top: 4px; }
+  .bar > i { display: block; height: 100%; background: var(--accent); }
+  .bar > i.floor { background: repeating-linear-gradient(45deg, var(--warn) 0 3px, transparent 3px 6px); }
+
+  /* welcome */
+  .wl { height: calc(100% - 58px); display: grid; place-items: center; padding: 30px; }
+  .wl-in { width: min(860px, 100%); text-align: center; }
+  .wl-in h1 { font-size: 44px; line-height: 1.1; margin-bottom: 8px; }
+  .wl-in > p { color: var(--text-soft); font-size: 16px; margin: 0 auto 30px; max-width: 58ch; }
+  .choices { display: grid; grid-template-columns: 1fr 1fr; gap: 22px; text-align: left; }
+  .choice { border-radius: var(--radius-lg); padding: 26px 26px 22px; background: var(--surface); box-shadow: inset 0 0 0 1px var(--border), 0 10px 30px rgba(0, 0, 0, .35); display: flex; flex-direction: column; gap: 10px; min-height: 250px; }
+  .choice.hl { box-shadow: inset 0 0 0 2px var(--primary), 0 10px 30px rgba(0, 0, 0, .35); }
+  .choice .ic { width: 52px; height: 52px; border-radius: 16px; display: grid; place-items: center; font-size: 26px; font-family: var(--font-mono); background: var(--cell); box-shadow: var(--inset); color: var(--accent-text); }
+  .choice h3 { font-size: 26px; margin: 4px 0 0; }
+  .choice p { margin: 0; color: var(--text-soft); font-size: 14px; }
+  .choice .fine { font-size: 12px; color: var(--muted); margin-top: auto; }
+  .choice .m-btn { align-self: flex-start; }
+  .wl-skip { margin-top: 22px; font-size: 13px; color: var(--muted); }
+  .phone .wl { place-items: start center; padding: 14px 16px; height: auto; }
+  .phone .wl-in .eyebrow { margin-bottom: 0; }
+  .phone .wl-skip { margin-top: 12px; }
+  .phone .wl-in h1 { font-size: 30px; }
+  .phone .wl-in > p { font-size: 14px; margin-bottom: 18px; }
+  .phone .choices { grid-template-columns: 1fr; gap: 14px; }
+  .phone .choice { min-height: 0; padding: 18px; }
+  .phone .choice h3 { font-size: 21px; }
+  .phone .choice .ic { width: 42px; height: 42px; font-size: 20px; border-radius: 12px; }
+  .phone .choice .m-btn { align-self: stretch; }
+
+  .panel { width: min(600px, 100%); margin: 0 auto; border-radius: var(--radius-lg); padding: 28px 30px; background: var(--surface); box-shadow: inset 0 0 0 1px var(--border), 0 10px 30px rgba(0, 0, 0, .35); text-align: left; }
+  .panel .back { font-size: 13px; color: var(--text-soft); display: inline-block; margin-bottom: 12px; }
+  .panel h2 { font-size: 30px; margin-bottom: 4px; }
+  .panel > p.sub { color: var(--text-soft); margin: 0 0 20px; }
+  .phone .panel { padding: 18px; box-shadow: none; background: transparent; }
+  .phone .panel h2 { font-size: 24px; }
+  .slots { display: flex; gap: 6px; align-items: center; font-size: 13px; color: var(--text-soft); }
+  .slots i { width: 26px; height: 10px; border-radius: 99px; background: var(--cell); box-shadow: var(--inset); }
+  .slots i.used { background: var(--done); box-shadow: none; } .slots i.new { background: repeating-linear-gradient(45deg, var(--done) 0 3px, transparent 3px 6px); box-shadow: inset 0 0 0 1px var(--done); }
+  .preview { display: grid; grid-template-columns: 52px 1fr; gap: 14px; align-items: center; border-radius: var(--radius-md); padding: 14px; background: var(--cell); box-shadow: var(--inset); }
+  .preview .key { width: 52px; height: 52px; border-radius: 14px; display: grid; place-items: center; font-family: var(--font-mono); font-weight: 600; font-size: 13px; color: #06171a; background: var(--accent); }
+  .preview b { font-family: var(--font-display); font-size: 19px; }
+  .preview small { display: block; color: var(--muted); font-size: 12px; }
+
+  /* toast + board stub for the invite path */
+  .board-stub { padding: 18px 22px; display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; }
+  .board-stub .col { border-radius: var(--radius-md); background: var(--surface); box-shadow: inset 0 0 0 1px var(--border); height: 420px; padding: 12px; font-size: 12px; color: var(--muted); font-family: var(--font-mono); }
+  .toast { position: absolute; left: 50%; bottom: 24px; transform: translateX(-50%); background: var(--panel); box-shadow: inset 0 0 0 1px var(--done), 0 10px 30px rgba(0, 0, 0, .5); border-radius: 99px; padding: 10px 20px; font-size: 14px; white-space: nowrap; }
+  .toast b { color: var(--done); }
+
+  /* admin overview with setup checklist */
+  .m-admin { display: grid; grid-template-columns: 230px minmax(0, 1fr); height: calc(100% - 58px); }
+  .m-snav { border-right: 1px solid var(--border); padding: 16px 12px; font-size: 13px; background: var(--panel); }
+  .m-snav .h { font-size: 10px; letter-spacing: .14em; color: var(--muted); text-transform: uppercase; margin: 12px 10px 4px; font-family: var(--font-mono); }
+  .m-snav .it { display: flex; justify-content: space-between; align-items: center; padding: 7px 12px; border-radius: 99px; color: var(--text-soft); }
+  .m-snav .it.on { background: color-mix(in srgb, var(--accent) 14%, transparent); color: var(--text); }
+  .m-snav .it .nw { font-size: 10px; color: var(--accent-text); border: 1px solid var(--accent); border-radius: 99px; padding: 0 6px; }
+  .m-content { padding: 24px 32px; overflow: hidden; }
+  .m-content h2 { font-size: 28px; margin-bottom: 2px; }
+  .m-content > p.sub { color: var(--text-soft); font-size: 13px; margin: 0 0 16px; }
+  .m-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; }
+  .m-grid .wide { grid-column: span 3; }
+  .m-tile { border-radius: var(--radius-md); padding: 14px 16px; background: var(--surface); box-shadow: inset 0 0 0 1px var(--border); font-size: 12px; }
+  .m-tile .th { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
+  .m-tile .th b { font-family: var(--font-display); font-size: 16px; }
+  .m-tile .th .grow { flex: 1; }
+  .m-tile.new { box-shadow: inset 0 0 0 2px var(--primary); }
+  .m-tile dl { display: grid; grid-template-columns: auto 1fr; gap: 3px 12px; margin: 0; }
+  .m-tile dt { color: var(--muted); } .m-tile dd { margin: 0; color: var(--text-soft); }
+  .dot { width: 9px; height: 9px; border-radius: 50%; display: inline-block; }
+  .dot.ok { background: var(--done); } .dot.warn { background: var(--warn); }
+  .check.mini li { padding: 6px 0; font-size: 12px; grid-template-columns: 22px 1fr auto; }
+  .check.mini li i { width: 18px; height: 18px; font-size: 10px; }
+</style>
+</head>
+<body>
+<header class="doc-head">
+  <b style="font-family: var(--font-display); font-size: 17px">Onboarding v1</b>
+  <nav>
+    <a href="#setup">1 · First-time setup</a>
+    <a href="#welcome">2 · Welcome</a>
+    <a href="#create">2a · Create a Flow</a>
+    <a href="#join">2b · Join a Flow</a>
+    <a href="#wording">3 · "Flow" wording</a>
+    <a href="#admin">4 · Admin page</a>
+    <a href="#plan">Build plan</a>
+  </nav>
+  <span class="spacer"></span>
+  <button type="button" id="theme">Light / dark</button>
+</header>
+<main>
+  <p class="eyebrow">Design only · branch onboarding · nothing built yet</p>
+  <h1 style="font-size: 34px">Setup, welcome and Flows</h1>
+  <p class="lead">Mock-ups in the Machined look (dark, gold lipped buttons, sunk pill inputs). Frames are real desktop (1280×800) and phone (390×800) layouts, scaled down. Use the button at the top right to see light mode. Each section ends with the open questions George needs to answer.</p>
+
+  <!-- ============ 1. SETUP ============ -->
+  <section class="item" id="setup">
+    <p class="eyebrow">1 · First-time setup · /setup</p>
+    <h2>A guided setup for the person installing the server</h2>
+    <p class="lead">Shown only while the server has <b>no accounts at all</b>. Step 1 creates the admin account and signs them in. From then on <code>/setup</code> is shut for everyone else: the server refuses a second admin account and the web app sends <code>/setup</code> to the login page. Steps 2–5 are ordinary admin settings shown to that admin as a wizard. They can leave half-way, and the checklist on the admin Overview picks up where they stopped.</p>
+    <ul class="changes">
+      <li>Works with only the secrets in .env. The site address is filled in from the page the installer opened, and nothing needs a restart.</li>
+      <li>A value set in .env wins and shows as "Set in .env" (read-only), so production's current setup keeps working unchanged.</li>
+      <li>"Skip for now" on Email. Without email, password resets go through an admin. The checklist says so.</li>
+    </ul>
+
+    <div class="mocks">
+      <div>
+        <div class="frame" style="--w:1280;--h:800"><div class="vp">
+          <div class="su">
+            <aside class="su-rail" data-clone="rail-1"></aside>
+            <div class="su-main"><div class="su-card" id="t-step1">
+              <p class="eyebrow">Step 1 of 5</p>
+              <h2>Create the admin account</h2>
+              <p class="sub">This is the account that runs the server. You can add more admins later on the admin page.</p>
+              <div class="m-f"><label>Your name</label><div class="m-input">George</div></div>
+              <div class="m-f"><label>Email</label><div class="m-input">george@example.org</div></div>
+              <div class="m-row2">
+                <div class="m-f"><label>Password</label><div class="m-input">••••••••••••</div><div class="hint">At least 8 characters.</div></div>
+                <div class="m-f"><label>Again</label><div class="m-input">••••••••••••</div></div>
+              </div>
+              <div class="m-f"><label>Setup code <span class="muted-t" style="text-transform:none;letter-spacing:0">(option B only, see questions)</span></label><div class="m-input">K7QM-2PXD <span class="tag">from the installer</span></div><div class="hint">Printed by the installer and in the server log. Stops a stranger who finds the new server first.</div></div>
+              <div class="m-foot"><span class="muted-t" style="font-size:12px">Only shown on a brand-new server.</span><div class="r"><span class="m-btn primary">Create admin account →</span></div></div>
+            </div></div>
+          </div>
+        </div></div>
+        <div class="frame-cap">Desktop · step 1. The rail lists every step; the steps after this one unlock once the account exists.</div>
+      </div>
+
+      <div>
+        <div class="frame phone" style="--w:390;--h:800"><div class="vp">
+          <div class="su-phone-head"><span class="m-logo">TEAMFLOW · SETUP</span><b>Step 1 of 5 · Admin account</b><div class="pbar"><i class="on"></i><i></i><i></i><i></i><i></i></div></div>
+          <div class="su-phone-body" data-clone="t-step1"></div>
+        </div></div>
+        <div class="frame-cap">Phone · step 1. The rail becomes a progress bar; buttons go full width.</div>
+      </div>
+
+      <div>
+        <div class="frame" style="--w:1280;--h:800"><div class="vp">
+          <div class="su">
+            <aside class="su-rail" data-clone="rail-2"></aside>
+            <div class="su-main"><div class="su-card" id="t-step2">
+              <p class="eyebrow">Step 2 of 5</p>
+              <h2>Name and address</h2>
+              <p class="sub">Shown on the login page, in the browser tab and in emails.</p>
+              <div class="m-f"><label>Site name</label><div class="m-input">Toasterland Teamflow</div></div>
+              <div class="m-f"><label>Public address</label><div class="m-input">https://teamflow.toasterland.org <span class="tag">from this page</span></div>
+                <div class="hint"><span class="ok-t">✓ Reachable</span>. Invite links, password-reset emails and the Discord bot use this address.</div></div>
+              <div class="m-callout">If people will open Teamflow at a different address from the one you're using now (for example through a proxy), change it here. You can edit it later in <b>Server admin → Site &amp; email</b>.</div>
+              <div class="m-foot"><span class="m-btn link">← Back</span><div class="r"><span class="m-btn primary">Save and continue →</span></div></div>
+            </div></div>
+          </div>
+        </div></div>
+        <div class="frame-cap">Desktop · step 2. Both fields are prefilled: the name with "Teamflow", the address with the page's own origin (or X-Forwarded-Proto/Host when the proxy is trusted).</div>
+      </div>
+
+      <div>
+        <div class="frame phone" style="--w:390;--h:800"><div class="vp">
+          <div class="su-phone-head"><span class="m-logo">TEAMFLOW · SETUP</span><b>Step 2 of 5 · Name and address</b><div class="pbar"><i class="done"></i><i class="on"></i><i></i><i></i><i></i></div></div>
+          <div class="su-phone-body" data-clone="t-step2"></div>
+        </div></div>
+        <div class="frame-cap">Phone · step 2.</div>
+      </div>
+
+      <div>
+        <div class="frame" style="--w:1280;--h:800"><div class="vp">
+          <div class="su">
+            <aside class="su-rail" data-clone="rail-3"></aside>
+            <div class="su-main"><div class="su-card">
+              <p class="eyebrow">Step 3 of 5 · optional</p>
+              <h2>Email</h2>
+              <p class="sub">Used for password resets and, later, notifications. Any SMTP service works.</p>
+              <div class="m-row2">
+                <div class="m-f"><label>SMTP server</label><div class="m-input">smtp.fastmail.com</div></div>
+                <div class="m-f"><label>Port</label><div class="m-input">587</div></div>
+              </div>
+              <div class="m-f"><label>Security</label><div class="m-seg"><span class="on">STARTTLS (587)</span><span>SSL (465)</span><span>None</span></div></div>
+              <div class="m-row2">
+                <div class="m-f"><label>Username</label><div class="m-input">george@example.org</div></div>
+                <div class="m-f"><label>Password</label><div class="m-input">••••••••</div></div>
+              </div>
+              <div class="m-f"><label>Send as</label><div class="m-input">Teamflow &lt;teamflow@toasterland.org&gt;</div></div>
+              <div class="m-foot"><span class="m-btn quiet sm">Send a test to george@example.org</span><div class="r"><span class="m-btn">Skip for now</span><span class="m-btn primary">Save and continue →</span></div></div>
+            </div></div>
+          </div>
+        </div></div>
+        <div class="frame-cap">Desktop · step 3. The password is stored encrypted with TEAMFLOW_SECRETS_KEY (or JWT_SECRET), the same way as the Discord bot secrets.</div>
+      </div>
+
+      <div>
+        <div class="frame" style="--w:1280;--h:800"><div class="vp">
+          <div class="su">
+            <aside class="su-rail" data-clone="rail-4"></aside>
+            <div class="su-main"><div class="su-card">
+              <p class="eyebrow">Step 4 of 5</p>
+              <h2>Storage and sign-up</h2>
+              <p class="sub">The rules for Flows people make themselves. The admin's own Flows have no limit.</p>
+              <div class="m-row3">
+                <div class="m-f"><label>Upload cap per Flow</label><div class="m-input">1 GB</div></div>
+                <div class="m-f"><label>Flows per person</label><div class="m-input">3</div></div>
+                <div class="m-f"><label>Stop uploads below</label><div class="m-input">2 GB free</div></div>
+              </div>
+              <div class="disk">This server: <b>41 GB free</b> of 98 GB on the upload disk.<div class="bar"><i style="width:58%"></i><i class="floor" style="width:2%"></i></div></div>
+              <div class="m-f" style="margin-top:20px"><label>Who can sign up</label><div class="m-seg"><span class="on">Anyone with the address</span><span>Only people with an invite</span></div>
+                <div class="hint">Invite-only is safer for a server on the internet. Today this is TEAMFLOW_INVITE_ONLY in .env.</div></div>
+              <div class="m-foot"><span class="m-btn link">← Back</span><div class="r"><span class="m-btn primary">Save and continue →</span></div></div>
+            </div></div>
+          </div>
+        </div></div>
+        <div class="frame-cap">Desktop · step 4. Same three values as Server admin → Space defaults, plus who can sign up (new to the UI).</div>
+      </div>
+
+      <div>
+        <div class="frame" style="--w:1280;--h:800"><div class="vp">
+          <div class="su">
+            <aside class="su-rail" data-clone="rail-5"></aside>
+            <div class="su-main"><div class="su-card" id="t-step5">
+              <p class="eyebrow">Step 5 of 5</p>
+              <h2>You're set up</h2>
+              <p class="sub">What's done and what's left. This list also stays on the admin Overview until everything is ticked or dismissed.</p>
+              <ul class="check">
+                <li><i class="y">✓</i><span>Admin account<small>George · george@example.org</small></span><span></span></li>
+                <li><i class="y">✓</i><span>Name and address<small>Toasterland Teamflow · https://teamflow.toasterland.org</small></span><span></span></li>
+                <li><i class="s">!</i><span>Email skipped<small>Password resets need an admin until it's set.</small></span><a>Set up email</a></li>
+                <li><i class="y">✓</i><span>Storage and sign-up<small>1 GB · 3 per person · stop below 2 GB · anyone can sign up</small></span><span></span></li>
+                <li><i class="n"></i><span>First backup<small>No backup yet.</small></span><a>Updates &amp; backups</a></li>
+                <li><i class="y">✓</i><span>Runs as a service<small>systemd: teamflow.service</small></span><span></span></li>
+                <li><i class="n"></i><span>Your first Flow<small>A board for you and your people.</small></span><span></span></li>
+              </ul>
+              <div class="m-foot"><span class="m-btn">Open server admin</span><div class="r"><span class="m-btn primary">Create my first Flow →</span></div></div>
+            </div></div>
+          </div>
+        </div></div>
+        <div class="frame-cap">Desktop · step 5. "Create my first Flow" opens the same Create a Flow screen as a new member sees, but the admin's Flow has no cap.</div>
+      </div>
+
+      <div>
+        <div class="frame phone" style="--w:390;--h:800"><div class="vp">
+          <div class="su-phone-head"><span class="m-logo">TEAMFLOW · SETUP</span><b>Step 5 of 5 · Checklist</b><div class="pbar"><i class="done"></i><i class="done"></i><i class="done"></i><i class="done"></i><i class="on"></i></div></div>
+          <div class="su-phone-body" data-clone="t-step5"></div>
+        </div></div>
+        <div class="frame-cap">Phone · step 5.</div>
+      </div>
+    </div>
+
+    <div class="qa">
+      <div><h4>Q1 · Who may claim a brand-new server?</h4>
+        <p><b>A.</b> Whoever opens it first. This is what happens today: the first account to register becomes admin.</p>
+        <p><b>B.</b> Whoever has the one-time setup code. The installer prints it and it is in the server log; the Installs lane would show it with the setup link.</p>
+        <p class="rec">B. A fresh server on a public address can be claimed by a stranger in the minutes before you open it. The code costs one paste.</p></div>
+      <div><h4>Q2 · Should .env still win over the page?</h4>
+        <p>PUBLIC_URL, SMTP_* and TEAMFLOW_INVITE_ONLY exist today.</p>
+        <p class="rec">Yes, while they are set. The field shows "Set in .env" and can't be edited. Production keeps working unchanged, and new installs leave them empty.</p></div>
+    </div>
+  </section>
+
+  <!-- ============ 2. WELCOME ============ -->
+  <section class="item" id="welcome">
+    <p class="eyebrow">2 · Welcome after sign-up · /welcome</p>
+    <h2>"You just created your account"</h2>
+    <p class="lead">Today, registering quietly makes a team called "General" (key GEN) and drops you on its board. With this change, registering makes <b>no</b> team. You land here and choose. Anyone who has no Flows (for example after leaving their last one) also lands here instead of an empty settings page.</p>
+    <div class="mocks">
+      <div>
+        <div class="frame" style="--w:1280;--h:800"><div class="vp">
+          <div class="m-top"><span class="m-logo">TOASTERLAND TEAMFLOW</span><span class="grow"></span><span class="m-avatar">SR</span></div>
+          <div class="wl"><div class="wl-in" id="t-welcome">
+            <p class="eyebrow">Welcome, Sam</p>
+            <h1>You just created your account.</h1>
+            <p>A Flow is a shared board: issues, files and the people working on them. Start your own, or join one someone invited you to.</p>
+            <div class="choices">
+              <div class="choice hl"><span class="ic">+</span><h3>Create a Flow</h3><p>Start a new board. Invite people whenever you're ready.</p><p class="fine">Free Flow · uploads up to 1 GB · you can own 3</p><span class="m-btn primary">Create a Flow</span></div>
+              <div class="choice"><span class="ic">⇢</span><h3>Join a Flow</h3><p>Paste the invite link or code someone sent you.</p><p class="fine">Links look like teamflow.toasterland.org/invite/…</p><span class="m-btn quiet">Join a Flow</span></div>
+            </div>
+            <p class="wl-skip">Not now? <u>Open settings</u> · <u>Log out</u></p>
+          </div></div>
+        </div></div>
+        <div class="frame-cap">Desktop · welcome. "Create a Flow" is the gold one because most people arriving without an invite want their own board.</div>
+      </div>
+      <div>
+        <div class="frame phone" style="--w:390;--h:800"><div class="vp">
+          <div class="m-top" style="padding:0 16px"><span class="m-logo">TEAMFLOW</span><span class="grow"></span><span class="m-avatar">SR</span></div>
+          <div class="wl" data-clone="t-welcome"></div>
+        </div></div>
+        <div class="frame-cap">Phone · welcome. The two cards stack; each button is full width.</div>
+      </div>
+      <div>
+        <div class="frame" style="--w:1280;--h:800"><div class="vp">
+          <div class="m-top"><span class="m-logo">TOASTERLAND TEAMFLOW</span><span style="margin-left:16px;font-weight:700">AXIOM · Axiom Ops</span><span class="grow"></span><span class="m-avatar">SR</span></div>
+          <div class="board-stub"><div class="col">TODO</div><div class="col">IN PROGRESS</div><div class="col">DONE</div></div>
+          <div class="toast"><b>✓</b> Welcome, Sam. You joined the Flow <b>AXIOM</b>.</div>
+        </div></div>
+        <div class="frame-cap">Desktop · arrived with an invite link. Register (the form already says "You're invited to AXIOM") → straight onto AXIOM's board, no welcome screen and no extra General team.</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ 2a. CREATE ============ -->
+  <section class="item" id="create">
+    <p class="eyebrow">2a · Create a Flow · /welcome/create</p>
+    <h2>Name it and go</h2>
+    <p class="lead">Uses the existing create-team call, so the free-space rules already apply: a free Flow with the 1 GB cap, at most 3 per person. Your first Flow is never refused, even if an admin has set the limit to 0, so a new account can always start. The key is suggested from the name and can be edited.</p>
+    <div class="mocks">
+      <div>
+        <div class="frame" style="--w:1280;--h:800"><div class="vp">
+          <div class="m-top"><span class="m-logo">TOASTERLAND TEAMFLOW</span><span class="grow"></span><span class="m-avatar">SR</span></div>
+          <div class="wl"><div class="panel" id="t-create">
+            <span class="back">← Back</span>
+            <h2>Create a Flow</h2>
+            <p class="sub">You'll be its owner. You can rename it or invite people later.</p>
+            <div class="m-f"><label>Flow name</label><div class="m-input">Design crew</div></div>
+            <div class="m-f"><label>Key</label><div class="m-input" style="width:180px">DSG</div><div class="hint">Issue IDs will look like <code>DSG-1</code>. 2–6 letters.</div></div>
+            <div class="m-f"><label>Your free Flows</label><div class="slots"><i class="new"></i><i></i><i></i><span>this will be 1 of 3 · uploads up to 1 GB</span></div></div>
+            <div class="m-foot"><div class="r"><span class="m-btn primary">Create Flow →</span></div></div>
+          </div></div>
+        </div></div>
+        <div class="frame-cap">Desktop · create. On success: the new board, with a one-line tip to invite people from Settings → Flow.</div>
+      </div>
+      <div>
+        <div class="frame phone" style="--w:390;--h:800"><div class="vp">
+          <div class="m-top" style="padding:0 16px"><span class="m-logo">TEAMFLOW</span><span class="grow"></span><span class="m-avatar">SR</span></div>
+          <div class="panel" style="margin-top:6px">
+            <span class="back">← Back</span>
+            <h2>Create a Flow</h2>
+            <div class="m-f"><label>Flow name</label><div class="m-input">Weekend build</div></div>
+            <div class="m-f"><label>Key</label><div class="m-input">WKND</div></div>
+            <div class="m-f"><label>Your free Flows</label><div class="slots"><i class="used"></i><i class="used"></i><i class="used"></i><span>3 of 3 used</span></div></div>
+            <div class="m-callout bad"><b>You already own 3 free Flows, the most allowed.</b> Delete one you no longer need, or ask a server admin to make one for you.</div>
+            <div class="m-foot"><div class="r"><span class="m-btn">Manage my Flows</span></div></div>
+          </div>
+        </div></div>
+        <div class="frame-cap">Phone · at the limit. The button is replaced by the server's own 409 <code>free_space_limit</code> wording before you type anything.</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ 2b. JOIN ============ -->
+  <section class="item" id="join">
+    <p class="eyebrow">2b · Join a Flow · /welcome/join</p>
+    <h2>Paste a link or a code</h2>
+    <p class="lead">Accepts a full link, an old <code>?invite=</code> link or the bare code, using <code>extractInviteToken</code>. It shows who you're joining (existing <code>GET /invites/:token</code>) before you commit, then calls the existing accept. Invite links clicked while signed out keep working as today: <code>stashPendingInvite</code> → register → <code>takePendingInvite</code> → that board.</p>
+    <div class="mocks">
+      <div>
+        <div class="frame" style="--w:1280;--h:800"><div class="vp">
+          <div class="m-top"><span class="m-logo">TOASTERLAND TEAMFLOW</span><span class="grow"></span><span class="m-avatar">SR</span></div>
+          <div class="wl"><div class="panel">
+            <span class="back">← Back</span>
+            <h2>Join a Flow</h2>
+            <p class="sub">Paste the invite link or code someone sent you.</p>
+            <div class="m-f"><label>Invite link or code</label><div class="m-input">https://teamflow.toasterland.org/invite/k3J9xQ… <span class="tag">pasted</span></div></div>
+            <div class="preview"><span class="key">AXIOM</span><span><b>Axiom Ops</b><small>Invited by George · you'll join as Member · 6 people</small></span></div>
+            <div class="m-foot"><div class="r"><span class="m-btn primary">Join AXIOM →</span></div></div>
+          </div></div>
+        </div></div>
+        <div class="frame-cap">Desktop · join. The preview loads as soon as something that looks like an invite is pasted.</div>
+      </div>
+      <div>
+        <div class="frame phone" style="--w:390;--h:800"><div class="vp">
+          <div class="m-top" style="padding:0 16px"><span class="m-logo">TEAMFLOW</span><span class="grow"></span><span class="m-avatar">SR</span></div>
+          <div class="panel" style="margin-top:6px">
+            <span class="back">← Back</span>
+            <h2>Join a Flow</h2>
+            <div class="m-f"><label>Invite link or code</label><div class="m-input bad">p8Ft2LwZ</div><div class="err">This invite has expired or was used up. Ask whoever sent it for a new link.</div></div>
+            <div class="m-foot"><div class="r"><span class="m-btn primary" style="opacity:.45">Join</span><span class="m-btn link">Create a Flow instead</span></div></div>
+          </div>
+        </div></div>
+        <div class="frame-cap">Phone · a bad code. Same wording as the server's invite errors.</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ 3. WORDING ============ -->
+  <section class="item" id="wording">
+    <p class="eyebrow">3 · Wording</p>
+    <h2>Where "Flow" replaces "team" and "space"</h2>
+    <p class="lead">One word for one thing: a team <i>is</i> a space (same row, same id), so the UI should not use two names for it. The API, database, permission ids and URLs (<code>/t/:teamKey</code>) keep "team"; only text people read changes.</p>
+    <div class="scroll-x"><table class="list">
+      <tr><th>Where</th><th>Today</th><th>Proposed</th></tr>
+      <tr><td>Top bar switcher</td><td>team switcher, "Create team"</td><td>"Switch Flow", "New Flow"</td></tr>
+      <tr><td>Settings → Team</td><td>Team, Team name, Team members, Delete team, Join a team</td><td>Flow, Flow name, Members, Delete Flow, Join a Flow</td></tr>
+      <tr><td>Settings → General</td><td>"Create another team."</td><td>"Create another Flow."</td></tr>
+      <tr><td>Invite messages</td><td>"Joined team ENG — …"</td><td>"You joined the Flow ENG — …"</td></tr>
+      <tr><td>Files drawer</td><td>Team files; meter says "free space"</td><td>Flow files; meter says "free Flow · 1 GB"</td></tr>
+      <tr><td>Space-full errors</td><td>"This space is full…"</td><td>"This Flow is full…"</td></tr>
+      <tr><td>Server admin</td><td>Spaces, Space defaults, Admin space / Free space</td><td>Flows, Flow defaults, Admin Flow / Free Flow</td></tr>
+      <tr><td>Kept as is</td><td>Roles, members, issue keys, board, Plan</td><td>unchanged</td></tr>
+      <tr><td>Kept as is</td><td>API paths, DB columns, error codes (<code>space_storage_full</code>), permission ids (<code>team.*</code>), MCP/CLI names</td><td>unchanged; docs say "Flow (team in the API)"</td></tr>
+    </table></div>
+    <div class="qa">
+      <div><h4>Q3 · Does "Flow" reach the admin page too?</h4>
+        <p><b>A.</b> Flow everywhere. The admin page says Flows, Free Flow and Admin Flow.</p>
+        <p><b>B.</b> Flow for members; the admin page keeps "Spaces" as the storage view of the same thing.</p>
+        <p class="rec">A. Two names for one row is what confuses people. "Free Flow · 1 GB" reads fine.</p></div>
+      <div><h4>Q4 · Capital F?</h4>
+        <p>"Create a Flow" vs "Create a flow".</p>
+        <p class="rec">Capital F, as a product name ("a Flow", "your Flows"). It also keeps it apart from the ordinary word "flow".</p></div>
+    </div>
+  </section>
+
+  <!-- ============ 4. ADMIN ============ -->
+  <section class="item" id="admin">
+    <p class="eyebrow">4 · Server admin page</p>
+    <h2>What it does today, what a fresh install is missing</h2>
+    <div class="scroll-x"><table class="list">
+      <tr><th>Section</th><th>Today</th><th>Missing for a fresh install</th><th>Would add</th></tr>
+      <tr><td>Overview</td><td class="ok">Server, version, uptime, public-URL check, upload disk, DB size, backups, updates, Discord bot, spaces summary, warnings</td><td class="miss">No "what's left to set up" list; warnings tell you to edit .env</td><td class="new">Setup checklist card (same as step 5) until done or dismissed; warnings link to the new panels instead of .env</td></tr>
+      <tr><td>Spaces</td><td class="ok">List, filter, create (admin/free, cap, owner), detail: usage, type, cap, owner, history, empty trash, delete</td><td>—</td><td>Rename to Flows (Q3)</td></tr>
+      <tr><td>Space defaults</td><td class="ok">Free cap, per-person limit, disk floor</td><td class="miss">Who can sign up lives only in .env</td><td class="new">"Sign-up": anyone / invite only</td></tr>
+      <tr><td>Updates &amp; backups</td><td class="ok">Version, update, backups</td><td>—</td><td>Owned by the Install lane; untouched here</td></tr>
+      <tr><td>Discord bot</td><td class="ok">Config, start/stop, status</td><td>—</td><td>—</td></tr>
+      <tr><td>How-tos &amp; fixes</td><td class="ok">Common fixes</td><td>—</td><td>Add "Set up email", "Change the address"</td></tr>
+      <tr><td><i>(none)</i></td><td class="miss">—</td><td class="miss">Site name and public address only in .env (needs a restart)</td><td class="new">New panel "Site &amp; email": name, address with check, SMTP with test send</td></tr>
+      <tr><td><i>(none)</i></td><td class="miss">—</td><td class="miss">No list of accounts in the UI (the <code>/instance/users</code> API exists); admins only via .env or the first-user rule</td><td class="new">New panel "People": list accounts, make/remove server admin (never the last one), send a reset link, see Flows owned</td></tr>
+    </table></div>
+    <div class="mocks">
+      <div>
+        <div class="frame" style="--w:1280;--h:800"><div class="vp">
+          <div class="m-top"><span class="m-logo">TOASTERLAND TEAMFLOW</span><span style="margin-left:16px;font-weight:700">Server admin</span><span class="grow"></span><span class="m-avatar">GE</span></div>
+          <div class="m-admin">
+            <nav class="m-snav">
+              <div class="h">Server</div>
+              <div class="it on">Overview</div>
+              <div class="it">Flows</div>
+              <div class="it">People <span class="nw">new</span></div>
+              <div class="it">Site &amp; email <span class="nw">new</span></div>
+              <div class="it">Updates &amp; backups</div>
+              <div class="it">Discord bot</div>
+              <div class="h">Settings</div>
+              <div class="it">Flow defaults &amp; sign-up</div>
+              <div class="h">Help</div>
+              <div class="it">How-tos &amp; fixes</div>
+            </nav>
+            <div class="m-content">
+              <h2>Overview</h2>
+              <p class="sub">Toasterland Teamflow · v0.9.0 · up 2 h</p>
+              <div class="m-grid">
+                <div class="m-tile new wide">
+                  <div class="th"><b>Finish setting up</b><span class="grow"></span><span class="muted-t">4 of 7 done</span><span class="m-btn link sm">Dismiss</span></div>
+                  <ul class="check mini">
+                    <li><i class="s">!</i><span>Email isn't set up, so password resets need an admin</span><a>Site &amp; email</a></li>
+                    <li><i class="n"></i><span>No backup yet</span><a>Updates &amp; backups</a></li>
+                    <li><i class="n"></i><span>You have no Flow yet</span><a>Create a Flow</a></li>
+                  </ul>
+                </div>
+                <div class="m-tile"><div class="th"><span class="dot ok"></span><b>Server</b></div><dl><dt>Address</dt><dd>teamflow.toasterland.org</dd><dt>Service</dt><dd>systemd</dd><dt>Node</dt><dd>v20.19.2</dd></dl></div>
+                <div class="m-tile"><div class="th"><span class="dot ok"></span><b>Storage</b></div><dl><dt>Upload disk</dt><dd>41 GB free</dd><dt>Database</dt><dd>3.1 MB</dd><dt>Flows</dt><dd>1 admin · 0 free</dd></dl></div>
+                <div class="m-tile"><div class="th"><span class="dot warn"></span><b>Backups</b></div><dl><dt>Last</dt><dd>never</dd><dt>Updates</dt><dd>up to date</dd></dl></div>
+              </div>
+            </div>
+          </div>
+        </div></div>
+        <div class="frame-cap">Desktop · admin Overview right after setup. Gold-edged card = new; only the open items are listed. Today's tiles are unchanged.</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ PLAN ============ -->
+  <section class="item" id="plan">
+    <p class="eyebrow">Build plan · after George picks Q1–Q4</p>
+    <h2>Numbered steps, one commit each</h2>
+    <ol class="plan">
+      <li><b>Settings in the database.</b> New <code>instance_settings</code> keys: <code>site</code> (name, address), <code>mail</code> (SMTP, password encrypted), <code>signup</code>, <code>setup</code> (checklist dismissed). Values set in .env win. Move every reader of <code>config.publicUrl</code>, <code>config.smtp</code> and <code>config.inviteOnly</code> (CORS, mail, Discord, health check) to getters that pick up changes without a restart. <small>M · no schema change needed: the table exists</small></li>
+      <li><b>Setup API.</b> Public <code>GET /setup/status</code> → <code>{ needed }</code> (true only with zero accounts). <code>POST /setup/admin</code> creates the account in one transaction that re-checks for zero accounts; afterwards it always returns 409. Setup code if Q1 = B. Rate-limited like login. <small>M · tests: second call refused, refused once any account exists, race of two calls</small></li>
+      <li><b>Admin settings API.</b> <code>GET/PATCH /instance/site</code>, <code>/instance/mail</code> (+ <code>POST …/test</code>), sign-up on <code>/instance/settings</code>, <code>GET /instance/setup-checklist</code>. <small>M</small></li>
+      <li><b>/setup in the web app.</b> Five steps, desktop rail and phone progress bar, address prefilled from the page. The login page sends you to /setup while it's needed; /setup sends you to login once it isn't. <small>L</small></li>
+      <li><b>Sign-up makes no team.</b> Register creates only the account. With an invite it joins that team. The first account (admin) gets an admin Flow through "Create my first Flow". <small>M · biggest test churn (fake API, server tests that expect GEN)</small></li>
+      <li><b>/welcome, Create a Flow, Join a Flow.</b> Zero-Flow users are routed here. Create uses <code>POST /teams</code>, with the "first one is never refused" rule kept. Join uses <code>extractInviteToken</code> + <code>GET /invites/:token</code> preview + accept. <small>L</small></li>
+      <li><b>Admin page: checklist card, "Site &amp; email", "People", sign-up switch.</b> People: list, make or remove admin (never the last one), send a reset link. <small>L</small></li>
+      <li><b>"Flow" wording pass</b> per the table (after Q3/Q4). Text only, plus tests that match on text. <small>M</small></li>
+      <li><b>Hand-off to the Install lane:</b> installers print the setup link (and code), and leave PUBLIC_URL/SMTP out of the generated .env. <small>S · their lane</small></li>
+      <li><b>Docs:</b> new docs/SETUP.md, SPACES.md ("Flows"), API.md (<code>pnpm docs:api</code>), README first-run section. <small>S</small></li>
+    </ol>
+    <h3 style="margin-top:18px">Risks</h3>
+    <ul class="changes">
+      <li><b>Takeover of a fresh server</b> before its owner opens it (Q1). The setup code removes it; without it, keep the window short.</li>
+      <li><b>Dropping the automatic "General" team</b> touches many tests and anything that assumes every user has a team (MCP and CLI defaults, the board shell). Existing users and teams are not changed.</li>
+      <li><b>Address and email moving from .env to the page:</b> CORS, mail and the Discord bot read them at boot today, so a missed reader keeps the old value. Step 1 lists every reader and adds a test for each.</li>
+      <li><b>SMTP password in the database</b> is encrypted with the secrets key, but it does end up in DB backups (encrypted). Changing the key means re-entering it.</li>
+      <li><b>Address prefill behind a proxy</b> shows <code>http://</code> unless TEAMFLOW_TRUST_PROXY is on. It's editable, and the reachability check catches it.</li>
+      <li><b>Production is unaffected by setup</b> (it has accounts), but plan step 5 changes sign-up there too: new users get the welcome screen instead of General.</li>
+      <li>Settings → Updates is not touched (Install lane).</li>
+    </ul>
+  </section>
+</main>
+
+<script>
+  // Rails for the five desktop setup frames.
+  const steps = [["Admin account", "you"], ["Name and address", "site"], ["Email", "optional"], ["Storage and sign-up", "rules"], ["Checklist", "what's left"]];
+  function rail(on, skipped) {
+    return '<span class="m-logo">TEAMFLOW · SETUP</span>' + steps.map(([t, s], i) => {
+      const n = i + 1;
+      const cls = n === on ? "on" : (skipped.includes(n) ? "skip" : (n < on ? "done" : ""));
+      const mark = cls === "done" ? "✓" : (cls === "skip" ? "–" : n);
+      return `<div class="step ${cls}"><i>${mark}</i><span>${t}<small>${s}</small></span></div>`;
+    }).join("") + '<span class="grow"></span><p class="fine">Only shown on a brand-new server. Once the admin account exists nobody else can open this page.</p>';
+  }
+  for (let i = 1; i <= 5; i++) {
+    document.querySelectorAll(`[data-clone="rail-${i}"]`).forEach((el) => { el.innerHTML = rail(i, i >= 4 ? [3] : []); });
+  }
+  // Phone frames reuse the desktop content.
+  document.querySelectorAll("[data-clone]").forEach((el) => {
+    const src = document.getElementById(el.dataset.clone);
+    if (src) el.innerHTML = src.outerHTML.replace(/ id="[^"]*"/, "");
+  });
+  document.getElementById("theme").addEventListener("click", () => {
+    const root = document.documentElement;
+    root.dataset.theme = root.dataset.theme === "dark" ? "light" : "dark";
+  });
+</script>
+</body>
+</html>
