@@ -1,5 +1,7 @@
 # Teamflow
 
+[![Buy me a coffee](https://img.shields.io/badge/Buy%20me%20a%20coffee-FFDD00?style=for-the-badge&logo=kofi&logoColor=black)](https://ko-fi.com/toters)
+
 Self-hosted issue tracker for small teams: kanban boards with rows (swimlanes) and columns, roles and permissions, team files, a Discord bot, and first-class **AI tooling** through MCP and a CLI. One Node process serves the API and the web UI from a single SQLite file.
 
 ## Features
@@ -124,7 +126,9 @@ A Docker setup exists for hosts that already run Docker: [deploy/docker/README.m
 
 ## Support
 
-Teamflow is free to use under [AGPL-3.0](LICENSE). If it saves you time, you can support it on [Ko-fi](https://ko-fi.com/toters).
+Teamflow is free to use under [AGPL-3.0](LICENSE). If it saves you time, you can [buy me a coffee](https://ko-fi.com/toters).
+
+[![Buy me a coffee](https://img.shields.io/badge/Buy%20me%20a%20coffee-FFDD00?style=for-the-badge&logo=kofi&logoColor=black)](https://ko-fi.com/toters)
 
 The same link appears in the in-app **About** dialog. Donation links are configured in [`packages/core/src/about.ts`](packages/core/src/about.ts).
 
