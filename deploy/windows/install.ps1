@@ -11,7 +11,7 @@ Write-Host "Teamflow Windows install" -ForegroundColor Cyan
 Write-Host "Repo: $RepoRoot"
 
 if (-not (Get-Command node -ErrorAction SilentlyContinue)) {
-  Write-Host "Node.js not found. Install Node 20+ (winget install OpenJS.NodeJS.LTS)" -ForegroundColor Red
+  Write-Host "Node.js not found. Install Node 20 (not 22+): https://nodejs.org/en/download or nvm-windows" -ForegroundColor Red
   exit 1
 }
 
