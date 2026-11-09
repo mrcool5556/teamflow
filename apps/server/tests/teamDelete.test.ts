@@ -163,14 +163,14 @@ describe("DELETE /teams/:teamId", () => {
 });
 
 describe("removing members never trips the role foreign keys", () => {
-  it("gives the last admin a clear 403 when they try to leave", async () => {
+  it("gives the last owner a clear 403 when they try to leave", async () => {
     const creator = await registerUser(app);
-    // POST /teams makes the creator the team's only Admin.
-    const teamId = await createTeam(app, creator.token, "Solo admin", "SOLO");
+    // POST /teams makes the creator the Flow's only Owner.
+    const teamId = await createTeam(app, creator.token, "Solo owner", "SOLO");
     const res = await api(app, "DELETE", `/teams/${teamId}/members/me`, { token: creator.token });
     expect(res.status).toBe(403);
     const body = await json<{ error: string; code: string }>(res);
-    expect(body.error).toBe("Cannot remove the last admin");
+    expect(body.error).toBe("Cannot remove the last owner");
     expect(body.code).toBeTruthy();
   });
 

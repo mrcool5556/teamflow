@@ -8,14 +8,14 @@ only uploaded bytes are. Design and mock-up: [mockups/admin-spaces-v1.html](mock
 
 | | Admin space | Free space |
 |---|---|---|
-| Made by | An instance admin (Server admin → Spaces → New space, or New team) | Any user (New team), and each new user's **General** |
+| Made by | An instance admin (Server admin → Spaces → New space, or New team) | Any user (Create a Flow, New team) |
 | Upload cap | Whatever the admin sets, or no limit | The free-space cap (default **1 GB**) |
-| Per-user limit | None | At most **3** per user (their General counts) |
+| Per-user limit | None | At most **3** per user (an older account's General counts) |
 
 - The space counts against `teams.space_owner_id`, the account it was made for. Instance admins
   (including accounts in `TEAMFLOW_INSTANCE_ADMINS`) always make admin spaces with no limit.
 - A fourth free space is refused with `409 free_space_limit` (`owned`, `limit` in the body).
-  Deleting one frees a slot. Registration is never refused, even with a limit of 0. An admin can
+  Deleting one frees a slot. A user's first free space is never refused, even with a limit of 0, so a new account can always start. An admin can
   make free spaces for a user past the limit.
 - Teams that existed before spaces (schema version 4) became **admin spaces with no limit**, so
   nothing changed for them until an admin sets a cap.

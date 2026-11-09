@@ -79,7 +79,7 @@ function DefaultsForm({
         value={cap}
         onChange={setCap}
         allowNoLimit={false}
-        hint="New free spaces, and each new user's General, start with this."
+        hint="New free spaces start with this."
       />
       <div className="settings-field">
         <label className="settings-field-label" htmlFor={perUserId}>
@@ -93,7 +93,7 @@ function DefaultsForm({
           onChange={(e) => setPerUser(e.target.value)}
         />
         <span className="settings-field-hint">
-          Their General counts. Signing up always works; New team is refused past this.
+          A user's first is never refused; New team is refused past this.
         </span>
       </div>
       <div className="settings-field">

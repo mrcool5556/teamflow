@@ -91,10 +91,10 @@ export function countOwnedFreeSpaces(db: DbExecutor, userId: string) {
 }
 
 /**
- * The space a user's own New team (or registration's General) gets. Instance admins make admin
- * spaces with no cap; everyone else makes free spaces with the free-space cap, at most
- * `freeSpacesPerUser` of them. `firstSpace` (registration) is never refused, so signing up works
- * even with a limit of 0.
+ * The space a Flow a user makes for themselves gets (Create a Flow, New Flow). Instance admins
+ * make admin spaces with no cap; everyone else makes free spaces with the free-space cap, at most
+ * `freeSpacesPerUser` of them. A user's first free space is never refused, so a new account can
+ * always start even with a limit of 0; `firstSpace` forces that exemption.
  */
 export function spaceForUserCreatedTeam(
   db: DbExecutor,
@@ -106,7 +106,7 @@ export function spaceForUserCreatedTeam(
   const settings = getSpaceSettings(db);
   if (!input.firstSpace) {
     const owned = countOwnedFreeSpaces(db, input.userId);
-    if (owned >= settings.freeSpacesPerUser) {
+    if (owned > 0 && owned >= settings.freeSpacesPerUser) {
       throw new ApiError(
         409,
         `You already have ${owned} free space${owned === 1 ? "" : "s"}, the most allowed. ` +

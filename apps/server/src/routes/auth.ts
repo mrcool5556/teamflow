@@ -1,4 +1,3 @@
-import { config } from "../config.js";
 import { Hono } from "hono";
 import type { AppEnv } from "../types.js";
 import { parseBody, parseWith, readJson } from "../lib/validation.js";
@@ -34,7 +33,6 @@ import {
   assertInviteAcceptable,
   isInviteOnlyRegistration,
 } from "../lib/invites.js";
-import { createTeamWithOwner, spaceForUserCreatedTeam } from "../lib/teams.js";
 import { ApiError } from "../lib/errors.js";
 import { createSetupAdmin, getSetupStatus, isSetupNeeded } from "../lib/setup.js";
 import { getSiteName } from "../lib/siteSettings.js";
@@ -103,22 +101,13 @@ routes.post("/auth/register", async (c) => {
   const passwordHash = await hashPassword(body.password);
   const inviteToken = body.inviteToken;
 
-  // User, "General" team (Owner), default board and invite acceptance land together or not at all.
+  // The account and invite acceptance land together or not at all. No team is made here: the
+  // welcome page offers Create a Flow / Join a Flow, and an invite joins that Flow directly.
   db.transaction((tx) => {
     // A fresh server's first account comes from /auth/setup/admin, so this one is never first.
     tx.insert(schema.users)
       .values({ id: userId, email: body.email, name: body.name, passwordHash, isInstanceAdmin: 0 })
       .run();
-
-    const isInstanceAdmin = config.instanceAdminEmails.includes(body.email.toLowerCase());
-    createTeamWithOwner(tx, {
-      userId,
-      userName: body.name,
-      name: "General",
-      key: "GEN",
-      role: "owner",
-      space: spaceForUserCreatedTeam(tx, { userId, isInstanceAdmin, firstSpace: true }),
-    });
 
     if (inviteToken) {
       acceptTeamInvite(tx, inviteToken, userId);

@@ -54,20 +54,27 @@ export type RegisteredUser = {
   email: string;
   password: string;
   token: string;
-  /** A team the user owns: their first team, or "General" (GEN) made by the helper. */
+  /** The "General" (GEN) team registerUser makes for the user (they are its Owner). */
   teamId: string;
 };
 
-export async function registerUser(
+export type RegisteredAccount = Omit<RegisteredUser, "teamId">;
+
+/**
+ * Register an account as a person signing up would: no team (registration makes none). On a
+ * fresh server the first account goes through setup and becomes the instance admin.
+ */
+export async function registerAccount(
   app: TestApp,
-  overrides: { email?: string; name?: string; password?: string } = {},
-): Promise<RegisteredUser> {
+  overrides: { email?: string; name?: string; password?: string; inviteToken?: string } = {},
+): Promise<RegisteredAccount> {
   const email = overrides.email ?? uniqueEmail();
   const password = overrides.password ?? "correct-horse-battery";
   const name = overrides.name ?? "Test User";
-  let res = await api(app, "POST", "/auth/register", { body: { email, name, password } });
+  let res = await api(app, "POST", "/auth/register", {
+    body: { email, name, password, inviteToken: overrides.inviteToken },
+  });
   if (res.status === 409 && (await res.clone().json()).code === "setup_required") {
-    // A fresh server: the first account is the instance admin, made through setup.
     res = await api(app, "POST", "/auth/setup/admin", {
       body: { code: await setupCode(), email, name, password },
     });
@@ -76,13 +83,22 @@ export async function registerUser(
     throw new Error(`register failed: ${res.status} ${await res.text()}`);
   }
   const data = await json<{ user: { id: string }; token: string }>(res);
-  let teams = await listTeams(app, data.token);
-  if (teams.length === 0) {
-    // The setup admin starts with no team; give it the Owner team registration makes.
-    await ownTeam(data.user.id, name);
-    teams = await listTeams(app, data.token);
-  }
-  return { id: data.user.id, email, password, token: data.token, teamId: teams[0]!.id };
+  return { id: data.user.id, email, password, token: data.token };
+}
+
+/**
+ * registerAccount plus a team the user owns, which most tests need: "General" (key GEN), made
+ * the way registration made it before the welcome page (Owner, the user's first free space, or
+ * an admin space for an instance admin).
+ */
+export async function registerUser(
+  app: TestApp,
+  overrides: { email?: string; name?: string; password?: string } = {},
+): Promise<RegisteredUser> {
+  const account = await registerAccount(app, overrides);
+  await ownTeam(account.id, overrides.name ?? "Test User");
+  const teams = await listTeams(app, account.token);
+  return { ...account, teamId: teams[0]!.id };
 }
 
 async function listTeams(app: TestApp, token: string) {

@@ -63,7 +63,8 @@ routes.post("/teams", requireAuth, requireWrite, async (c) => {
       userName: user?.name ?? "User",
       name: body.name,
       key: body.key,
-      role: "admin",
+      // You own the Flow you make (you can delete it, and it counts as your free space).
+      role: "owner",
       space: spaceForUserCreatedTeam(tx, { userId: auth.userId, isInstanceAdmin }),
     }),
   );
