@@ -12,6 +12,7 @@ import { AdminBotPanel, AdminUpdatesPanel } from "./routes/admin/ServerSections"
 import { AuthRoute } from "./routes/auth/AuthRoute";
 import { InviteRoute } from "./routes/auth/InviteRoute";
 import { SetupRoute } from "./routes/setup/SetupRoute";
+import { WelcomeRoute } from "./routes/welcome/WelcomeRoute";
 import { BoardShell } from "./routes/board/BoardShell";
 import { AppearancePanel } from "./routes/settings/AppearancePanel";
 import { DesignPanel } from "./routes/settings/DesignPanel";
@@ -72,6 +73,8 @@ export const routes: RouteObject[] = [
       { path: "reset", element: <AuthRoute mode="reset" /> },
       // First-time setup; closed once the server has an account (docs/SETUP.md).
       { path: "setup/:step?", element: <SetupRoute /> },
+      // After sign-up, or with no Flow: Create a Flow / Join a Flow.
+      { path: "welcome/:mode?", element: <WelcomeRoute /> },
       {
         element: <BoardShell />,
         children: [

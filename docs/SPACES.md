@@ -117,5 +117,5 @@ Instance admin only, no team needed (full list in [API.md](API.md#instance-admin
 | POST | `/instance/spaces/:teamId/cancel-uploads` | Abort uploads in progress |
 
 For members: `GET /teams/:teamId/storage` returns the cap, usage, breakdown, state (`ok`, `warn`,
-`full`) and `diskLow`. `GET /teams` includes `spaceType` and `storageCapBytes`. MCP has
+`full`) and `diskLow`. `GET /teams` includes `spaceType` and `storageCapBytes`. `GET /auth/space-allowance` says how many free spaces the user owns, the limit, the cap a new one gets and whether `POST /teams` would be allowed (the Create a Flow page shows it). MCP has
 `get_team_storage`; the CLI has `teamflow board storage --team <id>`.

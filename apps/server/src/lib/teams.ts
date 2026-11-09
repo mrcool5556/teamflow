@@ -1,5 +1,5 @@
 import { and, eq, inArray, sql } from "drizzle-orm";
-import { SPACE_ERROR_CODES, type SpaceType } from "@teamflow/core";
+import { SPACE_ERROR_CODES, type SpaceAllowancePublic, type SpaceType } from "@teamflow/core";
 import type { Db, DbExecutor } from "@teamflow/db";
 import { schema } from "@teamflow/db";
 import { userHasTeamPermission } from "./permissions.js";
@@ -120,6 +120,22 @@ export function spaceForUserCreatedTeam(
     spaceType: "free",
     storageCapBytes: settings.freeSpaceCapBytes,
     spaceOwnerId: input.userId,
+  };
+}
+
+/** How many free spaces the user owns and may still make (Create a Flow). */
+export function getSpaceAllowance(
+  db: DbExecutor,
+  input: { userId: string; isInstanceAdmin: boolean },
+): SpaceAllowancePublic {
+  const settings = getSpaceSettings(db);
+  const owned = countOwnedFreeSpaces(db, input.userId);
+  return {
+    unlimited: input.isInstanceAdmin,
+    owned,
+    limit: settings.freeSpacesPerUser,
+    capBytes: settings.freeSpaceCapBytes,
+    canCreate: input.isInstanceAdmin || owned === 0 || owned < settings.freeSpacesPerUser,
   };
 }
 

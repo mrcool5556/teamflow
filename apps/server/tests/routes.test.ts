@@ -17,7 +17,7 @@ describe("route split", () => {
         count += 1;
       }
     }
-    expect(count).toBe(119);
+    expect(count).toBe(120);
     const mounted = new Set(
       app.routes.filter((r) => r.method !== "ALL").map((r) => `${r.method} ${r.path}`),
     );

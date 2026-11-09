@@ -22,6 +22,7 @@ import "./styles/admin.css";
 import "./styles/plan.css";
 import "./styles/auth.css";
 import "./styles/setup.css";
+import "./styles/welcome.css";
 import "./styles/design.css";
 import "./styles/aspects.css";
 

@@ -522,6 +522,8 @@ export function BoardShell() {
     if (route.isIndex && teams.length > 0) {
       return <Navigate to={boardPath(defaultTeamKey())} replace state={navState} />;
     }
+    // No Flow yet (new account, or left the last one): the welcome page offers Create or Join.
+    if (route.isIndex && teams.length === 0) return <Navigate to="/welcome" replace />;
     if (route.teamKey && !routeTeam) return <Navigate to="/" replace />;
   }
 

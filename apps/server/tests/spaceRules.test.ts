@@ -91,6 +91,26 @@ describe("free-space rules", () => {
     admin = await registerAccount(app, { email: envAdminEmail });
   });
 
+  it("tells the Create a Flow page how many Flows the user has left", async () => {
+    const allowance = async (token: string) =>
+      (
+        await json<{ allowance: Record<string, unknown> }>(
+          await api(app, "GET", "/auth/space-allowance", { token }),
+        )
+      ).allowance;
+    const user = await registerAccount(app);
+    expect(await allowance(user.token)).toEqual({
+      unlimited: false,
+      owned: 0,
+      limit: 3,
+      capBytes: GIB,
+      canCreate: true,
+    });
+    for (const key of ["SA", "SB", "SC"]) await createTeam(app, user.token, key, key);
+    expect(await allowance(user.token)).toMatchObject({ owned: 3, canCreate: false });
+    expect(await allowance(admin.token)).toMatchObject({ unlimited: true, canCreate: true });
+  });
+
   it("makes you the Owner of a Flow you create", async () => {
     const user = await registerAccount(app);
     const teamId = await createTeam(app, user.token, "Mine", "MINE");

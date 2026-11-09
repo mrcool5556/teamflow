@@ -30,3 +30,13 @@ export function useTeamPermissionsQuery(teamId: string | null) {
     retry: false,
   });
 }
+
+/** How many free Flows the user owns and whether they may make another (Create a Flow). */
+export function useSpaceAllowanceQuery(enabled = true) {
+  return useQuery({
+    queryKey: queryKeys.spaceAllowance,
+    queryFn: async ({ signal }) => (await client.withSignal(signal).getSpaceAllowance()).allowance,
+    enabled,
+    retry: false,
+  });
+}

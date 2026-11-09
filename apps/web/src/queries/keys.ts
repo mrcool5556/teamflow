@@ -28,6 +28,7 @@ export const queryKeys = {
   instanceSignup: ["instance", "signup"] as const,
   setupChecklist: ["instance", "setup-checklist"] as const,
   authConfig: ["auth-config"] as const,
+  spaceAllowance: ["space-allowance"] as const,
 };
 
 export function createQueryClient() {

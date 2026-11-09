@@ -21,6 +21,8 @@ On a fresh server the first account is made on `/setup` with the one-time setup 
 
 Registering creates only the account. With an `inviteToken` the user also joins the inviting team with the invite's role, in the same transaction, and lands on its board. Without one, the web app shows the welcome page: **Create a Flow** (`POST /teams`) or **Join a Flow** (paste an invite link or code). Whoever creates a Flow is its **Owner**. A Flow a user makes is a **free space** with the free-space upload cap (1 GB by default), at most 3 per person, and the first is never refused; an instance admin's Flows are admin spaces with no cap ([SPACES.md](SPACES.md)).
 
+The welcome page lives at `/welcome` (`/welcome/create`, `/welcome/join`); `/` sends anyone with no Flow there, including someone who left their last one. Join a Flow accepts a full invite link, an old `?invite=` link or the bare code, shows the Flow and role (`GET /invites/:token`) and joins on confirm. An invite link opened while signed out still works as before: the token waits through sign-up, registration joins that Flow, and the person lands on its board.
+
 Accounts made before this change keep the **General** team registration used to create; it counts as one of their free spaces.
 
 Login, register and forgot-password are rate limited per client IP (`TEAMFLOW_AUTH_RATE_LIMIT` per minute, default 10, HTTP 429 with `Retry-After`). Behind a reverse proxy set `TEAMFLOW_TRUST_PROXY=1` so `X-Forwarded-For` is used as the client address.

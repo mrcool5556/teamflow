@@ -271,9 +271,9 @@ export function LoginScreen({
           </button>
         )}
 
-        {mode === "login" ? (
+        {mode === "register" && !pendingInvite ? (
           <p className="hint">
-            New install? Register the first account; it becomes the instance admin.
+            After signing up you can create your own Flow, or join one with an invite link.
           </p>
         ) : null}
 

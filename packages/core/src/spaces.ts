@@ -133,3 +133,17 @@ export const updateSpaceSchema = z
     message: "No updates provided",
   });
 export type UpdateSpaceInput = z.infer<typeof updateSpaceSchema>;
+
+/** What the signed-in user may still create (Create a Flow page). */
+export type SpaceAllowancePublic = {
+  /** Instance admins make admin spaces: no cap, no per-person limit. */
+  unlimited: boolean;
+  /** Free spaces this user owns now. */
+  owned: number;
+  /** freeSpacesPerUser. */
+  limit: number;
+  /** The cap a new free space gets. */
+  capBytes: number;
+  /** Whether POST /teams would be allowed now (the first free space always is). */
+  canCreate: boolean;
+};

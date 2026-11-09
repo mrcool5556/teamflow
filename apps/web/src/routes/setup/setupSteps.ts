@@ -20,5 +20,5 @@ export const CHECKLIST_LINKS: Record<SetupChecklistId, { to: string; label: stri
   storage: { to: "/setup/storage", label: "Review the rules" },
   backup: { to: "/admin/updates", label: "Updates & backups" },
   service: { to: "/admin/help", label: "How to" },
-  flow: { to: "/settings/general", label: "Create a Flow" },
+  flow: { to: "/welcome/create", label: "Create a Flow" },
 };

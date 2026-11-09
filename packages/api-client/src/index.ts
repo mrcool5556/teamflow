@@ -66,6 +66,7 @@ import type {
   SetupStatusPublic,
   SignupSettingsPublic,
   SiteSettingsAdminPublic,
+  SpaceAllowancePublic,
   SpaceSettingsPublic,
   UpdateMailSettingsInput,
   UpdateSetupProgressInput,
@@ -186,6 +187,11 @@ export class TeamflowClient {
 
   getAuthConfig() {
     return this.request<AuthConfigPublic>("/auth/config");
+  }
+
+  /** How many free Flows the user owns and may still make. */
+  getSpaceAllowance() {
+    return this.request<{ allowance: SpaceAllowancePublic }>("/auth/space-allowance");
   }
 
   /** First-time setup (docs/SETUP.md). */
