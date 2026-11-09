@@ -13,9 +13,11 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 BACKUP_REPO="$SCRIPT_DIR/backup.sh"
 UPDATE_REPO="$SCRIPT_DIR/update.sh"
 DISCORD_REPO="$SCRIPT_DIR/discord-bot.sh"
+RESTORE_REPO="$SCRIPT_DIR/restore.sh"
 BACKUP_BIN="$LIB_DIR/backup.sh"
 UPDATE_BIN="$LIB_DIR/update.sh"
 DISCORD_BIN="$LIB_DIR/discord-bot.sh"
+RESTORE_BIN="$LIB_DIR/restore.sh"
 SUDOERS_FILE="/etc/sudoers.d/teamflow-maintenance"
 
 if [[ $EUID -ne 0 ]]; then
@@ -23,7 +25,7 @@ if [[ $EUID -ne 0 ]]; then
   exit 1
 fi
 
-if [[ ! -f "$BACKUP_REPO" ]] || [[ ! -f "$UPDATE_REPO" ]] || [[ ! -f "$DISCORD_REPO" ]]; then
+if [[ ! -f "$BACKUP_REPO" ]] || [[ ! -f "$UPDATE_REPO" ]] || [[ ! -f "$DISCORD_REPO" ]] || [[ ! -f "$RESTORE_REPO" ]]; then
   echo "Scripts not found under $SCRIPT_DIR/"
   exit 1
 fi
@@ -37,6 +39,7 @@ fix_script() {
 fix_script "$BACKUP_REPO"
 fix_script "$UPDATE_REPO"
 fix_script "$DISCORD_REPO"
+fix_script "$RESTORE_REPO"
 
 # Root-owned copies: directory 755, files 755, owner root. The app user can execute but not edit.
 install -d -m 755 -o root -g root "$LIB_DIR"
@@ -61,11 +64,13 @@ install_atomic() {
 install_atomic "$BACKUP_REPO" "$BACKUP_BIN"
 install_atomic "$UPDATE_REPO" "$UPDATE_BIN"
 install_atomic "$DISCORD_REPO" "$DISCORD_BIN"
+install_atomic "$RESTORE_REPO" "$RESTORE_BIN"
 
 # Convenience names for humans on the box; sudoers does not reference these.
 ln -sf "$UPDATE_BIN" /usr/local/bin/teamflow-update
 ln -sf "$BACKUP_BIN" /usr/local/bin/teamflow-backup
 ln -sf "$DISCORD_BIN" /usr/local/bin/teamflow-discord
+ln -sf "$RESTORE_BIN" /usr/local/bin/teamflow-restore
 ln -sf "$UPDATE_BIN" /usr/local/bin/update
 
 # No Defaults line preserving the caller environment: the scripts use arguments and their own defaults.
@@ -77,7 +82,7 @@ cat >"$SUDOERS_TMP" <<EOF
 # Teamflow in-app maintenance (Settings → Updates) and Discord bot service (Settings → Integrations)
 # Only the root-owned copies under $LIB_DIR are allowed. Re-run setup-maintenance-sudo.sh after
 # changing the scripts in the repo; update.sh does this automatically.
-$APP_USER ALL=(root) NOPASSWD: $BACKUP_BIN *, $UPDATE_BIN *, $DISCORD_BIN *
+$APP_USER ALL=(root) NOPASSWD: $BACKUP_BIN *, $UPDATE_BIN *, $DISCORD_BIN *, $RESTORE_BIN *
 EOF
 
 chown root:root "$SUDOERS_TMP"

@@ -220,6 +220,21 @@ section "Backup"
 bash $APP_DIR/deploy/proxmox-lxc/backup.sh --db-only >/tmp/b.log 2>&1
 check "online backup is a valid database" bash -c "f=\$(sed -n 's/^BACKUP database //p' /tmp/b.log); test -s \"\$f\" && head -c 15 \"\$f\" | grep -q 'SQLite format 3'"
 
+section "Restore"
+out=$(bash $APP_DIR/deploy/proxmox-lxc/backup.sh --db-only)
+snap=$(basename "$(printf '%s
+' "$out" | sed -n 's/^BACKUP database //p')")
+(cd $APP_DIR && runuser -u teamflow -- node -e '
+  const D=require("/opt/teamflow/current/node_modules/better-sqlite3");
+  const db=new D("data/teamflow.db"); db.prepare("INSERT INTO canary VALUES (?)").run("after-snapshot"); db.close();')
+check "two canary rows before restore" test "$(canary)" = 2
+bash $APP_DIR/deploy/proxmox-lxc/restore.sh --file "$snap" >/tmp/r1.log 2>&1 || true
+check "RESTORED line" grep -q "^RESTORED $snap" $APP_DIR/data/maintenance.log
+check "database is back to the snapshot" test "$(canary)" = 1
+check "server answers after restore" test "$(running_version)" = 0.2.1
+bash $APP_DIR/deploy/proxmox-lxc/restore.sh --file ../../etc/passwd >/tmp/r2.log 2>&1 && bad "path should be refused" || ok "path refused"
+check "app user may run restore through sudo" runuser -u teamflow -- sudo -n /usr/local/lib/teamflow/restore.sh --help
+
 section "Releases kept"
 check "at most two releases on disk" bash -c "test \$(ls -d $APP_DIR/releases/v* | wc -l) -le 2"
 

@@ -1,443 +1,725 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { useQueryClient } from "@tanstack/react-query";
-import { useConfirm } from "../ui/confirmContext";
-import type { MaintenanceJobPublic, MaintenanceStatusPublic } from "@teamflow/core";
-import { MAINTENANCE_UPDATE_STEPS, inferUpdatePhase, updatePhaseIndex } from "@teamflow/core";
+import type {
+  MaintenanceBackupPublic,
+  MaintenanceJobPublic,
+  MaintenanceStatusPublic,
+  MaintenanceUpdateStep,
+} from "@teamflow/core";
+import { MAINTENANCE_RELEASE_STEPS } from "@teamflow/core";
 import { client } from "../api";
+import { useConfirm } from "../ui/confirmContext";
 import { queryKeys } from "../queries/keys";
 import { useMaintenanceStatusQuery } from "../queries/maintenance";
 import { errorMessage } from "../lib/errorSink";
 import type { PanelMessage } from "../lib/panelStatus";
 import { formatFileSize } from "../lib/format";
 
-type ServerMaintenanceSettingsSectionProps = {
+/**
+ * Settings → Updates (and Server admin → Updates & backups). One card answers "am I up to date?"
+ * in one of five states, with one button. Backups, host details, the release channel and the
+ * log live under a collapsed Advanced section. Design: docs/mockups/simple-update-v1.html.
+ */
+
+type Props = {
   teamId: string;
   canRun: boolean;
   onMessage: PanelMessage;
 };
 
-function formatWhen(iso: string) {
+const LINUX_INSTALL =
+  "curl -fsSL https://github.com/mrcool5556/teamflow/releases/latest/download/install.sh | sudo bash";
+const WINDOWS_INSTALL =
+  "irm https://github.com/mrcool5556/teamflow/releases/latest/download/install.ps1 | iex";
+
+/** How far along the bar is when each step starts. */
+const STEP_PROGRESS: Record<MaintenanceUpdateStep, number> = {
+  download: 8,
+  backup: 30,
+  install: 50,
+  restart: 72,
+  check: 88,
+};
+
+/** Give up waiting quietly after this long and show how to check the server. */
+const RECONNECT_HELP_AFTER_MS = 3 * 60 * 1000;
+
+function formatWhen(iso: string | null | undefined) {
+  if (!iso) return "—";
   const date = new Date(iso);
   if (Number.isNaN(date.getTime())) return iso;
-  return date.toLocaleString();
+  return date.toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" });
+}
+
+function formatDay(iso: string | null | undefined) {
+  if (!iso) return null;
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) return null;
+  return date.toLocaleDateString(undefined, { day: "numeric", month: "short", year: "numeric" });
+}
+
+function sinceText(iso: string | null) {
+  if (!iso) return "not checked yet";
+  const minutes = Math.round((Date.now() - Date.parse(iso)) / 60_000);
+  if (minutes < 1) return "checked just now";
+  if (minutes < 60) return `checked ${minutes} min ago`;
+  const hours = Math.round(minutes / 60);
+  if (hours < 48) return `checked ${hours} h ago`;
+  return `checked ${formatDay(iso)}`;
+}
+
+/** Release notes: "- item" lines become a list; other lines become short paragraphs. */
+function ReleaseNotes({ notes, limit = 8 }: { notes: string; limit?: number }) {
+  const lines = notes
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter((line) => line && !line.startsWith("#") && !/^full changelog/i.test(line));
+  const items = lines
+    .filter((line) => /^[-*] /.test(line))
+    .map((line) => line.replace(/^[-*] /, "").replace(/\*\*/g, ""));
+  if (items.length > 0) {
+    const shown = items.slice(0, limit);
+    return (
+      <ul>
+        {shown.map((item, index) => (
+          <li key={index}>{item}</li>
+        ))}
+        {items.length > shown.length ? <li>…and {items.length - shown.length} more</li> : null}
+      </ul>
+    );
+  }
+  return lines.length ? <p>{lines.slice(0, 3).join(" ")}</p> : null;
+}
+
+/** The last few lines a person would read (without the STEP/FAIL/DONE machine lines). */
+function humanLogTail(log: string, count: number) {
+  return log
+    .split(/\r?\n/)
+    .map((line) => line.trimEnd())
+    .filter(
+      (line) =>
+        line.trim() && !/^(STEP|FAIL|DONE|BACKUP|RESTORED) /.test(line) && !line.startsWith("> "),
+    )
+    .slice(-count)
+    .join("\n");
+}
+
+function backupFromLog(log: string) {
+  const match = /^BACKUP database (.+)$/m.exec(log);
+  if (!match) return null;
+  return match[1].split(/[\\/]/).pop() ?? null;
 }
 
 function jobLabel(job: MaintenanceJobPublic) {
-  if (job.type === "backup") {
-    return job.options.full ? "Full backup" : "Database backup";
-  }
-  if (job.options.backupFull) return "Update (with full backup)";
-  if (job.options.skipBackup) return "Update (no backup)";
-  return "Update";
+  if (job.type === "backup") return job.options.full ? "Full backup" : "Database backup";
+  if (job.type === "restore") return `Restore ${job.options.file ?? "backup"}`;
+  return job.options.version ? `Update to v${job.options.version}` : "Update";
 }
 
-function MaintenanceStatusCard({
-  status,
-  serverUnreachable,
-  refreshing,
-  onRefresh,
-}: {
-  status: MaintenanceStatusPublic;
-  serverUnreachable: boolean;
-  refreshing: boolean;
-  onRefresh: () => void;
-}) {
-  const { version, job } = status;
-  const jobRunning = job?.status === "running";
-  const updateRunning = jobRunning && job?.type === "update";
-  const phase = job ? inferUpdatePhase(job.logTail, job) : null;
-  const phaseIdx = phase !== null ? updatePhaseIndex(phase) : -1;
+function Dot({ tone }: { tone: "ok" | "new" | "run" | "bad" | "off" }) {
+  return <span className={`update-dot update-dot--${tone}`} aria-hidden />;
+}
 
-  const deployState = serverUnreachable
-    ? "restarting"
-    : updateRunning
-      ? "updating"
-      : jobRunning
-        ? "busy"
-        : version.updateAvailable
-          ? "update-available"
-          : "online";
+/** Shown while the server is restarting; reloads the page once the new version answers. */
+function BackInAMoment({ targetVersion }: { targetVersion: string | null }) {
+  const [waitedMs, setWaitedMs] = useState(0);
+  useEffect(() => {
+    const started = Date.now();
+    let stopped = false;
+    const controller = new AbortController();
+    const tick = async () => {
+      if (stopped) return;
+      setWaitedMs(Date.now() - started);
+      try {
+        const health = await client.getHealth(controller.signal);
+        if (health.ok && (!targetVersion || health.version === targetVersion)) {
+          // A hard reload so the browser fetches the new web app too.
+          window.location.reload();
+          return;
+        }
+      } catch {
+        // still restarting
+      }
+      if (!stopped) window.setTimeout(() => void tick(), 2000);
+    };
+    void tick();
+    return () => {
+      stopped = true;
+      controller.abort();
+    };
+  }, [targetVersion]);
 
-  const deployLabel =
-    deployState === "restarting"
-      ? "Restarting"
-      : deployState === "updating"
-        ? "Updating"
-        : deployState === "busy"
-          ? "Running job"
-          : deployState === "update-available"
-            ? "Update available"
-            : "Up to date";
-
+  const seconds = Math.round(waitedMs / 1000);
+  const stuck = waitedMs > RECONNECT_HELP_AFTER_MS;
   return (
-    <section className="maintenance-status-card">
-      <div className="maintenance-status-card-top">
-        <div>
-          <p className="eyebrow">Deployed version</p>
-          <div className="maintenance-version-line">
-            <span className="maintenance-version-tag">v{version.version}</span>
-            {version.branch ? (
-              <span className="maintenance-version-meta">{version.branch}</span>
-            ) : null}
-            {version.commitShort ? (
-              <code className="maintenance-version-sha">{version.commitShort}</code>
-            ) : null}
-          </div>
-          {version.commitDate ? (
-            <p className="settings-copy muted maintenance-version-deployed">
-              Deployed {formatWhen(version.commitDate)}
+    <div className="update-overlay" role="status" aria-live="polite">
+      <div className="update-overlay-box">
+        {stuck ? (
+          <>
+            <h3>Still not back</h3>
+            <p className="settings-copy">
+              Teamflow hasn&apos;t answered for {Math.round(seconds / 60)} minutes. On the server,
+              check it with:
             </p>
-          ) : null}
-          {version.updateAvailable && version.latestCommitShort ? (
-            <p className="settings-copy maintenance-version-behind">
-              Origin has <code>{version.latestCommitShort}</code>
-              {version.commitsBehind != null && version.commitsBehind > 0
-                ? ` · ${version.commitsBehind} commit${version.commitsBehind === 1 ? "" : "s"} behind`
-                : version.commitsBehind == null
-                  ? " · update pending"
-                  : null}
+            <pre className="update-command">
+              systemctl status teamflow{"\n"}journalctl -u teamflow -n 50
+            </pre>
+            <p className="settings-hint">This page keeps trying and reloads by itself.</p>
+          </>
+        ) : (
+          <>
+            <span className="update-spinner" aria-hidden />
+            <h3>Back in a moment</h3>
+            <p className="settings-copy">
+              Teamflow is restarting{targetVersion ? ` on v${targetVersion}` : ""}.
+              <br />
+              This page reloads by itself when it&apos;s ready.
             </p>
-          ) : !version.gitError &&
-            version.latestCommitShort &&
-            version.commitShort === version.latestCommitShort ? (
-            <p className="settings-copy muted">Matches latest on origin.</p>
-          ) : !version.gitError &&
-            version.latestCommitShort &&
-            version.commitShort &&
-            version.commitShort !== version.latestCommitShort &&
-            !version.updateAvailable ? (
-            <p className="settings-copy muted">
-              Local branch is ahead of origin (<code>{version.commitShort}</code> vs{" "}
-              <code>{version.latestCommitShort}</code>).
-            </p>
-          ) : null}
-          {version.gitError ? (
-            <p className="settings-copy issue-link-row-files-error">{version.gitError}</p>
-          ) : null}
-        </div>
-        <div className="maintenance-status-pills">
-          <span className={`maintenance-pill maintenance-pill--${deployState}`}>{deployLabel}</span>
-          {status.enabled ? (
-            // While a job runs, update.sh reinstalls the sudo scripts; the check waits for it.
-            <span
-              className={`maintenance-pill maintenance-pill--${
-                status.sudoPending ? "busy" : status.sudoReady ? "ok" : "warn"
-              }`}
-            >
-              {status.sudoPending
-                ? "Update in progress"
-                : status.sudoReady
-                  ? "Sudo ready"
-                  : "Sudo missing"}
-            </span>
-          ) : null}
-          {!status.backupScriptReady || !status.updateScriptReady ? (
-            <span className="maintenance-pill maintenance-pill--warn">Scripts incomplete</span>
-          ) : null}
-        </div>
+            <p className="update-meta">waiting {seconds} s</p>
+          </>
+        )}
       </div>
-
-      {updateRunning && phase !== null ? (
-        <ol className="maintenance-stepper" aria-label="Update progress">
-          {MAINTENANCE_UPDATE_STEPS.filter((step) => step.id !== "done").map((step, index) => {
-            const stepIdx = updatePhaseIndex(step.id);
-            const done = phaseIdx > stepIdx;
-            const active = phase === step.id || (phase === "failed" && step.id === "health");
-            const failed = phase === "failed" && active;
-            return (
-              <li
-                key={step.id}
-                className={[
-                  "maintenance-step",
-                  done ? "maintenance-step--done" : "",
-                  active ? "maintenance-step--active" : "",
-                  failed ? "maintenance-step--failed" : "",
-                ]
-                  .filter(Boolean)
-                  .join(" ")}
-              >
-                <span className="maintenance-step-marker" aria-hidden>
-                  {done ? "✓" : failed ? "!" : index + 1}
-                </span>
-                <span className="maintenance-step-label">{step.label}</span>
-              </li>
-            );
-          })}
-        </ol>
-      ) : null}
-
-      {serverUnreachable ? (
-        <p className="maintenance-restart-banner">
-          Server is restarting — status polling will resume automatically. This is normal during
-          updates.
-        </p>
-      ) : null}
-
-      <div className="maintenance-status-card-actions">
-        <button type="button" className="ghost" disabled={refreshing} onClick={onRefresh}>
-          {refreshing ? "Refreshing…" : "Refresh status"}
-        </button>
-      </div>
-    </section>
+    </div>
   );
 }
 
-export function ServerMaintenanceSettingsSection({
-  teamId,
-  canRun,
-  onMessage,
-}: ServerMaintenanceSettingsSectionProps) {
+function Steps({ current, failed }: { current: MaintenanceUpdateStep | null; failed: boolean }) {
+  const index = current ? MAINTENANCE_RELEASE_STEPS.findIndex((step) => step.id === current) : -1;
+  return (
+    <ol className="update-steps" aria-label="Update progress">
+      {MAINTENANCE_RELEASE_STEPS.map((step, i) => {
+        const state = i < index ? "done" : i === index ? (failed ? "fail" : "now") : "todo";
+        return (
+          <li key={step.id} className={`update-step update-step--${state}`}>
+            {state === "done" ? "✓ " : state === "fail" ? "! " : ""}
+            {step.label}
+          </li>
+        );
+      })}
+    </ol>
+  );
+}
+
+export function ServerMaintenanceSettingsSection({ teamId, canRun, onMessage }: Props) {
   const queryClient = useQueryClient();
   const confirm = useConfirm();
   const statusQuery = useMaintenanceStatusQuery(teamId);
   const status = statusQuery.data ?? null;
-  const loading = statusQuery.isPending;
-  const [refreshing, setRefreshing] = useState(false);
-  // While a job runs the app may restart; failed polls then mean "unreachable", not an error.
-  const serverUnreachable = statusQuery.isError && status?.job?.status === "running";
-  const [runningAction, setRunningAction] = useState<string | null>(null);
-  const [updateBranch, setUpdateBranch] = useState("");
+  const [busy, setBusy] = useState<string | null>(null);
+  const [backupFiles, setBackupFiles] = useState(false);
+  const [advancedOpen, setAdvancedOpen] = useState(false);
+  const logRef = useRef<HTMLDivElement>(null);
+
+  const job = status?.job ?? null;
+  const stopsServer =
+    job?.status === "running" && (job.type === "update" || job.type === "restore");
+  // While an update or restore runs the app restarts; failed polls then mean "restarting".
+  const restarting = statusQuery.isError && stopsServer;
 
   const setStatus = useCallback(
-    (
-      update: (current: MaintenanceStatusPublic | undefined) => MaintenanceStatusPublic | undefined,
-    ) => queryClient.setQueryData<MaintenanceStatusPublic>(queryKeys.maintenance(teamId), update),
+    (next: MaintenanceStatusPublic) =>
+      queryClient.setQueryData<MaintenanceStatusPublic>(queryKeys.maintenance(teamId), next),
     [queryClient, teamId],
   );
 
+  // The page was loaded by one version; when the server reports another, load the new web app.
+  const loadedVersion = useRef<string | null>(null);
+  const currentVersion = status?.release.current.version ?? null;
   useEffect(() => {
-    if (statusQuery.error && !serverUnreachable) {
-      onMessage(errorMessage(statusQuery.error, "Failed to load maintenance status"), "error");
+    if (!currentVersion) return;
+    if (loadedVersion.current === null) loadedVersion.current = currentVersion;
+    else if (loadedVersion.current !== currentVersion) window.location.reload();
+  }, [currentVersion]);
+
+  useEffect(() => {
+    if (statusQuery.error && !restarting) {
+      onMessage(errorMessage(statusQuery.error, "Failed to load the update status"), "error");
     }
-  }, [statusQuery.error, serverUnreachable, onMessage]);
+  }, [statusQuery.error, restarting, onMessage]);
 
-  const loadStatus = useCallback(
-    async (options?: { check?: boolean }) => {
-      if (!options?.check) {
-        await queryClient.invalidateQueries({ queryKey: queryKeys.maintenance(teamId) });
-        return;
-      }
-      // "Refresh status" re-runs the host check (sudo + origin); everything else just reads.
-      setRefreshing(true);
-      try {
-        const { status: next } = await client.checkServerMaintenance(teamId);
-        setStatus(() => next);
-      } catch (err) {
-        onMessage(errorMessage(err, "Failed to load maintenance status"), "error");
-      } finally {
-        setRefreshing(false);
-      }
-    },
-    [onMessage, queryClient, setStatus, teamId],
-  );
+  const refresh = () => queryClient.invalidateQueries({ queryKey: queryKeys.maintenance(teamId) });
 
-  async function runAction(label: string, action: () => Promise<{ job: MaintenanceJobPublic }>) {
-    if (!canRun) return;
-    const confirmed = await confirm({
-      title: `${label}?`,
-      message: `${label} will run on the server host. The app may restart during an update.`,
-      confirmLabel: "Continue",
-    });
-    if (!confirmed) return;
-
-    setRunningAction(label);
+  async function run<T>(label: string, action: () => Promise<T>, after?: (result: T) => void) {
+    if (!canRun || busy) return;
+    setBusy(label);
     onMessage(null);
     try {
-      const { job } = await action();
-      setStatus((current) => (current ? { ...current, job } : current));
-      onMessage(`${label} started.`);
-      void loadStatus();
+      const result = await action();
+      after?.(result);
+      await refresh();
     } catch (err) {
-      onMessage(errorMessage(err, `Failed to start ${label.toLowerCase()}`), "error");
+      onMessage(errorMessage(err, `${label} failed`), "error");
     } finally {
-      setRunningAction(null);
+      setBusy(null);
     }
   }
 
-  const jobRunning = status?.job?.status === "running";
-  const actionsDisabled =
-    !canRun || !status?.enabled || !status.sudoReady || jobRunning || Boolean(runningAction);
+  const checkNow = () =>
+    run(
+      "Check",
+      () => client.checkServerMaintenance(teamId),
+      ({ status: next }) => setStatus(next),
+    );
+
+  async function startUpdate(version: string, notes: string) {
+    if (/breaking/i.test(notes)) {
+      const ok = await confirm({
+        title: `Update to v${version}?`,
+        message:
+          "The release notes mention a breaking change. Read them first; the database is backed up before updating.",
+        confirmLabel: "Update",
+      });
+      if (!ok) return;
+    }
+    await run("Update", () =>
+      client.runServerMaintenanceUpdate(teamId, { version, backupFull: backupFiles }),
+    );
+  }
+
+  const dismiss = () => run("Dismiss", () => client.dismissServerMaintenanceJob(teamId));
+
+  async function restore(backup: MaintenanceBackupPublic) {
+    const ok = await confirm({
+      title: `Restore ${backup.name}?`,
+      message: `Teamflow restarts and the database goes back to ${formatWhen(backup.createdAt)}. Everything changed since then is replaced. The current database is backed up first, so you can undo this the same way.`,
+      confirmLabel: "Restore",
+      danger: true,
+    });
+    if (!ok) return;
+    await run("Restore", () => client.runServerMaintenanceRestore(teamId, { file: backup.name }));
+  }
+
+  function showLog() {
+    setAdvancedOpen(true);
+    window.setTimeout(() => logRef.current?.scrollIntoView({ behavior: "smooth" }), 50);
+  }
+
+  if (statusQuery.isPending) return <p className="settings-hint">Loading update status…</p>;
+  if (!status) return null;
+
+  const { release, state, lastRun } = status;
+  const current = release.current;
+  const latest = release.latest;
+  const installLine = status.platform === "win32" ? WINDOWS_INSTALL : LINUX_INSTALL;
+  const lastUpdateOk =
+    job?.type === "update" && job.status === "success" && lastRun?.done === current.version;
+
+  let card: ReactNode;
+  if (stopsServer && job) {
+    const step = lastRun?.step ?? null;
+    const progress = step ? STEP_PROGRESS[step] : 3;
+    card = (
+      <>
+        <div className="update-headline">
+          <Dot tone="run" />
+          <h3>
+            {job.type === "restore"
+              ? "Restoring a backup…"
+              : `Updating to v${job.options.version ?? latest?.version ?? "the newest version"}…`}
+          </h3>
+        </div>
+        <p className="update-meta">
+          Started {formatWhen(job.startedAt)} · closing this tab is fine
+        </p>
+        <div className="update-bar" aria-hidden>
+          <i style={{ width: `${progress}%` }} />
+        </div>
+        {job.type === "update" ? <Steps current={step} failed={false} /> : null}
+        <pre className="update-log-tail">{humanLogTail(job.logTail, 3) || "Starting…"}</pre>
+      </>
+    );
+  } else if (state === "failed" && job) {
+    const failure = lastRun?.failure;
+    const changed = failure && ["migrate", "health"].includes(failure.code);
+    card = (
+      <>
+        <div className="update-headline">
+          <Dot tone="bad" />
+          <h3>
+            {job.options.version
+              ? `Update to v${job.options.version} didn't finish`
+              : "The update didn't finish"}
+          </h3>
+        </div>
+        <p className="update-meta">
+          {changed
+            ? `You're still on v${current.version}: it was rolled back automatically. Nothing was lost.`
+            : `Nothing was changed. You're still on v${current.version}.`}
+        </p>
+        <Steps current={lastRun?.step ?? null} failed />
+        <div className="update-callout update-callout--bad">
+          {failure
+            ? failure.message
+            : "The update stopped without saying why. The log has the details."}
+        </div>
+        <div className="update-actions">
+          {canRun && latest ? (
+            <button
+              type="button"
+              disabled={Boolean(busy)}
+              onClick={() => void startUpdate(latest.version, "")}
+            >
+              {busy === "Update" ? "Starting…" : "Try again"}
+            </button>
+          ) : null}
+          <button type="button" className="ghost" onClick={showLog}>
+            Show log
+          </button>
+          {canRun ? (
+            <button
+              type="button"
+              className="ghost"
+              disabled={Boolean(busy)}
+              onClick={() => void dismiss()}
+            >
+              Dismiss
+            </button>
+          ) : null}
+        </div>
+      </>
+    );
+  } else if (state === "not-set-up") {
+    card = (
+      <>
+        <div className="update-headline">
+          <Dot tone="off" />
+          <h3>One-click updates aren&apos;t set up on this server</h3>
+        </div>
+        <p className="update-meta">
+          v{current.version}
+          {latest && latest.version !== current.version ? ` · v${latest.version} is available` : ""}
+        </p>
+        <div className="update-callout update-callout--info">
+          <p>{status.notSetUpReason}</p>
+          {status.enabled || !current.releaseInstall ? (
+            <>
+              <p>
+                Run this once on the server
+                {status.platform === "win32" ? " in PowerShell" : " as root"}, then press Check now:
+              </p>
+              <pre className="update-command">{installLine}</pre>
+              <p>
+                It&apos;s safe to re-run: it keeps your data and settings and only adds what&apos;s
+                missing.
+              </p>
+            </>
+          ) : null}
+        </div>
+        <div className="update-actions">
+          <button
+            type="button"
+            className="ghost"
+            disabled={Boolean(busy)}
+            onClick={() => void checkNow()}
+          >
+            {busy === "Check" ? "Checking…" : "Check now"}
+          </button>
+        </div>
+      </>
+    );
+  } else if (state === "available" && latest) {
+    const released = formatDay(latest.publishedAt);
+    card = (
+      <>
+        <div className="update-headline">
+          <Dot tone="new" />
+          <h3>v{latest.version} is available</h3>
+        </div>
+        <p className="update-meta">
+          You have v{current.version}
+          {released ? ` · released ${released}` : ""}
+          {latest.sizeBytes ? ` · ${formatFileSize(latest.sizeBytes)} download` : ""}
+        </p>
+        <div className="update-notes">
+          <strong>What&apos;s new</strong>
+          <ReleaseNotes notes={latest.notes} />
+          <a href={latest.url} target="_blank" rel="noreferrer">
+            Full release notes ↗
+          </a>
+        </div>
+        {canRun ? (
+          <div className="update-actions">
+            <button
+              type="button"
+              className="update-primary"
+              disabled={Boolean(busy)}
+              onClick={() => void startUpdate(latest.version, latest.notes)}
+            >
+              {busy === "Update" ? "Starting…" : `Update to v${latest.version}`}
+            </button>
+            <span className="settings-hint">
+              Backs up the database first. Teamflow is offline for about 30 seconds.
+            </span>
+          </div>
+        ) : (
+          <p className="settings-hint">Only an instance admin can update.</p>
+        )}
+      </>
+    );
+  } else {
+    const backup = lastUpdateOk && job ? backupFromLog(job.logTail) : null;
+    card = (
+      <>
+        <div className="update-headline">
+          <Dot tone="ok" />
+          <h3>{lastUpdateOk ? `Updated to v${current.version}` : "You're up to date"}</h3>
+        </div>
+        <p className="update-meta">
+          v{current.version}
+          {current.builtAt ? ` · built ${formatDay(current.builtAt)}` : ""} ·{" "}
+          {sinceText(release.checkedAt)}
+          {" · "}
+          <button
+            type="button"
+            className="admin-link"
+            disabled={Boolean(busy)}
+            onClick={() => void checkNow()}
+          >
+            {busy === "Check" ? "Checking…" : "Check now"}
+          </button>
+        </p>
+        {release.checkError ? <p className="settings-hint">{release.checkError}</p> : null}
+        {!release.checkEnabled ? (
+          <p className="settings-hint">
+            The update check is turned off (TEAMFLOW_UPDATE_CHECK=false).
+          </p>
+        ) : null}
+        {lastUpdateOk ? (
+          <div className="update-callout update-callout--ok">
+            Everything&apos;s running. Members pick up the new version next time they load a page.
+            {backup ? ` The database was backed up to ${backup}.` : ""}
+            {canRun ? (
+              <>
+                {" "}
+                <button type="button" className="admin-link" onClick={() => void dismiss()}>
+                  OK
+                </button>
+              </>
+            ) : null}
+          </div>
+        ) : latest && latest.version === current.version && latest.notes ? (
+          <div className="update-notes">
+            <strong>What came in v{current.version}</strong>
+            <ReleaseNotes notes={latest.notes} limit={4} />
+            <a href={latest.url} target="_blank" rel="noreferrer">
+              All release notes ↗
+            </a>
+          </div>
+        ) : null}
+      </>
+    );
+  }
+
+  const otherJob = job && !stopsServer && job.type !== "update" ? job : null;
 
   return (
-    <>
-      {loading ? <p className="settings-hint">Loading server status…</p> : null}
-
-      {!loading && status ? (
-        <>
-          <MaintenanceStatusCard
-            status={status}
-            serverUnreachable={serverUnreachable}
-            refreshing={refreshing}
-            onRefresh={() => void loadStatus({ check: true })}
+    <div className="update-page">
+      <section
+        className="update-card"
+        aria-label="Update status"
+        data-state={stopsServer ? "updating" : state}
+      >
+        {card}
+        {restarting ? (
+          <BackInAMoment
+            targetVersion={job?.type === "update" ? (job.options.version ?? null) : null}
           />
+        ) : null}
+      </section>
 
-          <section className="settings-section">
-            <h3>Host status</h3>
-            {status.enabled ? (
-              <p className="settings-copy">
-                Maintenance is enabled on this host.
-                {status.sudoDetail ? (
-                  <>
-                    {" "}
-                    <span className="issue-link-row-files-error">{status.sudoDetail}</span>
-                  </>
-                ) : null}
-              </p>
-            ) : (
-              <p className="settings-copy settings-hint">{status.reason}</p>
-            )}
-            {status.backupDir ? (
-              <p className="settings-copy muted">
-                Backup folder: <code>{status.backupDir}</code>
-              </p>
-            ) : null}
-          </section>
-
-          {canRun && status.enabled ? (
-            <section className="settings-section">
-              <h3>Actions</h3>
-              <p className="settings-copy">
-                Database-only backups are fast and run before updates by default. Full backups
-                include uploaded files.
-                {status.version.updateAvailable ? (
-                  <>
-                    {" "}
-                    <strong>An update is available</strong> — use Update app below to deploy it.
-                  </>
-                ) : null}
-              </p>
-              <div className="maintenance-actions row">
-                <button
-                  type="button"
-                  disabled={actionsDisabled || !status.backupScriptReady}
-                  onClick={() =>
-                    void runAction("Database backup", () =>
-                      client.runServerMaintenanceBackup(teamId, { full: false }),
-                    )
-                  }
-                >
-                  {runningAction === "Database backup" ? "Starting…" : "Backup database"}
-                </button>
-                <button
-                  type="button"
-                  disabled={actionsDisabled || !status.backupScriptReady}
-                  onClick={() =>
-                    void runAction("Full backup", () =>
-                      client.runServerMaintenanceBackup(teamId, { full: true }),
-                    )
-                  }
-                >
-                  {runningAction === "Full backup" ? "Starting…" : "Full backup"}
-                </button>
-              </div>
-              <div className="maintenance-actions row">
-                <button
-                  type="button"
-                  className={status.version.updateAvailable ? "" : undefined}
-                  disabled={actionsDisabled || !status.updateScriptReady}
-                  onClick={() =>
-                    void runAction("Update", () => client.runServerMaintenanceUpdate(teamId, {}))
-                  }
-                >
-                  {runningAction === "Update"
-                    ? "Starting…"
-                    : status.version.updateAvailable
-                      ? "Update app (new version)"
-                      : "Update app"}
-                </button>
-                <button
-                  type="button"
-                  disabled={actionsDisabled || !status.updateScriptReady}
-                  onClick={() =>
-                    void runAction("Update (with full backup)", () =>
-                      client.runServerMaintenanceUpdate(teamId, { backupFull: true }),
-                    )
-                  }
-                >
-                  {runningAction === "Update (with full backup)"
-                    ? "Starting…"
-                    : "Update + full backup"}
-                </button>
-              </div>
-              <label>
-                Optional git branch
-                <input
-                  value={updateBranch}
-                  onChange={(e) => setUpdateBranch(e.target.value)}
-                  placeholder="main"
-                  disabled={actionsDisabled}
-                />
-              </label>
-              {updateBranch.trim() ? (
-                <button
-                  type="button"
-                  className="ghost"
-                  disabled={actionsDisabled || !status.updateScriptReady}
-                  onClick={() =>
-                    void runAction(`Update branch ${updateBranch.trim()}`, () =>
-                      client.runServerMaintenanceUpdate(teamId, {
-                        branch: updateBranch.trim(),
-                      }),
-                    )
-                  }
-                >
-                  Update from branch
-                </button>
-              ) : null}
-            </section>
-          ) : null}
-
-          {status.job ? (
-            <section className="settings-section">
-              <h3>Current job</h3>
-              <p className="settings-copy">
-                <strong>{jobLabel(status.job)}</strong> — {status.job.status}
-                {status.job.finishedAt
-                  ? ` · finished ${formatWhen(status.job.finishedAt)}`
-                  : ` · started ${formatWhen(status.job.startedAt)}`}
-              </p>
-              {status.job.logTail ? (
-                <pre className="maintenance-log">{status.job.logTail}</pre>
-              ) : (
-                <p className="settings-hint">Waiting for log output…</p>
-              )}
-            </section>
-          ) : null}
-
-          <section className="settings-section">
-            <h3>Backups on disk</h3>
-            {status.backups.length === 0 ? (
-              <p className="settings-hint">No backups found yet.</p>
-            ) : (
-              <table className="maintenance-backup-table">
-                <thead>
-                  <tr>
-                    <th>File</th>
-                    <th>Type</th>
-                    <th>Size</th>
-                    <th>Created</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {status.backups.map((backup) => (
-                    <tr key={backup.name}>
-                      <td>
-                        <code>{backup.name}</code>
-                      </td>
-                      <td>{backup.kind === "uploads" ? "Uploads" : "Database"}</td>
-                      <td>{formatFileSize(backup.sizeBytes, 2)}</td>
-                      <td>{formatWhen(backup.createdAt)}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            )}
-            <button type="button" className="ghost" onClick={() => void loadStatus()}>
-              Refresh list
-            </button>
-          </section>
-        </>
+      {otherJob && otherJob.status === "running" ? (
+        <p className="settings-hint">{jobLabel(otherJob)} is running…</p>
       ) : null}
-    </>
+
+      <details
+        className="update-advanced"
+        open={advancedOpen}
+        onToggle={(event) => setAdvancedOpen((event.target as HTMLDetailsElement).open)}
+      >
+        <summary>Advanced</summary>
+        <div className="update-advanced-body">
+          {canRun && status.enabled ? (
+            <>
+              <h4>Update options</h4>
+              <label className="update-check">
+                <input
+                  type="checkbox"
+                  checked={backupFiles}
+                  onChange={(event) => setBackupFiles(event.target.checked)}
+                />
+                Also back up uploaded files before updating (slow with many files)
+              </label>
+              <label className="update-field">
+                <span>Release channel</span>
+                <select
+                  value={release.channel}
+                  disabled={Boolean(busy)}
+                  onChange={(event) =>
+                    void run(
+                      "Channel",
+                      () =>
+                        client.setServerMaintenanceSettings(teamId, {
+                          channel: event.target.value as "stable" | "prerelease",
+                        }),
+                      ({ status: next }) => setStatus(next),
+                    )
+                  }
+                >
+                  <option value="stable">Stable</option>
+                  <option value="prerelease">Pre-release</option>
+                </select>
+              </label>
+            </>
+          ) : null}
+
+          <h4>Backups</h4>
+          {canRun && status.enabled ? (
+            <div className="update-actions">
+              <button
+                type="button"
+                className="ghost"
+                disabled={Boolean(busy) || job?.status === "running" || !status.backupScriptReady}
+                onClick={() =>
+                  void run("Backup", () =>
+                    client.runServerMaintenanceBackup(teamId, { full: false }),
+                  )
+                }
+              >
+                Back up database now
+              </button>
+              <button
+                type="button"
+                className="ghost"
+                disabled={Boolean(busy) || job?.status === "running" || !status.backupScriptReady}
+                onClick={() =>
+                  void run("Backup", () =>
+                    client.runServerMaintenanceBackup(teamId, { full: true }),
+                  )
+                }
+              >
+                Full backup (with files)
+              </button>
+            </div>
+          ) : null}
+          {status.backups.length === 0 ? (
+            <p className="settings-hint">No backups yet.</p>
+          ) : (
+            <table className="maintenance-backup-table">
+              <thead>
+                <tr>
+                  <th>File</th>
+                  <th>Type</th>
+                  <th>Size</th>
+                  <th>Created</th>
+                  {canRun ? <th aria-label="Actions" /> : null}
+                </tr>
+              </thead>
+              <tbody>
+                {status.backups.map((backup) => (
+                  <tr key={backup.name}>
+                    <td>
+                      <code>{backup.name}</code>
+                    </td>
+                    <td>{backup.kind === "uploads" ? "Files" : "Database"}</td>
+                    <td>{formatFileSize(backup.sizeBytes, 2)}</td>
+                    <td>{formatWhen(backup.createdAt)}</td>
+                    {canRun ? (
+                      <td>
+                        {backup.kind === "database" && status.enabled ? (
+                          <button
+                            type="button"
+                            className="admin-link"
+                            disabled={Boolean(busy) || job?.status === "running"}
+                            onClick={() => void restore(backup)}
+                          >
+                            Restore…
+                          </button>
+                        ) : null}
+                      </td>
+                    ) : null}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+          {status.backupDir ? (
+            <p className="settings-hint">
+              Folder: <code>{status.backupDir}</code> · keeps the newest 10 database backups
+            </p>
+          ) : null}
+
+          <h4>Host</h4>
+          <dl className="update-facts">
+            <dt>Install type</dt>
+            <dd>
+              {current.releaseInstall
+                ? `Prebuilt release${current.platform ? ` (${current.platform})` : ""}`
+                : "Git checkout (development)"}
+            </dd>
+            <dt>Version</dt>
+            <dd>
+              v{current.version}
+              {current.commit ? (
+                <>
+                  {" · "}
+                  <code>{current.commit.slice(0, 7)}</code>
+                </>
+              ) : null}
+              {current.builtAt ? ` · built ${formatWhen(current.builtAt)}` : ""}
+            </dd>
+            <dt>Maintenance</dt>
+            <dd>{status.enabled ? "On" : (status.reason ?? "Off")}</dd>
+            {status.enabled ? (
+              <>
+                <dt>Maintenance sudo</dt>
+                <dd>
+                  {status.sudoPending
+                    ? "Update in progress"
+                    : status.sudoReady
+                      ? "Ready"
+                      : (status.sudoDetail ?? "Missing")}
+                </dd>
+                <dt>Update script</dt>
+                <dd>
+                  <code>{status.updateScript ?? "—"}</code>
+                  {status.updateScriptReady ? "" : " (missing)"}
+                </dd>
+              </>
+            ) : null}
+            <dt>Update check</dt>
+            <dd>
+              {release.checkEnabled
+                ? `${release.channel === "prerelease" ? "Pre-release" : "Stable"} channel · ${sinceText(release.checkedAt)}`
+                : "Off (TEAMFLOW_UPDATE_CHECK=false)"}
+            </dd>
+          </dl>
+
+          <h4>Logs</h4>
+          <div ref={logRef}>
+            {job ? (
+              <>
+                <p className="settings-copy">
+                  <strong>{jobLabel(job)}</strong> · {job.status}
+                  {job.finishedAt
+                    ? ` · finished ${formatWhen(job.finishedAt)}`
+                    : ` · started ${formatWhen(job.startedAt)}`}
+                </p>
+                <pre className="maintenance-log">{job.logTail || "Waiting for log output…"}</pre>
+              </>
+            ) : (
+              <p className="settings-hint">No recent update or backup.</p>
+            )}
+            <p className="settings-hint">
+              On the server:{" "}
+              <code>
+                {status.platform === "win32"
+                  ? "teamflow-update.ps1 -Help"
+                  : "sudo teamflow-update --help"}
+              </code>
+            </p>
+          </div>
+        </div>
+      </details>
+    </div>
   );
 }

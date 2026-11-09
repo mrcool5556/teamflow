@@ -5,6 +5,7 @@ import { validateParams } from "../middleware/params.js";
 import {
   maintenanceSettingsSchema,
   runMaintenanceBackupSchema,
+  runMaintenanceRestoreSchema,
   runMaintenanceUpdateSchema,
 } from "@teamflow/core";
 import { requireAuth, requireInstanceAdmin, requireWrite } from "../middleware/auth.js";
@@ -15,6 +16,7 @@ import {
   getMaintenanceJob,
   getMaintenanceStatus,
   runMaintenanceBackup,
+  runMaintenanceRestore,
   runMaintenanceUpdate,
   setMaintenanceChannel,
 } from "../lib/maintenance.js";
@@ -106,6 +108,22 @@ routes.post(
   async (c) => {
     const job = await dismissMaintenanceJob();
     return c.json({ job });
+  },
+);
+
+/** Advanced → Backups → Restore: put a database backup back (stops the app briefly). */
+routes.post(
+  "/teams/:teamId/server/maintenance/restore",
+  requireAuth,
+  requireWrite,
+  validateParams,
+  loadTeam(),
+  requirePermission("server.maintenance.run"),
+  requireInstanceAdmin,
+  async (c) => {
+    const body = await parseBody(c, runMaintenanceRestoreSchema);
+    const job = await runMaintenanceRestore(body);
+    return c.json({ job }, 202);
   },
 );
 

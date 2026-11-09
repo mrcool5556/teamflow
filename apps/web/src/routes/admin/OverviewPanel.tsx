@@ -272,7 +272,8 @@ export function OverviewPanel() {
   }
 
   const { maintenance, bot, spaces } = overview;
-  const version = maintenance.version;
+  const { current, latest } = maintenance.release;
+  const updateState = maintenance.state;
   const botStatus = botHealth(bot);
   const latestBackup = [...maintenance.backups].sort((a, b) =>
     b.createdAt.localeCompare(a.createdAt),
@@ -329,15 +330,23 @@ export function OverviewPanel() {
 
         <Tile
           title="Updates"
-          health={!maintenance.enabled ? "off" : version.updateAvailable ? "warn" : "ok"}
+          health={
+            updateState === "failed"
+              ? "bad"
+              : updateState === "available" || updateState === "not-set-up"
+                ? "warn"
+                : "ok"
+          }
           pill={
-            !maintenance.enabled
-              ? "off"
-              : version.updateAvailable
-                ? version.commitsBehind
-                  ? `${version.commitsBehind} behind`
-                  : "update available"
-                : "up to date"
+            updateState === "available" && latest
+              ? `v${latest.version} available`
+              : updateState === "updating"
+                ? "updating"
+                : updateState === "failed"
+                  ? "update failed"
+                  : updateState === "not-set-up"
+                    ? "not set up"
+                    : "up to date"
           }
           actions={
             <button type="button" className="ghost" onClick={() => go("updates")}>
@@ -347,11 +356,11 @@ export function OverviewPanel() {
         >
           <Facts
             rows={[
+              ["Running", `v${current.version}${current.releaseInstall ? "" : " · git checkout"}`],
               [
-                "Running",
-                `${version.version}${version.commitShort ? ` · ${version.commitShort}` : ""}${version.branch ? ` · ${version.branch}` : ""}`,
+                "Latest",
+                latest ? `v${latest.version}` : maintenance.release.checkError ? "unknown" : "—",
               ],
-              ["Latest", version.latestCommitShort ?? (version.gitError ? "unknown" : "—")],
               [
                 "Scripts",
                 maintenance.enabled

@@ -12,13 +12,12 @@ import type {
   MaintenanceReleaseCheckPublic,
   MaintenanceStatusPublic,
   MaintenanceUpdateState,
-  MaintenanceVersionPublic,
   RunMaintenanceBackupInput,
+  RunMaintenanceRestoreInput,
   RunMaintenanceUpdateInput,
 } from "@teamflow/core";
 import { inferMaintenanceJobOutcome, parseMaintenanceLog } from "@teamflow/core";
 import { config } from "../config.js";
-import { getMaintenanceVersionInfo } from "./versionInfo.js";
 import { getReleaseCheck, isUpdateAvailable, writeChannel } from "./releaseCheck.js";
 import { buildSpawnArgs, formatCommand, INSTALLED_SCRIPT_DIR, probeSudo } from "./hostScripts.js";
 import { badRequest, internalError } from "./errors.js";
@@ -65,6 +64,14 @@ function getUpdateScript() {
     config.maintenance.updateScript,
     `${INSTALLED_SCRIPT_DIR}update.sh`,
     "deploy/proxmox-lxc/update.sh",
+  );
+}
+
+function getRestoreScript() {
+  return resolveScriptPath(
+    undefined,
+    `${INSTALLED_SCRIPT_DIR}restore.sh`,
+    "deploy/proxmox-lxc/restore.sh",
   );
 }
 
@@ -244,10 +251,11 @@ async function startJob(
 
   await fs.appendFile(logPath, `> ${formatCommand(command, spawnArgs)}\n`);
 
-  const isUpdate = type === "update";
+  // Update and restore stop teamflow: they must survive as detached root processes that write
+  // their own log (update.sh / restore.sh redirect themselves).
+  const stopsServer = type === "update" || type === "restore";
 
-  if (isUpdate) {
-    // Update stops teamflow — must survive as a detached root process with its own log redirect in update.sh.
+  if (stopsServer) {
     const child = spawn(command, spawnArgs, {
       detached: true,
       stdio: "ignore",
@@ -315,7 +323,6 @@ async function startJob(
 type HostCheck = {
   /** null: never probed (skipped because a job was running). */
   sudo: { ready: boolean; command: string; detail: string } | null;
-  version: MaintenanceVersionPublic;
   checkedAt: string;
   /**
    * The check ran while a backup or update job was running. update.sh re-runs
@@ -347,8 +354,7 @@ export async function checkMaintenanceHost(): Promise<MaintenanceStatusPublic> {
       : jobRunning
         ? (hostCheck?.sudo ?? null)
         : await probeSudo(getBackupScript());
-  const version = await getMaintenanceVersionInfo({ skipOriginCheck: true });
-  hostCheck = { sudo, version, checkedAt: new Date().toISOString(), duringJob: jobRunning };
+  hostCheck = { sudo, checkedAt: new Date().toISOString(), duringJob: jobRunning };
   // "Check now": ask GitHub again even if the six-hour cache is fresh.
   await getReleaseCheck({ force: !jobRunning });
   return getMaintenanceStatus();
@@ -380,8 +386,6 @@ export async function getMaintenanceStatus(): Promise<MaintenanceStatusPublic> {
   const sudoProbe = enabled
     ? (hostCheck?.sudo ?? { ready: false, command: "", detail: HOST_NOT_CHECKED })
     : { ready: false, command: "", detail: reason };
-  const version =
-    hostCheck?.version ?? (await getMaintenanceVersionInfo({ skipOriginCheck: true }));
   // Reads the cache only; the boot check, the six-hourly timer and "Check now" refresh it.
   const release = await getReleaseCheck({ network: false });
   const lastRun = job?.type === "update" ? parseMaintenanceLog(job.logTail) : null;
@@ -412,7 +416,6 @@ export async function getMaintenanceStatus(): Promise<MaintenanceStatusPublic> {
     backupDir: enabled ? getBackupDir() : null,
     backups,
     job,
-    version,
     release,
     state: computeUpdateState({ job, lastRun, notSetUpReason, release }),
     lastRun,
@@ -483,12 +486,6 @@ export async function runMaintenanceBackup(input: RunMaintenanceBackupInput) {
 }
 
 export async function runMaintenanceUpdate(input: RunMaintenanceUpdateInput) {
-  if (input.branch) {
-    throw badRequest(
-      "Updating from a git branch is gone: servers install prebuilt releases. Pick a version instead.",
-    );
-  }
-
   const reason = disabledReason();
   if (reason) throw badRequest(reason);
 
@@ -511,8 +508,28 @@ export async function runMaintenanceUpdate(input: RunMaintenanceUpdateInput) {
   const job = await startJob("update", script, args, {
     backupFull: input.backupFull,
     skipBackup: input.skipBackup,
+    version,
   });
   if (!job) throw internalError("Failed to start update job");
+  return job;
+}
+
+/** Put a database backup back (Advanced → Backups → Restore). */
+export async function runMaintenanceRestore(input: RunMaintenanceRestoreInput) {
+  const reason = disabledReason();
+  if (reason) throw badRequest(reason);
+
+  const backups = await listBackups();
+  if (!backups.some((backup) => backup.name === input.file && backup.kind === "database")) {
+    throw badRequest(`No database backup named ${input.file}`);
+  }
+  const script = getRestoreScript();
+  if (!existsSync(script)) {
+    throw badRequest(`Restore script not found at ${script}. Re-run the installer to add it.`);
+  }
+
+  const job = await startJob("restore", script, ["--file", input.file], { file: input.file });
+  if (!job) throw internalError("Failed to start restore job");
   return job;
 }
 

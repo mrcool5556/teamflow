@@ -74,7 +74,7 @@ describe("overview", () => {
     expect(overview.settings.freeSpacesPerUser).toBe(3);
     expect(Array.isArray(overview.fixes)).toBe(true);
     expect(overview.bot.state).toBeTypeOf("string");
-    expect(overview.maintenance.version.version).toBeTypeOf("string");
+    expect(overview.maintenance.release.current.version).toBeTypeOf("string");
   });
 
   it("checks PUBLIC_URL/health and reports failures without throwing", async () => {

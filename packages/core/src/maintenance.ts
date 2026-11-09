@@ -13,7 +13,7 @@ export type MaintenanceJobStatus = "running" | "success" | "failed";
 
 export type MaintenanceJobPublic = {
   id: string;
-  type: "backup" | "update";
+  type: "backup" | "update" | "restore";
   status: MaintenanceJobStatus;
   startedAt: string;
   finishedAt: string | null;
@@ -22,88 +22,12 @@ export type MaintenanceJobPublic = {
     full?: boolean;
     backupFull?: boolean;
     skipBackup?: boolean;
-    branch?: string;
+    /** update: the version asked for. */
+    version?: string;
+    /** restore: the backup file put back. */
+    file?: string;
   };
 };
-
-export type MaintenanceVersionPublic = {
-  version: string;
-  branch: string | null;
-  commit: string | null;
-  commitShort: string | null;
-  commitDate: string | null;
-  latestCommit: string | null;
-  latestCommitShort: string | null;
-  updateAvailable: boolean;
-  commitsBehind: number | null;
-  gitError: string | null;
-};
-
-export type MaintenanceUpdatePhase =
-  | "starting"
-  | "backup"
-  | "pull"
-  | "install"
-  | "build"
-  | "migrate"
-  | "restart"
-  | "health"
-  | "done"
-  | "failed";
-
-export const MAINTENANCE_UPDATE_STEPS: { id: MaintenanceUpdatePhase; label: string }[] = [
-  { id: "starting", label: "Prepare" },
-  { id: "backup", label: "Backup" },
-  { id: "pull", label: "Pull" },
-  { id: "install", label: "Install" },
-  { id: "build", label: "Build" },
-  { id: "migrate", label: "Migrate" },
-  { id: "restart", label: "Restart" },
-  { id: "health", label: "Health" },
-  { id: "done", label: "Done" },
-];
-
-export function inferUpdatePhase(
-  log: string,
-  job: Pick<MaintenanceJobPublic, "type" | "status">,
-): MaintenanceUpdatePhase {
-  if (job.type !== "update") {
-    if (job.status === "success") return "done";
-    if (job.status === "failed") return "failed";
-    return "starting";
-  }
-
-  if (job.status === "failed") {
-    if (log.includes("Health check failed")) return "health";
-    return "failed";
-  }
-
-  if (job.status === "success" || log.includes("Health: ok")) return "done";
-  if (log.includes("Health check failed")) return "health";
-  if (log.includes("Update complete.")) return "restart";
-  if (log.includes("db:migrate") || log.includes("Applying migration")) return "migrate";
-  if (log.includes("apps/server build") || log.includes("vite build") || log.includes("Done in")) {
-    return "build";
-  }
-  if (log.includes("pnpm install") || log.includes("Lockfile")) return "install";
-  if (
-    log.includes("git pull") ||
-    log.includes("From https://") ||
-    log.includes("Fast-forward") ||
-    log.includes("Already up to date")
-  ) {
-    return "pull";
-  }
-  if (
-    log.includes("backup") ||
-    log.includes("SQLite backup") ||
-    log.includes("PostgreSQL backup")
-  ) {
-    return "backup";
-  }
-  if (log.includes("Teamflow update") || log.includes("systemctl stop")) return "starting";
-  return "starting";
-}
 
 export function inferMaintenanceJobOutcome(
   type: MaintenanceJobPublic["type"],
@@ -112,6 +36,9 @@ export function inferMaintenanceJobOutcome(
   if (type === "update") {
     if (/^DONE /m.test(log) || log.includes("Health: ok")) return "success";
     return "failed";
+  }
+  if (type === "restore") {
+    return /^RESTORED /m.test(log) ? "success" : "failed";
   }
 
   if (
@@ -124,12 +51,6 @@ export function inferMaintenanceJobOutcome(
   }
 
   return "failed";
-}
-
-export function updatePhaseIndex(phase: MaintenanceUpdatePhase) {
-  const order = MAINTENANCE_UPDATE_STEPS.map((step) => step.id);
-  if (phase === "failed") return -1;
-  return order.indexOf(phase);
 }
 
 /* ---------- Prebuilt releases (update.sh / update.ps1 and the GitHub release check) ---------- */
@@ -301,8 +222,6 @@ export type MaintenanceStatusPublic = {
   backupDir: string | null;
   backups: MaintenanceBackupPublic[];
   job: MaintenanceJobPublic | null;
-  /** @deprecated git-based version info; replaced by `release` and removed with the old page. */
-  version: MaintenanceVersionPublic;
   /** Installed version, newest release and the check that found it. */
   release: MaintenanceReleaseCheckPublic;
   state: MaintenanceUpdateState;
@@ -316,14 +235,23 @@ export const runMaintenanceBackupSchema = z.object({
   full: z.boolean().optional().default(false),
 });
 
-export const runMaintenanceUpdateSchema = z.object({
-  /** Install this release; defaults to the newest on the channel. */
-  version: z.string().regex(SEMVER_PATTERN).optional(),
-  backupFull: z.boolean().optional().default(false),
-  skipBackup: z.boolean().optional().default(false),
-  /** @deprecated Removed with prebuilt releases; the server refuses it. */
-  branch: z.string().min(1).max(120).optional(),
+export const runMaintenanceUpdateSchema = z
+  .object({
+    /** Install this release; defaults to the newest on the channel. */
+    version: z.string().regex(SEMVER_PATTERN).optional(),
+    backupFull: z.boolean().optional().default(false),
+    skipBackup: z.boolean().optional().default(false),
+  })
+  .strict();
+
+/** A database backup file in the backup folder (no paths). */
+export const MAINTENANCE_BACKUP_NAME = /^teamflow_[A-Za-z0-9_.-]+\.db$/;
+
+export const runMaintenanceRestoreSchema = z.object({
+  file: z.string().regex(MAINTENANCE_BACKUP_NAME),
 });
+
+export type RunMaintenanceRestoreInput = z.input<typeof runMaintenanceRestoreSchema>;
 
 export const maintenanceSettingsSchema = z.object({
   channel: z.enum(["stable", "prerelease"]),

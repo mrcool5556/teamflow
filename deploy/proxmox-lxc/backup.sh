@@ -66,7 +66,13 @@ backup_database() {
     echo "No database found at $db"
     exit 1
   fi
+  # Never overwrite: two backups in the same second (a restore right after a backup) get -2, -3…
   dest="$BACKUP_DIR/teamflow_$STAMP.db"
+  local n=2
+  while [[ -e "$dest" ]]; do
+    dest="$BACKUP_DIR/teamflow_${STAMP}-$n.db"
+    n=$((n + 1))
+  done
   echo "==> Database backup starting…"
   # A release install has a root-owned backup tool that uses SQLite's online backup, which is
   # safe while the server runs. A git checkout is owned by the app user, so root must not run
@@ -96,7 +102,11 @@ backup_uploads() {
     echo "No uploads directory at $upload_dir (skipped)."
     return 0
   fi
-  local archive="$BACKUP_DIR/teamflow_uploads_$STAMP.tar.gz"
+  local archive="$BACKUP_DIR/teamflow_uploads_$STAMP.tar.gz" n=2
+  while [[ -e "$archive" ]]; do
+    archive="$BACKUP_DIR/teamflow_uploads_${STAMP}-$n.tar.gz"
+    n=$((n + 1))
+  done
   echo "==> Uploads backup starting…"
   tar -czf "$archive" -C "$(dirname "$upload_dir")" "$(basename "$upload_dir")"
   chmod 600 "$archive"

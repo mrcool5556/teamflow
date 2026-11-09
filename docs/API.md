@@ -37,7 +37,7 @@ Server code throws `ApiError` from `apps/server/src/lib/errors.ts` (`badRequest`
 
 <!-- BEGIN GENERATED ROUTES (scripts/gen-api-docs.mjs) -->
 
-## Routes (123)
+## Routes (124)
 
 Generated from `apps/server/src/routes/*.ts` by `pnpm docs:api`; do not edit by hand.
 
@@ -178,6 +178,7 @@ Server maintenance: status, backups, updates (instance admin only).
 | POST | `/teams/:teamId/server/maintenance/backup` | bearer | yes | member | `server.maintenance.run` + instance admin | body `runMaintenanceBackupSchema` |
 | POST | `/teams/:teamId/server/maintenance/update` | bearer | yes | member | `server.maintenance.run` + instance admin | body `runMaintenanceUpdateSchema` |
 | POST | `/teams/:teamId/server/maintenance/job/dismiss` | bearer | yes | member | `server.maintenance.run` + instance admin |  |
+| POST | `/teams/:teamId/server/maintenance/restore` | bearer | yes | member | `server.maintenance.run` + instance admin | body `runMaintenanceRestoreSchema` |
 | PUT | `/teams/:teamId/server/maintenance/settings` | bearer | yes | member | `server.maintenance.run` + instance admin | body `maintenanceSettingsSchema` |
 
 ### Instance admin and spaces

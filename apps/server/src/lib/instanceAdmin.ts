@@ -298,15 +298,12 @@ export function collectFixes(input: {
         detail: maintenance.sudoDetail ?? "sudo is not set up for the teamflow user.",
       });
     }
-    if (maintenance.version.updateAvailable) {
+    if (maintenance.state === "available" && maintenance.release.latest) {
       add({
         id: "update-available",
         severity: "info",
-        title: "An update is available",
-        detail:
-          maintenance.version.commitsBehind !== null
-            ? `${maintenance.version.commitsBehind} commit(s) behind ${maintenance.version.branch ?? "the remote"}.`
-            : "The remote branch has newer commits.",
+        title: `Teamflow v${maintenance.release.latest.version} is available`,
+        detail: `You have v${maintenance.release.current.version}. Update from Updates & backups.`,
       });
     }
   }
@@ -353,7 +350,8 @@ export async function getInstanceOverview(db: Db): Promise<InstanceOverviewPubli
     ? maintenance.backups.reduce((sum, backup) => sum + backup.sizeBytes, 0)
     : null;
   const disk = await diskInfo(db, spaces, backupsBytes);
-  const server = serverInfo(maintenance.version.version, maintenance.version.commitShort);
+  const current = maintenance.release.current;
+  const server = serverInfo(current.version, current.commit ? current.commit.slice(0, 7) : null);
   return {
     checkedAt: new Date().toISOString(),
     server,

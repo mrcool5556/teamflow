@@ -78,18 +78,6 @@ export function makeOverview(extra: Partial<InstanceOverviewPublic> = {}): Insta
         },
       ],
       job: null,
-      version: {
-        version: "0.9.2",
-        branch: "main",
-        commit: "1d99913aaaa",
-        commitShort: "1d99913",
-        commitDate: null,
-        latestCommit: "a41c07ebbbb",
-        latestCommitShort: "a41c07e",
-        updateAvailable: true,
-        commitsBehind: 2,
-        gitError: null,
-      },
       release: {
         current: {
           version: "0.9.2",

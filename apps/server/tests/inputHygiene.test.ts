@@ -38,7 +38,7 @@ describe("maintenance update input", () => {
         body: { branch },
       });
       expect(res.status).toBe(400);
-      expect((await json<{ error: string }>(res)).error).toMatch(/branch is gone/);
+      expect((await json<{ error: string }>(res)).error).toMatch(/branch/);
     }
   });
 
@@ -48,6 +48,31 @@ describe("maintenance update input", () => {
       body: { version: "1.2.3; rm -rf /" },
     });
     expect(res.status).toBe(400);
+  });
+});
+
+describe("maintenance restore input", () => {
+  it("only takes a plain database backup file name", async () => {
+    for (const file of [
+      "../../etc/passwd",
+      "/var/backups/teamflow/teamflow_1.db",
+      "teamflow_1.tar.gz",
+      "x.db",
+    ]) {
+      const res = await api(app, "POST", `/teams/${admin.teamId}/server/maintenance/restore`, {
+        token: admin.token,
+        body: { file },
+      });
+      expect(res.status).toBe(400);
+    }
+  });
+
+  it("is instance-admin only", async () => {
+    const res = await api(app, "POST", `/teams/${member.teamId}/server/maintenance/restore`, {
+      token: member.token,
+      body: { file: "teamflow_2026-11-09_140201.db" },
+    });
+    expect(res.status).toBe(403);
   });
 });
 
