@@ -1,63 +1,109 @@
-import { beforeAll, describe, expect, it, vi } from "vitest";
+import fs from "node:fs";
+import os from "node:os";
+import path from "node:path";
+import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
+import type { MaintenanceStatusPublic } from "@teamflow/core";
 import { api, bootApp, json, registerUser, type RegisteredUser, type TestApp } from "./helpers";
 
-const versionInfo = vi.hoisted(() => ({
-  calls: [] as { skipOriginCheck?: boolean }[],
-}));
-
-vi.mock("../src/lib/versionInfo.js", () => ({
-  getMaintenanceVersionInfo: async (options?: { skipOriginCheck?: boolean }) => {
-    versionInfo.calls.push({ skipOriginCheck: options?.skipOriginCheck });
-    return {
-      version: "0.1.0",
-      branch: "main",
-      commit: "abc",
-      commitShort: "abc",
-      commitDate: null,
-      latestCommit: options?.skipOriginCheck ? null : "def",
-      latestCommitShort: options?.skipOriginCheck ? null : "def",
-      updateAvailable: !options?.skipOriginCheck,
-      commitsBehind: options?.skipOriginCheck ? null : 1,
-      gitError: null,
-    };
-  },
-}));
+const github = vi.hoisted(() => ({ calls: 0 }));
 
 let app: TestApp;
 let admin: RegisteredUser;
+let appDir: string;
+const realFetch = globalThis.fetch;
 
 beforeAll(async () => {
-  app = await bootApp();
+  appDir = fs.mkdtempSync(path.join(os.tmpdir(), "teamflow-check-"));
+  globalThis.fetch = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+    const url = String(input);
+    if (url.startsWith("https://api.github.com/")) {
+      github.calls += 1;
+      return new Response(
+        JSON.stringify([
+          { tag_name: "v99.0.0-rc.1", prerelease: true, draft: false, body: "rc", assets: [] },
+          {
+            tag_name: "v99.0.0",
+            prerelease: false,
+            draft: false,
+            body: "- Big one",
+            html_url: "https://github.com/mrcool5556/teamflow/releases/tag/v99.0.0",
+            published_at: "2026-11-09T10:00:00Z",
+            assets: [{ name: "teamflow-v99.0.0-linux-x64.tar.gz", size: 123 }],
+          },
+          { tag_name: "v98.0.0", prerelease: false, draft: false, body: "", assets: [] },
+          { tag_name: "v100.0.0", prerelease: false, draft: true, body: "", assets: [] },
+        ]),
+        { status: 200, headers: { "Content-Type": "application/json" } },
+      );
+    }
+    return realFetch(input, init);
+  }) as typeof fetch;
+  app = await bootApp({ TEAMFLOW_UPDATE_CHECK: "true", TEAMFLOW_APP_DIR: appDir });
   admin = await registerUser(app); // first account: instance admin and Owner of "General"
 });
 
+afterAll(async () => {
+  globalThis.fetch = realFetch;
+  process.env.TEAMFLOW_UPDATE_CHECK = "false";
+  delete process.env.TEAMFLOW_APP_DIR;
+  const { reloadConfig } = await import("../src/config.js");
+  reloadConfig();
+  fs.rmSync(appDir, { recursive: true, force: true });
+});
+
+async function status(method: "GET" | "POST", suffix = "") {
+  const res = await api(app, method, `/teams/${admin.teamId}/server/maintenance${suffix}`, {
+    token: admin.token,
+  });
+  expect(res.status).toBe(200);
+  return (await json<{ status: MaintenanceStatusPublic }>(res)).status;
+}
+
 describe("maintenance status", () => {
-  it("GET never contacts origin; POST check does and is cached for later GETs", async () => {
-    versionInfo.calls.length = 0;
-    const before = await api(app, "GET", `/teams/${admin.teamId}/server/maintenance`, {
-      token: admin.token,
-    });
-    expect(before.status).toBe(200);
-    expect(versionInfo.calls).toEqual([{ skipOriginCheck: true }]);
-    const { status: cold } = await json<{ status: { version: { latestCommit: string | null } } }>(
-      before,
-    );
-    expect(cold.version.latestCommit).toBeNull();
+  it("GET never contacts GitHub; POST check does and later GETs read the cache", async () => {
+    github.calls = 0;
+    const cold = await status("GET");
+    expect(github.calls).toBe(0);
+    expect(cold.release.latest).toBeNull();
+    expect(cold.release.checkEnabled).toBe(true);
 
-    versionInfo.calls.length = 0;
-    const check = await api(app, "POST", `/teams/${admin.teamId}/server/maintenance/check`, {
-      token: admin.token,
-    });
-    expect(check.status).toBe(200);
-    expect(versionInfo.calls).toEqual([{ skipOriginCheck: false }]);
+    const checked = await status("POST", "/check");
+    expect(github.calls).toBe(1);
+    // Newest stable, non-draft release; the pre-release and the draft are skipped.
+    expect(checked.release.latest?.version).toBe("99.0.0");
+    expect(checked.release.latest?.notes).toBe("- Big one");
+    expect(checked.release.channel).toBe("stable");
 
-    versionInfo.calls.length = 0;
-    const after = await api(app, "GET", `/teams/${admin.teamId}/server/maintenance`, {
+    const after = await status("GET");
+    expect(github.calls).toBe(1);
+    expect(after.release.latest?.version).toBe("99.0.0");
+    // A dev checkout is not a release install, so one-click updates are not set up here.
+    expect(after.state).toBe("not-set-up");
+    expect(after.notSetUpReason).toBeTruthy();
+  });
+
+  it("switching to the pre-release channel offers release candidates", async () => {
+    const res = await api(app, "PUT", `/teams/${admin.teamId}/server/maintenance/settings`, {
       token: admin.token,
+      body: { channel: "prerelease" },
     });
-    const { status } = await json<{ status: { version: { latestCommit: string | null } } }>(after);
-    expect(status.version.latestCommit).toBe("def");
-    expect(versionInfo.calls).toEqual([]);
+    expect(res.status).toBe(200);
+    const { status: next } = await json<{ status: MaintenanceStatusPublic }>(res);
+    expect(next.release.channel).toBe("prerelease");
+    // 99.0.0 is newer than its own release candidate.
+    expect(next.release.latest?.version).toBe("99.0.0");
+    await api(app, "PUT", `/teams/${admin.teamId}/server/maintenance/settings`, {
+      token: admin.token,
+      body: { channel: "stable" },
+    });
+  });
+
+  it("refuses branch updates", async () => {
+    const res = await api(app, "POST", `/teams/${admin.teamId}/server/maintenance/update`, {
+      token: admin.token,
+      body: { branch: "main" },
+    });
+    expect(res.status).toBe(400);
   });
 
   it("guards the check like the other maintenance actions", async () => {

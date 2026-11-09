@@ -6,15 +6,20 @@ import fs from "node:fs/promises";
 import path from "node:path";
 import type {
   MaintenanceBackupPublic,
+  MaintenanceChannel,
   MaintenanceJobPublic,
+  MaintenanceLogSummary,
+  MaintenanceReleaseCheckPublic,
   MaintenanceStatusPublic,
+  MaintenanceUpdateState,
   MaintenanceVersionPublic,
   RunMaintenanceBackupInput,
   RunMaintenanceUpdateInput,
 } from "@teamflow/core";
-import { inferMaintenanceJobOutcome } from "@teamflow/core";
+import { inferMaintenanceJobOutcome, parseMaintenanceLog } from "@teamflow/core";
 import { config } from "../config.js";
 import { getMaintenanceVersionInfo } from "./versionInfo.js";
+import { getReleaseCheck, isUpdateAvailable, writeChannel } from "./releaseCheck.js";
 import { buildSpawnArgs, formatCommand, INSTALLED_SCRIPT_DIR, probeSudo } from "./hostScripts.js";
 import { badRequest, internalError } from "./errors.js";
 
@@ -104,8 +109,10 @@ function isProcessRunning(pid: number) {
   try {
     process.kill(pid, 0);
     return true;
-  } catch {
-    return false;
+  } catch (err) {
+    // The update runs as root through sudo: signalling it is refused (EPERM) but it is alive.
+    // Treating that as "gone" marked updates failed while they were still finishing.
+    return (err as NodeJS.ErrnoException).code === "EPERM";
   }
 }
 
@@ -340,8 +347,10 @@ export async function checkMaintenanceHost(): Promise<MaintenanceStatusPublic> {
       : jobRunning
         ? (hostCheck?.sudo ?? null)
         : await probeSudo(getBackupScript());
-  const version = await getMaintenanceVersionInfo({ skipOriginCheck: jobRunning });
+  const version = await getMaintenanceVersionInfo({ skipOriginCheck: true });
   hostCheck = { sudo, version, checkedAt: new Date().toISOString(), duringJob: jobRunning };
+  // "Check now": ask GitHub again even if the six-hour cache is fresh.
+  await getReleaseCheck({ force: !jobRunning });
   return getMaintenanceStatus();
 }
 
@@ -373,6 +382,17 @@ export async function getMaintenanceStatus(): Promise<MaintenanceStatusPublic> {
     : { ready: false, command: "", detail: reason };
   const version =
     hostCheck?.version ?? (await getMaintenanceVersionInfo({ skipOriginCheck: true }));
+  // Reads the cache only; the boot check, the six-hourly timer and "Check now" refresh it.
+  const release = await getReleaseCheck({ network: false });
+  const lastRun = job?.type === "update" ? parseMaintenanceLog(job.logTail) : null;
+  const notSetUpReason = describeNotSetUp({
+    disabledReason: reason,
+    release,
+    sudoReady: sudoProbe.ready,
+    sudoChecked: Boolean(hostCheck?.sudo),
+    sudoPending,
+    lastRun,
+  });
 
   return {
     enabled,
@@ -393,7 +413,58 @@ export async function getMaintenanceStatus(): Promise<MaintenanceStatusPublic> {
     backups,
     job,
     version,
+    release,
+    state: computeUpdateState({ job, lastRun, notSetUpReason, release }),
+    lastRun,
+    notSetUpReason,
   };
+}
+
+/** Why the one-click update cannot run on this host, or null when it can. */
+export function describeNotSetUp(input: {
+  disabledReason: string | null;
+  release: MaintenanceReleaseCheckPublic;
+  sudoReady: boolean;
+  /** False until the sudo probe has run once (it runs at boot and on "Check now"). */
+  sudoChecked: boolean;
+  sudoPending: boolean;
+  lastRun: MaintenanceLogSummary | null;
+}): string | null {
+  if (input.disabledReason) return input.disabledReason;
+  if (!input.release.current.releaseInstall) {
+    return "This server runs from a git checkout. Run the installer once to switch it to prebuilt releases; it keeps your data and settings.";
+  }
+  if (input.sudoChecked && !input.sudoReady && !input.sudoPending) {
+    return "The maintenance permission (sudo rule) is missing. Re-run the installer to add it.";
+  }
+  if (input.lastRun?.failure?.code === "not-set-up") return input.lastRun.failure.message;
+  return null;
+}
+
+export function computeUpdateState(input: {
+  job: MaintenanceJobPublic | null;
+  lastRun: MaintenanceLogSummary | null;
+  notSetUpReason: string | null;
+  release: MaintenanceReleaseCheckPublic;
+}): MaintenanceUpdateState {
+  const { job } = input;
+  if (job?.type === "update" && job.status === "running") return "updating";
+  if (
+    job?.type === "update" &&
+    job.status === "failed" &&
+    input.lastRun?.failure?.code !== "not-set-up"
+  ) {
+    return "failed";
+  }
+  if (input.notSetUpReason) return "not-set-up";
+  return isUpdateAvailable(input.release) ? "available" : "up-to-date";
+}
+
+/** Settings → Updates → Advanced → Release channel. */
+export async function setMaintenanceChannel(channel: MaintenanceChannel) {
+  await writeChannel(channel);
+  await getReleaseCheck({ force: true });
+  return getMaintenanceStatus();
 }
 
 export async function runMaintenanceBackup(input: RunMaintenanceBackupInput) {
@@ -411,21 +482,12 @@ export async function runMaintenanceBackup(input: RunMaintenanceBackupInput) {
   return job;
 }
 
-/** Branch names reach `git checkout "$BRANCH"`; allow only plain ref characters, no options. */
-const BRANCH_PATTERN = /^[A-Za-z0-9._/-]{1,120}$/;
-
-export function isValidBranchName(value: string) {
-  return BRANCH_PATTERN.test(value) && !value.startsWith("-") && !value.includes("..");
-}
-
-export function assertValidBranchName(value: string | undefined) {
-  if (value !== undefined && !isValidBranchName(value)) {
-    throw badRequest("Invalid branch name");
-  }
-}
-
 export async function runMaintenanceUpdate(input: RunMaintenanceUpdateInput) {
-  assertValidBranchName(input.branch);
+  if (input.branch) {
+    throw badRequest(
+      "Updating from a git branch is gone: servers install prebuilt releases. Pick a version instead.",
+    );
+  }
 
   const reason = disabledReason();
   if (reason) throw badRequest(reason);
@@ -435,17 +497,20 @@ export async function runMaintenanceUpdate(input: RunMaintenanceUpdateInput) {
     throw badRequest(`Update script not found at ${script}`);
   }
 
+  // Install the version the page showed, so a release published meanwhile is not picked up
+  // unannounced. Without one, use the newest the check knows of; the script falls back to
+  // asking GitHub itself.
+  const release = await getReleaseCheck({ network: false });
+  const version = input.version ?? release.latest?.version;
   const args: string[] = [];
+  if (version) args.push("--version", version);
+  if (release.channel === "prerelease") args.push("--channel", "prerelease");
   if (input.skipBackup) args.push("--skip-backup");
   if (input.backupFull) args.push("--backup-full");
-  if (input.branch) {
-    args.push("--branch", input.branch);
-  }
 
   const job = await startJob("update", script, args, {
     backupFull: input.backupFull,
     skipBackup: input.skipBackup,
-    branch: input.branch,
   });
   if (!job) throw internalError("Failed to start update job");
   return job;
@@ -460,6 +525,12 @@ export async function dismissMaintenanceJob() {
   await reconcileStaleJob();
   const job = await readStoredJob();
   if (!job) return null;
+
+  // A finished job is cleared, so a failed update stops showing once read.
+  if (job.status !== "running") {
+    await fs.rm(path.join(getDataDir(), JOB_FILE), { force: true });
+    return null;
+  }
 
   if (job.status === "running") {
     if (job.pid && isProcessRunning(job.pid)) {
