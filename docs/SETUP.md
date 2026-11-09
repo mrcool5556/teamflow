@@ -4,6 +4,20 @@ A brand-new server (no accounts at all) is set up in the browser at `/setup`. Th
 
 Once any account exists, `/setup` is closed for good: the server refuses a second setup (`409 setup_done`) and the web app sends `/setup` to the login page. Existing servers never see it.
 
+## The setup page
+
+| Step | URL | What it does |
+|------|-----|--------------|
+| 1. Admin account | `/setup?code=…` | Name, email, password and the setup code. Signs the new admin in. Only while the server has no accounts. |
+| 2. Name and address | `/setup/site` | Site name (default Teamflow) and public address, prefilled from the address in the browser. **Check** asks the server to fetch `<address>/health`. |
+| 3. Email | `/setup/email` | SMTP server, port, security, login, sender. **Send a test to me** saves and sends. **Skip for now** is fine: password resets then need an admin. |
+| 4. Storage and sign-up | `/setup/storage` | Upload cap per Flow (1 GB), Flows per person (3), stop uploads below (2 GB free), and who can sign up. |
+| 5. Checklist | `/setup/done` | What's done and what's left, with links. Also shown on the server admin Overview until everything is done or the card is dismissed. |
+
+Steps 2–5 are ordinary admin settings: an instance admin can come back to any of them later, and the admin can leave the wizard at any point. A field that `.env` sets shows **Set in .env** and is read-only. On a phone the step list becomes a progress bar.
+
+The login page sends visitors to `/setup` while the server has no accounts.
+
 ## Contract with the installers
 
 This is what every installer (Proxmox LXC, Docker, Windows, manual) can rely on.

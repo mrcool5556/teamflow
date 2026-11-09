@@ -22,7 +22,6 @@ beforeAll(async () => {
   app = await bootApp();
   site = await import("../src/lib/siteSettings.js");
   await registerUser(app, { name: "Admin" }); // past setup, so registration is open
-
 });
 
 afterEach(async () => {
@@ -39,7 +38,9 @@ afterEach(async () => {
 
 describe("normalisePublicUrl", () => {
   it("keeps scheme, host, port and path, drops the trailing slash, query and default port", () => {
-    expect(normalisePublicUrl("https://Teamflow.Example.org/")).toBe("https://teamflow.example.org");
+    expect(normalisePublicUrl("https://Teamflow.Example.org/")).toBe(
+      "https://teamflow.example.org",
+    );
     expect(normalisePublicUrl("http://10.0.0.5:3000/tf/?x=1")).toBe("http://10.0.0.5:3000/tf");
     expect(normalisePublicUrl("https://a.example:443")).toBe("https://a.example");
     expect(normalisePublicUrl("ftp://a.example")).toBeNull();

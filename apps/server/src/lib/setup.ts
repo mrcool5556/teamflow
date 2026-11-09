@@ -31,7 +31,10 @@ let memoryCode: string | null = null;
 let announced = false;
 
 function accountCount(db: DbExecutor) {
-  const row = db.select({ count: sql<number>`count(*)` }).from(schema.users).get();
+  const row = db
+    .select({ count: sql<number>`count(*)` })
+    .from(schema.users)
+    .get();
   return Number(row?.count ?? 0);
 }
 
@@ -129,7 +132,11 @@ export function currentSetupCodeForTests(db: DbExecutor) {
 export async function createSetupAdmin(db: Db, input: SetupAdminInput) {
   const expected = ensureSetupCode(db);
   if (!expected) {
-    throw new ApiError(409, "This server is already set up. Log in instead.", SETUP_ERROR_CODES.done);
+    throw new ApiError(
+      409,
+      "This server is already set up. Log in instead.",
+      SETUP_ERROR_CODES.done,
+    );
   }
   if (!codesMatch(expected, input.code)) {
     throw new ApiError(

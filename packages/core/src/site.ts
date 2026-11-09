@@ -24,9 +24,10 @@ export type SiteSettingsPublic = {
 /** Normalise an http(s) address: origin plus path, no trailing slash, no query or hash. */
 export function normalisePublicUrl(raw: string): string | null {
   // No URL global here (core has no DOM or Node lib), so a strict pattern instead.
-  const match = /^(https?):\/\/([a-z0-9.-]+|\[[0-9a-f:.]+\])(:\d{1,5})?(\/[^\s?#]*)?(?:[?#]\S*)?$/i.exec(
-    raw.trim(),
-  );
+  const match =
+    /^(https?):\/\/([a-z0-9.-]+|\[[0-9a-f:.]+\])(:\d{1,5})?(\/[^\s?#]*)?(?:[?#]\S*)?$/i.exec(
+      raw.trim(),
+    );
   if (!match) return null;
   const [, scheme, host, port = "", path = ""] = match;
   if (port && Number(port.slice(1)) > 65535) return null;

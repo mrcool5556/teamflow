@@ -72,7 +72,11 @@ describe("site name and address", () => {
   it("ignores X-Forwarded-* unless the proxy is trusted", async () => {
     const res = await api(app, "GET", "/instance/site", {
       token: admin.token,
-      headers: { Host: "10.0.0.2:3000", "X-Forwarded-Proto": "https", "X-Forwarded-Host": "evil.example" },
+      headers: {
+        Host: "10.0.0.2:3000",
+        "X-Forwarded-Proto": "https",
+        "X-Forwarded-Host": "evil.example",
+      },
     });
     expect((await json<{ site: SiteSettingsAdminPublic }>(res)).site.suggestedPublicUrl).toBe(
       "http://10.0.0.2:3000",
@@ -159,7 +163,10 @@ describe("sign-up", () => {
       inviteOnly: true,
       source: "saved",
     });
-    await api(app, "PATCH", "/instance/signup", { token: admin.token, body: { inviteOnly: false } });
+    await api(app, "PATCH", "/instance/signup", {
+      token: admin.token,
+      body: { inviteOnly: false },
+    });
   });
 });
 

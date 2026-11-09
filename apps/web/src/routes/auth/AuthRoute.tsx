@@ -1,9 +1,10 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Navigate, useLocation, useNavigate } from "react-router";
 import { AboutDialog } from "../../components/AboutDialog";
 import type { AuthMode } from "../../lib/appRoute";
 import { useErrorSink } from "../../lib/errorSink";
 import type { NavState } from "../../lib/navState";
+import { useAuthConfigQuery } from "../../queries/auth";
 import { useSession, useTeams } from "../../session/session";
 import { LoginScreen } from "./LoginScreen";
 
@@ -18,6 +19,14 @@ export function AuthRoute({ mode }: { mode: AuthMode }) {
   const { teamsLoaded } = useTeams();
   const { error } = useErrorSink();
   const [aboutOpen, setAboutOpen] = useState(false);
+  const authConfig = useAuthConfigQuery();
+  const siteName = authConfig.data?.siteName;
+  useEffect(() => {
+    if (siteName) document.title = siteName;
+  }, [siteName]);
+
+  // A server with no accounts yet is set up first; /setup asks for the setup code.
+  if (!user && authConfig.data?.setupNeeded) return <Navigate to="/setup" replace />;
 
   if (user && teamsLoaded) {
     const from = navState?.from;

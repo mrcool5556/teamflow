@@ -86,14 +86,20 @@ function requestOrigin(c: Context): string | null {
 /* ---------- site name, address, email, sign-up (.env wins; see lib/siteSettings.ts) ---------- */
 
 routes.get("/instance/site", requireAuth, requireInstanceAdmin, async (c) => {
-  const site: SiteSettingsAdminPublic = { ...getSiteSettings(), suggestedPublicUrl: requestOrigin(c) };
+  const site: SiteSettingsAdminPublic = {
+    ...getSiteSettings(),
+    suggestedPublicUrl: requestOrigin(c),
+  };
   return c.json({ site });
 });
 
 routes.patch("/instance/site", requireAuth, requireWrite, requireInstanceAdmin, async (c) => {
   const body = await parseBody(c, updateSiteSettingsSchema);
   updateSiteSettings(body);
-  const site: SiteSettingsAdminPublic = { ...getSiteSettings(), suggestedPublicUrl: requestOrigin(c) };
+  const site: SiteSettingsAdminPublic = {
+    ...getSiteSettings(),
+    suggestedPublicUrl: requestOrigin(c),
+  };
   return c.json({ site });
 });
 

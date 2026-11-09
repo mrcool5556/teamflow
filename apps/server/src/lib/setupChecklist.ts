@@ -52,7 +52,10 @@ export async function getSetupChecklist(db: Db, viewerId: string): Promise<Setup
     .limit(1);
   const spacesSaved = readInstanceSetting<unknown>("spaces") !== null;
   const teamCount = Number(
-    db.select({ count: sql<number>`count(*)` }).from(schema.teams).get()?.count ?? 0,
+    db
+      .select({ count: sql<number>`count(*)` })
+      .from(schema.teams)
+      .get()?.count ?? 0,
   );
 
   const items: SetupChecklistItem[] = [
@@ -139,6 +142,9 @@ function serviceItem(): SetupChecklistItem {
     id: "service",
     state: "done",
     title: "Runs as a service",
-    detail: supervisor === "unknown" ? "Supervisor detected" : `${supervisor}${serviceName ? `: ${serviceName}` : ""}`,
+    detail:
+      supervisor === "unknown"
+        ? "Supervisor detected"
+        : `${supervisor}${serviceName ? `: ${serviceName}` : ""}`,
   };
 }

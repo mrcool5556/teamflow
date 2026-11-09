@@ -110,7 +110,7 @@ export function LoginScreen({
     <div className="login-shell">
       {/* A real form, so Enter submits whichever step is showing. */}
       <form className="login-card" noValidate onSubmit={handleSubmit}>
-        <p className="eyebrow">TEAMFLOW</p>
+        <p className="eyebrow">{authConfig?.siteName ?? "Teamflow"}</p>
         <h1>
           {mode === "forgot"
             ? "Forgot password"

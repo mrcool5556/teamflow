@@ -11,6 +11,7 @@ import { SpacesPanel } from "./routes/admin/SpacesPanel";
 import { AdminBotPanel, AdminUpdatesPanel } from "./routes/admin/ServerSections";
 import { AuthRoute } from "./routes/auth/AuthRoute";
 import { InviteRoute } from "./routes/auth/InviteRoute";
+import { SetupRoute } from "./routes/setup/SetupRoute";
 import { BoardShell } from "./routes/board/BoardShell";
 import { AppearancePanel } from "./routes/settings/AppearancePanel";
 import { DesignPanel } from "./routes/settings/DesignPanel";
@@ -69,6 +70,8 @@ export const routes: RouteObject[] = [
       { path: "login", element: <AuthRoute mode="login" /> },
       { path: "register", element: <AuthRoute mode="register" /> },
       { path: "reset", element: <AuthRoute mode="reset" /> },
+      // First-time setup; closed once the server has an account (docs/SETUP.md).
+      { path: "setup/:step?", element: <SetupRoute /> },
       {
         element: <BoardShell />,
         children: [

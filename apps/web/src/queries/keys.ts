@@ -23,6 +23,11 @@ export const queryKeys = {
   instanceSpace: (teamId: string) => ["instance", "spaces", teamId] as const,
   instanceSettings: ["instance", "settings"] as const,
   instanceUsers: (query: string) => ["instance", "users", query] as const,
+  instanceSite: ["instance", "site"] as const,
+  instanceMail: ["instance", "mail"] as const,
+  instanceSignup: ["instance", "signup"] as const,
+  setupChecklist: ["instance", "setup-checklist"] as const,
+  authConfig: ["auth-config"] as const,
 };
 
 export function createQueryClient() {

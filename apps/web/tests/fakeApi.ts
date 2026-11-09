@@ -244,7 +244,16 @@ export function installFakeApi(db: FakeDb, options: FakeApiOptions = {}) {
   const routes: FakeRoute[] = [
     ...(options.extraRoutes ?? []),
     ["GET", /^\/auth\/me$/, () => ({ user: db.user })],
-    ["GET", /^\/auth\/config$/, () => ({ inviteOnly: false, passwordResetEmail: false })],
+    [
+      "GET",
+      /^\/auth\/config$/,
+      () => ({
+        siteName: "Teamflow",
+        inviteOnly: false,
+        setupNeeded: false,
+        passwordResetEmail: false,
+      }),
+    ],
     ["GET", /^\/auth\/profile$/, () => ({ profile: db.profile })],
     ["PUT", /^\/auth\/profile$/, ({ body }) => ({ profile: (db.profile = body as UserProfile) })],
     ["PATCH", /^\/auth\/profile$/, () => ({ profile: db.profile })],
