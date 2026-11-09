@@ -238,6 +238,48 @@ check "app user may run restore through sudo" runuser -u teamflow -- sudo -n /us
 section "Releases kept"
 check "at most two releases on disk" bash -c "test \$(ls -d $APP_DIR/releases/v* | wc -l) -le 2"
 
+section "Dry run changes nothing"
+before=$(find $APP_DIR -maxdepth 2 -printf '%p %s
+' | sort | sha256sum)
+bash "$SRC/deploy/install/install.sh" --dry-run >/tmp/dry.log 2>&1 || { tail -20 /tmp/dry.log; bad "dry run exit"; }
+check "dry run says so" grep -q "Dry run finished" /tmp/dry.log
+check "dry run changed nothing" test "$(find $APP_DIR -maxdepth 2 -printf '%p %s
+' | sort | sha256sum)" = "$before"
+
+section "Installer switches a git-checkout server to releases (the CT998 path)"
+/usr/local/bin/fake-systemctl stop || true
+rm -rf $APP_DIR /etc/systemd/system/teamflow.service
+mkdir -p $APP_DIR/.git $APP_DIR/data $APP_DIR/apps/server
+legacy_jwt=$(openssl rand -hex 32)
+cat >$APP_DIR/.env <<ENV
+PORT=3000
+HOST=0.0.0.0
+DATABASE_URL=file:./data/teamflow.db
+JWT_SECRET=$legacy_jwt
+PUBLIC_URL=http://teamflow.example
+SERVE_WEB=true
+WEB_DIST=/opt/teamflow/apps/web/dist
+TEAMFLOW_MAINTENANCE_ENABLED=true
+TEAMFLOW_APP_DIR=/opt/teamflow
+ENV
+tmprel=$(mktemp -d)
+tar -xzf "$REL/download/v0.2.0/teamflow-v0.2.0-linux-x64.tar.gz" -C "$tmprel"
+(cd $APP_DIR && node "$tmprel/apps/server/dist/migrate.js" >/dev/null && node -e '
+  const D=require(process.argv[1]); const db=new D("data/teamflow.db");
+  db.exec("CREATE TABLE canary(v TEXT)"); db.prepare("INSERT INTO canary VALUES (?)").run("legacy"); db.close();' "$tmprel/node_modules/better-sqlite3")
+chown -R teamflow:teamflow $APP_DIR
+set_latest 0.2.1
+bash "$SRC/deploy/install/install.sh" --yes >/tmp/convert.log 2>&1 || { tail -30 /tmp/convert.log; bad "conversion exit"; }
+check "checkout kept aside" bash -c 'ls -d /opt/teamflow.git-* >/dev/null'
+check "current is a release" test "$(readlink $APP_DIR/current)" = releases/v0.2.1
+check "running v0.2.1" test "$(running_version)" = 0.2.1
+check "JWT_SECRET kept" grep -q "^JWT_SECRET=$legacy_jwt\$" $APP_DIR/.env
+check "secrets key = old JWT (stored secrets stay readable)" grep -q "^TEAMFLOW_SECRETS_KEY=$legacy_jwt\$" $APP_DIR/.env
+check "PUBLIC_URL kept" grep -q "^PUBLIC_URL=http://teamflow.example$" $APP_DIR/.env
+check "legacy data kept" test "$(canary)" = 1
+check "a pre-conversion backup exists" bash -c 'ls /var/backups/teamflow/*before-releases.db >/dev/null'
+check "printed the address" grep -q "Teamflow is running" /tmp/convert.log
+
 TEAMFLOW_SYSTEMCTL=/usr/local/bin/fake-systemctl /usr/local/bin/fake-systemctl stop || true
 echo ""
 echo "passed: $PASS   failed: ${#FAILS[@]}"

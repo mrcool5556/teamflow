@@ -217,7 +217,7 @@ for (const file of ["package.json", "pnpm-lock.yaml", "pnpm-workspace.yaml"])
 copyDir(path.join(root, "apps", "web", "dist"), path.join(stage, "apps", "web", "dist"));
 
 // 4. Deploy scripts for this platform.
-const deployFrom = isWindows ? ["windows"] : ["proxmox-lxc"];
+const deployFrom = isWindows ? ["windows"] : ["proxmox-lxc", "install"];
 for (const dir of deployFrom)
   copyDir(path.join(root, "deploy", dir), path.join(stage, "deploy", dir));
 for (const file of ["LICENSE", "README.md"]) {
