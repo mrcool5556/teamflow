@@ -8,9 +8,11 @@ set -euo pipefail
 APP_DIR="${APP_DIR:-/opt/teamflow}"
 APP_USER="${APP_USER:-teamflow}"
 LIB_DIR="/usr/local/lib/teamflow"
-BACKUP_REPO="$APP_DIR/deploy/proxmox-lxc/backup.sh"
-UPDATE_REPO="$APP_DIR/deploy/proxmox-lxc/update.sh"
-DISCORD_REPO="$APP_DIR/deploy/proxmox-lxc/discord-bot.sh"
+# The scripts next to this one: a git checkout's deploy/proxmox-lxc or a release's copy.
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+BACKUP_REPO="$SCRIPT_DIR/backup.sh"
+UPDATE_REPO="$SCRIPT_DIR/update.sh"
+DISCORD_REPO="$SCRIPT_DIR/discord-bot.sh"
 BACKUP_BIN="$LIB_DIR/backup.sh"
 UPDATE_BIN="$LIB_DIR/update.sh"
 DISCORD_BIN="$LIB_DIR/discord-bot.sh"
@@ -22,7 +24,7 @@ if [[ $EUID -ne 0 ]]; then
 fi
 
 if [[ ! -f "$BACKUP_REPO" ]] || [[ ! -f "$UPDATE_REPO" ]] || [[ ! -f "$DISCORD_REPO" ]]; then
-  echo "Scripts not found under $APP_DIR/deploy/proxmox-lxc/"
+  echo "Scripts not found under $SCRIPT_DIR/"
   exit 1
 fi
 

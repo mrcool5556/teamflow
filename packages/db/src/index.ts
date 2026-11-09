@@ -69,6 +69,25 @@ export function createDb(databaseUrl?: string) {
   return drizzle(sqlite, { schema });
 }
 
+/**
+ * Copy the database to `destination` with SQLite's online backup API. Unlike copying the file,
+ * this is consistent while the server is writing (WAL mode). Returns the source path.
+ */
+export async function backupDatabase(destination: string, databaseUrl?: string) {
+  const source = resolveDatabasePath(databaseUrl);
+  if (source === MEMORY_DB || !fs.existsSync(source)) {
+    throw new Error(`No database at ${source}`);
+  }
+  fs.mkdirSync(path.dirname(path.resolve(destination)), { recursive: true });
+  const sqlite = new Database(source, { readonly: true, fileMustExist: true });
+  try {
+    await sqlite.backup(destination);
+  } finally {
+    sqlite.close();
+  }
+  return source;
+}
+
 export { schema };
 export { SCHEMA_VERSION, getSchemaVersion } from "./patches.js";
 export {

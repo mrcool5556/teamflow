@@ -8,8 +8,10 @@
  * matching .sha256 file. Files sit at the archive root (no top folder):
  *
  *   version.json            { version, commit, builtAt, platform }
- *   apps/server/            dist/ + production node_modules (workspace packages inlined, no symlinks)
+ *   apps/server/dist/       the server (index.js, migrate.js, backup-db.js)
+ *   apps/discord-bot/dist/  the optional Discord bot
  *   apps/web/dist/          the built web app, served by the server
+ *   node_modules/           production dependencies (workspace packages inlined, no symlinks)
  *   deploy/                 install, update, backup and service scripts for this platform
  *
  * better-sqlite3 ships a native binary, so each platform must be packaged on that platform
@@ -81,11 +83,12 @@ function gitCommit() {
   }
 }
 
-// 1. Build everything (core, db, api-client, server, web).
+// 1. Build everything (core, db, api-client, server, discord-bot, web).
 if (!flag("skip-build")) run(pnpm, ["-r", "build"]);
 for (const needed of [
   "apps/server/dist/index.js",
   "apps/server/dist/migrate.js",
+  "apps/discord-bot/dist/index.js",
   "apps/web/dist/index.html",
 ]) {
   if (!fs.existsSync(path.join(root, needed))) {
@@ -96,8 +99,10 @@ for (const needed of [
 
 // 2. Production dependencies at the exact lockfile versions, flat (hoisted) so the archive has
 //    no symlinks. pnpm 9's `deploy` ignores the lockfile, so instead: a frozen install over just
-//    the server, core and db manifests, then prune what those three cannot reach.
-const SERVER_PACKAGES = ["apps/server", "packages/core", "packages/db"];
+//    the runtime manifests, then prune what they cannot reach.
+const APPS = ["server", "discord-bot"];
+const LIBS = ["core", "db", "api-client"];
+const SERVER_PACKAGES = [...APPS.map((a) => `apps/${a}`), ...LIBS.map((l) => `packages/${l}`)];
 rm(stage);
 fs.mkdirSync(stage, { recursive: true });
 for (const file of ["package.json", "pnpm-lock.yaml", "pnpm-workspace.yaml"]) {
@@ -122,7 +127,7 @@ function resolvePackage(name, fromDir) {
   }
 }
 
-// Walk dependencies from the three manifests. Workspace packages are followed by name so their
+// Walk dependencies from the runtime manifests. Workspace packages are followed by name so their
 // third-party dependencies are kept too.
 const keep = new Set();
 const queue = SERVER_PACKAGES.map((pkg) => path.join(stage, pkg));
@@ -179,12 +184,10 @@ function prune(nodeModules) {
 }
 prune(path.join(stage, "node_modules"));
 
-// Workspace packages become real folders at the top level, so apps/server/dist and
+// Workspace packages become real folders at the top level, so apps/*/dist and
 // @teamflow/db/dist both find them by walking up to <release>/node_modules.
-for (const pkg of ["apps/server", "packages/core", "packages/db"]) {
-  prune(path.join(stage, pkg, "node_modules"));
-}
-for (const pkg of ["core", "db"]) {
+for (const pkg of SERVER_PACKAGES) prune(path.join(stage, pkg, "node_modules"));
+for (const pkg of LIBS) {
   const to = path.join(stage, "node_modules", "@teamflow", pkg);
   fs.mkdirSync(to, { recursive: true });
   // Versions that clash with the top level are nested under the package; keep them with it.
@@ -199,11 +202,13 @@ if (!fs.existsSync(path.join(stage, "node_modules", "@teamflow", "db", "dist", "
   console.error("init.sql missing from @teamflow/db/dist. The db build should copy it.");
   process.exit(1);
 }
-const serverDir = path.join(stage, "apps", "server");
-const serverModules = path.join(serverDir, "node_modules");
-if (fs.existsSync(serverModules) && fs.readdirSync(serverModules).length === 0) rm(serverModules);
-copyDir(path.join(root, "apps", "server", "dist"), path.join(serverDir, "dist"));
-prunePackage(serverDir);
+for (const app of APPS) {
+  const appDir = path.join(stage, "apps", app);
+  const appModules = path.join(appDir, "node_modules");
+  if (fs.existsSync(appModules) && fs.readdirSync(appModules).length === 0) rm(appModules);
+  copyDir(path.join(root, "apps", app, "dist"), path.join(appDir, "dist"));
+  prunePackage(appDir);
+}
 rm(path.join(stage, "packages"));
 for (const file of ["package.json", "pnpm-lock.yaml", "pnpm-workspace.yaml"])
   rm(path.join(stage, file));
