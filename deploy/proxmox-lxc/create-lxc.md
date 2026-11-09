@@ -22,7 +22,7 @@ pct enter <CTID>
 
 ```bash
 apt update && apt upgrade -y
-apt install -y git curl ca-certificates
+apt install -y sudo git curl ca-certificates   # Debian/Ubuntu LXC templates ship without sudo
 ```
 
 ## 4. Clone Teamflow
