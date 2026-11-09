@@ -78,9 +78,11 @@ Details: [deploy/relay/README.md](../deploy/relay/README.md)
 
 ### Install
 
-From an existing clone:
+PowerShell blocks unsigned scripts by default on Windows clients; allow them for this window only, then clone and install:
 
 ```powershell
+Set-ExecutionPolicy -Scope Process Bypass
+git clone https://github.com/mrcool5556/teamflow.git D:\teamflow
 cd D:\teamflow
 .\deploy\windows\install.ps1        # creates .env from env.example, pnpm install, build, migrate
 notepad .env                        # set JWT_SECRET (and PUBLIC_URL if others connect)
@@ -92,11 +94,7 @@ notepad .env                        # set JWT_SECRET (and PUBLIC_URL if others c
 -join ((1..32) | % { '{0:x2}' -f (Get-Random -Max 256) })
 ```
 
-Fresh machine (clone + install):
-
-```powershell
-.\deploy\windows\clone-install.ps1 -RepoUrl "https://github.com/mrcool5556/teamflow.git" -InstallPath "D:\teamflow"
-```
+`clone-install.ps1 -RepoUrl ... -InstallPath ...` does the clone and install in one step, but it lives in the repo, so it only helps once you already have a copy.
 
 ### Start
 
@@ -143,9 +141,10 @@ More: [deploy/windows/README.md](../deploy/windows/README.md)
 ### Install
 
 1. Create the LXC: [deploy/proxmox-lxc/create-lxc.md](../deploy/proxmox-lxc/create-lxc.md)
-2. In the container:
+2. In the container, as root (the templates ship without `sudo`, which the scripts need):
 
    ```bash
+   apt update && apt install -y sudo git curl ca-certificates
    git clone https://github.com/mrcool5556/teamflow.git /opt/teamflow
    cd /opt/teamflow
    sudo bash deploy/proxmox-lxc/install.sh
