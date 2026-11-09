@@ -6,7 +6,7 @@ import { schema } from "@teamflow/db";
 import { userHasTeamAccess } from "./issues.js";
 import { getTeamMemberWithRole } from "./permissions.js";
 import { resolveInviteRoleId } from "./roles.js";
-import { config } from "../config.js";
+import { isInviteOnly } from "./siteSettings.js";
 import { badRequest, forbidden, notFound } from "./errors.js";
 
 const DEFAULT_INVITE_DAYS = 30;
@@ -274,7 +274,7 @@ export function acceptTeamInvite(
 }
 
 export function isInviteOnlyRegistration() {
-  return config.inviteOnly;
+  return isInviteOnly();
 }
 
 export { userIsTeamAdmin } from "./permissions.js";

@@ -2,6 +2,7 @@ import { randomBytes } from "node:crypto";
 import path from "node:path";
 import { config } from "../config.js";
 import { getEnvFileValue, setEnvFileValue } from "./envFile.js";
+import { getPublicUrl } from "./siteSettings.js";
 
 export function generateBotConfigKey() {
   return randomBytes(32).toString("base64url");
@@ -36,5 +37,5 @@ export async function syncDiscordBotEnv(appDir: string, teamflowUrl: string) {
 }
 
 export function defaultPublicUrl() {
-  return config.publicUrl;
+  return getPublicUrl();
 }

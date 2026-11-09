@@ -29,6 +29,7 @@ import { getDiscordBotServiceStatus } from "./discordBotService.js";
 import { badRequest, notFound } from "./errors.js";
 import { getMaintenanceStatus } from "./maintenance.js";
 import { getSpaceSettings } from "./spaceSettings.js";
+import { getPublicUrl } from "./siteSettings.js";
 import {
   asSpaceType,
   getAllSpaceUsage,
@@ -72,7 +73,7 @@ function serverInfo(version: string, commitShort: string | null): InstanceServer
     startedAt: startedAt.toISOString(),
     uptimeSec: Math.round(process.uptime()),
     listen: { host: config.host, port: config.port },
-    publicUrl: config.publicUrl,
+    publicUrl: getPublicUrl(),
     supervisor,
     serviceName,
     production: config.isProduction,
@@ -374,7 +375,7 @@ export async function getInstanceOverview(db: Db): Promise<InstanceOverviewPubli
 export async function checkPublicUrl(
   fetchImpl: typeof fetch = fetch,
 ): Promise<PublicUrlCheckPublic> {
-  const url = `${config.publicUrl}/health`;
+  const url = `${getPublicUrl()}/health`;
   const started = Date.now();
   try {
     const res = await fetchImpl(url, { signal: AbortSignal.timeout(5000), redirect: "manual" });

@@ -1,5 +1,6 @@
 import { open } from "node:fs/promises";
 import { config } from "../config.js";
+import { getPublicUrl } from "./siteSettings.js";
 
 /* ---------- CORS allowlist ---------- */
 
@@ -23,7 +24,7 @@ function originOf(value: string | undefined) {
  */
 export function getAllowedOrigins(): Set<string> {
   const allowed = new Set<string>();
-  const publicOrigin = originOf(config.publicUrl);
+  const publicOrigin = originOf(getPublicUrl());
   if (publicOrigin) allowed.add(publicOrigin);
   for (const origin of config.corsOrigins) allowed.add(origin);
   if (!config.isProduction) {

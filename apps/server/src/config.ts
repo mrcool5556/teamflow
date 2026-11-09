@@ -132,6 +132,7 @@ const envSchema = z.object({
   TEAMFLOW_TRUST_PROXY: boolVar(false),
   TEAMFLOW_INSTANCE_ADMINS: optionalString,
   TEAMFLOW_INVITE_ONLY: boolVar(false),
+  TEAMFLOW_SITE_NAME: optionalString,
   SMTP_HOST: optionalString,
   SMTP_PORT: intVar(587),
   SMTP_SECURE: boolVar(false),
@@ -171,6 +172,9 @@ export type SmtpConfig = {
   user: string | undefined;
   pass: string;
   from: string;
+  /** Saved settings only: "starttls" requires the upgrade, "none" skips TLS entirely. */
+  requireTLS?: boolean;
+  ignoreTLS?: boolean;
 };
 
 export type AppConfig = {
@@ -187,8 +191,15 @@ export type AppConfig = {
   secretsKey: string | null;
   /** Shared key for GET /integrations/discord/bot-config; null disables the endpoint. */
   botConfigKey: string | null;
-  /** No trailing slash. */
+  /**
+   * No trailing slash. PUBLIC_URL, or http://localhost:3000 when unset. Read the address in
+   * force through lib/siteSettings.getPublicUrl(), which adds the value saved on the admin page.
+   */
   publicUrl: string;
+  /** TEAMFLOW_SITE_NAME; null when unset (the admin page or the default decides). */
+  siteName: string | null;
+  /** Which settings .env sets; those win over the admin page and show as read-only there. */
+  envSet: { publicUrl: boolean; inviteOnly: boolean; siteName: boolean };
   /** Extra browser origins (CORS_ORIGINS), normalised to origins. */
   corsOrigins: string[];
   /** Credential endpoint attempts per minute per client. */
@@ -293,6 +304,12 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
       : null,
     botConfigKey: e.TEAMFLOW_BOT_CONFIG_KEY ?? null,
     publicUrl,
+    siteName: e.TEAMFLOW_SITE_NAME ?? null,
+    envSet: {
+      publicUrl: e.PUBLIC_URL !== undefined,
+      inviteOnly: Boolean(env.TEAMFLOW_INVITE_ONLY?.trim()),
+      siteName: e.TEAMFLOW_SITE_NAME !== undefined,
+    },
     corsOrigins,
     authRateLimit: e.TEAMFLOW_AUTH_RATE_LIMIT,
     trustProxy: e.TEAMFLOW_TRUST_PROXY,

@@ -74,6 +74,8 @@ TEAMFLOW_INVITE_ONLY=true
 
 Users must open a team invite link (`/invite/<token>`) before they can register.
 
+Or switch **Who can sign up** on Server admin → Flow defaults & sign-up (no restart). The `.env` value wins when set.
+
 ## Forgot password
 
 | Method | Path | Body |
@@ -94,7 +96,9 @@ The response to forgot-password is identical whether or not the email exists.
 
 ### SMTP (production)
 
-Add to the server environment (`/opt/teamflow/.env` on LXC):
+The easiest way is Server admin → Site & email: fill in the server, send a test, save. The password is stored encrypted with `TEAMFLOW_SECRETS_KEY` (or `JWT_SECRET`); changing that key means entering it again.
+
+Or add to the server environment (which wins over the admin page) (`/opt/teamflow/.env` on LXC):
 
 ```env
 PUBLIC_URL=https://teamflow.example.com

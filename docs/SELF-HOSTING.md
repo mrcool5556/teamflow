@@ -234,7 +234,8 @@ Full list with comments: root [`.env.example`](../.env.example). The ones a prod
 | Variable | Required | Purpose |
 |----------|----------|---------|
 | `JWT_SECRET` | yes | Signs sessions; placeholders refused |
-| `PUBLIC_URL` | yes for a public host | Links in invites and emails; allowed CORS origin |
+| `PUBLIC_URL` | no | Links in invites and emails; allowed CORS origin. Can be set on Server admin → Site & email instead |
+| `TEAMFLOW_SITE_NAME` | no | Name on the login page, browser tab and emails (default Teamflow). Can be set on the admin page instead |
 | `TEAMFLOW_SECRETS_KEY` | recommended | Encrypts Discord secrets; falls back to `JWT_SECRET` |
 | `DATABASE_URL` | no | Default `file:./data/teamflow.db` (relative to the repo root) |
 | `SERVE_WEB` | set by installers | Serve the built web UI from the API port (also on with `NODE_ENV=production` when the build exists); `WEB_DIST` moves the build folder |
@@ -244,20 +245,22 @@ Full list with comments: root [`.env.example`](../.env.example). The ones a prod
 | `TEAMFLOW_TRUST_PROXY` | behind a proxy | Use `X-Forwarded-For` for rate limiting |
 | `TEAMFLOW_AUTH_RATE_LIMIT` | no | Login/register/forgot attempts per minute per IP (default 10) |
 | `TEAMFLOW_INSTANCE_ADMINS` | no | Emails that get the instance-admin flag at login |
-| `TEAMFLOW_INVITE_ONLY` | no | `true` = registration only through an invite |
+| `TEAMFLOW_INVITE_ONLY` | no | `true` = registration only through an invite. Can be set on the admin page instead |
 | `TEAMFLOW_MAINTENANCE_ENABLED` | Setup B | Enables Server admin → Updates (and Settings → Updates) |
 | `TEAMFLOW_APP_DIR`, `TEAMFLOW_BACKUP_DIR` | no | Checkout the scripts operate on (default: repo root), backup folder (default `/var/backups/teamflow`) |
 | `TEAMFLOW_BACKUP_SCRIPT`, `TEAMFLOW_UPDATE_SCRIPT`, `TEAMFLOW_DISCORD_BOT_SCRIPT` | leave unset | Defaults are the root-owned copies sudoers allows; a path into the checkout breaks sudo |
 | `TEAMFLOW_BUNDLE_MAX_ENTRIES`, `TEAMFLOW_BUNDLE_MAX_BYTES` | no | Team bundle import caps (5000 entries, 2 GB) |
 | `TEAMFLOW_DB_MAINTENANCE_NIGHTLY` | no | Nightly trash purge and data upkeep |
 | `TEAMFLOW_BOT_CONFIG_KEY` | Discord bot | Generated when bot credentials are saved |
-| `SMTP_HOST`, `SMTP_PORT`, `SMTP_SECURE`, `SMTP_USER`, `SMTP_PASS`, `SMTP_FROM` | for email reset | Provider settings |
+| `SMTP_HOST`, `SMTP_PORT`, `SMTP_SECURE`, `SMTP_USER`, `SMTP_PASS`, `SMTP_FROM` | no | Outgoing email (password resets). Can be set on the admin page instead |
 | `ATTACHMENT_MAX_*`, `UPLOAD_CHUNK_*`, `UPLOAD_DIR` | no | See [ATTACHMENTS.md](ATTACHMENTS.md) |
 | `TEAMFLOW_FREE_SPACE_CAP_BYTES`, `TEAMFLOW_FREE_SPACES_PER_USER`, `TEAMFLOW_MIN_FREE_DISK_BYTES` | no | Free-space cap (1 GB), free spaces per user (3), free-disk floor (2 GB). See [SPACES.md](SPACES.md) |
 | `PORT` / `HOST` | no | Default `3000` / `0.0.0.0` |
 | `NODE_ENV` | no | `production` drops the localhost dev origins; `development` allows a dev secret |
 
 Invalid values (e.g. `PORT=abc`) stop the server at start with a list of problems.
+
+The site name, public address, email and sign-up policy can also be set on the server admin page (stored in the database, used at once, no restart). A value set in `.env` always wins: the admin page shows it as "Set in .env" and won't change it. Leave them out of `.env` to manage them from the page.
 
 Discord bot and MCP have their own docs: [discord-bot.md](discord-bot.md), [MCP.md](MCP.md).
 
