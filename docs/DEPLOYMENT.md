@@ -40,6 +40,13 @@ Open <http://localhost:3000>. At startup the server loads `TEAMFLOW_ENV_FILE` if
 
 - On boot the server brings the SQLite schema up to `SCHEMA_VERSION` (`packages/db/src/patches.ts`, currently 4). Version 4 adds spaces: every existing team becomes an admin space with no upload cap, so nothing changes until an instance admin sets one ([SPACES.md](SPACES.md)). The version lives in the `schema_version` table; an up-to-date database skips the patch run, an older one runs every patch once inside a single transaction. `pnpm db:migrate` does the same without starting the server.
 - A database written by a newer build is left untouched with a warning; update the app.
+- A fresh install logs `Database schema at version 4 (was 0)`; an upgrade logs the old version instead.
+
+  | Version | What it brings |
+  |---------|----------------|
+  | 2 | First tracked version: the `schema_version` table plus every earlier idempotent patch (roles, invites, stored files, instance admin, token version, ...); older databases show as 0 |
+  | 3 | `board.edit` granted once to every existing role except the built-in Viewer ([AUTH.md](AUTH.md#editing-the-board-boardedit)) |
+  | 4 | Spaces: every existing team becomes an admin space with no upload cap; new user teams are free spaces ([SPACES.md](SPACES.md)) |
 - Boot no longer changes user data. These jobs run only on demand:
   - purge issues that have been in the trash for more than 7 days;
   - re-grant `team.data.transfer` to Owner roles that lack it;

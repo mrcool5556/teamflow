@@ -31,10 +31,11 @@ Do these on every production install, and once when upgrading an install from be
 5. **`CORS_ORIGINS`**: only if the web UI is served from a different origin than `PUBLIC_URL` (comma-separated). Default is same-origin only.
 6. **Behind a reverse proxy:** `TEAMFLOW_TRUST_PROXY=1`, so login rate limiting sees real client IPs.
 7. **Setup B only:** run `sudo bash /opt/teamflow/deploy/proxmox-lxc/setup-maintenance-sudo.sh` once after deploying. It installs root-owned copies of the backup, update and Discord bot scripts in `/usr/local/lib/teamflow/` and the only sudoers rule the app user gets. Without it Settings → Updates and the Discord bot service buttons fail. `install.sh` and `sudo update` run it too, but ignore its errors, so check the output.
-8. **Admin account:** there is **no demo user**. The first account registered on a fresh install becomes the **instance admin** (Updates, Discord bot secrets and service). On an upgraded install the oldest account is promoted once. To grant more, set `TEAMFLOW_INSTANCE_ADMINS=you@example.com,other@example.com` (applied at their next login).
+8. **Admin account:** there is **no demo user**. The first account registered on a fresh install becomes the **instance admin** (the **Server admin** page in the account menu, Updates, Discord bot secrets and service, spaces). On an upgraded install the oldest account is promoted once. To grant more, set `TEAMFLOW_INSTANCE_ADMINS=you@example.com,other@example.com` (applied at their next login).
 9. **Trash purge:** issues in the trash are no longer purged at boot. Run `pnpm db:maintenance` now and then, or set `TEAMFLOW_DB_MAINTENANCE_NIGHTLY=true` (03:00 server time). See [DEPLOYMENT.md](DEPLOYMENT.md#schema-patches-and-data-maintenance).
 10. **SMTP** for password reset. Without it, reset links are only logged when `NODE_ENV=development`, so in production nobody can reset a password.
 11. **`.env` permissions** on Linux: `chmod 600`, owned by `teamflow`.
+12. **Disk and spaces:** keep more than **2 GB** free on the disk that holds `data/uploads/`; below that every upload in every space is refused until room is made (`TEAMFLOW_MIN_FREE_DISK_BYTES`, `0` turns the floor off). Each user may create up to 3 free spaces with 1 GB of uploads each; their own **General** counts. Review these in Server admin → Space defaults ([SPACES.md](SPACES.md)).
 
 Useful but optional: `NODE_ENV=production` (turns off the localhost dev origins in CORS), `TEAMFLOW_INVITE_ONLY=true`.
 
@@ -71,22 +72,29 @@ Details: [deploy/relay/README.md](../deploy/relay/README.md)
 - Windows 10/11
 - [Git](https://git-scm.com/): `winget install Git.Git`
 - **Node 20** (not 22 or 24): the v20 installer from <https://nodejs.org/en/download> or nvm-windows (`nvm install 20.19.2; nvm use 20.19.2`)
+- **pnpm 9**: `install.ps1` uses `pnpm` if it is on PATH, otherwise Corepack (bundled with Node 20) runs the pinned 9.15.0
+- Build tools only if the prebuilt `better-sqlite3` cannot be downloaded: Python 3 and Visual Studio Build Tools ("Desktop development with C++")
+- Disk: under 1 GB for the install, plus your data, plus the 2 GB free-disk floor for uploads
 
 ### Install
 
-From an existing clone:
+PowerShell blocks unsigned scripts by default on Windows clients; allow them for this window only, then clone and install:
 
 ```powershell
+Set-ExecutionPolicy -Scope Process Bypass
+git clone https://github.com/mrcool5556/teamflow.git D:\teamflow
 cd D:\teamflow
 .\deploy\windows\install.ps1        # creates .env from env.example, pnpm install, build, migrate
 notepad .env                        # set JWT_SECRET (and PUBLIC_URL if others connect)
 ```
 
-Fresh machine (clone + install):
+`install.ps1 -Port 8080` writes another port into `.env` (default 3000). This PowerShell one-liner (also in the `.env` comment) makes a 64-character secret:
 
 ```powershell
-.\deploy\windows\clone-install.ps1 -RepoUrl "https://github.com/mrcool5556/teamflow.git" -InstallPath "D:\teamflow"
+-join ((1..32) | % { '{0:x2}' -f (Get-Random -Max 256) })
 ```
+
+`clone-install.ps1 -RepoUrl ... -InstallPath ...` does the clone and install in one step, but it lives in the repo, so it only helps once you already have a copy.
 
 ### Start
 
@@ -127,14 +135,16 @@ More: [deploy/windows/README.md](../deploy/windows/README.md)
 ### Requirements
 
 - Proxmox VE with an LXC container, Debian 12+ or Ubuntu 24.04
-- About 2 CPU, 2–4 GB RAM, 20 GB disk
+- About 2 CPU, 2–4 GB RAM, 20 GB disk (the app needs under 1 GB; keep more than 2 GB free or uploads pause)
+- Internet access during install: `install.sh` installs `git`, `curl`, `build-essential`, `python3` and Node 20 from NodeSource, and Corepack fetches pnpm 9.15.0
 
 ### Install
 
 1. Create the LXC: [deploy/proxmox-lxc/create-lxc.md](../deploy/proxmox-lxc/create-lxc.md)
-2. In the container:
+2. In the container, as root (the templates ship without `sudo`, which the scripts need):
 
    ```bash
+   apt update && apt install -y sudo git curl ca-certificates
    git clone https://github.com/mrcool5556/teamflow.git /opt/teamflow
    cd /opt/teamflow
    sudo bash deploy/proxmox-lxc/install.sh
@@ -227,13 +237,18 @@ Full list with comments: root [`.env.example`](../.env.example). The ones a prod
 | `PUBLIC_URL` | yes for a public host | Links in invites and emails; allowed CORS origin |
 | `TEAMFLOW_SECRETS_KEY` | recommended | Encrypts Discord secrets; falls back to `JWT_SECRET` |
 | `DATABASE_URL` | no | Default `file:./data/teamflow.db` (relative to the repo root) |
-| `SERVE_WEB` | set by installers | Serve the built web UI from the API port |
+| `SERVE_WEB` | set by installers | Serve the built web UI from the API port (also on with `NODE_ENV=production` when the build exists); `WEB_DIST` moves the build folder |
+| `TEAMFLOW_ENV_FILE` | no | Load this env file instead of `<repo>/.env` (`start.ps1` and the NSSM service set it) |
+| `TEAMFLOW_ALLOW_DEV_SECRET` | never in production | `1` accepts a placeholder secret, like `NODE_ENV=development` |
 | `CORS_ORIGINS` | no | Extra allowed browser origins |
 | `TEAMFLOW_TRUST_PROXY` | behind a proxy | Use `X-Forwarded-For` for rate limiting |
 | `TEAMFLOW_AUTH_RATE_LIMIT` | no | Login/register/forgot attempts per minute per IP (default 10) |
 | `TEAMFLOW_INSTANCE_ADMINS` | no | Emails that get the instance-admin flag at login |
 | `TEAMFLOW_INVITE_ONLY` | no | `true` = registration only through an invite |
-| `TEAMFLOW_MAINTENANCE_ENABLED` | Setup B | Enables Settings → Updates |
+| `TEAMFLOW_MAINTENANCE_ENABLED` | Setup B | Enables Server admin → Updates (and Settings → Updates) |
+| `TEAMFLOW_APP_DIR`, `TEAMFLOW_BACKUP_DIR` | no | Checkout the scripts operate on (default: repo root), backup folder (default `/var/backups/teamflow`) |
+| `TEAMFLOW_BACKUP_SCRIPT`, `TEAMFLOW_UPDATE_SCRIPT`, `TEAMFLOW_DISCORD_BOT_SCRIPT` | leave unset | Defaults are the root-owned copies sudoers allows; a path into the checkout breaks sudo |
+| `TEAMFLOW_BUNDLE_MAX_ENTRIES`, `TEAMFLOW_BUNDLE_MAX_BYTES` | no | Team bundle import caps (5000 entries, 2 GB) |
 | `TEAMFLOW_DB_MAINTENANCE_NIGHTLY` | no | Nightly trash purge and data upkeep |
 | `TEAMFLOW_BOT_CONFIG_KEY` | Discord bot | Generated when bot credentials are saved |
 | `SMTP_HOST`, `SMTP_PORT`, `SMTP_SECURE`, `SMTP_USER`, `SMTP_PASS`, `SMTP_FROM` | for email reset | Provider settings |
@@ -275,7 +290,7 @@ Not for production. See the [README quick start](../README.md#quick-start-develo
 | Update | `update.ps1` | `sudo update` or Settings → Updates |
 | Logs | terminal / NSSM | `journalctl -u teamflow -f`, `data/maintenance.log` |
 | Config | `.env` in repo root (loaded by the server) | `/opt/teamflow/.env` (systemd) |
-| Backup | `backup.ps1` | `sudo teamflow-backup` |
+| Backup | `backup.ps1` (database only, to `data\backups\`; stop the server first, it copies the file without its `-wal`; copy `data\uploads\` yourself) | `sudo teamflow-backup` (database + uploads to `/var/backups/teamflow`; `--db-only` for the database) |
 | Data upkeep | `pnpm db:maintenance` | `sudo -u teamflow pnpm db:maintenance` in `/opt/teamflow` |
 
 ---
@@ -291,5 +306,7 @@ cp .env.example .env
 nano .env   # JWT_SECRET (real value), PUBLIC_URL
 docker compose up -d --build
 ```
+
+Keep `PORT=3000` in `deploy/docker/.env`: the same file sets the host port and the port the server listens on inside the container, so another value breaks the mapping. To publish on another host port, edit the left side of `ports:` in `docker-compose.yml` instead.
 
 The entrypoint runs migrations (and the demo seed only with `TEAMFLOW_SEED_DEMO=1`) on each start; data stays in the `teamflow-data` volume. Update with `git pull` then `docker compose up -d --build`. In-app updates and the Discord bot service do not work in Docker. More: [deploy/docker/README.md](../deploy/docker/README.md)

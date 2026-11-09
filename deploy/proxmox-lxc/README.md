@@ -7,20 +7,22 @@ Native install inside a Debian/Ubuntu LXC: `apt` + `systemd` + SQLite. (Postgres
 | Item | Value |
 |------|-------|
 | Template | Debian 12+ or Ubuntu 24.04 |
-| Resources | 2 vCPU, 2–4 GB RAM, 20 GB disk |
+| Resources | 2 vCPU, 2–4 GB RAM, 20 GB disk (the app needs under 1 GB; uploads pause below 2 GB free) |
+| Packages | `install.sh` installs `sudo`, `git`, `curl`, `build-essential`, `python3` (for `better-sqlite3` if no prebuilt binary), Node 20 from NodeSource and pnpm 9.15.0 via Corepack; needs internet |
+| Port | 3000 (`PORT` in `.env`) |
 | Services | Node 20, `teamflow` systemd unit, optional `teamflow-discord` |
 | Data | `/opt/teamflow/data/teamflow.db`, `/opt/teamflow/data/uploads/` |
 
 ## Install
 
 1. Create the LXC in Proxmox: [create-lxc.md](create-lxc.md)
-2. SSH into the container
+2. SSH into the container as root and install the basics (the templates ship without `sudo`): `apt update && apt install -y sudo git curl ca-certificates`
 3. `git clone https://github.com/mrcool5556/teamflow.git /opt/teamflow`
-4. `sudo bash /opt/teamflow/deploy/proxmox-lxc/install.sh`
+4. `sudo bash /opt/teamflow/deploy/proxmox-lxc/install.sh` (as root, `bash ...` works the same). It ends by starting the service, which fails until step 5; that is expected.
 5. Edit `/opt/teamflow/.env`: real `JWT_SECRET` (the service refuses the placeholder), `TEAMFLOW_SECRETS_KEY`, `PUBLIC_URL`, `CORS_ORIGINS` if the web runs on another origin, `TEAMFLOW_TRUST_PROXY=1` behind a proxy. Then `chmod 600 /opt/teamflow/.env`.
 6. **Required once:** `sudo bash /opt/teamflow/deploy/proxmox-lxc/setup-maintenance-sudo.sh` (see [Maintenance sudo](#maintenance-sudo)). `install.sh` already calls it but ignores failures, so run it and read the output.
 7. `systemctl restart teamflow && curl http://localhost:3000/health`
-8. Open `http://<lxc-ip>:3000` and register. The first account becomes the instance admin; there is no demo user.
+8. Open `http://<lxc-ip>:3000` and register. The first account becomes the instance admin; there is no demo user. The **Server admin** page (account menu) shows disk space, spaces, updates and backups, and the Discord bot.
 
 Full checklist: [docs/SELF-HOSTING.md](../../docs/SELF-HOSTING.md#production-checklist)
 
@@ -62,7 +64,7 @@ sudo update
 
 ## Maintenance sudo
 
-Settings → Updates (backup, update) and the Discord bot service buttons run host scripts as root through `sudo -n`. `setup-maintenance-sudo.sh`:
+Server admin → Updates & backups (also under Settings → Updates) and the Discord bot service buttons run host scripts as root through `sudo -n`. `setup-maintenance-sudo.sh`:
 
 - copies `backup.sh`, `update.sh` and `discord-bot.sh` to root-owned `/usr/local/lib/teamflow/` (mode 755);
 - links `/usr/local/bin/teamflow-update`, `teamflow-backup`, `teamflow-discord` and `update` to those copies;
@@ -97,7 +99,7 @@ chmod 440 /etc/sudoers.d/teamflow-maintenance
 visudo -cf /etc/sudoers.d/teamflow-maintenance
 ```
 
-### In-app updates (Settings → Updates)
+### In-app updates (Server admin → Updates & backups)
 
 Needs all of:
 

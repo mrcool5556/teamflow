@@ -13,7 +13,7 @@ if [[ $EUID -ne 0 ]]; then
 fi
 
 apt update
-apt install -y curl git ca-certificates postgresql postgresql-contrib build-essential python3
+apt install -y sudo curl git ca-certificates postgresql postgresql-contrib build-essential python3
 
 if ! command -v node &>/dev/null || [[ $(node -v | cut -d. -f1 | tr -d v) -lt 20 ]]; then
   curl -fsSL https://deb.nodesource.com/setup_20.x | bash -
