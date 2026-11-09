@@ -222,8 +222,7 @@ check "online backup is a valid database" bash -c "f=\$(sed -n 's/^BACKUP databa
 
 section "Restore"
 out=$(bash $APP_DIR/deploy/proxmox-lxc/backup.sh --db-only)
-snap=$(basename "$(printf '%s
-' "$out" | sed -n 's/^BACKUP database //p')")
+snap=$(basename "$(printf '%s\n' "$out" | sed -n 's/^BACKUP database //p')")
 (cd $APP_DIR && runuser -u teamflow -- node -e '
   const D=require("/opt/teamflow/current/node_modules/better-sqlite3");
   const db=new D("data/teamflow.db"); db.prepare("INSERT INTO canary VALUES (?)").run("after-snapshot"); db.close();')
@@ -238,13 +237,61 @@ check "app user may run restore through sudo" runuser -u teamflow -- sudo -n /us
 section "Releases kept"
 check "at most two releases on disk" bash -c "test \$(ls -d $APP_DIR/releases/v* | wc -l) -le 2"
 
+section "Proxmox one-liner (stubbed pct/pveam: no Proxmox here)"
+mkdir -p /tmp/pve/bin
+cat >/tmp/pve/bin/pct <<'STUB'
+#!/usr/bin/env bash
+echo "pct $*" >>/tmp/pve.log
+case "$1" in
+  status) [[ "$2" == 998 ]] && { echo "status: running"; exit 0; }; exit 2 ;;
+  exec)
+    shift 3
+    case "$*" in
+      *getent*) exit 0 ;;
+      *"hostname -I"*) echo "10.0.0.5" ;;
+      *) exit 0 ;;
+    esac
+    ;;
+esac
+exit 0
+STUB
+cat >/tmp/pve/bin/pveam <<'STUB'
+#!/usr/bin/env bash
+echo "pveam $*" >>/tmp/pve.log
+if [[ "$1" == available ]]; then
+  printf 'system          debian-11-standard_11.7-1_amd64.tar.zst\nsystem          debian-12-standard_12.2-1_amd64.tar.zst\nsystem          debian-12-standard_12.7-1_amd64.tar.zst\nsystem          ubuntu-24.04-standard_24.04-2_amd64.tar.zst\n'
+fi
+exit 0
+STUB
+printf '#!/usr/bin/env bash\necho "pvesh $*" >>/tmp/pve.log\necho 120\n' >/tmp/pve/bin/pvesh
+printf '#!/usr/bin/env bash\necho "Name Type Status Total Used Available %%"\necho "local-lvm lvmthin active 100 1 99 1%%"\n' >/tmp/pve/bin/pvesm
+printf '#!/usr/bin/env bash\necho "pve-manager/8.3.0/xxxx (running kernel: 6.8)"\n' >/tmp/pve/bin/pveversion
+chmod +x /tmp/pve/bin/*
+pve() { PATH="/tmp/pve/bin:$PATH" bash "$SRC/deploy/install/proxmox.sh" "$@"; }
+
+: >/tmp/pve.log
+pve --yes --dry-run >/tmp/pve-dry.log 2>&1 || { tail -20 /tmp/pve-dry.log; bad "proxmox dry run exit"; }
+check "dry run shows pct create with nesting, unprivileged, onboot" grep -qE "\[dry-run\] pct create 120 local:vztmpl/debian-12-standard_12.7-1_amd64.tar.zst .*--unprivileged 1 --features nesting=1 --onboot 1" /tmp/pve-dry.log
+check "dry run created nothing" bash -c '! grep -qE "^pct (create|start|exec)|^pveam download" /tmp/pve.log'
+
+: >/tmp/pve.log
+pve --yes --memory 2048 >/tmp/pve-run.log 2>&1 || { tail -20 /tmp/pve-run.log; bad "proxmox run exit"; }
+check "downloads the newest Debian 12 template" grep -q "^pveam download local debian-12-standard_12.7-1_amd64.tar.zst" /tmp/pve.log
+check "creates CT 120 with the chosen memory on local-lvm" grep -qE "^pct create 120 .*--memory 2048 .*--rootfs local-lvm:8 .*--net0 name=eth0,bridge=vmbr0,ip=dhcp" /tmp/pve.log
+check "starts it" grep -q "^pct start 120" /tmp/pve.log
+check "runs the Linux installer inside" grep -qE "^pct exec 120 -- bash -c .*releases/latest/download/install.sh' \| TEAMFLOW_YES=1 TEAMFLOW_PORT=3000 bash" /tmp/pve.log
+check "prints the address" grep -q "runs Teamflow at http://10.0.0.5:3000" /tmp/pve-run.log
+
+: >/tmp/pve.log
+pve --yes --ctid 998 >/tmp/pve-998.log 2>&1 && bad "an existing CT must be refused" || ok "existing CT 998 refused without --reuse"
+check "nothing ran against CT 998" bash -c '! grep -qE "^pct (create|start|exec|set|destroy|stop)" /tmp/pve.log'
+pve --yes --ip 192.168.1.50/24 >/tmp/pve-ip.log 2>&1 && bad "static IP without gateway must be refused" || ok "static IP needs a gateway"
+
 section "Dry run changes nothing"
-before=$(find $APP_DIR -maxdepth 2 -printf '%p %s
-' | sort | sha256sum)
+before=$(find $APP_DIR -maxdepth 2 -printf '%p %s\n' | sort | sha256sum)
 bash "$SRC/deploy/install/install.sh" --dry-run >/tmp/dry.log 2>&1 || { tail -20 /tmp/dry.log; bad "dry run exit"; }
 check "dry run says so" grep -q "Dry run finished" /tmp/dry.log
-check "dry run changed nothing" test "$(find $APP_DIR -maxdepth 2 -printf '%p %s
-' | sort | sha256sum)" = "$before"
+check "dry run changed nothing" test "$(find $APP_DIR -maxdepth 2 -printf '%p %s\n' | sort | sha256sum)" = "$before"
 
 section "Installer switches a git-checkout server to releases (the CT998 path)"
 /usr/local/bin/fake-systemctl stop || true

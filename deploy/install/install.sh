@@ -317,8 +317,7 @@ setup_service() {
   fi
   local out
   if ! out=$(cd "$APP_DIR" && runuser -u "$APP_USER" -- node "$APP_DIR/current/apps/server/dist/migrate.js" 2>&1); then
-    printf '%s
-' "$out" | tail -n 20
+    printf '%s\n' "$out" | tail -n 20
     die "the database migration failed (output above). Nothing else was changed."
   fi
   say "    database ready"
