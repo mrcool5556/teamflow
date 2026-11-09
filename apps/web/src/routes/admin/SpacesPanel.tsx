@@ -48,22 +48,22 @@ export function SpacesPanel() {
     <div className="settings-panel">
       <header className="settings-panel-header">
         <div className="settings-panel-title-row">
-          <h2>Spaces</h2>
+          <h2>Flows</h2>
           <button type="button" onClick={() => setCreating(true)}>
-            + New space
+            + New Flow
           </button>
         </div>
         <p className="settings-copy settings-lead">
-          {spaces.length} space{spaces.length === 1 ? "" : "s"} · {formatStorageBytes(totalUsed)}{" "}
+          {spaces.length} Flow{spaces.length === 1 ? "" : "s"} · {formatStorageBytes(totalUsed)}{" "}
           uploaded
           {settings
-            ? ` · free spaces get ${formatStorageBytes(settings.freeSpaceCapBytes)}, ${settings.freeSpacesPerUser} per user`
+            ? ` · free Flows get ${formatStorageBytes(settings.freeSpaceCapBytes)}, ${settings.freeSpacesPerUser} per user`
             : ""}
         </p>
       </header>
 
       <div className="admin-filters">
-        <span className="admin-chips" role="group" aria-label="Filter spaces">
+        <span className="admin-chips" role="group" aria-label="Filter Flows">
           {FILTERS.map((item) => {
             const count = spaces.filter(item.match).length;
             return (
@@ -82,8 +82,8 @@ export function SpacesPanel() {
         <input
           type="search"
           className="admin-search"
-          placeholder="Search spaces…"
-          aria-label="Search spaces"
+          placeholder="Search Flows…"
+          aria-label="Search Flows"
           value={search}
           onChange={(e) => setSearch(e.target.value)}
         />
@@ -91,17 +91,17 @@ export function SpacesPanel() {
 
       {query.isError ? (
         <p className="settings-hint settings-hint--warn" role="alert">
-          {query.error instanceof Error ? query.error.message : "Could not load spaces."}
+          {query.error instanceof Error ? query.error.message : "Could not load Flows."}
         </p>
       ) : !query.data ? (
-        <p className="settings-hint">Loading spaces…</p>
+        <p className="settings-hint">Loading Flows…</p>
       ) : shown.length === 0 ? (
-        <p className="settings-hint">No spaces match.</p>
+        <p className="settings-hint">No Flows match.</p>
       ) : (
         <table className="admin-table">
           <thead>
             <tr>
-              <th scope="col">Space</th>
+              <th scope="col">Flow</th>
               <th scope="col">Type</th>
               <th scope="col">Owner</th>
               <th scope="col">Members</th>

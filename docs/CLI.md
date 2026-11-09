@@ -72,4 +72,4 @@ Row ids come from `teamflow board rows`; status ids from `GET /teams/:teamId/sta
 - No `teams list`, no issue delete/restore, no assignee or row on `issues create`, no `--description` on `issues update`.
 - Errors surface as unhandled promise rejections with a stack trace rather than a short message.
 
-API refusals print the server's message and code, for example `Error: You already have 3 free spaces, the most allowed. … (free_space_limit)`, and exit with status 1.
+API refusals print the server's message and code, for example `Error: You already own 3 free Flows, the most allowed. … (free_space_limit)`, and exit with status 1.

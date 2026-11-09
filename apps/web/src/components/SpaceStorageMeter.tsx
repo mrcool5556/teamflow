@@ -14,7 +14,7 @@ export function SpaceStorageMeter({ teamId }: { teamId: string }) {
     capBytes === null
       ? `${used} used · no limit`
       : `${used} of ${formatStorageBytes(capBytes)} · ${state === "full" ? "full" : `${Math.round(pct)}%`}`;
-  const kind = storage.spaceType === "free" ? "free space" : "space";
+  const kind = storage.spaceType === "free" ? "free Flow" : "Flow";
 
   let sub: string;
   if (storage.diskLow) sub = DISK_LOW_TEXT;

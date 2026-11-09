@@ -175,10 +175,10 @@ export async function assertSpaceHasRoom(
     : "This file";
   const message =
     remainingBytes === 0
-      ? `This space is full (${formatStorageBytes(usedBytes)} of ${cap}). New uploads are paused; ` +
+      ? `This Flow is full (${formatStorageBytes(usedBytes)} of ${cap}). New uploads are paused; ` +
         "issues, comments and linking existing files still work. Empty the trash or remove files, " +
         "or ask a server admin for more."
-      : `${name} won't fit: this space has ${formatStorageBytes(remainingBytes)} left of its ${cap}. ` +
+      : `${name} won't fit: this Flow has ${formatStorageBytes(remainingBytes)} left of its ${cap}. ` +
         "Remove files or ask a server admin for more.";
   throw new ApiError(413, message, "space_storage_full", {
     usedBytes,

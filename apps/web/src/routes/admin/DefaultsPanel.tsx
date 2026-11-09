@@ -16,11 +16,11 @@ export function DefaultsPanel() {
   return (
     <div className="settings-panel">
       <header className="settings-panel-header">
-        <h2>Space defaults &amp; sign-up</h2>
+        <h2>Flow defaults &amp; sign-up</h2>
         <p className="settings-copy settings-lead">
-          What a new free space gets, how many each person may own, when the server stops all
-          uploads to protect its disk, and who can make an account. Changing these never changes an
-          existing space's cap.
+          What a new free Flow gets, how many each person may own, when the server stops all uploads
+          to protect its disk, and who can make an account. Changing these never changes an existing
+          Flow's cap.
         </p>
       </header>
       <PanelStatus status={status} />
@@ -30,7 +30,7 @@ export function DefaultsPanel() {
           signup={signup.data}
           disk={overview.data?.disk ?? null}
           submitLabel="Save defaults"
-          onSaved={() => onMessage("Defaults saved. They apply to new spaces; existing caps stay.")}
+          onSaved={() => onMessage("Defaults saved. They apply to new Flows; existing caps stay.")}
         />
       ) : (
         <p className="settings-hint">Loading…</p>

@@ -95,12 +95,13 @@ Conventions:
 
 ```text
 main.tsx        QueryClientProvider + RouterProvider; imports styles/* in cascade order
-router.tsx      URL map: /login /register /reset /invite/:token, /t/:teamKey, /t/:teamKey/issue/:ref,
+router.tsx      URL map: /login /register /reset /setup /welcome /invite/:token, /t/:teamKey, /t/:teamKey/issue/:ref,
                 /t/:teamKey/settings/<panel>, /t/:teamKey/admin/<section> (server admin, instance admins),
                 /t/:teamKey/plan (legacy ?ref= ?invite= ?reset= are redirected)
 session/        SessionProvider: token + user from localStorage, login/logout
 routes/         RootLayout, auth/ (LoginScreen, InviteRoute), board/ (BoardShell, actions), settings/ (one panel per section),
-                admin/ (server admin: Overview, Spaces, Space detail, How-tos, Space defaults)
+                admin/ (server admin: Overview, Flows, Flow detail, People, Site & email, How-tos, Flow defaults)
+                setup/ (first-time setup wizard)   welcome/ (Create a Flow / Join a Flow)
 queries/        TanStack Query hooks per area; keys.ts holds every cache key; boardMutations.ts is the one
                 optimistic update + rollback path; the board refetches every 15 s
 ui/             primitives: Dialog/Drawer, Popover (@floating-ui/react), ConfirmDialog/useConfirm, BottomDock,

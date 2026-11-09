@@ -15,7 +15,7 @@ async function openAppearance(options?: Parameters<typeof installFakeApi>[1]) {
   installFakeApi(db, options);
   signIn(db);
   renderApp("/t/ENG/settings/appearance");
-  await waitFor(() => expect(screen.getByLabelText("Workspace")).toBeEnabled());
+  await waitFor(() => expect(screen.getByLabelText("Flow")).toBeEnabled());
   return db;
 }
 
@@ -25,7 +25,7 @@ async function openDesign() {
   installFakeApi(db);
   signIn(db);
   renderApp("/t/ENG/settings/appearance/design");
-  await waitFor(() => expect(screen.getByLabelText("Workspace")).toBeEnabled());
+  await waitFor(() => expect(screen.getByLabelText("Flow")).toBeEnabled());
   await screen.findByRole("region", { name: "Share this mix" });
   return db;
 }
@@ -111,8 +111,8 @@ describe("appearance panel", () => {
       screen.queryByText(/Profile backup|Export profile|Import profile/),
     ).not.toBeInTheDocument();
     expect(screen.queryByRole("heading", { name: "Advanced" })).not.toBeInTheDocument();
-    expect(screen.getByLabelText("Team name")).toBeInTheDocument();
-    expect(screen.getByLabelText("Team key")).toHaveAccessibleDescription(/2–8 characters/);
+    expect(screen.getByLabelText("Flow name")).toBeInTheDocument();
+    expect(screen.getByLabelText("Flow key")).toHaveAccessibleDescription(/2–8 characters/);
   });
 
   it("shows Saving…, then Saved, and offers Retry when a save fails", async () => {

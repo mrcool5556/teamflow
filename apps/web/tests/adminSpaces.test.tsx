@@ -43,7 +43,7 @@ describe("admin spaces list", () => {
     expect(within(table()).getByText("Mod pack")).toBeInTheDocument();
 
     await user.click(screen.getByRole("button", { name: "All 2" }));
-    await user.type(screen.getByRole("searchbox", { name: "Search spaces" }), "engin");
+    await user.type(screen.getByRole("searchbox", { name: "Search Flows" }), "engin");
     expect(within(table()).getByText("Engineering")).toBeInTheDocument();
     expect(within(table()).queryByText("Mod pack")).not.toBeInTheDocument();
   });
@@ -54,13 +54,13 @@ describe("create space dialog", () => {
     const user = userEvent.setup();
     const { calls, path } = setup("/t/ENG/admin/spaces");
     await screen.findByRole("table");
-    await user.click(screen.getByRole("button", { name: "+ New space" }));
-    const dialog = await screen.findByRole("dialog", { name: "New space" });
+    await user.click(screen.getByRole("button", { name: "+ New Flow" }));
+    const dialog = await screen.findByRole("dialog", { name: "New Flow" });
 
     await user.type(within(dialog).getByLabelText("Name"), "Client portal");
     expect(within(dialog).getByLabelText("Key")).toHaveValue("CP");
     await user.click(within(dialog).getByRole("button", { name: "5 GB" }));
-    await user.click(within(dialog).getByRole("button", { name: "Create space" }));
+    await user.click(within(dialog).getByRole("button", { name: "Create Flow" }));
 
     await waitFor(() =>
       expect(calls.find((c) => c.method === "POST" && c.path === "/instance/spaces")?.body).toEqual(
@@ -72,7 +72,7 @@ describe("create space dialog", () => {
         },
       ),
     );
-    expect(screen.queryByRole("dialog", { name: "New space" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("dialog", { name: "New Flow" })).not.toBeInTheDocument();
     // The new space's detail page opens.
     await waitFor(() =>
       expect(path()).toBe("/t/ENG/admin/spaces/00000000-0000-4000-8000-0000000000c1"),
@@ -84,18 +84,18 @@ describe("create space dialog", () => {
     const user = userEvent.setup();
     const { calls } = setup("/t/ENG/admin/spaces");
     await screen.findByRole("table");
-    await user.click(screen.getByRole("button", { name: "+ New space" }));
-    const dialog = await screen.findByRole("dialog", { name: "New space" });
+    await user.click(screen.getByRole("button", { name: "+ New Flow" }));
+    const dialog = await screen.findByRole("dialog", { name: "New Flow" });
 
     await user.type(within(dialog).getByLabelText("Name"), "Jam");
     await user.clear(within(dialog).getByLabelText("Key"));
     await user.type(within(dialog).getByLabelText("Key"), "jam1");
-    await user.click(within(dialog).getByRole("radio", { name: /Free space/ }));
+    await user.click(within(dialog).getByRole("radio", { name: /Free Flow/ }));
     expect(within(dialog).getByText(/Upload allowance: 1.00 GB/)).toBeInTheDocument();
     await user.type(within(dialog).getByRole("searchbox"), "jul");
     await user.click(await within(dialog).findByRole("button", { name: /Jules/ }));
-    expect(within(dialog).getByText(/Owns 2 of 3 free spaces/)).toBeInTheDocument();
-    await user.click(within(dialog).getByRole("button", { name: "Create space" }));
+    expect(within(dialog).getByText(/Owns 2 of 3 free Flows/)).toBeInTheDocument();
+    await user.click(within(dialog).getByRole("button", { name: "Create Flow" }));
 
     await waitFor(() =>
       expect(calls.find((c) => c.method === "POST" && c.path === "/instance/spaces")?.body).toEqual(
@@ -113,14 +113,14 @@ describe("create space dialog", () => {
     const user = userEvent.setup();
     setup("/t/ENG/admin/spaces");
     await screen.findByRole("table");
-    await user.click(screen.getByRole("button", { name: "+ New space" }));
-    const dialog = await screen.findByRole("dialog", { name: "New space" });
+    await user.click(screen.getByRole("button", { name: "+ New Flow" }));
+    const dialog = await screen.findByRole("dialog", { name: "New Flow" });
     await user.type(within(dialog).getByLabelText("Name"), "Big");
     await user.clear(within(dialog).getByLabelText("Upload allowance"));
     expect(within(dialog).getByRole("alert")).toHaveTextContent(/greater than 0/);
-    expect(within(dialog).getByRole("button", { name: "Create space" })).toBeDisabled();
+    expect(within(dialog).getByRole("button", { name: "Create Flow" })).toBeDisabled();
     await user.click(within(dialog).getByRole("checkbox", { name: "No limit" }));
-    expect(within(dialog).getByRole("button", { name: "Create space" })).toBeEnabled();
+    expect(within(dialog).getByRole("button", { name: "Create Flow" })).toBeEnabled();
   });
 });
 

@@ -25,7 +25,7 @@ export function storageNotice(storage: SpaceStoragePublic | undefined): StorageN
   if (storage.state === "full") {
     return {
       tone: "full",
-      text: `This space is full: ${formatStorageBytes(storage.usedBytes)} of ${cap}. New uploads are paused; issues, comments and linking existing files still work.`,
+      text: `This Flow is full: ${formatStorageBytes(storage.usedBytes)} of ${cap}. New uploads are paused; issues, comments and linking existing files still work.`,
       help: MAKE_ROOM_HELP,
       blocked: true,
     };
@@ -33,7 +33,7 @@ export function storageNotice(storage: SpaceStoragePublic | undefined): StorageN
   if (storage.state === "warn") {
     return {
       tone: "warn",
-      text: `${formatStorageBytes(storage.remainingBytes ?? 0)} left of this space's ${cap}.`,
+      text: `${formatStorageBytes(storage.remainingBytes ?? 0)} left of this Flow's ${cap}.`,
       blocked: false,
     };
   }
@@ -54,7 +54,7 @@ export function uploadRefusal(
   if (file.size <= storage.remainingBytes) return null;
   const cap = formatStorageBytes(storage.capBytes);
   if (storage.remainingBytes === 0) {
-    return `This space is full (${formatStorageBytes(storage.usedBytes)} of ${cap}), so ${file.name} was not uploaded. ${MAKE_ROOM_HELP}`;
+    return `This Flow is full (${formatStorageBytes(storage.usedBytes)} of ${cap}), so ${file.name} was not uploaded. ${MAKE_ROOM_HELP}`;
   }
-  return `${file.name} (${formatStorageBytes(file.size)}) won't fit: this space has ${formatStorageBytes(storage.remainingBytes)} left of its ${cap}. Remove files or ask a server admin for more.`;
+  return `${file.name} (${formatStorageBytes(file.size)}) won't fit: this Flow has ${formatStorageBytes(storage.remainingBytes)} left of its ${cap}. Remove files or ask a server admin for more.`;
 }

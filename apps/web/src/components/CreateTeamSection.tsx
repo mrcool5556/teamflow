@@ -39,11 +39,11 @@ export function CreateTeamSection({ onMessage, onTeamCreated }: CreateTeamSectio
     const trimmedName = name.trim();
     const trimmedKey = normalizeTeamKey(key);
     if (!trimmedName) {
-      onMessage("Team name is required.", "error");
+      onMessage("Flow name is required.", "error");
       return;
     }
     if (trimmedKey.length < 2) {
-      onMessage("Team key must be at least 2 characters (A–Z, 0–9).", "error");
+      onMessage("Flow key must be at least 2 characters (A–Z, 0–9).", "error");
       return;
     }
 
@@ -61,7 +61,7 @@ export function CreateTeamSection({ onMessage, onTeamCreated }: CreateTeamSectio
       setKeyTouched(false);
       onTeamCreated(team.id, switchToNew);
     } catch (err) {
-      onMessage(errorMessage(err, "Failed to create team"), "error");
+      onMessage(errorMessage(err, "Failed to create the Flow"), "error");
     } finally {
       setCreating(false);
     }
@@ -69,13 +69,13 @@ export function CreateTeamSection({ onMessage, onTeamCreated }: CreateTeamSectio
 
   return (
     <section className="settings-section">
-      <h3>Create team</h3>
+      <h3>Create a Flow</h3>
       <p className="settings-copy">
-        Add another board to your account. Your main board stays as-is — use the workspace dropdown
-        in the header to switch between teams.
+        Add another board to your account. Your main board stays as-is — use the Flow dropdown in
+        the header to switch between Flows.
       </p>
       <label className="settings-field">
-        <span className="settings-field-label">Team name</span>
+        <span className="settings-field-label">Flow name</span>
         <input
           value={name}
           onChange={(e) => updateName(e.target.value)}
@@ -85,7 +85,7 @@ export function CreateTeamSection({ onMessage, onTeamCreated }: CreateTeamSectio
       </label>
       <div className="settings-field">
         <label className="settings-field-label" htmlFor="create-team-key">
-          Team key
+          Flow key
         </label>
         <input
           id="create-team-key"
@@ -109,14 +109,14 @@ export function CreateTeamSection({ onMessage, onTeamCreated }: CreateTeamSectio
           checked={switchToNew}
           onChange={(e) => setSwitchToNew(e.target.checked)}
         />
-        Switch to new team after creating
+        Switch to the new Flow after creating
       </label>
       <button
         type="button"
         disabled={creating || !name.trim() || normalizeTeamKey(key).length < 2}
         onClick={() => void submit()}
       >
-        {creating ? "Creating…" : "Create team"}
+        {creating ? "Creating…" : "Create a Flow"}
       </button>
     </section>
   );

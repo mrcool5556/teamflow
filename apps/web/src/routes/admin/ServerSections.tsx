@@ -32,7 +32,7 @@ function WithServerTeam({
         children(team)
       ) : (
         <p className="settings-hint settings-hint--warn">
-          Open the server admin page from a team where you are the Owner to use this section. The
+          Open the server admin page from a Flow where you are the Owner to use this section. The
           Overview still shows its status.
         </p>
       )}
@@ -74,7 +74,7 @@ export function AdminBotPanel() {
   return (
     <WithServerTeam
       title="Discord bot"
-      lead="The teamflow-discord service on this server. Bot credentials and per-team guild settings live in Settings → Integrations."
+      lead="The teamflow-discord service on this server. Bot credentials and per-Flow guild settings live in Settings → Integrations."
       allowed={access.showIntegrations}
     >
       {(team) => (

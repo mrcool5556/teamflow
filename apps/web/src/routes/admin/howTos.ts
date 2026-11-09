@@ -17,7 +17,7 @@ export const HOW_TOS: HowTo[] = [
     id: "disk-full",
     title: "Free disk space",
     fixIds: ["disk-low", "disk-getting-full", "caps-exceed-disk"],
-    when: "Uploads pause for everyone when free disk falls under the floor set in Space defaults.",
+    when: "Uploads pause for everyone when free disk falls under the floor set in Flow defaults.",
     steps: [
       {
         text: "See what uses the disk.",
@@ -28,10 +28,10 @@ export const HOW_TOS: HowTo[] = [
         command: "ls -lt /var/backups/teamflow",
       },
       {
-        text: "Empty the trash of the biggest spaces: Server admin → Spaces → a space → Empty trash now.",
+        text: "Empty the trash of the biggest Flows: Server admin → Flows → a Flow → Empty trash now.",
       },
       {
-        text: "Lower caps on spaces that do not need them, or grow the container disk in Proxmox.",
+        text: "Lower caps on Flows that do not need them, or grow the container disk in Proxmox.",
       },
     ],
   },
@@ -49,14 +49,14 @@ export const HOW_TOS: HowTo[] = [
   },
   {
     id: "space-full",
-    title: "A space is full",
+    title: "A Flow is full",
     fixIds: ["spaces-full"],
-    when: "Members of a full space cannot upload; issues, comments and links still work.",
+    when: "Members of a full Flow cannot upload; issues, comments and links still work.",
     steps: [
-      { text: "Open Server admin → Spaces and pick the space to see its largest files." },
+      { text: "Open Server admin → Flows and pick the Flow to see its largest files." },
       { text: "Empty its trash, or ask the owner to remove files they no longer need." },
       {
-        text: "Or raise its cap in the Upload cap box; free spaces can also be changed to admin spaces.",
+        text: "Or raise its cap in the Upload cap box; free Flows can also be changed to admin Flows.",
       },
     ],
   },

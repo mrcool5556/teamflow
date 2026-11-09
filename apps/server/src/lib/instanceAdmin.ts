@@ -220,7 +220,7 @@ export function collectFixes(input: {
         id: "caps-exceed-disk",
         severity: "info",
         title: "Caps add up to more than the free disk",
-        detail: `Spaces could still upload ${formatStorageBytes(unusedCaps)}; ${formatStorageBytes(disk.freeBytes)} is free. The floor still protects the server.`,
+        detail: `Flows could still upload ${formatStorageBytes(unusedCaps)}; ${formatStorageBytes(disk.freeBytes)} is free. The floor still protects the server.`,
       });
     }
   }
@@ -230,7 +230,7 @@ export function collectFixes(input: {
     add({
       id: "spaces-full",
       severity: "info",
-      title: `${full.length} space${full.length === 1 ? " is" : "s are"} full`,
+      title: `${full.length} Flow${full.length === 1 ? " is" : "s are"} full`,
       detail: `${full.map((space) => space.name).join(", ")}: uploads are paused there until files are removed or the cap is raised.`,
     });
   }
@@ -409,7 +409,7 @@ function capLabel(capBytes: number | null) {
 function getSpaceRaw(db: Db, teamId: string) {
   const row = db.$client.prepare(`${SPACE_SELECT} WHERE t.id = ?`).get(teamId) as
     SpaceRowRaw | undefined;
-  if (!row) throw notFound("Space not found");
+  if (!row) throw notFound("Flow not found");
   return row;
 }
 
@@ -502,7 +502,7 @@ export function createSpace(db: Db, actorId: string, input: CreateSpaceInput) {
         actorId,
         kind: "created",
         createdAt: new Date().toISOString(),
-        detail: `${input.spaceType === "free" ? "Free" : "Admin"} space for ${owner.name}, cap ${capLabel(storageCapBytes)}`,
+        detail: `${input.spaceType === "free" ? "Free" : "Admin"} Flow for ${owner.name}, cap ${capLabel(storageCapBytes)}`,
       })
       .run();
     return created;

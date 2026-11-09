@@ -14,7 +14,7 @@ export function RolesPanel() {
           <header className="settings-panel-header">
             <h2>Roles & permissions</h2>
             <p className="settings-copy settings-lead">
-              Each team member has one role. Roles define what they can do in Settings and
+              Each Flow member has one role. Roles define what they can do in Settings and
               integrations.
             </p>
           </header>

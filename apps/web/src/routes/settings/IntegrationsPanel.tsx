@@ -15,7 +15,7 @@ export function IntegrationsPanel() {
             <h2>Integrations</h2>
             <p className="settings-copy settings-lead">
               Connect Teamflow to Discord. Bot credentials are instance-wide; guild, roles, and
-              tickets are configured per team below.
+              tickets are configured per Flow below.
             </p>
           </header>
           <PanelStatus status={status} />

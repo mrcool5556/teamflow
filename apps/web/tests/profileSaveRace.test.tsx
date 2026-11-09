@@ -31,7 +31,7 @@ describe("profile saves racing with clicks", () => {
     installFakeApi(db, { gate: hold.gate });
     signIn(db);
     renderApp("/t/ENG/settings/appearance");
-    await waitFor(() => expect(screen.getByLabelText("Workspace")).toBeEnabled());
+    await waitFor(() => expect(screen.getByLabelText("Flow")).toBeEnabled());
     const theme = await screen.findByRole("radiogroup", { name: "Light or dark" });
 
     // Light goes out in a save that is slow to answer…

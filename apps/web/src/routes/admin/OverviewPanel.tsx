@@ -209,7 +209,7 @@ function DiskTile({ overview }: { overview: InstanceOverviewPublic }) {
       )}
       <p className="admin-tile-note">
         Caps allocated: <strong>{formatStorageBytes(disk.allocatedCapBytes)}</strong> across{" "}
-        {disk.cappedSpaces} capped space{disk.cappedSpaces === 1 ? "" : "s"} · {disk.uncappedSpaces}{" "}
+        {disk.cappedSpaces} capped Flow{disk.cappedSpaces === 1 ? "" : "s"} · {disk.uncappedSpaces}{" "}
         with no limit ·{" "}
         {disk.floorBytes > 0 ? (
           <>
@@ -394,7 +394,7 @@ export function OverviewPanel() {
 
         <DiskTile overview={overview} />
 
-        <Tile title="Spaces" health={spaces.full > 0 ? "warn" : "ok"} pill={`${spaces.count}`}>
+        <Tile title="Flows" health={spaces.full > 0 ? "warn" : "ok"} pill={`${spaces.count}`}>
           <Facts
             rows={[
               ["Admin", String(spaces.admin)],

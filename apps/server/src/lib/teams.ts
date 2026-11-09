@@ -80,7 +80,7 @@ export function createTeamWithOwner(
   return db.select().from(schema.teams).where(eq(schema.teams.id, teamId)).get()!;
 }
 
-/** Free spaces counting against `userId` (their General included). */
+/** Free spaces (free Flows) counting against `userId` (an older account's General included). */
 export function countOwnedFreeSpaces(db: DbExecutor, userId: string) {
   const row = db
     .select({ count: sql<number>`count(*)` })
@@ -109,8 +109,8 @@ export function spaceForUserCreatedTeam(
     if (owned > 0 && owned >= settings.freeSpacesPerUser) {
       throw new ApiError(
         409,
-        `You already have ${owned} free space${owned === 1 ? "" : "s"}, the most allowed. ` +
-          "Delete one you no longer need, or ask a server admin to make a space for you.",
+        `You already own ${owned} free Flow${owned === 1 ? "" : "s"}, the most allowed. ` +
+          "Delete one you no longer need, or ask a server admin to make one for you.",
         SPACE_ERROR_CODES.freeSpaceLimit,
         { owned, limit: settings.freeSpacesPerUser },
       );

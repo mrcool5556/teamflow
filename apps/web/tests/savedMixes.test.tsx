@@ -68,7 +68,7 @@ describe("Your mixes on the Design page", () => {
     installFakeApi(db);
     signIn(db);
     renderApp("/t/ENG/settings/appearance/design");
-    await waitFor(() => expect(screen.getByLabelText("Workspace")).toBeEnabled());
+    await waitFor(() => expect(screen.getByLabelText("Flow")).toBeEnabled());
 
     // Make the look your own first, so it is not one of the built-in looks.
     const fonts = await screen.findByRole("radiogroup", { name: "Fonts" });

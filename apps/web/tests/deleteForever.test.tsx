@@ -59,7 +59,7 @@ describe("delete forever from the Files trash", () => {
     await user.click(await screen.findByRole("button", { name: "Delete forever" }));
 
     const confirm = await screen.findByRole("dialog", { name: /Delete .* forever\?/ });
-    expect(confirm).toHaveTextContent("This can't be undone. It frees 120 MB in this space");
+    expect(confirm).toHaveTextContent("This can't be undone. It frees 120 MB in this Flow");
     await user.click(within(confirm).getByRole("button", { name: "Delete forever" }));
 
     await waitFor(() =>

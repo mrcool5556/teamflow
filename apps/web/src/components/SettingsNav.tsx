@@ -26,7 +26,7 @@ const NAV_ITEMS: {
   { id: "general", label: "General", group: "account" },
   { id: "appearance", label: "Appearance", group: "account" },
   { id: "tokens", label: "API tokens", group: "account" },
-  { id: "team", label: "Team", group: "team", teamOnly: true },
+  { id: "team", label: "Flow", group: "team", teamOnly: true },
   { id: "roles", label: "Roles", group: "team", teamOnly: true, roles: true },
   {
     id: "integrations",
@@ -61,7 +61,7 @@ export function SettingsNav({
     group === "account"
       ? "Account"
       : group === "team"
-        ? `Team${teamKey ? ` · ${teamKey}` : ""}`
+        ? `Flow${teamKey ? ` · ${teamKey}` : ""}`
         : "Server";
 
   return (

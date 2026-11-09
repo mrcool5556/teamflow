@@ -32,10 +32,10 @@ describe("storage messages", () => {
     expect(warn).toMatchObject({
       tone: "warn",
       blocked: false,
-      text: "124 MB left of this space's 1.00 GB.",
+      text: "124 MB left of this Flow's 1.00 GB.",
     });
     expect(storageNotice(full)).toMatchObject({ tone: "full", blocked: true });
-    expect(storageNotice(full)?.text).toMatch(/This space is full: 1.00 GB of 1.00 GB/);
+    expect(storageNotice(full)?.text).toMatch(/This Flow is full: 1.00 GB of 1.00 GB/);
     expect(storageNotice(makeStorage({ diskLow: true, capBytes: null }))).toMatchObject({
       blocked: true,
       text: expect.stringMatching(/almost out of disk space/),
@@ -46,9 +46,9 @@ describe("storage messages", () => {
     const room = makeStorage({ usedBytes: 836 * MIB, remainingBytes: 188 * MIB, state: "warn" });
     expect(uploadRefusal(room, { name: "small.png", size: 10 * MIB })).toBeNull();
     expect(uploadRefusal(room, { name: "poster.psd", size: 340 * MIB })).toBe(
-      "poster.psd (340 MB) won't fit: this space has 188 MB left of its 1.00 GB. Remove files or ask a server admin for more.",
+      "poster.psd (340 MB) won't fit: this Flow has 188 MB left of its 1.00 GB. Remove files or ask a server admin for more.",
     );
-    expect(uploadRefusal(full, { name: "a.txt", size: 1 })).toMatch(/This space is full/);
+    expect(uploadRefusal(full, { name: "a.txt", size: 1 })).toMatch(/This Flow is full/);
     expect(uploadRefusal(undefined, { name: "a.txt", size: 1 })).toBeNull();
     expect(
       uploadRefusal(makeStorage({ capBytes: null, remainingBytes: null }), {
@@ -98,7 +98,7 @@ describe("Files drawer meter", () => {
     const meter = await screen.findByRole("region", { name: "Storage" });
     expect(within(meter).getByText("812 MB of 1.00 GB · 79%")).toBeInTheDocument();
     expect(within(meter).getByRole("meter", { name: "Storage used" })).toBeInTheDocument();
-    expect(within(meter).getByText(/212 MB left in this free space/)).toBeInTheDocument();
+    expect(within(meter).getByText(/212 MB left in this free Flow/)).toBeInTheDocument();
     expect(within(meter).getByText(/trash holds 120 MB, which counts/)).toBeInTheDocument();
   });
 
@@ -134,7 +134,7 @@ describe("uploads when the space is full", () => {
     signIn(db);
     renderApp("/t/ENG");
     const { drawer } = await openRowFiles();
-    expect(await within(drawer).findByRole("alert")).toHaveTextContent(/This space is full/);
+    expect(await within(drawer).findByRole("alert")).toHaveTextContent(/This Flow is full/);
     expect(within(drawer).getByRole("button", { name: "Choose file" })).toBeDisabled();
   });
 
@@ -143,7 +143,7 @@ describe("uploads when the space is full", () => {
     installFakeApi(db, { extraRoutes: [storageRoute(() => full)] });
     signIn(db);
     renderApp("/t/ENG/issue/ENG-1");
-    expect(await screen.findByText(/This space is full: 1.00 GB of 1.00 GB/)).toBeInTheDocument();
+    expect(await screen.findByText(/This Flow is full: 1.00 GB of 1.00 GB/)).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Choose file" })).toBeDisabled();
   });
 
@@ -164,7 +164,7 @@ describe("uploads when the space is full", () => {
     await user.upload(input, new File(["x".repeat(500)], "notes.txt", { type: "text/plain" }));
 
     expect(
-      await screen.findByText(/notes.txt \(500 B\) won't fit: this space has 100 B left/),
+      await screen.findByText(/notes.txt \(500 B\) won't fit: this Flow has 100 B left/),
     ).toBeInTheDocument();
     expect(calls.some((c) => c.method === "POST" && c.path.includes("/attachments"))).toBe(false);
   });

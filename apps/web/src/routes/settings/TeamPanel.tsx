@@ -14,9 +14,9 @@ export function TeamPanel() {
       {(team) => (
         <div className="settings-panel">
           <header className="settings-panel-header">
-            <h2>Team</h2>
+            <h2>Flow</h2>
             <p className="settings-copy settings-lead">
-              Members, invites, and team lifecycle for <strong>{team.name}</strong>.
+              Members, invites, and Flow lifecycle for <strong>{team.name}</strong>.
             </p>
           </header>
           <PanelStatus status={status} />

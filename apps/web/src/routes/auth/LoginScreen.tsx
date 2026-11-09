@@ -128,7 +128,7 @@ export function LoginScreen({
 
         {pendingInvite && mode !== "forgot" && mode !== "reset" ? (
           <p className="hint invite-login-hint">
-            You have a team invite — log in or register to join.
+            You have a Flow invite — log in or register to join.
           </p>
         ) : inviteOnly && mode === "register" ? (
           <p className="hint invite-login-hint">

@@ -12,7 +12,7 @@ async function openDesign() {
   installFakeApi(db);
   signIn(db);
   renderApp("/t/ENG/settings/appearance/design");
-  await waitFor(() => expect(screen.getByLabelText("Workspace")).toBeEnabled());
+  await waitFor(() => expect(screen.getByLabelText("Flow")).toBeEnabled());
   await screen.findByRole("heading", { name: "Design" });
   return db;
 }
@@ -26,7 +26,7 @@ describe("Design page", () => {
     installFakeApi(db);
     signIn(db);
     renderApp("/t/ENG/settings/appearance");
-    await waitFor(() => expect(screen.getByLabelText("Workspace")).toBeEnabled());
+    await waitFor(() => expect(screen.getByLabelText("Flow")).toBeEnabled());
     await user.click(await screen.findByRole("link", { name: /Open Design page/ }));
     expect(await screen.findByRole("heading", { name: "Design" })).toBeInTheDocument();
     expect(screen.getByRole("radiogroup", { name: "Colours" })).toBeInTheDocument();
