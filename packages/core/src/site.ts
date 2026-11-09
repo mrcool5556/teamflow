@@ -152,3 +152,51 @@ export const SETUP_ERROR_CODES = {
   /** Wrong or missing setup code. */
   badCode: "setup_code_invalid",
 } as const;
+
+/* ---------- setup checklist (setup step 5 and the admin Overview card) ---------- */
+
+export const SETUP_CHECKLIST_IDS = [
+  "admin",
+  "site",
+  "email",
+  "storage",
+  "backup",
+  "service",
+  "flow",
+] as const;
+export type SetupChecklistId = (typeof SETUP_CHECKLIST_IDS)[number];
+
+/** done; todo; skipped (chosen to leave for later); unavailable (cannot be done on this host). */
+export type SetupChecklistState = "done" | "todo" | "skipped" | "unavailable";
+
+export type SetupChecklistItem = {
+  id: SetupChecklistId;
+  state: SetupChecklistState;
+  title: string;
+  detail: string;
+};
+
+export type SetupChecklistPublic = {
+  items: SetupChecklistItem[];
+  doneCount: number;
+  /** Items that count (unavailable ones don't). */
+  total: number;
+  /** Every counted item is done or skipped. */
+  complete: boolean;
+  /** The admin hid the Overview card. */
+  dismissed: boolean;
+};
+
+export const updateSetupProgressSchema = z
+  .object({
+    emailSkipped: z.boolean().optional(),
+    storageReviewed: z.boolean().optional(),
+    dismissed: z.boolean().optional(),
+  })
+  .strict();
+export type UpdateSetupProgressInput = z.infer<typeof updateSetupProgressSchema>;
+
+export type SiteSettingsAdminPublic = SiteSettingsPublic & {
+  /** The address this request came in on (honours X-Forwarded-* when the proxy is trusted). */
+  suggestedPublicUrl: string | null;
+};

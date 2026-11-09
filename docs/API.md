@@ -16,10 +16,14 @@ server together with the request id.
 | 400 | `validation_error` | Body, query or path parameter failed its schema |
 | 400 | `bad_request` | Request is well-formed but cannot be applied (e.g. row belongs to another team, invite expired) |
 | 401 | `unauthorized` | Missing or invalid session / PAT / stream token / bot config key |
+| 403 | `setup_code_invalid` | Wrong setup code on `POST /auth/setup/admin` ([SETUP.md](SETUP.md)) |
 | 403 | `forbidden` | Not a member, PAT scoped to another team, missing permission or write scope, instance admin required |
 | 404 | `not_found` | Team, row, column, issue, comment, file, invite, role or member does not exist |
 | 409 | `conflict` | Email already registered, column/row still has issues, last row on a board |
 | 409 | `free_space_limit` | The user already owns the most free spaces allowed; body adds `owned`, `limit` ([SPACES.md](SPACES.md)) |
+| 409 | `setup_required` | `POST /auth/register` on a server with no accounts yet; the first account is made on `/setup` |
+| 409 | `setup_done` | `POST /auth/setup/admin` once any account exists |
+| 409 | `setting_set_in_env` | Saving a site, email or sign-up setting that `.env` sets; body adds `variable` |
 | 410 | `gone` | Removed endpoint |
 | 413 | `payload_too_large` | Body over the JSON (1 MB), attachment or bundle limit |
 | 413 | `space_storage_full` | The upload does not fit in the space's cap; body adds `usedBytes`, `capBytes`, `fileBytes`, `remainingBytes` |
@@ -37,7 +41,7 @@ Server code throws `ApiError` from `apps/server/src/lib/errors.ts` (`badRequest`
 
 <!-- BEGIN GENERATED ROUTES (scripts/gen-api-docs.mjs) -->
 
-## Routes (109)
+## Routes (119)
 
 Generated from `apps/server/src/routes/*.ts` by `pnpm docs:api`; do not edit by hand.
 
@@ -185,7 +189,17 @@ Instance admin page (web /admin): server status, spaces, caps and space settings
 | Method | Path | Auth | Write | Team | Permission | Input |
 |--------|------|------|-------|------|------------|-------|
 | GET | `/instance/overview` | bearer |  |  | instance admin |  |
-| GET | `/instance/checks/public-url` | bearer |  |  | instance admin |  |
+| GET | `/instance/checks/public-url` | bearer |  |  | instance admin | query `publicUrlCheckQuerySchema` |
+| GET | `/instance/site` | bearer |  |  | instance admin |  |
+| PATCH | `/instance/site` | bearer | yes |  | instance admin | body `updateSiteSettingsSchema` |
+| GET | `/instance/mail` | bearer |  |  | instance admin |  |
+| PUT | `/instance/mail` | bearer | yes |  | instance admin | body `updateMailSettingsSchema` |
+| DELETE | `/instance/mail` | bearer | yes |  | instance admin |  |
+| POST | `/instance/mail/test` | bearer | yes |  | instance admin | body `sendTestMailSchema` |
+| GET | `/instance/signup` | bearer |  |  | instance admin |  |
+| PATCH | `/instance/signup` | bearer | yes |  | instance admin | body `updateSignupSettingsSchema` |
+| GET | `/instance/setup-checklist` | bearer |  |  | instance admin |  |
+| PATCH | `/instance/setup-checklist` | bearer | yes |  | instance admin | body `updateSetupProgressSchema` |
 | GET | `/instance/settings` | bearer |  |  | instance admin |  |
 | PATCH | `/instance/settings` | bearer | yes |  | instance admin | body `updateSpaceSettingsSchema` |
 | GET | `/instance/users` | bearer |  |  | instance admin | query `listInstanceUsersQuerySchema` |

@@ -62,3 +62,16 @@ Only the secrets (`JWT_SECRET`, optionally `TEAMFLOW_SECRETS_KEY`). Installers s
 | POST | `/auth/register` | none | While setup is needed: `409 setup_required` |
 
 `GET /auth/config` also returns `setupNeeded` and `siteName`.
+
+### Admin settings used by setup steps 2–5
+
+Instance admins only. A value set in `.env` wins; saving over it answers `409 setting_set_in_env`.
+
+| Method | Path | Notes |
+|--------|------|-------|
+| GET / PATCH | `/instance/site` | `{ siteName, publicUrl }`; GET adds `suggestedPublicUrl` (the address the request came in on; `X-Forwarded-*` only with `TEAMFLOW_TRUST_PROXY`) |
+| GET | `/instance/checks/public-url?url=` | Fetches `<url>/health` from the server, to check an address before saving it |
+| GET / PUT / DELETE | `/instance/mail` | SMTP `{ host, port, security: starttls\|ssl\|none, user, password, from }`. The password is stored encrypted and never returned (`passwordSet`). Omit `password` to keep the saved one |
+| POST | `/instance/mail/test` | `{ to? }` (default: you). Answers `{ result: { ok, to, error } }` with the SMTP server's message |
+| GET / PATCH | `/instance/signup` | `{ inviteOnly }` |
+| GET / PATCH | `/instance/setup-checklist` | What's done and what's left. PATCH `{ emailSkipped?, storageReviewed?, dismissed? }` |

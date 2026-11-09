@@ -43,7 +43,7 @@ const DAY_MS = 24 * 60 * 60 * 1000;
 
 /* ---------- server and disk (local checks only) ---------- */
 
-function detectSupervisor(): { supervisor: ServerSupervisor; serviceName: string | null } {
+export function detectSupervisor(): { supervisor: ServerSupervisor; serviceName: string | null } {
   if (process.env.INVOCATION_ID) {
     // systemd puts each service in its own cgroup, named after the unit.
     let serviceName: string | null = null;
@@ -374,8 +374,9 @@ export async function getInstanceOverview(db: Db): Promise<InstanceOverviewPubli
 /** Ask PUBLIC_URL/health from the server itself (proxy, DNS and TLS in the path). */
 export async function checkPublicUrl(
   fetchImpl: typeof fetch = fetch,
+  address: string = getPublicUrl(),
 ): Promise<PublicUrlCheckPublic> {
-  const url = `${getPublicUrl()}/health`;
+  const url = `${address}/health`;
   const started = Date.now();
   try {
     const res = await fetchImpl(url, { signal: AbortSignal.timeout(5000), redirect: "manual" });

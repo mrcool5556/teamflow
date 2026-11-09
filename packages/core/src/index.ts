@@ -418,7 +418,11 @@ export type TeamInvitePreview = {
 };
 
 export type AuthConfigPublic = {
+  /** Shown on the login page and in the browser tab. */
+  siteName: string;
   inviteOnly: boolean;
+  /** The server has no accounts yet: send people to /setup. */
+  setupNeeded: boolean;
   passwordResetEmail: boolean;
 };
 

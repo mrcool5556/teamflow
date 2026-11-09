@@ -73,6 +73,10 @@ function writeSaved(key: string, value: unknown) {
   cache.delete(key);
 }
 
+/** Read or write another instance_settings key through the same cache. */
+export const readInstanceSetting = readSaved;
+export const writeInstanceSetting = writeSaved;
+
 /** Test hook: forget cached values (after a test writes instance_settings directly). */
 export function resetSiteSettingsCache() {
   cache.clear();
