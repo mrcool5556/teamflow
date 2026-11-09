@@ -71,16 +71,7 @@ backup_uploads() {
   echo "Uploads backup: $archive"
 }
 
-if grep -q '^DATABASE_URL=postgresql' "$APP_DIR/.env" 2>/dev/null; then
-  echo "==> PostgreSQL backup starting (pg_dump teamflow)…"
-  sudo -u postgres pg_dump teamflow > "$BACKUP_DIR/teamflow_$STAMP.sql"
-  echo "PostgreSQL backup: $BACKUP_DIR/teamflow_$STAMP.sql"
-  if [[ "$MODE" == "full" ]]; then
-    backup_uploads
-  else
-    echo "Uploads skipped (use teamflow-backup --full to include)."
-  fi
-elif [[ -f "$APP_DIR/data/teamflow.db" ]]; then
+if [[ -f "$APP_DIR/data/teamflow.db" ]]; then
   echo "==> SQLite backup starting…"
   cp "$APP_DIR/data/teamflow.db" "$BACKUP_DIR/teamflow_$STAMP.db"
   echo "SQLite backup: $BACKUP_DIR/teamflow_$STAMP.db"

@@ -13,7 +13,7 @@ if [[ $EUID -ne 0 ]]; then
 fi
 
 apt update
-apt install -y sudo curl git ca-certificates postgresql postgresql-contrib build-essential python3
+apt install -y sudo curl git ca-certificates build-essential python3
 
 if ! command -v node &>/dev/null || [[ $(node -v | cut -d. -f1 | tr -d v) -lt 20 ]]; then
   curl -fsSL https://deb.nodesource.com/setup_20.x | bash -
@@ -37,11 +37,6 @@ if [[ -d "$APP_DIR/.git" ]]; then
   git config --system --add safe.directory "$APP_DIR" 2>/dev/null || true
   sudo -u "$APP_USER" git config --global --add safe.directory "$APP_DIR" 2>/dev/null || true
 fi
-
-sudo -u postgres psql -tc "SELECT 1 FROM pg_roles WHERE rolname='$APP_USER'" | grep -q 1 || \
-  sudo -u postgres createuser "$APP_USER"
-sudo -u postgres psql -tc "SELECT 1 FROM pg_database WHERE datname='teamflow'" | grep -q 1 || \
-  sudo -u postgres createdb -O "$APP_USER" teamflow
 
 if [[ ! -f .env ]]; then
   cp deploy/proxmox-lxc/.env.example .env
@@ -80,15 +75,9 @@ ensure_env_defaults
 sudo -u "$APP_USER" pnpm install
 sudo -u "$APP_USER" pnpm build
 
-# Note: Postgres driver migration is Phase 2 — for now SQLite fallback on LXC if DATABASE_URL uses file:
-if grep -q '^DATABASE_URL=file:' .env 2>/dev/null; then
-  # Migrations only. No demo account is created; the first registered user becomes
-  # the instance admin. For throwaway demo data run: TEAMFLOW_SEED_DEMO=1 pnpm db:seed
-  sudo -u "$APP_USER" pnpm db:migrate
-else
-  echo "PostgreSQL configured — run Drizzle Postgres migrations when added (Phase 2)."
-  echo "For now, set DATABASE_URL=file:./data/teamflow.db in .env for SQLite on LXC."
-fi
+# Teamflow uses SQLite only (ensure_env_defaults sets DATABASE_URL=file:...). Migrations only:
+# no demo account is created. For throwaway demo data run: TEAMFLOW_SEED_DEMO=1 pnpm db:seed
+sudo -u "$APP_USER" pnpm db:migrate
 
 cp deploy/proxmox-lxc/teamflow.service /etc/systemd/system/teamflow.service
 systemctl daemon-reload
