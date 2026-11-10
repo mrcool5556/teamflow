@@ -5,8 +5,8 @@
 # With options:
 #   & ([scriptblock]::Create((irm https://github.com/mrcool5556/teamflow/releases/latest/download/install.ps1))) -Service
 #
-# Gets Node 20 if this PC doesn't have it (a private copy from nodejs.org, checked against its
-# published SHA-256), downloads and verifies the newest Teamflow release, generates secrets,
+# Gets Teamflow its own Node 20 (a private copy from nodejs.org, checked against its published
+# SHA-256, whatever Node the PC has), downloads and verifies the newest Teamflow release, generates secrets,
 # optionally installs a Windows service, checks that Teamflow answers and opens the browser on
 # the setup page. Safe to re-run: .env, the database and uploads are kept.
 #

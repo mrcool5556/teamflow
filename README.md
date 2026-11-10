@@ -17,9 +17,9 @@ Self-hosted issue tracker for small teams: kanban boards with rows (swimlanes) a
 - **CLI** (`teamflow`) for scripts and terminal work
 - **Discord bot**: slash commands, ticket threads to issues, share links
 - Personal access tokens (PATs) with read/write scope and optional team restriction
-- In-app backups and updates on Linux (Settings → Updates)
+- One-line installers for Windows, Linux and Proxmox, a Windows tray app, and in-app backups and updates (Settings → Updates)
 
-## Requirements
+## Requirements (development)
 
 - **Node 20** (pinned in `.nvmrc` and `engines`; `better-sqlite3` is built for Node 20, other majors fail to load it). With nvm: `nvm use`. With nvm-windows: `nvm use 20.19.2`.
 - **pnpm 9** (`corepack enable` picks up the `packageManager` field; pnpm 10 is not tested).
@@ -78,17 +78,35 @@ Rebuild a package (`pnpm --filter @teamflow/core build`, likewise `db`, `api-cli
 | `pnpm db:maintenance` | Data upkeep: purge trash older than 7 days, repair Owner roles, renumber duplicate issue numbers |
 | `pnpm docs:api` / `pnpm docs:api:check` | Regenerate / verify [docs/API.md](docs/API.md) from the route files |
 
-## Deployment
+## Install on a server
 
-**[Self-hosting guide](docs/SELF-HOSTING.md)** covers install, update and the production checklist.
+Prebuilt releases, no build tools and no git checkout. Each command downloads and checks the newest release, generates secrets, starts Teamflow and prints a one-time setup link (`/setup?code=…`) where you create the admin account. **[Self-hosting guide](docs/SELF-HOSTING.md)** has the details, options and the production checklist.
+
+**Windows 10/11:** download `TeamflowSetup-vX.Y.Z.exe` from the [latest release](https://github.com/mrcool5556/teamflow/releases/latest) (not code-signed yet: on "Windows protected your PC" click **More info → Run anyway**), or in PowerShell:
+
+```powershell
+irm https://github.com/mrcool5556/teamflow/releases/latest/download/install.ps1 | iex
+```
+
+**Proxmox VE**, in the host's shell (creates a Debian 12 container and installs Teamflow in it):
+
+```bash
+bash -c "$(curl -fsSL https://github.com/mrcool5556/teamflow/releases/latest/download/proxmox.sh)"
+```
+
+**Debian 12+ / Ubuntu 22.04+:**
+
+```bash
+curl -fsSL https://github.com/mrcool5556/teamflow/releases/latest/download/install.sh | sudo bash
+```
+
+Updates: **Settings → Updates** in the app (backup, switch, health check, automatic rollback).
 
 | Setup | Doc | Best for |
 |-------|-----|----------|
-| **A. Windows** | [deploy/windows/README.md](deploy/windows/README.md) | Dev machine or a small team on one PC |
-| **B. Proxmox LXC** | [deploy/proxmox-lxc/README.md](deploy/proxmox-lxc/README.md) | Always-on Linux server (`sudo update`, in-app updates) |
+| **A. Windows** | [deploy/windows/README.md](deploy/windows/README.md) | A PC at home or in the office |
+| **B. Linux / Proxmox** | [deploy/proxmox-lxc/README.md](deploy/proxmox-lxc/README.md) | Always-on server (`sudo update`, in-app updates) |
 | Remote access | [deploy/relay/README.md](deploy/relay/README.md) | Tailscale, Caddy or Cloudflare in front of the server |
-
-Production needs a real `JWT_SECRET` (the server refuses placeholders) and on Linux one run of `setup-maintenance-sudo.sh`. Everything else (admin account, site name, public address, email, storage rules, who can sign up) is set in the browser on first start: open the `/setup?code=…` link the installer or server log prints ([docs/SETUP.md](docs/SETUP.md)). See [SELF-HOSTING.md](docs/SELF-HOSTING.md#production-checklist).
 
 ## AI integration (MCP)
 
@@ -116,6 +134,7 @@ Create a PAT in **Settings → API tokens**. Tools and details: [docs/MCP.md](do
 | Doc | Purpose |
 |-----|---------|
 | [docs/SELF-HOSTING.md](docs/SELF-HOSTING.md) | Install, update, production checklist |
+| [docs/RELEASING.md](docs/RELEASING.md) | Making a release (tags, workflow, checksums) |
 | [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md) | Deployment index, schema versions, data maintenance |
 | [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | Monorepo map, server and web layout, auth model, data flow |
 | [docs/AUTH.md](docs/AUTH.md) | Login, roles, instance admin, PATs, password reset, SMTP |

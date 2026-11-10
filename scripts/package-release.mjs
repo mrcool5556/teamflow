@@ -8,7 +8,7 @@
  * matching .sha256 file. Files sit at the archive root (no top folder):
  *
  *   version.json            { version, commit, builtAt, platform }
- *   apps/server/dist/       the server (index.js, migrate.js, backup-db.js)
+ *   apps/server/dist/       the server (index.js, migrate.js, backup-db.js, db-maintenance.js)
  *   apps/discord-bot/dist/  the optional Discord bot
  *   apps/web/dist/          the built web app, served by the server
  *   node_modules/           production dependencies (workspace packages inlined, no symlinks)
@@ -88,6 +88,7 @@ if (!flag("skip-build")) run(pnpm, ["-r", "build"]);
 for (const needed of [
   "apps/server/dist/index.js",
   "apps/server/dist/migrate.js",
+  "apps/server/dist/db-maintenance.js",
   "apps/discord-bot/dist/index.js",
   "apps/web/dist/index.html",
 ]) {

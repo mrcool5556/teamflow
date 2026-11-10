@@ -1,8 +1,16 @@
 # Install & update plan
 
-Status: **design only, 2026-11-09.** Nothing here is built yet. George picks the options in
-[Decisions for George](#decisions-for-george) first. Mock-up of the new Updates page:
-[`docs/mockups/simple-update-v1.html`](mockups/simple-update-v1.html).
+Status: **built, 2026-11-10, on branch `claude/install-plan-e40df1` (not merged, not released).**
+George chose: Tauri app, unsigned (SmartScreen "More info → Run anyway" documented), x64 only,
+setup code (contract in [SETUP.md](SETUP.md)), first release v0.2.0, NSSM kept, build
+attestations. Steps 1–10 below are done, one commit each. Tested on Windows on a real PC
+(one-liner, service-free supervisor, in-app update/backup/restore with rollbacks, the Tauri app
+and its NSIS installer) and on Linux in a Debian container (update.sh/backup/restore/rollbacks);
+`install.sh` and `proxmox.sh` are checked with shellcheck and `--dry-run` only. Still to test on
+real machines: the Linux one-liner under real systemd and NodeSource, `proxmox.sh` on a Proxmox
+host, the first real GitHub release (workflow, attestations), and converting CT998's checkout.
+The app icon is a placeholder. User docs: [SELF-HOSTING.md](SELF-HOSTING.md). Mock-up of the
+Updates page: [`docs/mockups/simple-update-v1.html`](mockups/simple-update-v1.html).
 
 ## Goal
 

@@ -30,15 +30,23 @@ else
   echo "health endpoint unreachable on :3000"
 fi
 
-section "git (/opt/teamflow as teamflow user)"
-if [[ -d "$APP_DIR/.git" ]]; then
+section "release"
+if [[ -L "$APP_DIR/current" ]]; then
+  echo "current -> $(readlink "$APP_DIR/current")"
+  cat "$APP_DIR/current/version.json" 2>/dev/null || true
+  echo ""
+  ls -1 "$APP_DIR/releases" 2>&1 || true
+  grep -E '^(STEP|DONE|FAIL)' "$APP_DIR/data/maintenance.log" 2>/dev/null | tail -8 || true
+elif [[ -d "$APP_DIR/.git" ]]; then
+  echo "git checkout (not a release install); run the installer once to switch"
   sudo -u teamflow git -C "$APP_DIR" log -1 --oneline 2>&1 || true
   sudo -u teamflow git -C "$APP_DIR" status -sb 2>&1 | head -10 || true
   sudo -u teamflow git -C "$APP_DIR" fetch origin 2>&1 | tail -3 || true
   sudo -u teamflow git -C "$APP_DIR" rev-list --left-right --count HEAD...origin/main 2>&1 || true
 else
-  echo "no git repo at $APP_DIR"
+  echo "no release and no git checkout at $APP_DIR"
 fi
+
 
 section "maintenance wrappers"
 ls -la /usr/local/bin/teamflow-* 2>&1 || true

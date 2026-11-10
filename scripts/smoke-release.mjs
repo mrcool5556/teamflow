@@ -4,7 +4,7 @@
  *
  *   node scripts/smoke-release.mjs <unpacked-release-dir> [--expect-version 0.2.0]
  *
- * Runs migrate.js, then the server on a free port from an empty working folder (like
+ * Runs migrate.js and db-maintenance.js, then the server on a free port from an empty working folder (like
  * /opt/teamflow), checks /health reports the version and / serves the web app, and stops it.
  * Exits non-zero on any failure. Used by the release workflow and by hand.
  */
@@ -51,6 +51,11 @@ function fail(msg) {
 }
 
 execFileSync(process.execPath, [path.join(dir, "apps", "server", "dist", "migrate.js")], {
+  cwd: work,
+  env,
+  stdio: "inherit",
+});
+execFileSync(process.execPath, [path.join(dir, "apps", "server", "dist", "db-maintenance.js")], {
   cwd: work,
   env,
   stdio: "inherit",

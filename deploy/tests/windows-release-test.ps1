@@ -81,6 +81,7 @@ try {
   $log | Out-File (Join-Path $Work "install.log")
   Check "printed the address" { ($log -join "`n") -match "Teamflow is running" }
   Check "running v0.2.0" { WaitVersion "0.2.0" 30 }
+  Check "printed the one-time setup link" { ($log -join "`n") -match "/setup\?code=[A-Z2-9]{4}-[A-Z2-9]{4}" }
   Check "secrets generated" { (Get-Content "$root\.env") -match '^JWT_SECRET=[0-9a-f]{64}$' -and (Get-Content "$root\.env") -match '^TEAMFLOW_SECRETS_KEY=[0-9a-f]{64}$' }
   Check "uses its own Node 20 (not the PC's)" { (& "$root\node\node.exe" -v) -match '^v20\.' }
   Check ".env has no BOM" { ([IO.File]::ReadAllBytes("$root\.env")[0]) -ne 0xEF }
@@ -141,9 +142,12 @@ try {
 
   Section "In-app update through the server (as the Update button does)"
   $email = "admin-$(Get-Random)@example.test"
-  $reg = Invoke-RestMethod -Method Post -Uri "http://127.0.0.1:$Port/auth/register" -ContentType "application/json" -Body (@{ email = $email; name = "Admin"; password = "correct-horse-battery" } | ConvertTo-Json)
+  # A fresh server makes its first account (the instance admin) on /setup with the setup code.
+  $code = (Get-Content "$root\data\setup-code" -TotalCount 1).Trim()
+  $reg = Invoke-RestMethod -Method Post -Uri "http://127.0.0.1:$Port/auth/setup/admin" -ContentType "application/json" -Body (@{ code = $code; email = $email; name = "Admin"; password = "correct-horse-battery" } | ConvertTo-Json)
   $hdr = @{ Authorization = "Bearer $($reg.token)" }
-  $team = (Invoke-RestMethod -Uri "http://127.0.0.1:$Port/teams" -Headers $hdr).teams[0].id
+  $team = (Invoke-RestMethod -Method Post -Uri "http://127.0.0.1:$Port/teams" -Headers $hdr -ContentType "application/json" -Body '{"name":"Test","key":"TST"}').team.id
+  Check "setup code is gone once the admin exists" { -not (Test-Path "$root\data\setup-code") }
   $st = (Invoke-RestMethod -Uri "http://127.0.0.1:$Port/teams/$team/server/maintenance" -Headers $hdr).status
   Check "maintenance is on for Windows (no 'Linux only')" { $st.enabled -eq $true }
   Check "the update script is the release's update.ps1" { $st.updateScript -like "*current\deploy\windows\update.ps1" }
