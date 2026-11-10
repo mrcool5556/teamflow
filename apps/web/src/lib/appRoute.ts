@@ -77,11 +77,14 @@ export function planPath(teamKey: string | null) {
   return `${teamBasePath(teamKey)}/plan`;
 }
 
-export type AdminSection = "overview" | "spaces" | "updates" | "bot" | "help" | "defaults";
+export type AdminSection =
+  "overview" | "spaces" | "people" | "site" | "updates" | "bot" | "help" | "defaults";
 
 export const ADMIN_SECTIONS: AdminSection[] = [
   "overview",
   "spaces",
+  "people",
+  "site",
   "updates",
   "bot",
   "help",

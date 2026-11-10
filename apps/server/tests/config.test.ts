@@ -19,6 +19,8 @@ describe("config", () => {
     expect(config.trustProxy).toBe(false);
     expect(config.inviteOnly).toBe(false);
     expect(config.smtp).toBeNull();
+    expect(config.siteName).toBeNull();
+    expect(config.envSet).toEqual({ publicUrl: false, inviteOnly: false, siteName: false });
     expect(config.secretsKey).toBeNull();
     expect(config.botConfigKey).toBeNull();
     expect(config.maintenance.enabled).toBe(false);
@@ -56,6 +58,7 @@ describe("config", () => {
     expect(config.authRateLimit).toBe(42);
     expect(config.trustProxy).toBe(true);
     expect(config.inviteOnly).toBe(true);
+    expect(config.envSet).toEqual({ publicUrl: true, inviteOnly: true, siteName: false });
     expect(config.maintenance.sudo).toBe(false);
     expect(config.instanceAdminEmails).toEqual(["admin@example.com", "other@example.com"]);
     expect(config.attachments.defaultBytes).toBe(1024);

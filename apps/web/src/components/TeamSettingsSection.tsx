@@ -175,7 +175,7 @@ export function TeamSettingsSection({
     onMessage(null);
     try {
       await client.removeTeamMember(teamId, member.id);
-      onMessage(`${member.name} removed from the team.`);
+      onMessage(`${member.name} removed from the Flow.`);
       await refreshMembers(teamId);
     } catch (err) {
       onMessage(errorMessage(err, "Failed to remove member"), "error");
@@ -188,7 +188,7 @@ export function TeamSettingsSection({
     const ok = await confirm({
       title: `Leave ${teamName}?`,
       message: "You can rejoin later with an invite link. Your personal board is not deleted.",
-      confirmLabel: "Leave team",
+      confirmLabel: "Leave Flow",
       danger: true,
     });
     if (!ok) return;
@@ -199,7 +199,7 @@ export function TeamSettingsSection({
       onMessage(`You left ${teamName}.`);
       onTeamLeft?.(teamId);
     } catch (err) {
-      onMessage(errorMessage(err, "Failed to leave team"), "error");
+      onMessage(errorMessage(err, "Failed to leave the Flow"), "error");
     } finally {
       setLeavingTeam(false);
     }
@@ -208,9 +208,9 @@ export function TeamSettingsSection({
   async function deleteCurrentTeam() {
     const label = `${teamKey} — ${teamName}`;
     const ok = await confirm({
-      title: `Delete team "${label}"?`,
-      message: "All rows, columns, and issues for this team will be removed.",
-      confirmLabel: "Delete team",
+      title: `Delete Flow "${label}"?`,
+      message: "All rows, columns, and issues for this Flow will be removed.",
+      confirmLabel: "Delete Flow",
       danger: true,
     });
     if (!ok) return;
@@ -229,7 +229,7 @@ export function TeamSettingsSection({
       onMessage(`Deleted ${label}.`);
       onTeamDeleted?.(teamId);
     } catch (err) {
-      onMessage(errorMessage(err, "Failed to delete team"), "error");
+      onMessage(errorMessage(err, "Failed to delete the Flow"), "error");
     } finally {
       setDeletingTeam(false);
     }
@@ -244,14 +244,14 @@ export function TeamSettingsSection({
       const { team, alreadyMember } = await client.acceptInvite(token);
       onMessage(
         alreadyMember
-          ? `You are already on ${team.name}.`
-          : `Joined ${team.key} — ${team.name}. Switch teams from the header.`,
+          ? `You're already in the Flow ${team.name}.`
+          : `You joined the Flow ${team.key} — ${team.name}. Switch Flows from the header.`,
       );
       setJoinToken("");
       onTeamJoined?.(team.id);
       await refreshMembers(team.id);
     } catch (err) {
-      onMessage(errorMessage(err, "Failed to join team"), "error");
+      onMessage(errorMessage(err, "Failed to join the Flow"), "error");
     } finally {
       setJoining(false);
     }
@@ -286,18 +286,18 @@ export function TeamSettingsSection({
               <li>Run backups and install updates</li>
             ) : null}
             {permissions.permissions.includes("team.data.transfer") ? (
-              <li>Export and import team board bundles</li>
+              <li>Export and import Flow board bundles</li>
             ) : null}
             {permissions.permissions.length === 1 &&
             permissions.permissions[0] === "team.members.view" ? (
-              <li>View team members only</li>
+              <li>View Flow members only</li>
             ) : null}
           </ul>
         </section>
       ) : null}
 
       <section className="settings-section">
-        <h3>Team members</h3>
+        <h3>Members</h3>
         <p className="settings-copy">
           People who can view and edit <strong>{teamName}</strong>.
         </p>
@@ -355,7 +355,7 @@ export function TeamSettingsSection({
         <section className="settings-section">
           <h3>Invite link</h3>
           <p className="settings-copy">
-            Share a link so someone can join this team. Links expire after 30 days. New links are
+            Share a link so someone can join this Flow. Links expire after 30 days. New links are
             single-use by default.
           </p>
           <label className="settings-checkbox">
@@ -446,7 +446,7 @@ export function TeamSettingsSection({
 
       {canDeleteTeam ? (
         <section className="settings-section settings-danger-zone">
-          <h3>Delete team</h3>
+          <h3>Delete Flow</h3>
           <p className="settings-copy">
             Permanently remove{" "}
             <strong>
@@ -466,10 +466,10 @@ export function TeamSettingsSection({
       ) : null}
 
       <section className="settings-section">
-        <h3>Join a team</h3>
+        <h3>Join a Flow</h3>
         <p className="settings-copy">
           Paste an invite link or token from a teammate. You keep your personal board — this adds
-          another team to your account.
+          another Flow to your account.
         </p>
         <label>
           Invite link or token
@@ -484,7 +484,7 @@ export function TeamSettingsSection({
           disabled={joining || !joinToken.trim()}
           onClick={() => void joinWithToken()}
         >
-          {joining ? "Joining…" : "Join team"}
+          {joining ? "Joining…" : "Join Flow"}
         </button>
       </section>
     </>

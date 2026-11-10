@@ -17,7 +17,11 @@ export type ApiErrorCode =
   | "service_unavailable"
   | "space_storage_full"
   | "server_storage_low"
-  | "free_space_limit";
+  | "free_space_limit"
+  | "setting_set_in_env"
+  | "setup_required"
+  | "setup_done"
+  | "setup_code_invalid";
 
 export const ERROR_CODES: Record<number, ApiErrorCode> = {
   400: "bad_request",

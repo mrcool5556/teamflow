@@ -26,9 +26,10 @@ import { getUploadDir, hardDeleteStoredFile } from "./attachments.js";
 import { abortUploadSession } from "./chunkedUpload.js";
 import { readDiskSpace } from "./disk.js";
 import { getDiscordBotServiceStatus } from "./discordBotService.js";
-import { badRequest, notFound } from "./errors.js";
+import { ApiError, badRequest, notFound } from "./errors.js";
 import { getMaintenanceStatus } from "./maintenance.js";
 import { getSpaceSettings } from "./spaceSettings.js";
+import { getPublicUrl } from "./siteSettings.js";
 import {
   asSpaceType,
   getAllSpaceUsage,
@@ -42,7 +43,7 @@ const DAY_MS = 24 * 60 * 60 * 1000;
 
 /* ---------- server and disk (local checks only) ---------- */
 
-function detectSupervisor(): { supervisor: ServerSupervisor; serviceName: string | null } {
+export function detectSupervisor(): { supervisor: ServerSupervisor; serviceName: string | null } {
   if (process.env.INVOCATION_ID) {
     // systemd puts each service in its own cgroup, named after the unit.
     let serviceName: string | null = null;
@@ -72,7 +73,7 @@ function serverInfo(version: string, commitShort: string | null): InstanceServer
     startedAt: startedAt.toISOString(),
     uptimeSec: Math.round(process.uptime()),
     listen: { host: config.host, port: config.port },
-    publicUrl: config.publicUrl,
+    publicUrl: getPublicUrl(),
     supervisor,
     serviceName,
     production: config.isProduction,
@@ -219,7 +220,7 @@ export function collectFixes(input: {
         id: "caps-exceed-disk",
         severity: "info",
         title: "Caps add up to more than the free disk",
-        detail: `Spaces could still upload ${formatStorageBytes(unusedCaps)}; ${formatStorageBytes(disk.freeBytes)} is free. The floor still protects the server.`,
+        detail: `Flows could still upload ${formatStorageBytes(unusedCaps)}; ${formatStorageBytes(disk.freeBytes)} is free. The floor still protects the server.`,
       });
     }
   }
@@ -229,7 +230,7 @@ export function collectFixes(input: {
     add({
       id: "spaces-full",
       severity: "info",
-      title: `${full.length} space${full.length === 1 ? " is" : "s are"} full`,
+      title: `${full.length} Flow${full.length === 1 ? " is" : "s are"} full`,
       detail: `${full.map((space) => space.name).join(", ")}: uploads are paused there until files are removed or the cap is raised.`,
     });
   }
@@ -238,9 +239,10 @@ export function collectFixes(input: {
     add({
       id: "public-url-unset",
       severity: "warn",
-      title: "PUBLIC_URL still points at localhost",
-      detail:
-        "Password-reset links and the Discord bot use it. Set PUBLIC_URL in .env and restart.",
+      title: "The public address still points at localhost",
+      detail: config.envSet.publicUrl
+        ? "Password-reset links, invites and the Discord bot use it. PUBLIC_URL in .env sets it: change it there and restart."
+        : "Password-reset links, invites and the Discord bot use it. Set it on Site & email.",
     });
   }
   if (server.production && server.supervisor === "none") {
@@ -373,8 +375,9 @@ export async function getInstanceOverview(db: Db): Promise<InstanceOverviewPubli
 /** Ask PUBLIC_URL/health from the server itself (proxy, DNS and TLS in the path). */
 export async function checkPublicUrl(
   fetchImpl: typeof fetch = fetch,
+  address: string = getPublicUrl(),
 ): Promise<PublicUrlCheckPublic> {
-  const url = `${config.publicUrl}/health`;
+  const url = `${address}/health`;
   const started = Date.now();
   try {
     const res = await fetchImpl(url, { signal: AbortSignal.timeout(5000), redirect: "manual" });
@@ -406,7 +409,7 @@ function capLabel(capBytes: number | null) {
 function getSpaceRaw(db: Db, teamId: string) {
   const row = db.$client.prepare(`${SPACE_SELECT} WHERE t.id = ?`).get(teamId) as
     SpaceRowRaw | undefined;
-  if (!row) throw notFound("Space not found");
+  if (!row) throw notFound("Flow not found");
   return row;
 }
 
@@ -499,7 +502,7 @@ export function createSpace(db: Db, actorId: string, input: CreateSpaceInput) {
         actorId,
         kind: "created",
         createdAt: new Date().toISOString(),
-        detail: `${input.spaceType === "free" ? "Free" : "Admin"} space for ${owner.name}, cap ${capLabel(storageCapBytes)}`,
+        detail: `${input.spaceType === "free" ? "Free" : "Admin"} Flow for ${owner.name}, cap ${capLabel(storageCapBytes)}`,
       })
       .run();
     return created;
@@ -586,17 +589,79 @@ export async function cancelSpaceUploads(db: Db, actorId: string, teamId: string
 
 /* ---------- users (owner picker) ---------- */
 
-export function listInstanceUsers(db: Db, query: string | undefined): InstanceUserPublic[] {
+type InstanceUserRow = Omit<InstanceUserPublic, "isInstanceAdmin" | "adminFromEnv"> & {
+  isInstanceAdmin: number;
+};
+
+const INSTANCE_USER_COLUMNS = `u.id, u.name, u.email, u.created_at AS createdAt,
+  u.is_instance_admin AS isInstanceAdmin,
+  (SELECT COUNT(*) FROM teams t WHERE t.space_owner_id = u.id AND t.space_type = 'free') AS freeSpaces,
+  (SELECT COUNT(*) FROM team_members m WHERE m.user_id = u.id) AS teamCount`;
+
+function toInstanceUser(row: InstanceUserRow): InstanceUserPublic {
+  return {
+    ...row,
+    isInstanceAdmin: row.isInstanceAdmin === 1,
+    adminFromEnv: config.instanceAdminEmails.includes(row.email.toLowerCase()),
+  };
+}
+
+/** Accounts for the owner picker and the People panel (name or email search). */
+export function listInstanceUsers(
+  db: Db,
+  query: string | undefined,
+  limit = 50,
+): InstanceUserPublic[] {
   const like = `%${(query ?? "").trim().toLowerCase()}%`;
   const rows = db.$client
     .prepare(
-      `SELECT u.id, u.name, u.email, u.is_instance_admin AS isInstanceAdmin,
-         (SELECT COUNT(*) FROM teams t WHERE t.space_owner_id = u.id AND t.space_type = 'free') AS freeSpaces
+      `SELECT ${INSTANCE_USER_COLUMNS}
        FROM users u WHERE lower(u.name) LIKE ? OR lower(u.email) LIKE ?
-       ORDER BY u.name LIMIT 50`,
+       ORDER BY u.name LIMIT ?`,
     )
-    .all(like, like) as (Omit<InstanceUserPublic, "isInstanceAdmin"> & {
-    isInstanceAdmin: number;
-  })[];
-  return rows.map((row) => ({ ...row, isInstanceAdmin: row.isInstanceAdmin === 1 }));
+    .all(like, like, limit) as InstanceUserRow[];
+  return rows.map(toInstanceUser);
+}
+
+function getInstanceUser(db: Db, userId: string): InstanceUserPublic {
+  const row = db.$client
+    .prepare(`SELECT ${INSTANCE_USER_COLUMNS} FROM users u WHERE u.id = ?`)
+    .get(userId) as InstanceUserRow | undefined;
+  if (!row) throw notFound("User not found");
+  return toInstanceUser(row);
+}
+
+/**
+ * Make someone a server admin or stop them being one. Refused for the last server admin (the
+ * page would lock everyone out) and for accounts listed in TEAMFLOW_INSTANCE_ADMINS (login would
+ * make them admin again).
+ */
+export function setInstanceAdmin(db: Db, userId: string, isInstanceAdmin: boolean) {
+  const user = getInstanceUser(db, userId);
+  if (user.isInstanceAdmin === isInstanceAdmin) return user;
+  if (!isInstanceAdmin) {
+    if (user.adminFromEnv) {
+      throw new ApiError(
+        409,
+        `${user.email} is listed in TEAMFLOW_INSTANCE_ADMINS in .env, which makes them admin at every login. Remove it there first.`,
+        "setting_set_in_env",
+        { variable: "TEAMFLOW_INSTANCE_ADMINS" },
+      );
+    }
+    const admins = Number(
+      (
+        db.$client.prepare("SELECT COUNT(*) AS n FROM users WHERE is_instance_admin = 1").get() as {
+          n: number;
+        }
+      ).n,
+    );
+    if (admins <= 1) {
+      throw new ApiError(409, "This is the last server admin. Make someone else admin first.");
+    }
+  }
+  db.update(schema.users)
+    .set({ isInstanceAdmin: isInstanceAdmin ? 1 : 0 })
+    .where(eq(schema.users.id, userId))
+    .run();
+  return getInstanceUser(db, userId);
 }

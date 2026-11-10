@@ -5,7 +5,7 @@ import { schema } from "@teamflow/db";
 import { getPublicBaseUrl, isSmtpConfigured, sendPasswordResetEmail } from "./mail.js";
 import { hashPassword } from "./auth.js";
 import { config } from "../config.js";
-import { badRequest } from "./errors.js";
+import { badRequest, notFound } from "./errors.js";
 
 const RESET_TTL_MS = 60 * 60 * 1000;
 
@@ -34,13 +34,8 @@ function resetResponse() {
   return { message: isSmtpConfigured() ? GENERIC_MESSAGE : NO_SMTP_MESSAGE };
 }
 
-export async function requestPasswordReset(db: Db, email: string) {
-  const [user] = await db.select().from(schema.users).where(eq(schema.users.email, email)).limit(1);
-
-  if (!user) {
-    return resetResponse();
-  }
-
+/** A fresh one-hour reset link for the user; any older unused link stops working. */
+async function issueResetToken(db: Db, userId: string) {
   const token = randomBytes(32).toString("base64url");
   const tokenHash = hashResetToken(token);
   const expiresAt = new Date(Date.now() + RESET_TTL_MS).toISOString();
@@ -49,19 +44,39 @@ export async function requestPasswordReset(db: Db, email: string) {
     .update(schema.passwordResetTokens)
     .set({ usedAt: new Date().toISOString() })
     .where(
-      and(
-        eq(schema.passwordResetTokens.userId, user.id),
-        isNull(schema.passwordResetTokens.usedAt),
-      ),
+      and(eq(schema.passwordResetTokens.userId, userId), isNull(schema.passwordResetTokens.usedAt)),
     );
 
-  await db.insert(schema.passwordResetTokens).values({
-    userId: user.id,
-    tokenHash,
-    expiresAt,
-  });
+  await db.insert(schema.passwordResetTokens).values({ userId, tokenHash, expiresAt });
+  return { resetUrl: buildResetUrl(token), expiresAt };
+}
 
-  const resetUrl = buildResetUrl(token);
+/**
+ * Server admin page → People → Send reset link. Emails it when email is set up; the link is
+ * always returned too, so the admin can pass it on when email is not set up (or did not arrive).
+ */
+export async function issuePasswordResetForAdmin(db: Db, userId: string) {
+  const [user] = await db.select().from(schema.users).where(eq(schema.users.id, userId)).limit(1);
+  if (!user) throw notFound("User not found");
+  const { resetUrl, expiresAt } = await issueResetToken(db, user.id);
+  let emailed = false;
+  let emailError: string | null = null;
+  try {
+    emailed = await sendPasswordResetEmail(user.email, resetUrl);
+  } catch (err) {
+    emailError = err instanceof Error ? err.message : String(err);
+  }
+  return { url: resetUrl, expiresAt, emailed, emailError };
+}
+
+export async function requestPasswordReset(db: Db, email: string) {
+  const [user] = await db.select().from(schema.users).where(eq(schema.users.email, email)).limit(1);
+
+  if (!user) {
+    return resetResponse();
+  }
+
+  const { resetUrl } = await issueResetToken(db, user.id);
   const emailed = await sendPasswordResetEmail(user.email, resetUrl);
 
   if (!emailed) {

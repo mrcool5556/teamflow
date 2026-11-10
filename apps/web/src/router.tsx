@@ -6,11 +6,15 @@ import { AdminLayout } from "./routes/admin/AdminLayout";
 import { DefaultsPanel } from "./routes/admin/DefaultsPanel";
 import { HelpPanel } from "./routes/admin/HelpPanel";
 import { OverviewPanel } from "./routes/admin/OverviewPanel";
+import { PeoplePanel } from "./routes/admin/PeoplePanel";
+import { SitePanel } from "./routes/admin/SitePanel";
 import { SpaceDetailPanel } from "./routes/admin/SpaceDetailPanel";
 import { SpacesPanel } from "./routes/admin/SpacesPanel";
 import { AdminBotPanel, AdminUpdatesPanel } from "./routes/admin/ServerSections";
 import { AuthRoute } from "./routes/auth/AuthRoute";
 import { InviteRoute } from "./routes/auth/InviteRoute";
+import { SetupRoute } from "./routes/setup/SetupRoute";
+import { WelcomeRoute } from "./routes/welcome/WelcomeRoute";
 import { BoardShell } from "./routes/board/BoardShell";
 import { AppearancePanel } from "./routes/settings/AppearancePanel";
 import { DesignPanel } from "./routes/settings/DesignPanel";
@@ -49,6 +53,8 @@ const adminRoute: RouteObject = {
     { path: "overview", element: <OverviewPanel /> },
     { path: "spaces", element: <SpacesPanel /> },
     { path: "spaces/:spaceId", element: <SpaceDetailPanel /> },
+    { path: "people", element: <PeoplePanel /> },
+    { path: "site", element: <SitePanel /> },
     { path: "updates", element: <AdminUpdatesPanel /> },
     { path: "bot", element: <AdminBotPanel /> },
     { path: "help", element: <HelpPanel /> },
@@ -69,6 +75,10 @@ export const routes: RouteObject[] = [
       { path: "login", element: <AuthRoute mode="login" /> },
       { path: "register", element: <AuthRoute mode="register" /> },
       { path: "reset", element: <AuthRoute mode="reset" /> },
+      // First-time setup; closed once the server has an account (docs/SETUP.md).
+      { path: "setup/:step?", element: <SetupRoute /> },
+      // After sign-up, or with no Flow: Create a Flow / Join a Flow.
+      { path: "welcome/:mode?", element: <WelcomeRoute /> },
       {
         element: <BoardShell />,
         children: [

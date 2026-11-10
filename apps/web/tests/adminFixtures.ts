@@ -3,6 +3,7 @@ import {
   type InstanceOverviewPublic,
   type InstanceSpaceDetailPublic,
   type InstanceSpacePublic,
+  type SignupSettingsPublic,
   type SpaceSettingsPublic,
   type SpaceStoragePublic,
 } from "@teamflow/core";
@@ -191,6 +192,7 @@ export function adminRoutes(
     spaces?: InstanceSpacePublic[];
     detail?: InstanceSpaceDetailPublic;
     settings?: SpaceSettingsPublic;
+    signup?: SignupSettingsPublic;
   } = {},
 ): FakeRoute[] {
   const settings = () =>
@@ -232,6 +234,18 @@ export function adminRoutes(
     ],
     ["GET", /^\/instance\/settings$/, () => ({ settings: settings() })],
     [
+      "GET",
+      /^\/instance\/signup$/,
+      () => ({ signup: (state.signup ??= { inviteOnly: false, source: "default" }) }),
+    ],
+    [
+      "PATCH",
+      /^\/instance\/signup$/,
+      ({ body }) => ({
+        signup: (state.signup = { ...(body as { inviteOnly: boolean }), source: "saved" }),
+      }),
+    ],
+    [
       "PATCH",
       /^\/instance\/settings$/,
       ({ body }) => ({ settings: (state.settings = { ...settings(), ...(body as object) }) }),
@@ -246,14 +260,20 @@ export function adminRoutes(
             name: "Ada",
             email: "ada@example.test",
             isInstanceAdmin: true,
+            adminFromEnv: false,
             freeSpaces: 0,
+            teamCount: 2,
+            createdAt: "2026-10-01T10:00:00.000Z",
           },
           {
             id: "user-2",
             name: "Jules",
             email: "jules@example.test",
             isInstanceAdmin: false,
+            adminFromEnv: false,
             freeSpaces: 2,
+            teamCount: 2,
+            createdAt: "2026-10-02T10:00:00.000Z",
           },
         ],
       }),

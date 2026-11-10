@@ -1,5 +1,5 @@
 import { and, eq, inArray, sql } from "drizzle-orm";
-import { SPACE_ERROR_CODES, type SpaceType } from "@teamflow/core";
+import { SPACE_ERROR_CODES, type SpaceAllowancePublic, type SpaceType } from "@teamflow/core";
 import type { Db, DbExecutor } from "@teamflow/db";
 import { schema } from "@teamflow/db";
 import { userHasTeamPermission } from "./permissions.js";
@@ -80,7 +80,7 @@ export function createTeamWithOwner(
   return db.select().from(schema.teams).where(eq(schema.teams.id, teamId)).get()!;
 }
 
-/** Free spaces counting against `userId` (their General included). */
+/** Free spaces (free Flows) counting against `userId` (an older account's General included). */
 export function countOwnedFreeSpaces(db: DbExecutor, userId: string) {
   const row = db
     .select({ count: sql<number>`count(*)` })
@@ -91,10 +91,10 @@ export function countOwnedFreeSpaces(db: DbExecutor, userId: string) {
 }
 
 /**
- * The space a user's own New team (or registration's General) gets. Instance admins make admin
- * spaces with no cap; everyone else makes free spaces with the free-space cap, at most
- * `freeSpacesPerUser` of them. `firstSpace` (registration) is never refused, so signing up works
- * even with a limit of 0.
+ * The space a Flow a user makes for themselves gets (Create a Flow, New Flow). Instance admins
+ * make admin spaces with no cap; everyone else makes free spaces with the free-space cap, at most
+ * `freeSpacesPerUser` of them. A user's first free space is never refused, so a new account can
+ * always start even with a limit of 0; `firstSpace` forces that exemption.
  */
 export function spaceForUserCreatedTeam(
   db: DbExecutor,
@@ -106,11 +106,11 @@ export function spaceForUserCreatedTeam(
   const settings = getSpaceSettings(db);
   if (!input.firstSpace) {
     const owned = countOwnedFreeSpaces(db, input.userId);
-    if (owned >= settings.freeSpacesPerUser) {
+    if (owned > 0 && owned >= settings.freeSpacesPerUser) {
       throw new ApiError(
         409,
-        `You already have ${owned} free space${owned === 1 ? "" : "s"}, the most allowed. ` +
-          "Delete one you no longer need, or ask a server admin to make a space for you.",
+        `You already own ${owned} free Flow${owned === 1 ? "" : "s"}, the most allowed. ` +
+          "Delete one you no longer need, or ask a server admin to make one for you.",
         SPACE_ERROR_CODES.freeSpaceLimit,
         { owned, limit: settings.freeSpacesPerUser },
       );
@@ -120,6 +120,22 @@ export function spaceForUserCreatedTeam(
     spaceType: "free",
     storageCapBytes: settings.freeSpaceCapBytes,
     spaceOwnerId: input.userId,
+  };
+}
+
+/** How many free spaces the user owns and may still make (Create a Flow). */
+export function getSpaceAllowance(
+  db: DbExecutor,
+  input: { userId: string; isInstanceAdmin: boolean },
+): SpaceAllowancePublic {
+  const settings = getSpaceSettings(db);
+  const owned = countOwnedFreeSpaces(db, input.userId);
+  return {
+    unlimited: input.isInstanceAdmin,
+    owned,
+    limit: settings.freeSpacesPerUser,
+    capBytes: settings.freeSpaceCapBytes,
+    canCreate: input.isInstanceAdmin || owned === 0 || owned < settings.freeSpacesPerUser,
   };
 }
 

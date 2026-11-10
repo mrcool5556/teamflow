@@ -12,7 +12,7 @@ export function GeneralPanel() {
     <div className="settings-panel">
       <header className="settings-panel-header">
         <h2>General</h2>
-        <p className="settings-copy settings-lead">Create another team.</p>
+        <p className="settings-copy settings-lead">Create another Flow.</p>
         <p className="settings-hint">
           Looks, board size and sharing your look are under{" "}
           <Link to="../appearance">Appearance</Link>.

@@ -50,7 +50,7 @@ notepad .env                        # paste it as JWT_SECRET=...; set PUBLIC_URL
 .\deploy\windows\start.ps1
 ```
 
-Open <http://localhost:3000> (or your port) and **register**. The first account becomes the instance admin; the **Server admin** page is in the account menu.
+Open the setup link the server prints in its window (`http://localhost:3000/setup?code=…`; the code is also in `data\setup-code`) and create the instance admin account ([docs/SETUP.md](../../docs/SETUP.md)). The **Server admin** page is in the account menu.
 
 At startup the server loads `TEAMFLOW_ENV_FILE` if set, else `.env` in the app folder if it exists. Variables already in the process environment always win over the file. `start.ps1` points `TEAMFLOW_ENV_FILE` at the repo's `.env` and sets `SERVE_WEB=true`; anything you set in the session first (for example `$env:PORT`) overrides the file. Stop it with Ctrl+C.
 

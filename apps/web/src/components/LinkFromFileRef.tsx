@@ -37,7 +37,7 @@ export function LinkFromFileRef({
     try {
       const result = await client.resolveRef(teamId, ref);
       if (result.resolved.type !== "file" || !result.file) {
-        setError("File ref not found on this team.");
+        setError("File ref not found in this Flow.");
         return;
       }
       await onLinkFileId(result.file.fileId);

@@ -27,17 +27,17 @@ Do these on every production install, and once when upgrading an install from be
 1. **Node 20** on the server (`node -v` → `v20.x`). `better-sqlite3` is built for Node 20; other majors fail at start.
 2. **`JWT_SECRET`**: a real random value, at least 16 characters (`openssl rand -hex 32`). The server **refuses to start** while it is unset, short, or one of the shipped placeholders (`change-me-...`, `dev-secret`).
 3. **`TEAMFLOW_SECRETS_KEY`** (recommended): a second random value that encrypts Discord secrets at rest. Same rules; when unset, `JWT_SECRET` is used.
-4. **`PUBLIC_URL`**: the address users open, e.g. `https://tasks.example.com`. Used for invite and reset links and as the allowed browser origin.
+4. **Public address**: the address users open, e.g. `https://tasks.example.com`. Used for invite and reset links and as the allowed browser origin. Set it in setup step 2 or on Server admin → Site & email (no restart); `PUBLIC_URL` in `.env` still works and then wins.
 5. **`CORS_ORIGINS`**: only if the web UI is served from a different origin than `PUBLIC_URL` (comma-separated). Default is same-origin only.
 6. **Behind a reverse proxy:** `TEAMFLOW_TRUST_PROXY=1`, so login rate limiting sees real client IPs.
 7. **Setup B only:** run `sudo bash /opt/teamflow/deploy/proxmox-lxc/setup-maintenance-sudo.sh` once after deploying. It installs root-owned copies of the backup, update and Discord bot scripts in `/usr/local/lib/teamflow/` and the only sudoers rule the app user gets. Without it Settings → Updates and the Discord bot service buttons fail. `install.sh` and `sudo update` run it too, but ignore its errors, so check the output.
-8. **Admin account:** there is **no demo user**. The first account registered on a fresh install becomes the **instance admin** (the **Server admin** page in the account menu, Updates, Discord bot secrets and service, spaces). On an upgraded install the oldest account is promoted once. To grant more, set `TEAMFLOW_INSTANCE_ADMINS=you@example.com,other@example.com` (applied at their next login).
+8. **Admin account:** there is **no demo user**. On a fresh install, open the setup link the installer prints or the server logs (`/setup?code=…`, see [SETUP.md](SETUP.md)) and create the **instance admin** account there (the **Server admin** page in the account menu, Updates, Discord bot secrets and service, Flows). Ordinary sign-up opens after that. On an upgraded install the oldest account is promoted once. To grant more, use Server admin → People, or set `TEAMFLOW_INSTANCE_ADMINS=you@example.com,other@example.com` (applied at their next login).
 9. **Trash purge:** issues in the trash are no longer purged at boot. Run `pnpm db:maintenance` now and then, or set `TEAMFLOW_DB_MAINTENANCE_NIGHTLY=true` (03:00 server time). See [DEPLOYMENT.md](DEPLOYMENT.md#schema-patches-and-data-maintenance).
-10. **SMTP** for password reset. Without it, reset links are only logged when `NODE_ENV=development`, so in production nobody can reset a password.
+10. **Email** for password reset: setup step 3 or Server admin → Site & email (with a test send), or `SMTP_*` in `.env`. Without it, an admin hands out reset links from Server admin → People.
 11. **`.env` permissions** on Linux: `chmod 600`, owned by `teamflow`.
 12. **Disk and spaces:** keep more than **2 GB** free on the disk that holds `data/uploads/`; below that every upload in every space is refused until room is made (`TEAMFLOW_MIN_FREE_DISK_BYTES`, `0` turns the floor off). Each user may create up to 3 free spaces with 1 GB of uploads each; their own **General** counts. Review these in Server admin → Space defaults ([SPACES.md](SPACES.md)).
 
-Useful but optional: `NODE_ENV=production` (turns off the localhost dev origins in CORS), `TEAMFLOW_INVITE_ONLY=true`.
+Useful but optional: `NODE_ENV=production` (turns off the localhost dev origins in CORS). Invite-only sign-up is a switch in setup step 4 and on Server admin → Flow defaults & sign-up (`TEAMFLOW_INVITE_ONLY=true` still works).
 
 **How `.env` is read.** At startup the server loads `TEAMFLOW_ENV_FILE` if set, else `.env` in the app folder if it exists. Variables already in the process environment always win over the file. On Setup B systemd also supplies it (`EnvironmentFile=/opt/teamflow/.env`), so nothing changes there; on Setup A `start.ps1` and the NSSM service point the server at it.
 
@@ -105,7 +105,7 @@ cd D:\teamflow
 
 The server loads `.env` (set `JWT_SECRET` there first; it refuses to start without one). Variables set in the session override the file.
 
-Open <http://localhost:3000> and register; the first account becomes the instance admin.
+Open the setup link printed in the server log (`http://localhost:3000/setup?code=…`) and create the instance admin account ([SETUP.md](SETUP.md)).
 
 ### Update
 
@@ -152,16 +152,16 @@ More: [deploy/windows/README.md](../deploy/windows/README.md)
 
    `install.sh` installs Node 20 and pnpm, creates the `teamflow` user, builds, runs `pnpm db:migrate` (no demo data), installs the systemd unit, runs `setup-maintenance-sudo.sh`, links `teamflow-smtp` and offers SMTP setup. (It also installs a PostgreSQL package that Teamflow does not use.)
 
-3. Edit `/opt/teamflow/.env` (the service will not start with the placeholder secret):
+3. Make sure `/opt/teamflow/.env` has real secrets (the service will not start with the placeholder):
 
    ```bash
-   nano /opt/teamflow/.env       # JWT_SECRET, TEAMFLOW_SECRETS_KEY, PUBLIC_URL, CORS_ORIGINS if needed
+   nano /opt/teamflow/.env       # JWT_SECRET, TEAMFLOW_SECRETS_KEY, CORS_ORIGINS if needed
    chmod 600 /opt/teamflow/.env
    systemctl restart teamflow
    curl http://localhost:3000/health
    ```
 
-4. Open the site and register the first (admin) account.
+4. Open the setup link the installer prints, `http://<container-ip>:3000/setup?code=XXXX-XXXX`, and follow the five steps ([SETUP.md](SETUP.md)). Lost the link? The code is in `/opt/teamflow/data/setup-code` and the service log (`journalctl -u teamflow | grep "Setup code"`).
 
 ### SMTP (password reset emails)
 
@@ -179,7 +179,7 @@ Use your provider's SMTP (no mail server is installed in the LXC):
 | Outlook / Microsoft 365 | `smtp.office365.com` | 587 |
 | SendGrid | `smtp.sendgrid.net` | 587 |
 
-Values go into `/opt/teamflow/.env` and the service restarts. Without SMTP, production servers log nothing usable for **Forgot password**.
+Values go into `/opt/teamflow/.env` and the service restarts. Simpler: set email on Server admin → Site & email (or setup step 3) with **Send a test to me**; no restart. A value in `.env` wins over the page. Without email, an admin sends reset links from Server admin → People.
 
 ### Update
 
@@ -210,9 +210,9 @@ Changing `JWT_SECRET` signs everyone out once. Unless `TEAMFLOW_SECRETS_KEY` was
 
 ## Inviting teammates
 
-1. Log in on your public `PUBLIC_URL` (not localhost).
-2. **Settings → Team → Invite link** → create a link (pick a role; you cannot invite above your own role).
-3. Send the link. They register, join, and bookmark the page.
+1. Log in on your public address (not localhost).
+2. **Settings → Flow → Invite link** → create a link (pick a role; you cannot invite above your own role).
+3. Send the link. They register and land straight on that Flow's board. Someone who signs up without a link gets the welcome page, where **Join a Flow** takes a pasted link or code.
 
 ---
 
@@ -220,8 +220,8 @@ Changing `JWT_SECRET` signs everyone out once. Unless `TEAMFLOW_SECRETS_KEY` was
 
 **Forgot password?** on the login screen:
 
-- With SMTP → the reset link is emailed.
-- Without SMTP → only logged when `NODE_ENV=development`.
+- With email set up → the reset link is emailed.
+- Without email → a server admin opens Server admin → People → **Send reset link** and passes the link on (it is also logged when `NODE_ENV=development`).
 
 A reset signs the user out everywhere. Details: [AUTH.md](AUTH.md#forgot-password)
 
@@ -234,7 +234,8 @@ Full list with comments: root [`.env.example`](../.env.example). The ones a prod
 | Variable | Required | Purpose |
 |----------|----------|---------|
 | `JWT_SECRET` | yes | Signs sessions; placeholders refused |
-| `PUBLIC_URL` | yes for a public host | Links in invites and emails; allowed CORS origin |
+| `PUBLIC_URL` | no | Links in invites and emails; allowed CORS origin. Can be set on Server admin → Site & email instead |
+| `TEAMFLOW_SITE_NAME` | no | Name on the login page, browser tab and emails (default Teamflow). Can be set on the admin page instead |
 | `TEAMFLOW_SECRETS_KEY` | recommended | Encrypts Discord secrets; falls back to `JWT_SECRET` |
 | `DATABASE_URL` | no | Default `file:./data/teamflow.db` (relative to the repo root) |
 | `SERVE_WEB` | set by installers | Serve the built web UI from the API port (also on with `NODE_ENV=production` when the build exists); `WEB_DIST` moves the build folder |
@@ -244,20 +245,22 @@ Full list with comments: root [`.env.example`](../.env.example). The ones a prod
 | `TEAMFLOW_TRUST_PROXY` | behind a proxy | Use `X-Forwarded-For` for rate limiting |
 | `TEAMFLOW_AUTH_RATE_LIMIT` | no | Login/register/forgot attempts per minute per IP (default 10) |
 | `TEAMFLOW_INSTANCE_ADMINS` | no | Emails that get the instance-admin flag at login |
-| `TEAMFLOW_INVITE_ONLY` | no | `true` = registration only through an invite |
+| `TEAMFLOW_INVITE_ONLY` | no | `true` = registration only through an invite. Can be set on the admin page instead |
 | `TEAMFLOW_MAINTENANCE_ENABLED` | Setup B | Enables Server admin → Updates (and Settings → Updates) |
 | `TEAMFLOW_APP_DIR`, `TEAMFLOW_BACKUP_DIR` | no | Checkout the scripts operate on (default: repo root), backup folder (default `/var/backups/teamflow`) |
 | `TEAMFLOW_BACKUP_SCRIPT`, `TEAMFLOW_UPDATE_SCRIPT`, `TEAMFLOW_DISCORD_BOT_SCRIPT` | leave unset | Defaults are the root-owned copies sudoers allows; a path into the checkout breaks sudo |
 | `TEAMFLOW_BUNDLE_MAX_ENTRIES`, `TEAMFLOW_BUNDLE_MAX_BYTES` | no | Team bundle import caps (5000 entries, 2 GB) |
 | `TEAMFLOW_DB_MAINTENANCE_NIGHTLY` | no | Nightly trash purge and data upkeep |
 | `TEAMFLOW_BOT_CONFIG_KEY` | Discord bot | Generated when bot credentials are saved |
-| `SMTP_HOST`, `SMTP_PORT`, `SMTP_SECURE`, `SMTP_USER`, `SMTP_PASS`, `SMTP_FROM` | for email reset | Provider settings |
+| `SMTP_HOST`, `SMTP_PORT`, `SMTP_SECURE`, `SMTP_USER`, `SMTP_PASS`, `SMTP_FROM` | no | Outgoing email (password resets). Can be set on the admin page instead |
 | `ATTACHMENT_MAX_*`, `UPLOAD_CHUNK_*`, `UPLOAD_DIR` | no | See [ATTACHMENTS.md](ATTACHMENTS.md) |
 | `TEAMFLOW_FREE_SPACE_CAP_BYTES`, `TEAMFLOW_FREE_SPACES_PER_USER`, `TEAMFLOW_MIN_FREE_DISK_BYTES` | no | Free-space cap (1 GB), free spaces per user (3), free-disk floor (2 GB). See [SPACES.md](SPACES.md) |
 | `PORT` / `HOST` | no | Default `3000` / `0.0.0.0` |
 | `NODE_ENV` | no | `production` drops the localhost dev origins; `development` allows a dev secret |
 
 Invalid values (e.g. `PORT=abc`) stop the server at start with a list of problems.
+
+The site name, public address, email and sign-up policy can also be set on the server admin page (stored in the database, used at once, no restart). A value set in `.env` always wins: the admin page shows it as "Set in .env" and won't change it. Leave them out of `.env` to manage them from the page.
 
 Discord bot and MCP have their own docs: [discord-bot.md](discord-bot.md), [MCP.md](MCP.md).
 

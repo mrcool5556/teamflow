@@ -14,7 +14,7 @@ cp .env.example .env
 docker compose up -d --build
 ```
 
-Open <http://localhost:3000> and register; the first account becomes the instance admin. No demo user is created unless you add `TEAMFLOW_SEED_DEMO=1` to `.env`.
+Open the setup link the server logs (`docker compose logs | grep "Setup code"`, link `http://localhost:3000/setup?code=…`) and create the instance admin account ([docs/SETUP.md](../../docs/SETUP.md)). No demo user is created unless you add `TEAMFLOW_SEED_DEMO=1` to `.env`.
 
 Requirements: Docker Engine with Compose v2, about 1 GB for the image build, and more than 2 GB free on the disk behind the `teamflow-data` volume (uploads pause below that; see [docs/SPACES.md](../../docs/SPACES.md)). The image builds `better-sqlite3` itself, so nothing else is needed on the host.
 

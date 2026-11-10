@@ -183,7 +183,7 @@ function CapTile({
         ...(typeChanged ? { spaceType: type } : {}),
         ...(capChanged ? { capBytes } : {}),
       });
-      onMessage(`Saved: ${type === "free" ? "free" : "admin"} space, cap ${capText(capBytes)}.`);
+      onMessage(`Saved: ${type === "free" ? "free" : "admin"} Flow, cap ${capText(capBytes)}.`);
     } catch (err) {
       onMessage(err instanceof Error ? err.message : "Could not save", "error");
     }
@@ -220,10 +220,10 @@ function CapTile({
       </fieldset>
       <p className="settings-field-hint">
         {type === "admin"
-          ? `Admin: does not count toward ${ownerName}'s free spaces.`
-          : `Free: counts toward ${ownerName}'s free spaces${space.ownerFreeSpaces !== null && settings ? ` (${space.ownerFreeSpaces} of ${settings.freeSpacesPerUser} now)` : ""}.`}
+          ? `Admin: does not count toward ${ownerName}'s free Flows.`
+          : `Free: counts toward ${ownerName}'s free Flows${space.ownerFreeSpaces !== null && settings ? ` (${space.ownerFreeSpaces} of ${settings.freeSpacesPerUser} now)` : ""}.`}
         {settings && type === "free" && space.spaceType !== "free" && cap.noLimit
-          ? ` With no cap set it gets the free-space default, ${formatStorageBytes(settings.freeSpaceCapBytes)}.`
+          ? ` With no cap set it gets the free Flow default, ${formatStorageBytes(settings.freeSpaceCapBytes)}.`
           : ""}
       </p>
       <div className="admin-tile-actions">
@@ -250,7 +250,7 @@ function CapTile({
   );
 }
 
-/** One space: usage breakdown, largest files, cap and type editing, history. */
+/** One Flow: usage breakdown, largest files, cap and type editing, history. */
 export function SpaceDetailPanel() {
   const navigate = useNavigate();
   const { adminSpaceId } = useAppRoute();
@@ -267,7 +267,7 @@ export function SpaceDetailPanel() {
       className="admin-link"
       onClick={() => navigate(adminPath(teamKey, "spaces"))}
     >
-      ← Spaces
+      ← Flows
     </button>
   );
 
@@ -276,7 +276,7 @@ export function SpaceDetailPanel() {
       <div className="settings-panel">
         {back}
         <p className="settings-hint settings-hint--warn" role="alert">
-          {query.error instanceof Error ? query.error.message : "Space not found."}
+          {query.error instanceof Error ? query.error.message : "Flow not found."}
         </p>
       </div>
     );

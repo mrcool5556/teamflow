@@ -110,7 +110,7 @@ export function LoginScreen({
     <div className="login-shell">
       {/* A real form, so Enter submits whichever step is showing. */}
       <form className="login-card" noValidate onSubmit={handleSubmit}>
-        <p className="eyebrow">TEAMFLOW</p>
+        <p className="eyebrow">{authConfig?.siteName ?? "Teamflow"}</p>
         <h1>
           {mode === "forgot"
             ? "Forgot password"
@@ -128,7 +128,7 @@ export function LoginScreen({
 
         {pendingInvite && mode !== "forgot" && mode !== "reset" ? (
           <p className="hint invite-login-hint">
-            You have a team invite — log in or register to join.
+            You have a Flow invite — log in or register to join.
           </p>
         ) : inviteOnly && mode === "register" ? (
           <p className="hint invite-login-hint">
@@ -271,9 +271,9 @@ export function LoginScreen({
           </button>
         )}
 
-        {mode === "login" ? (
+        {mode === "register" && !pendingInvite ? (
           <p className="hint">
-            New install? Register the first account; it becomes the instance admin.
+            After signing up you can create your own Flow, or join one with an invite link.
           </p>
         ) : null}
 

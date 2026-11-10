@@ -58,8 +58,22 @@ import type {
   InstanceSpaceDetailPublic,
   InstanceSpacePublic,
   InstanceUserPublic,
+  MailSettingsPublic,
+  PasswordResetIssuedPublic,
   PublicUrlCheckPublic,
+  SendTestMailInput,
+  SetupAdminInput,
+  SetupChecklistPublic,
+  SetupStatusPublic,
+  SignupSettingsPublic,
+  SiteSettingsAdminPublic,
+  SpaceAllowancePublic,
   SpaceSettingsPublic,
+  UpdateInstanceUserInput,
+  UpdateMailSettingsInput,
+  UpdateSetupProgressInput,
+  UpdateSignupSettingsInput,
+  UpdateSiteSettingsInput,
   SpaceStoragePublic,
   UpdateSpaceInput,
   UpdateSpaceSettingsInput,
@@ -175,6 +189,23 @@ export class TeamflowClient {
 
   getAuthConfig() {
     return this.request<AuthConfigPublic>("/auth/config");
+  }
+
+  /** How many free Flows the user owns and may still make. */
+  getSpaceAllowance() {
+    return this.request<{ allowance: SpaceAllowancePublic }>("/auth/space-allowance");
+  }
+
+  /** First-time setup (docs/SETUP.md). */
+  getSetupStatus() {
+    return this.request<{ setup: SetupStatusPublic }>("/auth/setup");
+  }
+
+  createSetupAdmin(input: SetupAdminInput) {
+    return this.request<{ user: UserPublic; token: string }>("/auth/setup/admin", {
+      method: "POST",
+      body: JSON.stringify(input),
+    });
   }
 
   requestPasswordReset(input: ForgotPasswordInput) {
@@ -912,8 +943,65 @@ export class TeamflowClient {
     return this.request<{ overview: InstanceOverviewPublic }>("/instance/overview");
   }
 
-  checkPublicUrl() {
-    return this.request<{ check: PublicUrlCheckPublic }>("/instance/checks/public-url");
+  /** Check the address in force, or `url` before saving it. */
+  checkPublicUrl(url?: string) {
+    const q = url ? `?url=${encodeURIComponent(url)}` : "";
+    return this.request<{ check: PublicUrlCheckPublic }>(`/instance/checks/public-url${q}`);
+  }
+
+  getSiteSettings() {
+    return this.request<{ site: SiteSettingsAdminPublic }>("/instance/site");
+  }
+
+  updateSiteSettings(input: UpdateSiteSettingsInput) {
+    return this.request<{ site: SiteSettingsAdminPublic }>("/instance/site", {
+      method: "PATCH",
+      body: JSON.stringify(input),
+    });
+  }
+
+  getMailSettings() {
+    return this.request<{ mail: MailSettingsPublic }>("/instance/mail");
+  }
+
+  updateMailSettings(input: UpdateMailSettingsInput) {
+    return this.request<{ mail: MailSettingsPublic }>("/instance/mail", {
+      method: "PUT",
+      body: JSON.stringify(input),
+    });
+  }
+
+  clearMailSettings() {
+    return this.request<{ mail: MailSettingsPublic }>("/instance/mail", { method: "DELETE" });
+  }
+
+  sendTestMail(input: SendTestMailInput = {}) {
+    return this.request<{ result: { ok: boolean; to: string; error: string | null } }>(
+      "/instance/mail/test",
+      { method: "POST", body: JSON.stringify(input) },
+    );
+  }
+
+  getSignupSettings() {
+    return this.request<{ signup: SignupSettingsPublic }>("/instance/signup");
+  }
+
+  updateSignupSettings(input: UpdateSignupSettingsInput) {
+    return this.request<{ signup: SignupSettingsPublic }>("/instance/signup", {
+      method: "PATCH",
+      body: JSON.stringify(input),
+    });
+  }
+
+  getSetupChecklist() {
+    return this.request<{ checklist: SetupChecklistPublic }>("/instance/setup-checklist");
+  }
+
+  updateSetupProgress(input: UpdateSetupProgressInput) {
+    return this.request<{ checklist: SetupChecklistPublic }>("/instance/setup-checklist", {
+      method: "PATCH",
+      body: JSON.stringify(input),
+    });
   }
 
   getSpaceSettings() {
@@ -927,9 +1015,28 @@ export class TeamflowClient {
     });
   }
 
-  listInstanceUsers(query?: string) {
-    const q = query ? `?q=${encodeURIComponent(query)}` : "";
+  listInstanceUsers(query?: string, limit?: number) {
+    const parts: string[] = [];
+    if (query) parts.push(`q=${encodeURIComponent(query)}`);
+    if (limit) parts.push(`limit=${limit}`);
+    const q = parts.length ? `?${parts.join("&")}` : "";
     return this.request<{ users: InstanceUserPublic[] }>(`/instance/users${q}`);
+  }
+
+  /** Make someone a server admin, or stop them being one (never the last). */
+  updateInstanceUser(userId: string, input: UpdateInstanceUserInput) {
+    return this.request<{ user: InstanceUserPublic }>(`/instance/users/${userId}`, {
+      method: "PATCH",
+      body: JSON.stringify(input),
+    });
+  }
+
+  /** A one-hour password reset link for someone; emailed when email is set up. */
+  issuePasswordResetLink(userId: string) {
+    return this.request<{ reset: PasswordResetIssuedPublic }>(
+      `/instance/users/${userId}/reset-link`,
+      { method: "POST", body: "{}" },
+    );
   }
 
   listSpaces() {

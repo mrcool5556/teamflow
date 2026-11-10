@@ -47,7 +47,7 @@ describe("space detail", () => {
     await waitFor(() =>
       expect(calls.find((c) => c.method === "PATCH")?.body).toEqual({ capBytes: 5 * GIB }),
     );
-    expect(await screen.findByText(/Saved: free space, cap 5.00 GB/)).toBeInTheDocument();
+    expect(await screen.findByText(/Saved: free Flow, cap 5.00 GB/)).toBeInTheDocument();
   });
 
   it("warns that a cap under current use blocks uploads but deletes nothing", async () => {
@@ -69,7 +69,7 @@ describe("space detail", () => {
     await user.click(within(capTile).getByRole("button", { name: "Admin" }));
     await user.click(within(capTile).getByRole("checkbox", { name: "No limit" }));
     expect(
-      within(capTile).getByText(/does not count toward Jules's free spaces/),
+      within(capTile).getByText(/does not count toward Jules's free Flows/),
     ).toBeInTheDocument();
     await user.click(within(capTile).getByRole("button", { name: "Save" }));
     await waitFor(() =>

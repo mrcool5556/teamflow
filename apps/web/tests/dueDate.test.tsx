@@ -50,7 +50,7 @@ async function openBoard(role: "owner" | "viewer" = "owner") {
   signIn(db);
   renderApp("/t/ENG");
   await screen.findByText("ENG issue 5");
-  await waitFor(() => expect(screen.getByLabelText("Workspace")).toBeEnabled());
+  await waitFor(() => expect(screen.getByLabelText("Flow")).toBeEnabled());
   return db;
 }
 

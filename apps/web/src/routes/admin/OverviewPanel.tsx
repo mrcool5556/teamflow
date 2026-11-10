@@ -4,12 +4,15 @@ import {
   formatStorageBytes,
   type InstanceOverviewPublic,
   type PublicUrlCheckPublic,
+  type SetupChecklistId,
 } from "@teamflow/core";
 import { client } from "../../api";
 import { adminPath, type AdminSection } from "../../lib/appRoute";
 import { formatTimestamp } from "../../lib/format";
 import { useInstanceOverviewQuery } from "../../queries/instance";
 import { useShell } from "../board/shellContext";
+import { SetupChecklist } from "../setup/SetupChecklist";
+import { CHECKLIST_LINKS } from "../setup/setupSteps";
 import { FIX_HEALTH, type Health } from "./adminHealth";
 import { howToForFix } from "./howTos";
 
@@ -206,7 +209,7 @@ function DiskTile({ overview }: { overview: InstanceOverviewPublic }) {
       )}
       <p className="admin-tile-note">
         Caps allocated: <strong>{formatStorageBytes(disk.allocatedCapBytes)}</strong> across{" "}
-        {disk.cappedSpaces} capped space{disk.cappedSpaces === 1 ? "" : "s"} · {disk.uncappedSpaces}{" "}
+        {disk.cappedSpaces} capped Flow{disk.cappedSpaces === 1 ? "" : "s"} · {disk.uncappedSpaces}{" "}
         with no limit ·{" "}
         {disk.floorBytes > 0 ? (
           <>
@@ -219,6 +222,23 @@ function DiskTile({ overview }: { overview: InstanceOverviewPublic }) {
       </p>
     </Tile>
   );
+}
+
+/** Open setup items on the Overview card link to the matching admin panel. */
+function checklistLink(
+  id: SetupChecklistId,
+  teamKey: string | null,
+): { to: string; label: string } | null {
+  const panel: Partial<Record<SetupChecklistId, [AdminSection, string]>> = {
+    site: ["site", "Set the address"],
+    email: ["site", "Set up email"],
+    storage: ["defaults", "Review the rules"],
+    backup: ["updates", "Updates & backups"],
+    service: ["help", "How to"],
+  };
+  const target = panel[id];
+  if (target) return { to: adminPath(teamKey, target[0]), label: target[1] };
+  return CHECKLIST_LINKS[id];
 }
 
 export function OverviewPanel() {
@@ -275,6 +295,8 @@ export function OverviewPanel() {
           </button>
         </p>
       </header>
+
+      <SetupChecklist variant="card" linkFor={(id) => checklistLink(id, teamKey)} />
 
       <div className="admin-grid">
         <ServerTile server={overview.server} />
@@ -372,7 +394,7 @@ export function OverviewPanel() {
 
         <DiskTile overview={overview} />
 
-        <Tile title="Spaces" health={spaces.full > 0 ? "warn" : "ok"} pill={`${spaces.count}`}>
+        <Tile title="Flows" health={spaces.full > 0 ? "warn" : "ok"} pill={`${spaces.count}`}>
           <Facts
             rows={[
               ["Admin", String(spaces.admin)],

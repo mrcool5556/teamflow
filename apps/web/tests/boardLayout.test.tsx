@@ -32,7 +32,7 @@ describe("board layout", () => {
     installFakeApi(db);
     signIn(db);
     renderApp("/t/ENG/settings/team");
-    expect(await screen.findByRole("heading", { name: "Team" })).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "Flow" })).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /close/i })).not.toBeInTheDocument();
     expect(screen.queryByText("No issues here yet")).not.toBeInTheDocument();
 
@@ -52,7 +52,7 @@ describe("board layout", () => {
     expect(screen.getByText("Sample row")).toBeInTheDocument();
     expect(screen.getByText("+ Add issue")).toBeInTheDocument();
     expect(screen.getByText("Doing ▾")).toBeInTheDocument();
-    await waitFor(() => expect(screen.getByLabelText("Workspace")).toBeEnabled());
+    await waitFor(() => expect(screen.getByLabelText("Flow")).toBeEnabled());
     expect(screen.queryByText("ENG issue 1")).not.toBeInTheDocument();
   });
 
@@ -94,7 +94,7 @@ describe("board layout", () => {
     const select = await screen.findByRole("combobox", { name: "Settings section" });
     expect(select).toHaveValue("general");
     // Before the team list loads the shell has no team key yet (same for the nav buttons).
-    await waitFor(() => expect(screen.getByLabelText("Workspace")).toBeEnabled());
+    await waitFor(() => expect(screen.getByLabelText("Flow")).toBeEnabled());
     await user.selectOptions(select, "tokens");
     await waitFor(() => expect(path()).toBe("/t/ENG/settings/tokens"));
   });

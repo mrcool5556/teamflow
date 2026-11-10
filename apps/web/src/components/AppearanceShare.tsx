@@ -68,7 +68,7 @@ export function AppearanceShare() {
     <div className="appearance-share">
       <p className="settings-copy appearance-share-intro">
         Send your look to someone, or use one they sent you. Theme, colours, style and board size
-        come along; nothing about your teams does.
+        come along; nothing about your Flows does.
       </p>
       <div className="appearance-share-actions">
         <button type="button" className="ghost" onClick={download}>

@@ -116,13 +116,13 @@ export function DiscordBotSettingsSection({
     <section className="settings-section">
       <h3>Discord bot</h3>
       <p className="settings-copy">
-        One bot can serve every Teamflow team. Configure this team&apos;s Discord server, roles, and
-        tickets below. Bot token and PAT are saved above under Bot credentials (admin only).
+        One bot can serve every Flow. Configure this Flow&apos;s Discord server, roles, and tickets
+        below. Bot token and PAT are saved above under Bot credentials (admin only).
       </p>
 
       {!loading && commandsReady ? (
         <p className="settings-hint">
-          <strong>{teamKey}</strong> Discord commands are configured for this team.
+          <strong>{teamKey}</strong> Discord commands are configured for this Flow.
         </p>
       ) : null}
       {!loading && !commandsReady ? (
@@ -153,7 +153,7 @@ export function DiscordBotSettingsSection({
             On a Linux server, click <strong>Enable Discord bot</strong> above. For local dev, run{" "}
             <code>pnpm dev:discord</code>.
           </li>
-          <li>Link this team below — the bot registers slash commands for saved server IDs.</li>
+          <li>Link this Flow below — the bot registers slash commands for saved server IDs.</li>
         </ol>
         <div className="row settings-actions">
           <button
@@ -180,7 +180,7 @@ export function DiscordBotSettingsSection({
             />
           </label>
           <p className="settings-hint">
-            Developer Mode → right-click your server → Copy Server ID. Each team links one server.
+            Developer Mode → right-click your server → Copy Server ID. Each Flow links one server.
           </p>
 
           <label>

@@ -1,0 +1,409 @@
+/* First-time setup (/setup) and the setup checklist (also the admin Overview card).
+   Built from theme tokens, so every look (Machined included) styles it. */
+
+.setup-shell {
+  min-height: 100vh;
+  display: grid;
+  grid-template-columns: 290px minmax(0, 1fr);
+  background: var(--bg);
+}
+
+.setup-rail {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  padding: var(--space-6) var(--space-5);
+  background: var(--panel);
+  border-right: 1px solid var(--border);
+}
+
+.setup-logo {
+  margin: 0 0 var(--space-4);
+}
+
+.setup-steps {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: var(--space-1);
+}
+
+.setup-step {
+  display: grid;
+  grid-template-columns: 28px 1fr;
+  gap: var(--space-3);
+  align-items: center;
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-md);
+  color: var(--text-soft);
+}
+
+.setup-step small {
+  display: block;
+  font-size: var(--font-size-xs);
+  color: var(--muted);
+}
+
+.setup-step-mark {
+  width: 28px;
+  height: 28px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  font-family: var(--font-mono);
+  font-size: var(--font-size-xs);
+  background: var(--cell);
+  box-shadow: var(--shadow-inset, inset 0 0 0 1px var(--border));
+}
+
+.setup-step--done .setup-step-mark {
+  background: var(--done);
+  color: var(--bg);
+  box-shadow: none;
+}
+
+.setup-step--current {
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
+  color: var(--text);
+}
+
+.setup-step--current .setup-step-mark {
+  background: var(--accent);
+  color: var(--bg);
+  box-shadow: none;
+}
+
+.setup-rail-fine {
+  margin-top: auto;
+  font-size: var(--font-size-xs);
+  color: var(--muted);
+}
+
+.setup-phone-head {
+  display: none;
+}
+
+.setup-main {
+  padding: clamp(var(--space-5), 5vw, 3rem) clamp(var(--space-4), 5vw, 4rem);
+  min-width: 0;
+}
+
+.setup-card {
+  max-width: 660px;
+}
+
+.setup-header {
+  margin-bottom: var(--space-5);
+}
+
+.setup-header .eyebrow {
+  margin: 0 0 var(--space-1);
+}
+
+.setup-header h1 {
+  font-size: clamp(1.6rem, 4vw, 2.2rem);
+  line-height: 1.15;
+  margin-bottom: var(--space-2);
+}
+
+.setup-lead {
+  margin: 0;
+  color: var(--text-soft);
+}
+
+.setup-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--space-3);
+  margin-top: var(--space-5);
+}
+
+.setup-back {
+  margin-right: auto;
+  color: var(--text-soft);
+}
+
+/* Links that look like the primary and quiet buttons (checklist page actions). */
+.setup-link-button {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.55rem 0.9rem;
+  text-decoration: none;
+  background: var(--btn-bg, var(--primary));
+  color: var(--btn-text, var(--chrome-btn-text));
+  border: var(--btn-border-w, var(--chrome-btn-border-width)) solid
+    var(--btn-border, var(--chrome-btn-border-color));
+  border-radius: var(--btn-radius, var(--radius-control));
+  box-shadow: var(--btn-shadow, var(--chrome-btn-shadow));
+}
+
+.setup-link-button--quiet {
+  background: var(--btn-quiet-bg, transparent);
+  color: var(--btn-quiet-text, var(--text));
+  border-color: var(--btn-quiet-border, var(--border));
+  box-shadow: var(--btn-quiet-shadow, none);
+}
+
+.setting-env-badge,
+.setting-from-tag {
+  display: inline-block;
+  margin-left: var(--space-2);
+  padding: 0 var(--space-2);
+  border-radius: 99px;
+  font-size: var(--font-size-xs);
+  white-space: nowrap;
+}
+
+.setting-env-badge {
+  color: var(--warn, var(--text-soft));
+  border: 1px solid currentColor;
+}
+
+.setting-from-tag {
+  color: var(--accent-text);
+  border: 1px solid color-mix(in srgb, var(--accent) 55%, transparent);
+}
+
+.site-url-row {
+  display: flex;
+  gap: var(--space-2);
+}
+
+.site-url-row button {
+  flex: none;
+}
+
+.mail-form-row {
+  display: grid;
+  grid-template-columns: minmax(0, 2fr) minmax(0, 1fr);
+  gap: var(--space-3);
+}
+
+.setup-admin-form .mail-form-row {
+  grid-template-columns: 1fr 1fr;
+}
+
+/* ---------- checklist ---------- */
+
+.setup-checklist-items {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.setup-check {
+  position: relative;
+  display: grid;
+  grid-template-columns: 26px minmax(0, 1fr) auto;
+  gap: var(--space-3);
+  align-items: center;
+  padding: var(--space-3) 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.setup-check small {
+  display: block;
+  color: var(--muted);
+  font-size: var(--font-size-xs);
+}
+
+.setup-check a {
+  font-size: var(--font-size-sm);
+  white-space: nowrap;
+  color: var(--accent-text);
+}
+
+.setup-check-mark {
+  width: 22px;
+  height: 22px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  font-size: var(--font-size-xs);
+  background: var(--cell);
+  box-shadow: inset 0 0 0 1px var(--border);
+}
+
+.setup-check--done .setup-check-mark {
+  background: var(--done);
+  color: var(--bg);
+  box-shadow: none;
+}
+
+.setup-check--skipped .setup-check-mark {
+  color: var(--warn, var(--text-soft));
+  box-shadow: inset 0 0 0 1px currentColor;
+}
+
+.setup-check--unavailable {
+  color: var(--muted);
+}
+
+.setup-checklist--card {
+  border: 2px solid var(--primary);
+  border-radius: var(--radius-md);
+  padding: var(--space-3) var(--space-4);
+  background: var(--surface);
+}
+
+.setup-checklist-head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+}
+
+.setup-checklist-head h3 {
+  margin-right: auto;
+}
+
+.setup-checklist--card .setup-check {
+  padding: var(--space-2) 0;
+}
+
+.setup-checklist--card .setup-check:last-child {
+  border-bottom: none;
+}
+
+/* ---------- phone: progress bar instead of the rail ---------- */
+
+@media (max-width: 760px) {
+  .setup-shell {
+    grid-template-columns: 1fr;
+    grid-template-rows: auto 1fr;
+  }
+
+  .setup-rail {
+    display: none;
+  }
+
+  .setup-phone-head {
+    display: grid;
+    gap: var(--space-1);
+    padding: var(--space-4);
+    background: var(--panel);
+    border-bottom: 1px solid var(--border);
+  }
+
+  .setup-phone-head .eyebrow {
+    margin: 0;
+  }
+
+  .setup-progress {
+    display: flex;
+    gap: 5px;
+    margin-top: var(--space-2);
+  }
+
+  .setup-progress i {
+    flex: 1;
+    height: 5px;
+    border-radius: 99px;
+    background: var(--cell);
+    box-shadow: inset 0 0 0 1px var(--border);
+  }
+
+  .setup-progress i.done {
+    background: var(--done);
+    box-shadow: none;
+  }
+
+  .setup-progress i.current {
+    background: var(--accent);
+    box-shadow: none;
+  }
+
+  .setup-main {
+    padding: var(--space-5) var(--space-4);
+  }
+
+  .mail-form-row,
+  .setup-admin-form .mail-form-row {
+    grid-template-columns: 1fr;
+    gap: 0;
+  }
+
+  .setup-actions {
+    flex-direction: column-reverse;
+    align-items: stretch;
+  }
+
+  .setup-actions > * {
+    justify-content: center;
+    text-align: center;
+  }
+
+  .setup-back {
+    margin-right: 0;
+  }
+}
+
+/* Segmented choices keep their natural width inside a stacked field. */
+.setup-card .settings-field > .admin-seg,
+.settings-section .settings-field > .admin-seg {
+  justify-self: start;
+}
+
+/* ---------- server admin: People ---------- */
+
+.admin-people {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.admin-person {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding: var(--space-3) 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.admin-person-main {
+  display: grid;
+  gap: var(--space-1);
+  min-width: 0;
+  flex: 1 1 280px;
+}
+
+.admin-person-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: var(--font-size-xs);
+}
+
+.admin-person-meta .setting-env-badge {
+  margin-left: 0;
+}
+
+.admin-person-reset {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
+.admin-person-reset code {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--font-size-xs);
+}
+
+.admin-person-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.setup-checklist--card {
+  margin-bottom: var(--space-4);
+}

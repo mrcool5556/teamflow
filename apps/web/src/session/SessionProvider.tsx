@@ -193,6 +193,15 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     [bootstrap, clearError, report],
   );
 
+  const adoptSession = useCallback(
+    async (result: { user: UserPublic; token: string }) => {
+      setSession(result.token, result.user);
+      setUser(result.user);
+      await bootstrap();
+    },
+    [bootstrap],
+  );
+
   const logout = useCallback(() => {
     clearSession();
     setUser(null);
@@ -214,6 +223,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       replaceProfile: applyProfile,
       login,
       register,
+      adoptSession,
       logout,
     }),
     [
@@ -227,6 +237,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       applyProfile,
       login,
       register,
+      adoptSession,
       logout,
     ],
   );

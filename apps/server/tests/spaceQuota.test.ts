@@ -75,13 +75,13 @@ describe("direct uploads", () => {
       fileBytes: 300,
       remainingBytes: 200,
     });
-    expect(body.error).toMatch(/won't fit: this space has 200 B left/);
+    expect(body.error).toMatch(/won't fit: this Flow has 200 B left/);
     // Exactly filling the cap is allowed; then the space reads as full.
     await uploadedFileId(await uploadToIssue(app, user.token, issueId, 200));
     const full = await expectFull(await uploadToIssue(app, user.token, issueId, 1), {
       remainingBytes: 0,
     });
-    expect(full.error).toMatch(/This space is full/);
+    expect(full.error).toMatch(/This Flow is full/);
   });
 
   it("refuses a row upload that would pass the cap", async () => {

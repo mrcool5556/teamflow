@@ -1,54 +1,79 @@
 import nodemailer from "nodemailer";
-import { config } from "../config.js";
+import { getPublicUrl, getSiteName, getSmtpConfig } from "./siteSettings.js";
 
+/** Email is set up in .env or on the admin page (Site & email). */
 export function isSmtpConfigured() {
-  return config.smtp !== null;
+  return getSmtpConfig() !== null;
 }
 
 export function getPublicBaseUrl() {
-  return config.publicUrl;
+  return getPublicUrl();
 }
 
 function createTransport() {
-  const smtp = config.smtp;
+  const smtp = getSmtpConfig();
   if (!smtp) {
-    throw new Error("SMTP_HOST is not set");
-  }
-  if (!smtp.user || !smtp.pass) {
-    throw new Error("SMTP_USER and SMTP_PASS are required when SMTP_HOST is set");
+    throw new Error("Email is not set up");
   }
 
   return nodemailer.createTransport({
     host: smtp.host,
     port: smtp.port,
     secure: smtp.secure,
-    auth: { user: smtp.user, pass: smtp.pass },
+    requireTLS: smtp.requireTLS,
+    ignoreTLS: smtp.ignoreTLS,
+    // Some relays on a private network take mail without a login.
+    ...(smtp.user ? { auth: { user: smtp.user, pass: smtp.pass } } : {}),
+    connectionTimeout: 10_000,
+    greetingTimeout: 10_000,
   });
 }
 
 export async function sendPasswordResetEmail(to: string, resetUrl: string) {
-  if (!config.smtp) {
+  const smtp = getSmtpConfig();
+  if (!smtp) {
     return false;
   }
 
-  const from = config.smtp.from;
+  const site = getSiteName();
   const transport = createTransport();
   await transport.sendMail({
-    from,
+    from: smtp.from,
     to,
-    subject: "Reset your Teamflow password",
+    subject: `Reset your ${site} password`,
     text: [
-      "You requested a password reset for Teamflow.",
+      `You requested a password reset for ${site}.`,
       "",
       resetUrl,
       "",
       "This link expires in 1 hour. If you did not request this, you can ignore this email.",
     ].join("\n"),
     html: [
-      "<p>You requested a password reset for Teamflow.</p>",
+      `<p>You requested a password reset for ${escapeHtml(site)}.</p>`,
       `<p><a href="${resetUrl}">Reset your password</a></p>`,
       "<p>This link expires in 1 hour. If you did not request this, you can ignore this email.</p>",
     ].join(""),
   });
   return true;
+}
+
+/** The admin page's "Send a test" button. Throws with the SMTP server's own message. */
+export async function sendTestEmail(to: string) {
+  const smtp = getSmtpConfig();
+  if (!smtp) throw new Error("Email is not set up");
+  const site = getSiteName();
+  await createTransport().sendMail({
+    from: smtp.from,
+    to,
+    subject: `${site}: test email`,
+    text: `This is a test from ${site} at ${getPublicUrl()}. Email works.`,
+  });
+}
+
+function escapeHtml(value: string) {
+  return value
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
 }

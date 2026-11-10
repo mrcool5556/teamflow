@@ -25,6 +25,8 @@ export type Session = {
   replaceProfile: (next: UserProfile) => void;
   login: (email: string, password: string) => Promise<void>;
   register: (name: string, email: string, password: string) => Promise<void>;
+  /** Sign in with a token the server just issued (first-time setup creates the admin). */
+  adoptSession: (result: { user: UserPublic; token: string }) => Promise<void>;
   logout: () => void;
 };
 

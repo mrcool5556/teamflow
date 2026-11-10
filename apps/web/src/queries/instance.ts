@@ -52,12 +52,29 @@ export function useSpaceSettingsQuery(enabled = true) {
   });
 }
 
-export function useInstanceUsersQuery(query: string, enabled = true) {
+export function useInstanceUsersQuery(query: string, enabled = true, limit?: number) {
   return useQuery({
-    queryKey: queryKeys.instanceUsers(query),
+    queryKey: [...queryKeys.instanceUsers(query), limit ?? 50],
     queryFn: async ({ signal }): Promise<InstanceUserPublic[]> =>
-      (await client.withSignal(signal).listInstanceUsers(query || undefined)).users,
+      (await client.withSignal(signal).listInstanceUsers(query || undefined, limit)).users,
     enabled,
+  });
+}
+
+/** People panel: make or unmake a server admin. */
+export function useSetInstanceAdminMutation() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (input: { userId: string; isInstanceAdmin: boolean }) =>
+      (await client.updateInstanceUser(input.userId, { isInstanceAdmin: input.isInstanceAdmin }))
+        .user,
+    onSuccess: () => void queryClient.invalidateQueries({ queryKey: ["instance", "users"] }),
+  });
+}
+
+export function useIssueResetLinkMutation() {
+  return useMutation({
+    mutationFn: async (userId: string) => (await client.issuePasswordResetLink(userId)).reset,
   });
 }
 

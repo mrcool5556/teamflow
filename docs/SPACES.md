@@ -1,4 +1,10 @@
-# Spaces and the server admin page
+# Flows (spaces) and the server admin page
+
+**Words.** In the app a team is called a **Flow** (capital F): "Create a Flow", "Free Flow",
+"Admin Flow", Server admin → **Flows**. The API, database, error codes, permission ids, MCP and
+CLI keep the older names (`team`, `space`, `space_storage_full`, `free_space_limit`,
+`/instance/spaces`), so this page uses "space" in its technical parts. A Flow, a team and a space
+are the same row.
 
 Every team is a **space**: a team plus an upload allowance. Spaces keep the server's disk from
 filling up without limiting how people work: issues, comments, rows and links are never capped,
@@ -8,14 +14,15 @@ only uploaded bytes are. Design and mock-up: [mockups/admin-spaces-v1.html](mock
 
 | | Admin space | Free space |
 |---|---|---|
-| Made by | An instance admin (Server admin → Spaces → New space, or New team) | Any user (New team), and each new user's **General** |
+| Shown as | Admin Flow | Free Flow |
+| Made by | An instance admin (Server admin → Flows → New Flow, or Create a Flow) | Any user (Create a Flow) |
 | Upload cap | Whatever the admin sets, or no limit | The free-space cap (default **1 GB**) |
-| Per-user limit | None | At most **3** per user (their General counts) |
+| Per-user limit | None | At most **3** per user (an older account's General counts) |
 
 - The space counts against `teams.space_owner_id`, the account it was made for. Instance admins
   (including accounts in `TEAMFLOW_INSTANCE_ADMINS`) always make admin spaces with no limit.
 - A fourth free space is refused with `409 free_space_limit` (`owned`, `limit` in the body).
-  Deleting one frees a slot. Registration is never refused, even with a limit of 0. An admin can
+  Deleting one frees a slot. A user's first free space is never refused, even with a limit of 0, so a new account can always start. An admin can
   make free spaces for a user past the limit.
 - Teams that existed before spaces (schema version 4) became **admin spaces with no limit**, so
   nothing changed for them until an admin sets a cap.
@@ -44,7 +51,7 @@ recorded in the space's history). An admin can also empty a space's whole trash.
 - **From 80%:** the Files drawer meter turns amber, and the issue and row upload zones say how
   much is left.
 - **At the cap, or when a file would not fit:** the upload is refused before any bytes are
-  sent. The upload zone says the space is full, what still works and how to make room, and
+  sent. The upload zone says the Flow is full, what still works and how to make room, and
   Choose file is disabled. Issues, comments, moving files and linking existing files keep
   working.
 - **Server free-disk floor:** while the upload disk has less than the floor free (default
@@ -63,7 +70,7 @@ there is room.
 
 ## Changing a space
 
-Server admin → Spaces → a space:
+Server admin → Flows → a Flow:
 
 - **Cap:** any size in GB, or no limit. Lowering it under current use deletes nothing; it only
   blocks new uploads until files are removed.
@@ -75,7 +82,7 @@ Every change is recorded in the space's history (`space_events`).
 
 ## Settings
 
-Server admin → Space defaults, or the environment (the page's values win once saved):
+Server admin → Flow defaults & sign-up, or the environment (the page's values win once saved):
 
 | Setting | Env | Default |
 |---|---|---|
@@ -96,7 +103,17 @@ Instance admins open it from the account menu (**Server admin**) at `/t/<team>/a
   the upload folder: uploads, database, backups and the rest, caps allocated, the floor), space
   counts and **common fixes** worked out from those checks. Anything that needs more host access
   than the process has says "not detectable" or "not available" and links a how-to.
-- **Spaces**, **Space detail**, **Space defaults:** above.
+- **Finish setting up** (top of the Overview): the open items of the setup checklist
+  ([SETUP.md](SETUP.md)), each linking to its panel, until they are all done or the card is
+  dismissed.
+- **Flows**, **Flow detail**, **Flow defaults & sign-up:** above, plus who can make an
+  account (anyone, or only people with an invite).
+- **People:** every account, with its Flows and how many free Flows it owns. **Make admin** /
+  **Remove admin** (never the last server admin, and not someone `TEAMFLOW_INSTANCE_ADMINS` lists).
+  **Send reset link** makes a one-hour password reset link, emails it when email is set up, and
+  always shows it so the admin can pass it on.
+- **Site & email:** site name, public address (with a reachability check) and outgoing email
+  (with a test send), the same forms as setup steps 2 and 3. Values set in `.env` are read-only.
 - **Updates & backups** and **Discord bot:** the Settings panels, through the current team.
 - **How-tos & fixes:** step-by-step commands (LXC first, Windows where it differs); the ones
   matching the Overview's findings are listed first.
@@ -109,13 +126,16 @@ Instance admin only, no team needed (full list in [API.md](API.md#instance-admin
 |---|---|---|
 | GET | `/instance/overview` | Server, disk, bot, maintenance, space counts, settings, fixes |
 | GET | `/instance/checks/public-url` | Fetch `PUBLIC_URL/health` (5 s timeout) |
-| GET, PATCH | `/instance/settings` | Space defaults |
-| GET | `/instance/users?q=` | Owner picker with each user's free-space count |
+| GET, PATCH | `/instance/settings` | Flow defaults |
+| GET | `/instance/users?q=&limit=` | Accounts (owner picker, People) with free spaces, Flows, admin source |
+| PATCH | `/instance/users/:userId` | `{ isInstanceAdmin }`; never the last admin or an env-listed one |
+| POST | `/instance/users/:userId/reset-link` | One-hour reset link: `{ url, expiresAt, emailed, emailError }` |
+| GET, PATCH | `/instance/site`, `/instance/signup`; GET, PUT, DELETE `/instance/mail` | See [SETUP.md](SETUP.md) |
 | GET, POST | `/instance/spaces` | List; create (`createSpaceSchema`) |
 | GET, PATCH | `/instance/spaces/:teamId` | Detail; change type or cap (`updateSpaceSchema`) |
 | POST | `/instance/spaces/:teamId/empty-trash` | Delete the trash now |
 | POST | `/instance/spaces/:teamId/cancel-uploads` | Abort uploads in progress |
 
 For members: `GET /teams/:teamId/storage` returns the cap, usage, breakdown, state (`ok`, `warn`,
-`full`) and `diskLow`. `GET /teams` includes `spaceType` and `storageCapBytes`. MCP has
+`full`) and `diskLow`. `GET /teams` includes `spaceType` and `storageCapBytes`. `GET /auth/space-allowance` says how many free spaces the user owns, the limit, the cap a new one gets and whether `POST /teams` would be allowed (the Create a Flow page shows it). MCP has
 `get_team_storage`; the CLI has `teamflow board storage --team <id>`.

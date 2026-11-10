@@ -85,7 +85,7 @@ export function TeamFilesDrawer({ teamId, open, onClose, onNavigateRef }: TeamFi
     (filesQuery.error
       ? filesQuery.error instanceof Error
         ? filesQuery.error.message
-        : "Could not load team files"
+        : "Could not load Flow files"
       : null);
   const [query, setQuery] = useState("");
   const [sort, setSort] = useState<SortMode>("size");
@@ -169,7 +169,7 @@ export function TeamFilesDrawer({ teamId, open, onClose, onNavigateRef }: TeamFi
     const displayName = getTeamFileDisplayName(file);
     const ok = await confirm({
       title: `Delete ${displayName} forever?`,
-      message: `This can't be undone. It frees ${formatStorageBytes(file.sizeBytes)} in this space right away.`,
+      message: `This can't be undone. It frees ${formatStorageBytes(file.sizeBytes)} in this Flow right away.`,
       confirmLabel: "Delete forever",
       danger: true,
     });
@@ -223,7 +223,7 @@ export function TeamFilesDrawer({ teamId, open, onClose, onNavigateRef }: TeamFi
     <Drawer onClose={handleClose} className="team-files-drawer">
       <header className="team-files-drawer-header">
         <div>
-          <p className="eyebrow">Team files</p>
+          <p className="eyebrow">Flow files</p>
           <DialogTitle>File directory</DialogTitle>
           <p className="muted team-files-drawer-summary">
             {files.length} file{files.length === 1 ? "" : "s"} · {formatFileSize(totalBytes)} total

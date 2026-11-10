@@ -17,7 +17,13 @@ Teamflow uses email + password accounts. Every request authenticates with `Autho
 | GET | `/auth/me` | Current user (Bearer token); `user.isInstanceAdmin` marks server-wide admins |
 | GET | `/auth/config` | `{ inviteOnly, passwordResetEmail }` |
 
-Registering creates the user and a personal team called **General** (key `GEN`) with the new user as Owner, in one transaction. General is a **free space** with the free-space upload cap (1 GB by default), except for instance admins, whose General has no cap. Any user can make more teams with New team, up to 3 free spaces in all ([SPACES.md](SPACES.md)). With an `inviteToken` the user also joins the inviting team with the invite's role.
+On a fresh server the first account is made on `/setup` with the one-time setup code ([SETUP.md](SETUP.md)); `/auth/register` answers `409 setup_required` until then.
+
+Registering creates only the account. With an `inviteToken` the user also joins the inviting team with the invite's role, in the same transaction, and lands on its board. Without one, the web app shows the welcome page: **Create a Flow** (`POST /teams`) or **Join a Flow** (paste an invite link or code). Whoever creates a Flow is its **Owner**. A Flow a user makes is a **free space** with the free-space upload cap (1 GB by default), at most 3 per person, and the first is never refused; an instance admin's Flows are admin spaces with no cap ([SPACES.md](SPACES.md)).
+
+The welcome page lives at `/welcome` (`/welcome/create`, `/welcome/join`); `/` sends anyone with no Flow there, including someone who left their last one. Join a Flow accepts a full invite link, an old `?invite=` link or the bare code, shows the Flow and role (`GET /invites/:token`) and joins on confirm. An invite link opened while signed out still works as before: the token waits through sign-up, registration joins that Flow, and the person lands on its board.
+
+Accounts made before this change keep the **General** team registration used to create; it counts as one of their free spaces.
 
 Login, register and forgot-password are rate limited per client IP (`TEAMFLOW_AUTH_RATE_LIMIT` per minute, default 10, HTTP 429 with `Retry-After`). Behind a reverse proxy set `TEAMFLOW_TRUST_PROXY=1` so `X-Forwarded-For` is used as the client address.
 
@@ -74,6 +80,8 @@ TEAMFLOW_INVITE_ONLY=true
 
 Users must open a team invite link (`/invite/<token>`) before they can register.
 
+Or switch **Who can sign up** on Server admin → Flow defaults & sign-up (no restart). The `.env` value wins when set.
+
 ## Forgot password
 
 | Method | Path | Body |
@@ -94,7 +102,9 @@ The response to forgot-password is identical whether or not the email exists.
 
 ### SMTP (production)
 
-Add to the server environment (`/opt/teamflow/.env` on LXC):
+The easiest way is Server admin → Site & email: fill in the server, send a test, save. The password is stored encrypted with `TEAMFLOW_SECRETS_KEY` (or `JWT_SECRET`); changing that key means entering it again.
+
+Or add to the server environment (which wins over the admin page) (`/opt/teamflow/.env` on LXC):
 
 ```env
 PUBLIC_URL=https://teamflow.example.com

@@ -90,7 +90,7 @@ export function TeamDataTransferSection({
         <strong>
           {teamKey} — {teamName}
         </strong>
-        , or merge a bundle into this team. Assignees match by email; refs in descriptions are
+        , or merge a bundle into this Flow. Assignees match by email; refs in descriptions are
         rewritten on import.
       </p>
 
@@ -118,7 +118,7 @@ export function TeamDataTransferSection({
       <div className="settings-subsection">
         <h4>Import</h4>
         <p className="settings-hint">
-          Merges rows, columns, issues, and comments into this team. Re-importing the same bundle is
+          Merges rows, columns, issues, and comments into this Flow. Re-importing the same bundle is
           skipped unless forced.
         </p>
         <label className="settings-checkbox">

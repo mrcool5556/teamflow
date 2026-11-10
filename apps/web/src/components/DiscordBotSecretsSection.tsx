@@ -91,7 +91,7 @@ export function DiscordBotSecretsSection({
       <h3>Bot credentials</h3>
       <p className="settings-copy">
         Stored encrypted on the Teamflow server. Applies to the whole instance — one Discord bot
-        serves all teams. Leave token fields blank to keep existing values.
+        serves all Flows. Leave token fields blank to keep existing values.
       </p>
 
       {loading ? <p className="settings-hint">Loading bot credentials…</p> : null}
@@ -158,7 +158,7 @@ export function DiscordBotSecretsSection({
             />
           </label>
           <p className="settings-hint">
-            Create under Settings → API tokens. The PAT user must belong to every team linked to
+            Create under Settings → API tokens. The PAT user must belong to every Flow linked to
             Discord.
           </p>
 

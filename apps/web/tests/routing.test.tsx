@@ -49,7 +49,7 @@ describe("routing", () => {
     const { path } = renderApp("/t/ENG/settings/tokens");
     expect(await screen.findByText("Personal access tokens")).toBeInTheDocument();
     // The board has loaded once the team switcher is enabled.
-    await waitFor(() => expect(screen.getByLabelText("Workspace")).toBeEnabled());
+    await waitFor(() => expect(screen.getByLabelText("Flow")).toBeEnabled());
     expect(path()).toBe("/t/ENG/settings/tokens");
   });
 
@@ -57,7 +57,7 @@ describe("routing", () => {
     signIn(db);
     const { path } = renderApp("/t/ENG");
     await screen.findByText("ENG issue 1");
-    await userEvent.selectOptions(screen.getByLabelText("Workspace"), db.teams[1]!.id);
+    await userEvent.selectOptions(screen.getByLabelText("Flow"), db.teams[1]!.id);
     await waitFor(() => expect(path()).toBe("/t/OPS"));
     expect(await screen.findByText("OPS issue 1")).toBeInTheDocument();
     expect(screen.queryByText("ENG issue 1")).not.toBeInTheDocument();
@@ -82,7 +82,7 @@ describe("routing", () => {
   it("keeps an invite across the login page", async () => {
     const { path } = renderApp("/?invite=tok-1");
     await waitFor(() => expect(path()).toBe("/login"));
-    expect(screen.getByText(/You have a team invite/)).toBeInTheDocument();
+    expect(screen.getByText(/You have a Flow invite/)).toBeInTheDocument();
     expect(sessionStorage.getItem("teamflow_pending_invite")).toBe("tok-1");
   });
 });

@@ -43,7 +43,7 @@ describe("admin spaces list", () => {
     expect(within(table()).getByText("Mod pack")).toBeInTheDocument();
 
     await user.click(screen.getByRole("button", { name: "All 2" }));
-    await user.type(screen.getByRole("searchbox", { name: "Search spaces" }), "engin");
+    await user.type(screen.getByRole("searchbox", { name: "Search Flows" }), "engin");
     expect(within(table()).getByText("Engineering")).toBeInTheDocument();
     expect(within(table()).queryByText("Mod pack")).not.toBeInTheDocument();
   });
@@ -54,13 +54,13 @@ describe("create space dialog", () => {
     const user = userEvent.setup();
     const { calls, path } = setup("/t/ENG/admin/spaces");
     await screen.findByRole("table");
-    await user.click(screen.getByRole("button", { name: "+ New space" }));
-    const dialog = await screen.findByRole("dialog", { name: "New space" });
+    await user.click(screen.getByRole("button", { name: "+ New Flow" }));
+    const dialog = await screen.findByRole("dialog", { name: "New Flow" });
 
     await user.type(within(dialog).getByLabelText("Name"), "Client portal");
     expect(within(dialog).getByLabelText("Key")).toHaveValue("CP");
     await user.click(within(dialog).getByRole("button", { name: "5 GB" }));
-    await user.click(within(dialog).getByRole("button", { name: "Create space" }));
+    await user.click(within(dialog).getByRole("button", { name: "Create Flow" }));
 
     await waitFor(() =>
       expect(calls.find((c) => c.method === "POST" && c.path === "/instance/spaces")?.body).toEqual(
@@ -72,7 +72,7 @@ describe("create space dialog", () => {
         },
       ),
     );
-    expect(screen.queryByRole("dialog", { name: "New space" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("dialog", { name: "New Flow" })).not.toBeInTheDocument();
     // The new space's detail page opens.
     await waitFor(() =>
       expect(path()).toBe("/t/ENG/admin/spaces/00000000-0000-4000-8000-0000000000c1"),
@@ -84,18 +84,18 @@ describe("create space dialog", () => {
     const user = userEvent.setup();
     const { calls } = setup("/t/ENG/admin/spaces");
     await screen.findByRole("table");
-    await user.click(screen.getByRole("button", { name: "+ New space" }));
-    const dialog = await screen.findByRole("dialog", { name: "New space" });
+    await user.click(screen.getByRole("button", { name: "+ New Flow" }));
+    const dialog = await screen.findByRole("dialog", { name: "New Flow" });
 
     await user.type(within(dialog).getByLabelText("Name"), "Jam");
     await user.clear(within(dialog).getByLabelText("Key"));
     await user.type(within(dialog).getByLabelText("Key"), "jam1");
-    await user.click(within(dialog).getByRole("radio", { name: /Free space/ }));
+    await user.click(within(dialog).getByRole("radio", { name: /Free Flow/ }));
     expect(within(dialog).getByText(/Upload allowance: 1.00 GB/)).toBeInTheDocument();
     await user.type(within(dialog).getByRole("searchbox"), "jul");
     await user.click(await within(dialog).findByRole("button", { name: /Jules/ }));
-    expect(within(dialog).getByText(/Owns 2 of 3 free spaces/)).toBeInTheDocument();
-    await user.click(within(dialog).getByRole("button", { name: "Create space" }));
+    expect(within(dialog).getByText(/Owns 2 of 3 free Flows/)).toBeInTheDocument();
+    await user.click(within(dialog).getByRole("button", { name: "Create Flow" }));
 
     await waitFor(() =>
       expect(calls.find((c) => c.method === "POST" && c.path === "/instance/spaces")?.body).toEqual(
@@ -113,26 +113,27 @@ describe("create space dialog", () => {
     const user = userEvent.setup();
     setup("/t/ENG/admin/spaces");
     await screen.findByRole("table");
-    await user.click(screen.getByRole("button", { name: "+ New space" }));
-    const dialog = await screen.findByRole("dialog", { name: "New space" });
+    await user.click(screen.getByRole("button", { name: "+ New Flow" }));
+    const dialog = await screen.findByRole("dialog", { name: "New Flow" });
     await user.type(within(dialog).getByLabelText("Name"), "Big");
     await user.clear(within(dialog).getByLabelText("Upload allowance"));
     expect(within(dialog).getByRole("alert")).toHaveTextContent(/greater than 0/);
-    expect(within(dialog).getByRole("button", { name: "Create space" })).toBeDisabled();
+    expect(within(dialog).getByRole("button", { name: "Create Flow" })).toBeDisabled();
     await user.click(within(dialog).getByRole("checkbox", { name: "No limit" }));
-    expect(within(dialog).getByRole("button", { name: "Create space" })).toBeEnabled();
+    expect(within(dialog).getByRole("button", { name: "Create Flow" })).toBeEnabled();
   });
 });
 
 describe("space defaults", () => {
-  it("saves the free-space cap, per-user limit and disk floor", async () => {
+  it("saves the free-space cap, per-person limit, disk floor and sign-up", async () => {
     const user = userEvent.setup();
     const { calls } = setup("/t/ENG/admin/defaults");
-    const perUser = await screen.findByLabelText("Free spaces per user");
+    const perUser = await screen.findByLabelText("Flows per person");
     await user.clear(perUser);
     await user.type(perUser, "5");
     await user.click(screen.getByRole("button", { name: "5 GB" }));
-    const floor = screen.getByLabelText("Keep this much disk free (GB)");
+    await user.click(screen.getByRole("button", { name: "Only people with an invite" }));
+    const floor = screen.getByLabelText("Stop uploads below (GB free)");
     await user.clear(floor);
     await user.type(floor, "0");
     await user.click(screen.getByRole("button", { name: "Save defaults" }));
@@ -142,6 +143,11 @@ describe("space defaults", () => {
         calls.find((c) => c.method === "PATCH" && c.path === "/instance/settings")?.body,
       ).toEqual({ freeSpaceCapBytes: 5 * GIB, freeSpacesPerUser: 5, minFreeDiskBytes: 0 }),
     );
-    expect(await screen.findByText(/Space defaults saved/)).toBeInTheDocument();
+    await waitFor(() =>
+      expect(
+        calls.find((c) => c.method === "PATCH" && c.path === "/instance/signup")?.body,
+      ).toEqual({ inviteOnly: true }),
+    );
+    expect(await screen.findByText(/Defaults saved/)).toBeInTheDocument();
   });
 });

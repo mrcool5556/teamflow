@@ -522,6 +522,8 @@ export function BoardShell() {
     if (route.isIndex && teams.length > 0) {
       return <Navigate to={boardPath(defaultTeamKey())} replace state={navState} />;
     }
+    // No Flow yet (new account, or left the last one): the welcome page offers Create or Join.
+    if (route.isIndex && teams.length === 0) return <Navigate to="/welcome" replace />;
     if (route.teamKey && !routeTeam) return <Navigate to="/" replace />;
   }
 
@@ -539,9 +541,9 @@ export function BoardShell() {
               <h1 className="sr-only">{teams.find((t) => t.id === teamId)?.name ?? "Board"}</h1>
               {teams.length > 0 && (
                 <label className="topbar-team-switch">
-                  <span className="sr-only">Workspace</span>
+                  <span className="sr-only">Flow</span>
                   <select
-                    aria-label="Workspace"
+                    aria-label="Flow"
                     value={teamId ?? ""}
                     disabled={!teamId || loading}
                     onChange={(e) => {
@@ -590,7 +592,7 @@ export function BoardShell() {
                 <button
                   type="button"
                   className="ghost topbar-btn"
-                  title="Team files"
+                  title="Flow files"
                   onClick={() => setTeamFilesOpen(true)}
                 >
                   <span className="topbar-btn-icon" aria-hidden="true">

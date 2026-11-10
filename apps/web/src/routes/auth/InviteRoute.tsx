@@ -30,8 +30,8 @@ export function InviteRoute() {
         const { team, alreadyMember } = await client.acceptInvite(token);
         await refreshTeams(queryClient);
         const notice = alreadyMember
-          ? `Already on team ${team.key} — ${team.name}`
-          : `Joined team ${team.key} — ${team.name}`;
+          ? `You're already in the Flow ${team.key} — ${team.name}`
+          : `You joined the Flow ${team.key} — ${team.name}`;
         navigate(boardPath(team.key), { replace: true, state: { notice } });
       } catch (err) {
         report(err, "Failed to accept invite");

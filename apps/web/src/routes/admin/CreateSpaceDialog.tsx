@@ -63,7 +63,7 @@ export function CreateSpaceDialog({
       });
       onCreated(space);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Could not create the space");
+      setError(err instanceof Error ? err.message : "Could not create the Flow");
     }
   };
 
@@ -79,7 +79,7 @@ export function CreateSpaceDialog({
         void submit();
       }}
     >
-      <DialogTitle>New space</DialogTitle>
+      <DialogTitle>New Flow</DialogTitle>
       <div className="admin-dialog-row">
         <label>
           Name
@@ -110,11 +110,11 @@ export function CreateSpaceDialog({
               checked={spaceType === type}
               onChange={() => setSpaceType(type)}
             />
-            <strong>{type === "admin" ? "Admin space" : "Free space"}</strong>
+            <strong>{type === "admin" ? "Admin Flow" : "Free Flow"}</strong>
             <span>
               {type === "admin"
                 ? "You set the upload allowance, or no limit."
-                : `Default cap${settings ? ` (${formatStorageBytes(settings.freeSpaceCapBytes)})` : ""}. Counts toward the owner's free spaces.`}
+                : `Default cap${settings ? ` (${formatStorageBytes(settings.freeSpaceCapBytes)})` : ""}. Counts toward the owner's free Flows.`}
             </span>
           </label>
         ))}
@@ -125,8 +125,8 @@ export function CreateSpaceDialog({
       ) : (
         <p className="settings-field-hint">
           Upload allowance:{" "}
-          {settings ? formatStorageBytes(settings.freeSpaceCapBytes) : "the free-space default"}.
-          Change the default in Space defaults, or pick Admin space for a custom allowance.
+          {settings ? formatStorageBytes(settings.freeSpaceCapBytes) : "the free Flow default"}.
+          Change the default in Flow defaults, or pick Admin Flow for a custom allowance.
         </p>
       )}
 
@@ -163,7 +163,7 @@ export function CreateSpaceDialog({
               {owner.name}
               {owner.id === user?.id ? " (you)" : ""} gets the Owner role.
               {spaceType === "free" && settings
-                ? ` Owns ${owner.freeSpaces} of ${settings.freeSpacesPerUser} free spaces; an admin may go over.`
+                ? ` Owns ${owner.freeSpaces} of ${settings.freeSpacesPerUser} free Flows; an admin may go over.`
                 : ""}
             </>
           ) : (
@@ -182,7 +182,7 @@ export function CreateSpaceDialog({
           Cancel
         </button>
         <button type="submit" disabled={!canSubmit}>
-          {create.isPending ? "Creating…" : "Create space"}
+          {create.isPending ? "Creating…" : "Create Flow"}
         </button>
       </div>
     </Dialog>
