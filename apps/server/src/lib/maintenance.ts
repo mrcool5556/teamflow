@@ -269,7 +269,7 @@ async function startJob(
   const { command, args: spawnArgs, verbatim } = buildJobSpawn(script, args);
   // A PID file left by an earlier job must not speak for this one (Windows, see jobPid).
   await fs.rm(path.join(dataDir, JOB_PID_FILE), { force: true });
-  const env = {
+  const env: NodeJS.ProcessEnv = {
     ...process.env,
     APP_DIR: config.appDir,
     BACKUP_DIR: getBackupDir(),
@@ -279,6 +279,11 @@ async function startJob(
   };
   // Set by update.ps1 / restore.ps1 for their own child backup; a server they restarted inherits it.
   delete env.TEAMFLOW_NESTED_JOB;
+  // Windows PowerShell 5.1 cannot load its own modules (Get-FileHash...) with PowerShell 7's
+  // module path, which a server started from PowerShell 7 inherits. Unset, 5.1 uses its default.
+  if (process.platform === "win32") {
+    for (const key of Object.keys(env)) if (key.toLowerCase() === "psmodulepath") delete env[key];
+  }
 
   await fs.appendFile(logPath, `> ${formatCommand(command, spawnArgs)}\n`);
 
