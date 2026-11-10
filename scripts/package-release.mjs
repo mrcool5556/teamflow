@@ -55,7 +55,7 @@ function run(cmd, args, opts = {}) {
 }
 
 function rm(p) {
-  fs.rmSync(p, { recursive: true, force: true, maxRetries: 10, retryDelay: 300 });
+  fs.rmSync(p, { recursive: true, force: true, maxRetries: 30, retryDelay: 500 });
 }
 
 /** Drop sources, tests, maps and type files from our own packages; they are not needed to run. */
@@ -103,7 +103,12 @@ for (const needed of [
 const APPS = ["server", "discord-bot"];
 const LIBS = ["core", "db", "api-client"];
 const SERVER_PACKAGES = [...APPS.map((a) => `apps/${a}`), ...LIBS.map((l) => `packages/${l}`)];
-rm(stage);
+try {
+  rm(stage);
+} catch {
+  // Windows: antivirus can hold a fresh .node file for a while. Move the old stage aside.
+  fs.renameSync(stage, `${stage}-old-${Date.now()}`);
+}
 fs.mkdirSync(stage, { recursive: true });
 for (const file of ["package.json", "pnpm-lock.yaml", "pnpm-workspace.yaml"]) {
   fs.copyFileSync(path.join(root, file), path.join(stage, file));

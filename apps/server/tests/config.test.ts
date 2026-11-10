@@ -25,7 +25,10 @@ describe("config", () => {
     expect(config.botConfigKey).toBeNull();
     expect(config.maintenance.enabled).toBe(false);
     expect(config.maintenance.sudo).toBe(true);
-    expect(config.maintenance.backupDir).toBe("/var/backups/teamflow");
+    // Windows keeps backups next to the install; Linux uses the system backup folder.
+    expect(config.maintenance.backupDir).toBe(
+      process.platform === "win32" ? path.join(config.appDir, "backups") : "/var/backups/teamflow",
+    );
     expect(config.bundle.maxEntries).toBe(5000);
     expect(path.isAbsolute(config.uploadDir)).toBe(true);
     expect(path.isAbsolute(config.appDir)).toBe(true);

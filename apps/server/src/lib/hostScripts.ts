@@ -29,6 +29,21 @@ export function formatCommand(command: string, args: string[]) {
 /** The command line for running `script args` (via sudo -n when enabled). */
 export function buildSpawnArgs(script: string, args: string[], sudo = useSudo()) {
   if (process.platform === "win32") {
+    // Windows PowerShell 5.1 ships with every Windows 10/11; no sudo there.
+    if (script.toLowerCase().endsWith(".ps1")) {
+      return {
+        command: "powershell.exe",
+        args: [
+          "-NoProfile",
+          "-NonInteractive",
+          "-ExecutionPolicy",
+          "Bypass",
+          "-File",
+          script,
+          ...args,
+        ],
+      };
+    }
     return { command: "bash", args: [script, ...args] };
   }
   if (sudo) {
@@ -78,4 +93,27 @@ export async function probeSudo(script: string, env?: NodeJS.ProcessEnv): Promis
       });
     });
   });
+}
+
+/** Quote one argument for a cmd.exe command line (our arguments never contain quotes). */
+function quoteForCmd(arg: string) {
+  return /[\s&|<>^()]/.test(arg) ? `"${arg}"` : arg;
+}
+
+/**
+ * How a maintenance job is launched so it outlives this server, which it may stop.
+ * Linux: the plain command, spawned detached. Windows: a detached `cmd /c start "" /b` that
+ * starts PowerShell and exits. Node keeps non-detached children in a job object that dies with
+ * the server, and PowerShell started detached (no console) never runs, so the extra hop is
+ * needed. The job's own PID is then in data\maintenance-job.pid (written by the script).
+ */
+export function buildJobSpawn(script: string, args: string[]) {
+  const plain = buildSpawnArgs(script, args);
+  if (process.platform !== "win32") return { ...plain, verbatim: false };
+  const line = [plain.command, ...plain.args].map(quoteForCmd).join(" ");
+  return {
+    command: "cmd.exe",
+    args: ["/d", "/s", "/c", `"start "" /b ${line}"`],
+    verbatim: true,
+  };
 }

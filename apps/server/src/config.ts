@@ -347,7 +347,9 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
     maintenance: {
       enabled: e.TEAMFLOW_MAINTENANCE_ENABLED,
       sudo: e.TEAMFLOW_MAINTENANCE_SUDO,
-      backupDir: resolveFrom(appDir, e.TEAMFLOW_BACKUP_DIR) ?? "/var/backups/teamflow",
+      backupDir:
+        resolveFrom(appDir, e.TEAMFLOW_BACKUP_DIR) ??
+        (process.platform === "win32" ? path.join(appDir, "backups") : "/var/backups/teamflow"),
       backupScript: resolveFrom(appDir, e.TEAMFLOW_BACKUP_SCRIPT),
       updateScript: resolveFrom(appDir, e.TEAMFLOW_UPDATE_SCRIPT),
       discordBotScript: resolveFrom(appDir, e.TEAMFLOW_DISCORD_BOT_SCRIPT),

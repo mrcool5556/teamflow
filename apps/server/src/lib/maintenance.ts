@@ -19,11 +19,15 @@ import type {
 import { inferMaintenanceJobOutcome, parseMaintenanceLog } from "@teamflow/core";
 import { config } from "../config.js";
 import { getReleaseCheck, isUpdateAvailable, writeChannel } from "./releaseCheck.js";
-import { buildSpawnArgs, formatCommand, INSTALLED_SCRIPT_DIR, probeSudo } from "./hostScripts.js";
+import { buildJobSpawn, formatCommand, INSTALLED_SCRIPT_DIR, probeSudo } from "./hostScripts.js";
 import { badRequest, internalError } from "./errors.js";
 
 const JOB_FILE = "maintenance-job.json";
 const LOG_FILE = "maintenance.log";
+/** Windows: the PowerShell job writes its PID here (the spawned cmd.exe exits at once). */
+const JOB_PID_FILE = "maintenance-job.pid";
+/** How long a Windows job may take to start PowerShell and write its PID file. */
+const JOB_START_GRACE_MS = 60_000;
 const LOG_TAIL_BYTES = 12_000;
 
 function getDataDir() {
@@ -38,13 +42,22 @@ function getBackupDir() {
   return config.maintenance.backupDir;
 }
 
-/** Configured path (already absolute) > root-owned installed copy > checkout copy. */
+/**
+ * Linux: configured path (already absolute) > root-owned installed copy > checkout copy.
+ * Windows: configured path > the running release's deploy\windows script > checkout copy.
+ */
 function resolveScriptPath(
   configured: string | undefined,
   installedPath: string,
   repoRelative: string,
 ) {
   if (configured) return configured;
+  if (process.platform === "win32") {
+    const name = path.basename(repoRelative).replace(/\.sh$/, ".ps1");
+    const release = path.join(config.appDir, "current", "deploy", "windows", name);
+    if (existsSync(release)) return release;
+    return path.join(config.appDir, "deploy", "windows", name);
+  }
   if (existsSync(installedPath)) return installedPath;
   return path.join(config.appDir, repoRelative);
 }
@@ -78,9 +91,6 @@ function getRestoreScript() {
 function disabledReason(): string | null {
   if (!isMaintenanceEnabled()) {
     return "Server maintenance is disabled. Set TEAMFLOW_MAINTENANCE_ENABLED=true on the host.";
-  }
-  if (process.platform === "win32") {
-    return "In-app maintenance is only supported on Linux server installs.";
   }
   return null;
 }
@@ -123,11 +133,26 @@ function isProcessRunning(pid: number) {
   }
 }
 
+/** Is the job's process still alive? On Windows the PID comes from the script's PID file. */
+async function jobAlive(job: StoredJob) {
+  if (process.platform === "win32") {
+    try {
+      const raw = await fs.readFile(path.join(getDataDir(), JOB_PID_FILE), "utf8");
+      const pid = Number.parseInt(raw.trim(), 10);
+      if (Number.isFinite(pid) && pid > 0) return isProcessRunning(pid);
+    } catch {
+      // not written yet
+    }
+    return Date.now() - Date.parse(job.startedAt) < JOB_START_GRACE_MS;
+  }
+  return Boolean(job.pid && isProcessRunning(job.pid));
+}
+
 async function reconcileStaleJob() {
   const job = await readStoredJob();
   if (!job || job.status !== "running") return;
 
-  if (job.pid && isProcessRunning(job.pid)) return;
+  if (await jobAlive(job)) return;
 
   const logPath = path.join(getDataDir(), LOG_FILE);
   const log = await readLogTail();
@@ -191,7 +216,7 @@ async function listBackups(): Promise<MaintenanceBackupPublic[]> {
 
   const backups: MaintenanceBackupPublic[] = [];
   for (const name of entries) {
-    if (!/^teamflow_.+\.(db|sql|tar\.gz)$/.test(name)) continue;
+    if (!/^teamflow_.+\.(db|sql|tar\.gz|zip)$/.test(name)) continue;
     const fullPath = path.join(backupDir, name);
     try {
       const stat = await fs.stat(fullPath);
@@ -241,26 +266,35 @@ async function startJob(
   };
   await writeStoredJob(job);
 
-  const { command, args: spawnArgs } = buildSpawnArgs(script, args);
+  const { command, args: spawnArgs, verbatim } = buildJobSpawn(script, args);
+  // A PID file left by an earlier job must not speak for this one (Windows, see jobPid).
+  await fs.rm(path.join(dataDir, JOB_PID_FILE), { force: true });
   const env = {
     ...process.env,
     APP_DIR: config.appDir,
     BACKUP_DIR: getBackupDir(),
     MAINTENANCE_LOG: logPath,
+    // Windows: update.ps1 / restore.ps1 stop this process when no service manager does it.
+    TEAMFLOW_SERVER_PID: String(process.pid),
   };
+  // Set by update.ps1 / restore.ps1 for their own child backup; a server they restarted inherits it.
+  delete env.TEAMFLOW_NESTED_JOB;
 
   await fs.appendFile(logPath, `> ${formatCommand(command, spawnArgs)}\n`);
 
   // Update and restore stop teamflow: they must survive as detached root processes that write
-  // their own log (update.sh / restore.sh redirect themselves).
-  const stopsServer = type === "update" || type === "restore";
+  // their own log (update.sh / restore.sh redirect themselves). On Windows every job writes its
+  // own log: output does not come back through the cmd.exe hop, and a log handle passed down
+  // would block the script's own writes to the same file.
+  const writesOwnLog = type === "update" || type === "restore" || process.platform === "win32";
 
-  if (stopsServer) {
+  if (writesOwnLog) {
     const child = spawn(command, spawnArgs, {
       detached: true,
       stdio: "ignore",
       env,
       windowsHide: true,
+      windowsVerbatimArguments: verbatim,
     });
 
     child.on("error", (err) => {
@@ -292,6 +326,7 @@ async function startJob(
       stdio: ["ignore", logHandle.fd, logHandle.fd],
       env,
       windowsHide: true,
+      windowsVerbatimArguments: verbatim,
     });
 
     child.on("error", (err) => {
@@ -550,7 +585,7 @@ export async function dismissMaintenanceJob() {
   }
 
   if (job.status === "running") {
-    if (job.pid && isProcessRunning(job.pid)) {
+    if (await jobAlive(job)) {
       throw badRequest("Job is still running on the server.");
     }
     const log = await readLogTail();

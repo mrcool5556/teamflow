@@ -53,7 +53,7 @@ describe("maintenance sudo layout", () => {
   });
 
   it("update.sh and install.sh no longer install sudo targets into /usr/local/bin", () => {
-    for (const rel of ["deploy/proxmox-lxc/update.sh", "deploy/proxmox-lxc/install.sh"]) {
+    for (const rel of ["deploy/proxmox-lxc/update.sh", "deploy/install/install.sh"]) {
       const text = read(rel);
       expect(text, rel).not.toMatch(
         /install -m 755 .*\/usr\/local\/bin\/teamflow-(update|backup|discord)/,
