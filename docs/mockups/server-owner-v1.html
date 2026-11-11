@@ -1,0 +1,207 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Server Owner and backups v1</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link href="https://fonts.googleapis.com/css2?family=Encode+Sans+Semi+Condensed:wght@500;700&family=IBM+Plex+Mono:wght@400;600&family=Manrope:wght@400;600;700&display=swap" rel="stylesheet" />
+<style>
+  /* Machined look (copied from apps/web/src/styles/themes.css), mock-up only. */
+  :root {
+    --bg: #07090c; --surface: #11161c; --panel: #0e1318; --cell: #0c1014;
+    --border: #434b52; --border-strong: #6e7984; --text: #f2efe8; --text-soft: #caced0; --muted: #aab3bc;
+    --primary: #e6b84a; --accent: #00cfea; --danger: #e5484d; --done: #55bd9c; --warn: #e3c34f;
+    --inset: inset 0 0 0 1px rgba(236,233,225,.12), inset 0 2px 4px rgba(0,0,0,.45);
+    --lip: linear-gradient(180deg,#fff1b0 0%,#f0c75c 14%,#e6b84a 38%,#c9972c 66%,#8f6a1d 90%,#5a4012 100%);
+    --display: "Encode Sans Semi Condensed", sans-serif; --body: Manrope, sans-serif; --mono: "IBM Plex Mono", monospace;
+  }
+  :root[data-theme="light"] {
+    --bg: #f2efe8; --surface: #fff; --panel: #f9f8f5; --cell: #f6f4ef; --border: #b6b9bb; --border-strong: #71777d;
+    --text: #15120c; --text-soft: #343536; --muted: #4d5258; --primary: #9a6f15; --accent: #016f80; --danger: #c8303a; --done: #1d7a5f; --warn: #a07800;
+    --inset: inset 0 0 0 1px rgba(20,16,10,.12), inset 0 2px 3px rgba(0,0,0,.08);
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text); font: 14px/1.5 var(--body); }
+  h1, h2, h3 { font-family: var(--display); margin: 0 0 8px; }
+  main { max-width: 1400px; margin: 0 auto; padding: 24px 16px; }
+  .top { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
+  .top .grow { flex: 1; }
+  .top button { font: inherit; background: none; color: var(--text); border: 1px solid var(--border-strong); border-radius: 99px; padding: 3px 12px; }
+  .eyebrow { font: 600 11px var(--mono); letter-spacing: .18em; text-transform: uppercase; color: var(--accent); margin: 0 0 4px; }
+  .lead { color: var(--text-soft); max-width: 95ch; }
+  section { border-top: 1px solid var(--border); padding: 24px 0; }
+  ul.notes { font-size: 13px; color: var(--text-soft); max-width: 100ch; }
+  .mocks { display: flex; flex-wrap: wrap; gap: 20px; align-items: flex-start; margin-top: 12px; }
+  .frame { --s: .6; width: calc(var(--w) * var(--s) * 1px); height: calc(var(--h) * var(--s) * 1px); overflow: hidden; border: 1px solid var(--border-strong); border-radius: 10px; flex: none; max-width: 100%; }
+  .frame > .vp { width: calc(var(--w) * 1px); height: calc(var(--h) * 1px); transform: scale(var(--s)); transform-origin: 0 0; background: var(--bg); position: relative; }
+  .frame.phone { --s: .66; }
+  .cap { font-size: 12px; color: var(--muted); margin-top: 4px; max-width: 740px; }
+  @media (max-width: 760px) { .frame { --s: .27; } .frame.phone { --s: .75; } }
+
+  /* app parts */
+  .bar { display: flex; align-items: center; gap: 12px; height: 56px; padding: 0 20px; background: var(--surface); border-bottom: 1px solid var(--border); }
+  .bar .grow { flex: 1; }
+  .logo { font: 600 12px var(--mono); letter-spacing: .2em; color: var(--accent); }
+  .av { width: 30px; height: 30px; border-radius: 50%; background: var(--accent); color: #06171a; display: grid; place-items: center; font-weight: 700; font-size: 12px; }
+  .admin { display: grid; grid-template-columns: 220px 1fr; height: calc(100% - 56px); }
+  .nav { background: var(--panel); border-right: 1px solid var(--border); padding: 14px 10px; font-size: 13px; }
+  .nav .h { font: 10px var(--mono); letter-spacing: .14em; color: var(--muted); text-transform: uppercase; margin: 12px 10px 4px; }
+  .nav .it { padding: 6px 12px; border-radius: 99px; color: var(--text-soft); }
+  .nav .it.on { background: color-mix(in srgb, var(--accent) 14%, transparent); color: var(--text); }
+  .content { padding: 22px 30px; overflow: hidden; }
+  .content h2 { font-size: 26px; }
+  .sub { color: var(--text-soft); font-size: 13px; margin: 0 0 14px; }
+  .btn { display: inline-flex; align-items: center; font: 600 13px var(--body); padding: 6px 14px; border-radius: 99px; border: 1px solid var(--border-strong); background: none; color: var(--text); white-space: nowrap; }
+  .btn.primary { border: 3px solid transparent; background: linear-gradient(var(--primary),var(--primary)) padding-box, var(--lip) border-box; color: #14100a; }
+  .btn.danger { border-color: var(--danger); color: var(--danger); }
+  .btn.sm { font-size: 12px; padding: 3px 10px; }
+  .pill { font: 11px var(--mono); padding: 0 8px; border-radius: 99px; border: 1px solid; white-space: nowrap; }
+  .pill.owner { color: var(--primary); } .pill.env { color: var(--warn); } .pill.muted { color: var(--muted); }
+  .card { border: 1px solid var(--border); border-radius: 10px; background: var(--surface); padding: 14px 16px; margin-bottom: 12px; }
+  .card h3 { font-size: 17px; }
+  .row { display: grid; grid-template-columns: minmax(0,1.4fr) minmax(0,3fr) auto; gap: 14px; align-items: center; padding: 10px 0; border-bottom: 1px solid var(--border); font-size: 13px; }
+  .row:last-child { border-bottom: 0; }
+  .who b { display: block; } .who small { color: var(--muted); }
+  .powers { display: flex; flex-wrap: wrap; gap: 6px 12px; }
+  .tick { display: inline-flex; gap: 6px; align-items: center; font-size: 12px; color: var(--text-soft); }
+  .tick i { width: 15px; height: 15px; border-radius: 4px; box-shadow: var(--inset); background: var(--cell); display: inline-grid; place-items: center; font-style: normal; font-size: 10px; }
+  .tick i.on { background: var(--accent); color: #06171a; box-shadow: none; }
+  .add { display: flex; gap: 8px; margin-top: 10px; }
+  .input { flex: 1; padding: 7px 12px; border-radius: 99px; background: var(--cell); box-shadow: var(--inset); color: var(--muted); font: 13px var(--mono); }
+  .scrim { position: absolute; inset: 0; background: rgba(0,0,0,.55); }
+  .dialog { position: absolute; left: 50%; top: 50%; transform: translate(-50%,-50%); width: 480px; background: var(--panel); border: 1px solid var(--border-strong); border-radius: 12px; padding: 20px 22px; font-size: 13px; }
+  .dialog h3 { font-size: 20px; }
+  .dialog .foot { display: flex; justify-content: flex-end; gap: 8px; margin-top: 14px; }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  th { text-align: left; font: 10px var(--mono); letter-spacing: .12em; text-transform: uppercase; color: var(--muted); padding: 6px 8px; border-bottom: 1px solid var(--border-strong); font-weight: 400; }
+  td { padding: 8px; border-bottom: 1px solid var(--border); }
+  td.r { text-align: right; }
+  .kind { font: 11px var(--mono); padding: 0 8px; border-radius: 99px; border: 1px solid var(--border-strong); color: var(--text-soft); }
+  .kind.db { color: var(--accent); border-color: var(--accent); } .kind.up { color: var(--done); border-color: var(--done); }
+  .total { display: flex; gap: 18px; align-items: baseline; flex-wrap: wrap; margin-bottom: 10px; }
+  .total b { font: 700 22px var(--display); }
+  .keep { display: flex; gap: 14px; flex-wrap: wrap; margin-top: 12px; align-items: flex-end; }
+  .keep label { display: block; font: 10px var(--mono); letter-spacing: .12em; text-transform: uppercase; color: var(--muted); margin-bottom: 4px; }
+  .keep .input { width: 90px; flex: none; color: var(--text); }
+  .phone .row { grid-template-columns: 1fr; gap: 6px; }
+  .phone .admin { grid-template-columns: 1fr; }
+  .phone .nav { display: none; }
+  .phone .content { padding: 14px; }
+  .phone td:nth-child(3) { display: none; }
+</style>
+</head>
+<body>
+<main>
+  <div class="top"><div><p class="eyebrow">Mock-up · branch server-owner · decisions from 2026-11-11</p><h1>Server Owner, trusted admins and the backup list</h1></div><span class="grow"></span><button type="button" onclick="document.documentElement.dataset.theme = document.documentElement.dataset.theme === 'dark' ? 'light' : 'dark'">Light / dark</button></div>
+  <p class="lead">Frames are 1280×800 desktop and 390×800 phone, scaled. They show only what the decisions leave open: where things sit and what the confirms say.</p>
+
+  <section>
+    <p class="eyebrow">1 · Server admin → People (Owner)</p>
+    <h2>Server Owner, trusted admins with powers</h2>
+    <ul class="notes">
+      <li>Top card: the <b>Server Owner</b> (the setup account). It has every power, and only it sees the trusted list and <b>Transfer ownership</b>.</li>
+      <li><b>Trusted admins</b>: one row per person, with seven tick boxes that save as soon as you tick. Clearing every box removes all Server admin access. <b>Remove</b> takes them off the list.</li>
+      <li>People listed in <code>TEAMFLOW_INSTANCE_ADMINS</code> show "Set in .env": all seven boxes ticked and locked, no Remove.</li>
+      <li>"Add a trusted admin" picks an existing account by name or email; they start with no powers ticked.</li>
+      <li>Below, as before, everyone with an account and <b>Send reset link</b> (that part needs the People power).</li>
+    </ul>
+    <div class="mocks">
+      <div><div class="frame" style="--w:1280;--h:800"><div class="vp">
+        <div class="bar"><span class="logo">TOASTERLAND TEAMFLOW</span><b style="margin-left:14px">Server admin</b><span class="grow"></span><span class="btn sm">Go to my Flows →</span><span class="av">GE</span></div>
+        <div class="admin">
+          <nav class="nav"><div class="h">Server</div><div class="it">Overview</div><div class="it">Flows</div><div class="it on">People</div><div class="it">Site &amp; email</div><div class="it">Updates &amp; backups</div><div class="it">Discord bot</div><div class="h">Settings</div><div class="it">Flow defaults &amp; sign-up</div></nav>
+          <div class="content" id="people">
+            <h2>People</h2><p class="sub">Who runs this server, and everyone with an account.</p>
+            <div class="card"><h3>Server Owner</h3>
+              <div class="row"><span class="who"><b>George <span class="pill owner">Owner</span></b><small>mr.cool5556@hotmail.com</small></span><span class="muted" style="color:var(--muted)">Every power. Only the Owner adds trusted admins, changes their powers, transfers ownership and deletes Flows for good.</span><span class="btn sm">Transfer ownership…</span></div>
+            </div>
+            <div class="card"><h3>Trusted admins</h3>
+              <div class="row"><span class="who"><b>Sam Rivers</b><small>sam@example.org</small></span>
+                <span class="powers"><span class="tick"><i class="on">✓</i>Updates</span><span class="tick"><i class="on">✓</i>Backups</span><span class="tick"><i>&nbsp;</i>People</span><span class="tick"><i class="on">✓</i>Flows</span><span class="tick"><i>&nbsp;</i>Site &amp; email</span><span class="tick"><i class="on">✓</i>Discord bot</span><span class="tick"><i>&nbsp;</i>Sign-up rules</span></span>
+                <span class="btn sm danger">Remove</span></div>
+              <div class="row"><span class="who"><b>Ops Bot <span class="pill env">Set in .env</span></b><small>ops@example.org</small></span>
+                <span class="powers"><span class="tick"><i class="on">✓</i>Updates</span><span class="tick"><i class="on">✓</i>Backups</span><span class="tick"><i class="on">✓</i>People</span><span class="tick"><i class="on">✓</i>Flows</span><span class="tick"><i class="on">✓</i>Site &amp; email</span><span class="tick"><i class="on">✓</i>Discord bot</span><span class="tick"><i class="on">✓</i>Sign-up rules</span></span>
+                <span class="pill muted">locked</span></div>
+              <div class="add"><span class="input">Add a trusted admin: name or email…</span><span class="btn sm">Add</span></div>
+            </div>
+            <div class="card"><h3>Everyone</h3><div class="row"><span class="who"><b>Jules</b><small>jules@example.org</small></span><span style="color:var(--muted);font-size:12px">2 Flows · owns 1 free · joined 3 Oct</span><span class="btn sm">Send reset link</span></div></div>
+          </div>
+        </div>
+      </div></div><div class="cap">Desktop · the Owner's People page. Ticks save at once; the panel status line says "Sam can now run backups".</div></div>
+
+      <div><div class="frame" style="--w:1280;--h:800"><div class="vp">
+        <div class="bar"><span class="logo">TOASTERLAND TEAMFLOW</span><b style="margin-left:14px">Server admin</b><span class="grow"></span><span class="av">GE</span></div>
+        <div class="scrim"></div>
+        <div class="dialog"><h3>Transfer ownership to Sam Rivers?</h3>
+          <p>Sam becomes the Server Owner with every power. You stay a trusted admin with all seven powers, but you can no longer add or remove admins, transfer ownership or delete Flows for good.</p>
+          <p>Only Sam can give ownership back.</p>
+          <p style="color:var(--muted)">Type <b style="color:var(--text)">sam@example.org</b> to confirm:</p><span class="input" style="display:block">sam@example.org</span>
+          <div class="foot"><span class="btn">Cancel</span><span class="btn danger">Transfer ownership</span></div>
+        </div>
+      </div></div><div class="cap">Desktop · Transfer ownership. The button stays disabled until the new Owner's email is typed. Pick the person first from a list of trusted admins.</div></div>
+
+      <div><div class="frame phone" style="--w:390;--h:800"><div class="vp">
+        <div class="bar" style="padding:0 14px"><span class="logo">TEAMFLOW</span><span class="grow"></span><span class="av">GE</span></div>
+        <div class="admin"><div class="content" data-clone="people"></div></div>
+      </div></div><div class="cap">Phone · rows stack: who, then the seven ticks, then Remove.</div></div>
+    </div>
+  </section>
+
+  <section>
+    <p class="eyebrow">2 · Server admin → Updates &amp; backups (Backups power)</p>
+    <h2>The backup list</h2>
+    <ul class="notes">
+      <li>The total used and the backup folder sit at the top. Below them is one row per file: date, type (database, uploads or checkpoint), size, then Restore and Delete.</li>
+      <li>The newest database backup has no Delete (the server refuses it). Its row says "newest, kept".</li>
+      <li>Delete asks: "Delete teamflow_2026-11-09_031500.db for good? This can't be undone. It frees 3.1 MB."</li>
+      <li>Two keep-N fields (1–100): database backups (default 10) and upload archives (default 1). They're applied after the next backup. They save on change, with "Saved" next to them.</li>
+      <li>Someone with Updates but not Backups sees the update card only; the backup list and buttons are hidden.</li>
+    </ul>
+    <div class="mocks">
+      <div><div class="frame" style="--w:1280;--h:800"><div class="vp">
+        <div class="bar"><span class="logo">TOASTERLAND TEAMFLOW</span><b style="margin-left:14px">Server admin</b><span class="grow"></span><span class="av">GE</span></div>
+        <div class="admin">
+          <nav class="nav"><div class="h">Server</div><div class="it">Overview</div><div class="it">Flows</div><div class="it">People</div><div class="it">Site &amp; email</div><div class="it on">Updates &amp; backups</div><div class="it">Discord bot</div></nav>
+          <div class="content" id="backups">
+            <h2>Backups</h2>
+            <div class="total"><span><b>2.4 GB</b> used by 7 backups</span><span style="color:var(--muted);font:12px var(--mono)">/var/backups/teamflow</span><span style="flex:1"></span><span class="btn sm">Back up database</span><span class="btn sm primary">Full backup (with files)</span></div>
+            <table><thead><tr><th>Date</th><th>Type</th><th>Name</th><th class="r">Size</th><th></th></tr></thead><tbody>
+              <tr><td>11 Nov 03:15</td><td><span class="kind db">database</span></td><td><code>teamflow_2026-11-11_031500.db</code></td><td class="r">3.1 MB</td><td class="r"><span class="btn sm">Restore</span> <span class="pill muted">newest, kept</span></td></tr>
+              <tr><td>10 Nov 03:15</td><td><span class="kind db">database</span></td><td><code>teamflow_2026-11-10_031500.db</code></td><td class="r">3.1 MB</td><td class="r"><span class="btn sm">Restore</span> <span class="btn sm danger">Delete</span></td></tr>
+              <tr><td>09 Nov 22:40</td><td><span class="kind up">uploads</span></td><td><code>teamflow_uploads_2026-11-09_224012.tar.gz</code></td><td class="r">2.3 GB</td><td class="r"><span class="btn sm danger">Delete</span></td></tr>
+              <tr><td>09 Nov 22:39</td><td><span class="kind">checkpoint</span></td><td><code>teamflow_pre-update-0.2.2.db</code></td><td class="r">3.0 MB</td><td class="r"><span class="btn sm">Restore</span> <span class="btn sm danger">Delete</span></td></tr>
+            </tbody></table>
+            <div class="keep"><div><label>Keep database backups</label><span class="input">10</span></div><div><label>Keep upload archives</label><span class="input">1</span></div><span style="color:var(--muted);font-size:12px">Older automatic backups are deleted after each backup. Checkpoints are never deleted automatically.</span></div>
+          </div>
+        </div>
+      </div></div><div class="cap">Desktop · it sits under the update card on Updates &amp; backups and is open by default for anyone with the Backups power.</div></div>
+      <div><div class="frame" style="--w:1280;--h:800"><div class="vp">
+        <div class="bar"><span class="logo">TOASTERLAND TEAMFLOW</span><span class="grow"></span><span class="av">GE</span></div>
+        <div class="scrim"></div>
+        <div class="dialog"><h3>Delete teamflow_2026-11-10_031500.db for good?</h3><p>This can't be undone. It frees 3.1 MB. The newest database backup stays.</p><div class="foot"><span class="btn">Cancel</span><span class="btn danger">Delete backup</span></div></div>
+      </div></div><div class="cap">Desktop · Delete confirm.</div></div>
+      <div><div class="frame phone" style="--w:390;--h:800"><div class="vp">
+        <div class="bar" style="padding:0 14px"><span class="logo">TEAMFLOW</span><span class="grow"></span><span class="av">GE</span></div>
+        <div class="admin"><div class="content" data-clone="backups"></div></div>
+      </div></div><div class="cap">Phone · the name column hides; date, type, size and actions stay.</div></div>
+    </div>
+  </section>
+
+  <section>
+    <p class="eyebrow">3 · Start page</p>
+    <h2>The Owner lands on Server admin → Overview</h2>
+    <ul class="notes">
+      <li>After signing in, the Owner opens on Overview. The bar has a <b>Go to my Flows →</b> button (first frame). Trusted admins and everyone else open on their Flow as now.</li>
+      <li>Server admin's nav shows only the sections someone has a power for. Overview is shown to anyone with at least one power.</li>
+    </ul>
+  </section>
+</main>
+<script>
+  document.querySelectorAll("[data-clone]").forEach((el) => {
+    const src = document.getElementById(el.dataset.clone);
+    if (src) el.innerHTML = src.innerHTML;
+  });
+</script>
+</body>
+</html>
