@@ -193,7 +193,12 @@ function Install-Teamflow {
     }
   }
 
-  $fresh = -not (Test-Path $envFile)
+  # A dry run did not copy -From's .env, so it reads that one to show the same plan.
+  $envSource = $envFile
+  if ($DryRun -and $From -and -not (Test-Path $envFile) -and -not (Test-Path (Join-Path $root "data\teamflow.db")) -and (Test-Path (Join-Path $From ".env"))) {
+    $envSource = Join-Path $From ".env"
+  }
+  $fresh = -not (Test-Path $envSource)
   $script:EnvLines = @()
   if ($fresh) {
     $script:EnvLines = @(
@@ -202,7 +207,7 @@ function Install-Teamflow {
       "NODE_ENV=production"
     )
   } else {
-    $script:EnvLines = @(Get-Content $envFile)
+    $script:EnvLines = @(Get-Content $envSource)
   }
   Set-EnvIfMissing "PORT" "$Port"
   Set-EnvIfMissing "HOST" "0.0.0.0"
@@ -216,8 +221,10 @@ function Install-Teamflow {
     $jwt = Get-EnvLine "JWT_SECRET"
   }
   if (-not (Get-EnvLine "TEAMFLOW_SECRETS_KEY")) {
-    # On an old install, stored secrets were encrypted with JWT_SECRET; keep that key.
-    if ($fresh) { Set-EnvIfMissing "TEAMFLOW_SECRETS_KEY" (New-Secret) } else { Set-EnvIfMissing "TEAMFLOW_SECRETS_KEY" $jwt }
+    # An existing install without the key encrypted its saved secrets with JWT_SECRET. Leave it
+    # unset so the server keeps that fallback; a new key would make those secrets unreadable.
+    if ($fresh) { Set-EnvIfMissing "TEAMFLOW_SECRETS_KEY" (New-Secret) }
+    else { Write-Host "    TEAMFLOW_SECRETS_KEY stays unset: saved secrets keep using JWT_SECRET" }
   }
   Act "write $envFile" {
     Write-Utf8 $envFile (($script:EnvLines -join "`r`n") + "`r`n")
