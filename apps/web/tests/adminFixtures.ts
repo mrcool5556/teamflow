@@ -75,6 +75,8 @@ export function makeOverview(extra: Partial<InstanceOverviewPublic> = {}): Insta
           kind: "database",
           sizeBytes: 500_000,
           createdAt: "2026-11-05T21:39:00Z",
+          deletable: false,
+          restorable: true,
         },
       ],
       job: null,

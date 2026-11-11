@@ -176,15 +176,15 @@ check "anything else is refused" in_ct '! runuser -u teamflow -- sudo -n /bin/tr
 
 section "In-app backup and update (through sudo, default github.com URLs)"
 set_latest 0.2.1
-st=$(api POST "/teams/$TEAM/server/maintenance/check")
+st=$(api POST "/server/maintenance/check")
 check "maintenance enabled" has "$st" '"enabled":true'
 check "release check sees v0.2.1" has "$st" '"version":"0.2.1"' || echo "    $st" | head -c 800
-api POST "/teams/$TEAM/server/maintenance/backup" '{"full":false}' >/dev/null
+api POST "/server/maintenance/backup" '{"full":false}' >/dev/null
 job=""
-for _ in $(seq 1 60); do job=$(api GET "/teams/$TEAM/server/maintenance"); [[ "$job" == *'"status":"running"'* ]] || break; sleep 1; done
+for _ in $(seq 1 60); do job=$(api GET "/server/maintenance"); [[ "$job" == *'"status":"running"'* ]] || break; sleep 1; done
 check "in-app backup succeeded" has "$job" '"status":"success"'
 pid_before=$(in_ct 'systemctl show -p MainPID --value teamflow')
-api POST "/teams/$TEAM/server/maintenance/update" '{"version":"0.2.1"}' >/dev/null
+api POST "/server/maintenance/update" '{"version":"0.2.1"}' >/dev/null
 check "server updated itself to 0.2.1" wait_version 0.2.1 180
 check "DONE 0.2.1 logged" test "$(last_line DONE)" = "DONE 0.2.1"
 check "new MainPID under systemd" test "$(in_ct 'systemctl show -p MainPID --value teamflow')" != "$pid_before"
@@ -213,6 +213,26 @@ in_ct "teamflow-restore --file '$(basename "$snap")'" >"$WORK/restore.log" 2>&1 
 check "RESTORED logged" has "$(last_line RESTORED)" "RESTORED $(basename "$snap")"
 check "answers after restore" wait_version 0.2.1 60
 check "one team after restore" test "$(teams_count)" = 1
+
+section "Backups from the app (list, delete through sudo, keep settings)"
+in_ct 'cd /var/backups/teamflow && echo keep >teamflow-pre-0.2.0.db && echo keep >teamflow_env_pre-0.2.0 && echo keep >notes.txt'
+B="/server/maintenance"
+list=$(api GET "$B/backups")
+check "lists backups with a total" has "$list" '"totalBytes":'
+check "checkpoints listed as such" has "$list" '"name":"teamflow-pre-0.2.0.db","kind":"checkpoint"'
+check "other files not listed" lacks "$list" notes.txt
+newest=$(in_ct 'cd /var/backups/teamflow && ls -t teamflow_2*.db | head -n1')
+check "newest database backup refused" has "$(api DELETE "$B/backups/$newest")" "newest database backup"
+check "...still there" in_ct "test -f /var/backups/teamflow/$newest"
+check "a checkpoint deleted through sudo" has "$(api DELETE "$B/backups/teamflow_env_pre-0.2.0")" '"backups":'
+check "...gone" in_ct '! test -e /var/backups/teamflow/teamflow_env_pre-0.2.0'
+check "keep settings saved" has "$(api PUT "$B/backup-retention" '{"keepDatabaseBackups":2,"keepUploadArchives":1}')" '"keepDatabaseBackups":2'
+api POST "$B/backup" '{"full":false}' >/dev/null
+for _ in $(seq 1 60); do job=$(api GET "$B/job"); [[ "$job" == *'"status":"running"'* ]] || break; sleep 1; done
+check "in-app backup after the change succeeded" has "$job" '"status":"success"'
+check "keeps 2 database backups" test "$(in_ct 'ls /var/backups/teamflow | grep -cE "^teamflow_[0-9-]{10}_[0-9]{6}(-[0-9]+)?\.db$"')" = 2
+check "checkpoint and other file untouched" in_ct 'test -f /var/backups/teamflow/teamflow-pre-0.2.0.db && test -f /var/backups/teamflow/notes.txt'
+api PUT "$B/backup-retention" '{"keepDatabaseBackups":10,"keepUploadArchives":1}' >/dev/null
 
 section "proxmox.sh --reuse: its installer command, run for real in this container"
 set_latest 0.2.1
