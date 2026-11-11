@@ -212,14 +212,10 @@ fn ensure_env(root: &Path) -> Result<u16, String> {
         lines.retain(|l| !l.starts_with("JWT_SECRET="));
         add(&mut lines, "JWT_SECRET", random_hex());
     }
-    if env_get(&lines, "TEAMFLOW_SECRETS_KEY").is_none() {
-        // On an existing install, stored secrets were encrypted with JWT_SECRET; keep that key.
-        let key = if fresh {
-            random_hex()
-        } else {
-            env_get(&lines, "JWT_SECRET").unwrap_or_else(random_hex)
-        };
-        add(&mut lines, "TEAMFLOW_SECRETS_KEY", key);
+    // An existing install without the key encrypted its saved secrets with JWT_SECRET. Leave it
+    // unset there so the server keeps that fallback; a new key would make them unreadable.
+    if fresh {
+        add(&mut lines, "TEAMFLOW_SECRETS_KEY", random_hex());
     }
     let mut text = lines.join("\r\n");
     text.push_str("\r\n");

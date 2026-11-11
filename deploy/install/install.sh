@@ -24,6 +24,8 @@ REPO="mrcool5556/teamflow"
 APP_DIR="/opt/teamflow"
 APP_USER="teamflow"
 SERVICE="teamflow"
+BOT_SERVICE="teamflow-discord"
+CONVERTING=0
 
 # A heredoc, not the header above: under `curl | bash` there is no script file to read it from.
 usage() {
@@ -194,6 +196,7 @@ convert_git_checkout() {
   say "    Prebuilt releases replace it. Your .env, database and uploads are kept; the checkout"
   say "    moves to $kept (delete it later), and the database is backed up first."
   ask_yes "Switch this server to prebuilt releases?" || die "nothing was changed."
+  CONVERTING=1
 
   local url db
   url=$(env_get DATABASE_URL)
@@ -207,6 +210,7 @@ convert_git_checkout() {
   esac
 
   act systemctl_do stop "$SERVICE"
+  if bot_unit_installed; then act systemctl_do stop "$BOT_SERVICE"; fi
   if [[ -f "$db" ]]; then
     local backup
     backup="/var/backups/teamflow/teamflow_$(date +%Y-%m-%d_%H%M%S)-before-releases.db"
@@ -219,6 +223,14 @@ convert_git_checkout() {
   [[ -f "$kept/.env" ]] && act mv "$kept/.env" "$APP_DIR/.env"
   [[ -d "$kept/data" ]] && act mv "$kept/data" "$APP_DIR/data"
   say "    checkout kept at $kept"
+  if [[ -f "$kept/apps/discord-bot/.env" ]]; then
+    say "    note: $kept/apps/discord-bot/.env is not carried over; the Discord bot's unit should"
+    say "    read its settings from EnvironmentFile=$APP_DIR/data/discord-bot.env"
+  fi
+}
+
+bot_unit_installed() {
+  [[ -f "/etc/systemd/system/$BOT_SERVICE.service" ]]
 }
 
 prepare_dirs() {
@@ -261,14 +273,13 @@ EOF
     env_set_if_missing JWT_SECRET "$(random_hex)"
     jwt="$(env_get JWT_SECRET)"
   fi
-  if [[ -z "$secrets" ]]; then
-    if [[ "$fresh" == 1 ]]; then
-      env_set_if_missing TEAMFLOW_SECRETS_KEY "$(random_hex)"
-    else
-      # Saved integration secrets were encrypted with JWT_SECRET (the fallback); the same value
-      # keeps them readable and lets JWT_SECRET change later without losing them.
-      env_set_if_missing TEAMFLOW_SECRETS_KEY "$jwt"
-    fi
+  if [[ -z "$secrets" && "$fresh" == 1 ]]; then
+    env_set_if_missing TEAMFLOW_SECRETS_KEY "$(random_hex)"
+  elif [[ -z "$secrets" ]]; then
+    # An existing install without the key encrypted its saved secrets (Discord, e-mail) with
+    # JWT_SECRET. Leave it unset: the server keeps that fallback, using JWT_SECRET exactly as
+    # systemd reads it. A new key, or a copy that parses differently, would lose those secrets.
+    say "    TEAMFLOW_SECRETS_KEY stays unset: saved secrets keep using JWT_SECRET"
   fi
   act chown "$APP_USER:$APP_USER" "$APP_DIR/.env"
   act chmod 600 "$APP_DIR/.env"
@@ -320,6 +331,11 @@ link_paths() {
   local name
   for name in apps deploy; do
     if [[ -e "$APP_DIR/$name" && ! -L "$APP_DIR/$name" ]]; then
+      # A dry run left the checkout in place; the real run moves this folder away with it.
+      if [[ "$DRY_RUN" == 1 && "$CONVERTING" == 1 ]]; then
+        act ln -sfn "current/$name" "$APP_DIR/$name"
+        continue
+      fi
       die "$APP_DIR/$name is a folder, expected a link into current/. Move it away and re-run."
     fi
     act ln -sfn "current/$name" "$APP_DIR/$name"
@@ -333,8 +349,14 @@ systemctl_do() {
 setup_service() {
   step "Service"
   if [[ "$DRY_RUN" == 1 ]]; then
-    say "    [dry-run] migrate the database, install teamflow.service, enable and start it"
-    say "    [dry-run] install the update permission (setup-maintenance-sudo.sh)"
+    say "    [dry-run] migrate the database: node $APP_DIR/current/apps/server/dist/migrate.js"
+    say "    [dry-run] install $SERVICE.service, enable and restart it"
+    say "    [dry-run] install the update permission (setup-maintenance-sudo.sh) and teamflow-smtp"
+    say "    [dry-run] wait for http://127.0.0.1:$PORT/health"
+    if bot_unit_installed; then
+      say "    [dry-run] restart $BOT_SERVICE.service (runs from $APP_DIR/apps/discord-bot → current/apps)"
+    fi
+    say "    [dry-run] print the address"
     return
   fi
   local out
@@ -359,6 +381,18 @@ setup_service() {
     die "couldn't install the update permission (setup-maintenance-sudo.sh). Run it by hand to see why: sudo bash $APP_DIR/deploy/proxmox-lxc/setup-maintenance-sudo.sh"
   install -m 755 "$APP_DIR/current/deploy/proxmox-lxc/configure-smtp.sh" /usr/local/bin/teamflow-smtp
   say "    one-click updates enabled (Settings → Updates)"
+}
+
+# The Discord bot's unit runs from $APP_DIR/apps/discord-bot, which is now current/apps. It talks
+# to the server, so it restarts once the server answers.
+restart_bot() {
+  bot_unit_installed || return 0
+  [[ "$CONVERTING" == 1 ]] || systemctl_do is-enabled "$BOT_SERVICE" >/dev/null 2>&1 || return 0
+  if systemctl_do restart "$BOT_SERVICE"; then
+    say "    $BOT_SERVICE.service restarted"
+  else
+    say "    couldn't restart $BOT_SERVICE: journalctl -u $BOT_SERVICE -n 50"
+  fi
 }
 
 wait_healthy() {
@@ -466,6 +500,7 @@ main() {
   if ! wait_healthy "$PORT"; then
     die "Teamflow didn't answer on port $PORT within 60 seconds. See: journalctl -u teamflow -n 50"
   fi
+  restart_bot
   print_address "$PORT"
 }
 

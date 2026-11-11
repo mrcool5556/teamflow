@@ -98,6 +98,21 @@ cat >/usr/local/bin/fake-systemctl <<'EOF'
 #!/usr/bin/env bash
 # Runs teamflow.service's ExecStart as the app user in the background.
 pidfile=/run/teamflow.pid
+if [[ "${2:-}" == teamflow-discord ]]; then
+  # The bot's unit: record the call; on restart run its ExecStart once, as the unit says.
+  echo "$1" >>/tmp/bot-calls.log
+  unit=/etc/systemd/system/teamflow-discord.service
+  case "$1" in
+    is-enabled) [[ -f $unit ]] ;;
+    restart|start)
+      exec_start=$(sed -n 's/^ExecStart=//p' $unit)
+      workdir=$(sed -n 's/^WorkingDirectory=//p' $unit)
+      envfile=$(sed -n 's/^EnvironmentFile=//p' $unit)
+      (cd "$workdir" && set -a && . "$envfile" && set +a && timeout 30 runuser -u teamflow -- $exec_start) >/tmp/bot.log 2>&1 || true
+      ;;
+  esac
+  exit 0
+fi
 case "$1" in
   start|restart)
     if [[ "$1" == restart && -f $pidfile ]]; then kill "$(cat $pidfile)" 2>/dev/null || true; sleep 1; fi
@@ -295,8 +310,12 @@ check "dry run changed nothing" test "$(find $APP_DIR -maxdepth 2 -printf '%p %s
 
 section "Installer switches a git-checkout server to releases (the CT998 path)"
 /usr/local/bin/fake-systemctl stop || true
-rm -rf $APP_DIR /etc/systemd/system/teamflow.service
-mkdir -p $APP_DIR/.git $APP_DIR/data $APP_DIR/apps/server
+rm -rf $APP_DIR /etc/systemd/system/teamflow.service /tmp/bot-calls.log
+mkdir -p $APP_DIR/.git $APP_DIR/data $APP_DIR/apps/server $APP_DIR/apps/discord-bot $APP_DIR/deploy
+echo "DISCORD_TOKEN=old-style" >$APP_DIR/apps/discord-bot/.env
+# CT998 runs the Discord bot from the repo's unit, which reads data/discord-bot.env.
+tr -d '\r' <"$SRC/deploy/proxmox-lxc/teamflow-discord.service" >/etc/systemd/system/teamflow-discord.service
+printf 'TEAMFLOW_URL=http://127.0.0.1:3000\nTEAMFLOW_BOT_CONFIG_KEY=not-set-on-the-server\n' >$APP_DIR/data/discord-bot.env
 legacy_jwt=$(openssl rand -hex 32)
 cat >$APP_DIR/.env <<ENV
 PORT=3000
@@ -314,18 +333,59 @@ tar -xzf "$REL/download/v0.2.0/teamflow-v0.2.0-linux-x64.tar.gz" -C "$tmprel"
 (cd $APP_DIR && node "$tmprel/apps/server/dist/migrate.js" >/dev/null && node -e '
   const D=require(process.argv[1]); const db=new D("data/teamflow.db");
   db.exec("CREATE TABLE canary(v TEXT)"); db.prepare("INSERT INTO canary VALUES (?)").run("legacy"); db.close();' "$tmprel/node_modules/better-sqlite3")
+# A secret saved the way CT998 saved its Discord settings: no TEAMFLOW_SECRETS_KEY, so JWT_SECRET.
+(cd $APP_DIR && env -i PATH="$PATH" NODE_ENV=production JWT_SECRET="$legacy_jwt" node --input-type=module -e '
+  const m = await import(process.argv[1]); process.stdout.write(m.encryptSecret("discord-bot-token-123"));' \
+  "$tmprel/apps/server/dist/lib/secretsCrypto.js" 2>/dev/null) >/tmp/legacy-secret.blob || true
+check "legacy secret encrypted with the JWT_SECRET fallback" grep -q '^v2:' /tmp/legacy-secret.blob
+# decrypt_with <env file>: decrypt it as the service would, with that file's values.
+decrypt_with() {
+  (cd $APP_DIR && env -i PATH="$PATH" bash -c 'set -a; . "$1"; set +a; node --input-type=module -e "
+    const m = await import(process.argv[1]); process.stdout.write(m.decryptSecret(process.argv[2]));" \
+    "$2" "$3"' _ "$1" "$APP_DIR/apps/server/dist/lib/secretsCrypto.js" "$(cat /tmp/legacy-secret.blob)" 2>/dev/null) || true
+}
 chown -R teamflow:teamflow $APP_DIR
 set_latest 0.2.1
 # No terminal (as from cron or ssh without -t) and no --yes: it must ask, so it must stop.
 setsid bash "$SRC/deploy/install/install.sh" </dev/null >/tmp/convert-notty.log 2>&1 && bad "converted without a terminal or --yes" || ok "no terminal, no --yes: refuses to convert"
 check "...says to use --yes" grep -q "Re-run with --yes" /tmp/convert-notty.log
 check "...checkout untouched" test -d $APP_DIR/.git
+
+# The dry run must show the whole switch, although it leaves the checkout's apps/ in place.
+dry_before=$(find $APP_DIR -printf '%p %s\n' | sort | sha256sum)
+bash "$SRC/deploy/install/install.sh" --dry-run --yes >/tmp/convert-dry.log 2>&1 && ok "conversion dry run exit 0" || { tail -20 /tmp/convert-dry.log; bad "conversion dry run exit"; }
+dry_has() { grep -qF -- "$1" /tmp/convert-dry.log; }
+check "...did not stop at the apps folder" bash -c '! grep -q "expected a link" /tmp/convert-dry.log'
+check "...shows the checkout move" dry_has "[dry-run] mv $APP_DIR $APP_DIR.git-"
+check "...shows the apps link" dry_has "[dry-run] ln -sfn current/apps $APP_DIR/apps"
+check "...shows the deploy link" dry_has "[dry-run] ln -sfn current/deploy $APP_DIR/deploy"
+check "...shows the migration" dry_has "[dry-run] migrate the database"
+check "...shows the unit" dry_has "[dry-run] install teamflow.service"
+check "...shows the sudo rule" dry_has "setup-maintenance-sudo.sh"
+check "...shows the Discord bot restart" dry_has "[dry-run] restart teamflow-discord.service"
+check "...shows the health check" dry_has "[dry-run] wait for http://127.0.0.1:3000/health"
+check "...keeps the secrets key unset" dry_has "TEAMFLOW_SECRETS_KEY stays unset"
+check "...finished" dry_has "Dry run finished"
+check "...changed nothing" test "$(find $APP_DIR -printf '%p %s\n' | sort | sha256sum)" = "$dry_before"
+check "...did not touch the bot" test ! -f /tmp/bot-calls.log
 bash "$SRC/deploy/install/install.sh" --yes >/tmp/convert.log 2>&1 || { tail -30 /tmp/convert.log; bad "conversion exit"; }
 check "checkout kept aside" bash -c 'ls -d /opt/teamflow.git-* >/dev/null'
 check "current is a release" test "$(readlink $APP_DIR/current)" = releases/v0.2.1
 check "running v0.2.1" test "$(running_version)" = 0.2.1
 check "JWT_SECRET kept" grep -q "^JWT_SECRET=$legacy_jwt\$" $APP_DIR/.env
-check "secrets key = old JWT (stored secrets stay readable)" grep -q "^TEAMFLOW_SECRETS_KEY=$legacy_jwt\$" $APP_DIR/.env
+check "no TEAMFLOW_SECRETS_KEY added (the JWT_SECRET fallback stays)" bash -c "! grep -q '^TEAMFLOW_SECRETS_KEY' $APP_DIR/.env"
+check "secret saved before the switch still decrypts" test "$(decrypt_with $APP_DIR/.env)" = discord-bot-token-123
+cp $APP_DIR/.env /tmp/newkey.env; echo "TEAMFLOW_SECRETS_KEY=$(openssl rand -hex 32)" >>/tmp/newkey.env
+check "...and a new key would not have decrypted it" test -z "$(decrypt_with /tmp/newkey.env)"
+check "WEB_DIST=/opt/teamflow/apps/web/dist resolves" test -f /opt/teamflow/apps/web/dist/index.html
+check "...and the web app is served" bash -c 'curl -fsS http://127.0.0.1:3000/ | grep -qi "<html"'
+check "TEAMFLOW_APP_DIR=/opt/teamflow holds .env and data" test -f /opt/teamflow/.env -a -f /opt/teamflow/data/teamflow.db
+check "bot folder resolves through apps -> current/apps" test "$(readlink -f $APP_DIR/apps/discord-bot)" = $APP_DIR/releases/v0.2.1/apps/discord-bot
+check "Discord bot stopped before the move, restarted after" test "$(tr '\n' ' ' </tmp/bot-calls.log)" = "stop restart "
+check "Discord bot loaded its modules from the release" bash -c '! grep -qE "ERR_MODULE_NOT_FOUND|Cannot find (module|package)" /tmp/bot.log'
+check "...read data/discord-bot.env and reached the server" grep -q "Server has no TEAMFLOW_BOT_CONFIG_KEY" /tmp/bot.log
+grep -q "Server has no TEAMFLOW_BOT_CONFIG_KEY" /tmp/bot.log || sed 's/^/    bot: /' /tmp/bot.log | head -20
+check "...old apps/discord-bot/.env is pointed out" grep -q "apps/discord-bot/.env is not carried over" /tmp/convert.log
 check "PUBLIC_URL kept" grep -q "^PUBLIC_URL=http://teamflow.example$" $APP_DIR/.env
 check "legacy data kept" test "$(canary)" = 1
 check "a pre-conversion backup exists" bash -c 'ls /var/backups/teamflow/*before-releases.db >/dev/null'
