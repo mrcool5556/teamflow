@@ -27,17 +27,34 @@ Accounts made before this change keep the **General** team registration used to 
 
 Login, register and forgot-password are rate limited per client IP (`TEAMFLOW_AUTH_RATE_LIMIT` per minute, default 10, HTTP 429 with `Retry-After`). Behind a reverse proxy set `TEAMFLOW_TRUST_PROXY=1` so `X-Forwarded-For` is used as the client address.
 
-### Instance admin
+### Server Owner and trusted admins
 
-Team roles are per team. Server-wide actions (updates and backups, Discord bot secrets, Discord bot service start/stop) need the **instance admin** flag on the account (`users.is_instance_admin`) and nothing else: the open Flow, and the role in it, do not matter. They work from any Flow and with none.
+Roles inside a Flow are per Flow. Running the server is separate and does not depend on which Flow is open (or whether any is):
 
-- On a fresh install the **first registered account** gets it.
-- On upgrade, the oldest existing account is promoted once when the column is added.
-- `TEAMFLOW_INSTANCE_ADMINS=alice@example.com,bob@example.com` grants it to those emails at their next login or registration.
+- **Server Owner:** one account, the one made on `/setup`. It has every server power. Only the Owner can add or remove trusted admins and change their powers, **transfer ownership** (Server admin → People → Transfer ownership, confirmed by typing the new Owner's email; the old Owner stays a trusted admin with every power), and **delete a Flow for good** (Server admin → Flows → a Flow, confirmed by typing its key). Nobody can remove the Owner.
+- **Trusted admins** hold the powers the Owner ticks for them. With none ticked they have no Server admin access.
 
-Without the flag those routes return `403 { "error": "Instance admin required", "code": "forbidden" }` even for Flow Owners, and the web app hides the panels. The routes are `/server/maintenance/*` and `/integrations/discord/{secrets,service}`; the old `/teams/:teamId/server/maintenance` and `…/job` reads still answer (team ignored) so a page loaded before an update keeps following it.
+| Power | What it opens |
+|-------|---------------|
+| Updates | Install updates, the release channel (`/server/maintenance/update`, `…/settings`) |
+| Backups | Back up, restore, the backup list, delete a backup, how many to keep (`/server/maintenance/backup*`, `…/restore`) |
+| People | See every account, send password reset links (`/instance/users`, `…/reset-link`) |
+| Flows | Make Flows, upload caps, Flow defaults, empty a Flow's trash (`/instance/spaces*`, `/instance/settings`); their own new Flows are admin Flows with no cap |
+| Site & email | Site name, public address, email (`/instance/site`, `/instance/mail*`) |
+| Discord bot | Bot credentials and service (`/integrations/discord/{secrets,service*}`) |
+| Sign-up rules | Who can make an account (`/instance/signup`) |
 
-Instance admins also get the **server admin page** (account menu → Server admin) and its API under `/instance/*`, which needs only the flag, no team: server, disk, bot, update and backup status, every space with its upload cap, and the space defaults. Teams they create are admin spaces with no upload cap. See [SPACES.md](SPACES.md).
+Any power opens the Overview, the setup checklist and How-tos. Update and job status need Updates or Backups. A route without its power answers `403 forbidden` ("Needs the Backups server power"); Owner-only routes answer "Only the Server Owner can do this".
+
+The web app shows Server admin only to someone with at least one power, and its nav only the sections their powers open. The Owner starts on Server admin → Overview after signing in (with **Go to my Flows**); everyone else starts on their Flow.
+
+Where it comes from:
+
+- On a fresh install the account made on `/setup` is the Owner.
+- Upgrading to schema 5 makes the oldest account that held the old instance-admin flag the Owner (never a retired account: an `@invalid.invalid` email or "(retired)" in the name). Every other flagged account becomes a trusted admin with every power.
+- `TEAMFLOW_INSTANCE_ADMINS=alice@example.com,bob@example.com` makes those accounts trusted admins with every power at their next login. It never makes an Owner, and the app cannot change or remove them ("Set in .env").
+
+Stored on `users`: `is_server_owner`, `is_instance_admin` (on the admin list) and `server_powers` (JSON). `GET /auth/me` returns `serverRole` (`owner`, `admin` or null), `serverPowers` and `isInstanceAdmin` (any access).
 
 ### Team roles
 

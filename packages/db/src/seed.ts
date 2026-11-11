@@ -38,6 +38,8 @@ async function seed() {
     name: "Demo User",
     passwordHash: await bcrypt.hash("changeme123", 10),
     isInstanceAdmin: 1,
+    // A fresh demo database: the demo account is the Server Owner (every server power).
+    isServerOwner: 1,
   });
 
   const teamId = crypto.randomUUID();

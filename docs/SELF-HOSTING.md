@@ -157,7 +157,7 @@ Options (after `sudo bash -s --` when piped, or as environment variables): `--ye
 
 ### Backup retention
 
-How many backups to keep is set by the instance admin (Server admin → Updates & backups):
+How many backups to keep is set on Server admin → Updates & backups (Backups power), where the backup list also deletes single backups:
 **database backups** (default 10) and **upload archives** (default 1), each 1–100. After every
 successful backup (by hand, from the app or before an update) the oldest of that kind beyond the
 number are deleted. The settings live in `data/backup-settings.json`
@@ -247,7 +247,7 @@ Full list with comments: root [`.env.example`](../.env.example). The ones a prod
 | `CORS_ORIGINS` | no | Extra allowed browser origins |
 | `TEAMFLOW_TRUST_PROXY` | behind a proxy | Use `X-Forwarded-For` for rate limiting |
 | `TEAMFLOW_AUTH_RATE_LIMIT` | no | Login/register/forgot attempts per minute per IP (default 10) |
-| `TEAMFLOW_INSTANCE_ADMINS` | no | Emails that get the instance-admin flag at login |
+| `TEAMFLOW_INSTANCE_ADMINS` | no | Emails that become trusted server admins with every power at login (never the Server Owner; locked in the app) |
 | `TEAMFLOW_INVITE_ONLY` | no | `true` = registration only through an invite. Can be set on the admin page instead |
 | `TEAMFLOW_BACKUP_DIR` | no (Linux: leave unset; the root scripts always use `/var/backups/teamflow`) | Backup folder (Linux `/var/backups/teamflow`, Windows `<install folder>\backups`) |
 | `TEAMFLOW_BACKUP_SCRIPT`, `TEAMFLOW_UPDATE_SCRIPT`, `TEAMFLOW_DISCORD_BOT_SCRIPT` | leave unset | Defaults are the root-owned copies sudoers allows (Linux) or the release's own scripts (Windows) |

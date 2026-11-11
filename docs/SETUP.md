@@ -14,7 +14,7 @@ Once any account exists, `/setup` is closed for good: the server refuses a secon
 | 4. Storage and sign-up | `/setup/storage` | Upload cap per Flow (1 GB), Flows per person (3), stop uploads below (2 GB free), and who can sign up. |
 | 5. Checklist | `/setup/done` | What's done and what's left, with links. Also shown on the server admin Overview until everything is done or the card is dismissed. |
 
-Steps 2–5 are ordinary admin settings: an instance admin can come back to any of them later, and the admin can leave the wizard at any point. A field that `.env` sets shows **Set in .env** and is read-only. On a phone the step list becomes a progress bar.
+The account made in step 1 is the **Server Owner** ([AUTH.md](AUTH.md#server-owner-and-trusted-admins)): every power, and the only one who can add trusted admins. Steps 2–5 are ordinary admin settings: the Owner (or a trusted admin with the matching power) can come back to any of them later, and the admin can leave the wizard at any point. A field that `.env` sets shows **Set in .env** and is read-only. On a phone the step list becomes a progress bar.
 
 The login page sends visitors to `/setup` while the server has no accounts.
 
@@ -79,7 +79,7 @@ Only the secrets (`JWT_SECRET`, optionally `TEAMFLOW_SECRETS_KEY`). Installers s
 
 ### Admin settings used by setup steps 2–5
 
-Instance admins only. A value set in `.env` wins; saving over it answers `409 setting_set_in_env`.
+Each needs its server power (Site & email, Sign-up rules, Flows); any power reads the checklist. A value set in `.env` wins; saving over it answers `409 setting_set_in_env`.
 
 | Method | Path | Notes |
 |--------|------|-------|

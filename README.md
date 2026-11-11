@@ -10,7 +10,7 @@ Self-hosted issue tracker for small teams: kanban boards with rows (swimlanes) a
 - **First-time setup** in the browser (admin account with a one-time setup code, site name and address, email, storage rules) and a welcome page to Create a Flow or Join a Flow
 - Web UI: kanban board, issue drawer, full-page settings, responsive layout
 - **Make it yours**: ready-made Looks, a simple Appearance panel, and a Design page to mix colours, fonts, corners, cards, buttons, fields and switches, then save and share your mixes
-- Roles and permissions per team (Owner, Admin, Member, Viewer, plus custom roles); server-wide actions need an instance admin
+- Roles and permissions per team (Owner, Admin, Member, Viewer, plus custom roles); running the server belongs to one Server Owner and the trusted admins they give powers to
 - **Storage per Flow**: free Flows for users (up to 3, 1 GB each), uploads paused when the server runs low on disk, and a server admin page with an overview, setup checklist, people, site and email settings, how-tos and common fixes
 - File attachments up to 4 GB with chunked, resumable uploads and seekable video; a trash with restore and Delete forever
 - **MCP server** for Cursor / Codex / Claude (list, create, update, complete issues from chat)
@@ -55,7 +55,7 @@ NODE_ENV=development pnpm dev
 - Web (Vite): <http://localhost:5173>, proxies `/api` to the API
 - API: <http://localhost:3000> (`GET /health`)
 - Database: `data/teamflow.db` in the repo root (override with `DATABASE_URL=file:...`)
-- Demo login (only with `TEAMFLOW_SEED_DEMO=1`): `demo@teamflow.local` / `changeme123`, already an instance admin. Without it, open the setup link the server prints at start (`/setup?code=…`) and create the instance admin; see [docs/SETUP.md](docs/SETUP.md). The admin finds the **Server admin** page in the account menu (`/admin`).
+- Demo login (only with `TEAMFLOW_SEED_DEMO=1`): `demo@teamflow.local` / `changeme123`, already the Server Owner. Without it, open the setup link the server prints at start (`/setup?code=…`) and create the Server Owner account; see [docs/SETUP.md](docs/SETUP.md). The admin finds the **Server admin** page in the account menu (`/admin`).
 - The Vite proxy always targets port 3000; if you change `PORT` for the API, the dev web app will not reach it.
 - A root `.env` is optional in development. If you copy `.env.example`, keep `NODE_ENV=development` set (its `JWT_SECRET` is a placeholder).
 
@@ -137,7 +137,7 @@ Create a PAT in **Settings → API tokens**. Tools and details: [docs/MCP.md](do
 | [docs/RELEASING.md](docs/RELEASING.md) | Making a release (tags, workflow, checksums) |
 | [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md) | Deployment index, schema versions, data maintenance |
 | [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | Monorepo map, server and web layout, auth model, data flow |
-| [docs/AUTH.md](docs/AUTH.md) | Login, roles, instance admin, PATs, password reset, SMTP |
+| [docs/AUTH.md](docs/AUTH.md) | Login, roles, Server Owner and trusted admins, PATs, password reset, SMTP |
 | [docs/API.md](docs/API.md) | HTTP API reference (generated) |
 | [docs/ATTACHMENTS.md](docs/ATTACHMENTS.md) | Issue and row files, team files, trash |
 | [docs/LARGE-FILES.md](docs/LARGE-FILES.md) | Chunked upload, streaming, move and link |

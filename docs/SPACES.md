@@ -15,7 +15,7 @@ only uploaded bytes are. Design and mock-up: [mockups/admin-spaces-v1.html](mock
 | | Admin space | Free space |
 |---|---|---|
 | Shown as | Admin Flow | Free Flow |
-| Made by | An instance admin (Server admin → Flows → New Flow, or Create a Flow) | Any user (Create a Flow) |
+| Made by | The Server Owner or a trusted admin with the Flows power (Server admin → Flows → New Flow, or Create a Flow) | Any user (Create a Flow) |
 | Upload cap | Whatever the admin sets, or no limit | The free-space cap (default **1 GB**) |
 | Per-user limit | None | At most **3** per user (an older account's General counts) |
 
@@ -94,7 +94,7 @@ They apply to new spaces only; existing caps stay. The page stores them in `inst
 
 ## The server admin page
 
-Instance admins open it from the account menu (**Server admin**) at `/t/<team>/admin` (or
+The Server Owner and trusted admins open it from the account menu (**Server admin**); each section needs its power ([AUTH.md](AUTH.md#server-owner-and-trusted-admins)). They open it at `/t/<team>/admin` (or
 `/admin`). It keeps the current team so the existing update and bot panels can run.
 
 - **Overview:** the server (version, Node, uptime, listen address and port, `PUBLIC_URL`, systemd
@@ -108,19 +108,20 @@ Instance admins open it from the account menu (**Server admin**) at `/t/<team>/a
   dismissed.
 - **Flows**, **Flow detail**, **Flow defaults & sign-up:** above, plus who can make an
   account (anyone, or only people with an invite).
-- **People:** every account, with its Flows and how many free Flows it owns. **Make admin** /
-  **Remove admin** (never the last server admin, and not someone `TEAMFLOW_INSTANCE_ADMINS` lists).
-  **Send reset link** makes a one-hour password reset link, emails it when email is set up, and
-  always shows it so the admin can pass it on.
+- **People:** for the Server Owner, the Owner card (**Transfer ownership**) and the **trusted
+  admins** with a tick per power (add, change, remove; `TEAMFLOW_INSTANCE_ADMINS` ones are
+  locked). For the People power, every account with its Flows and how many free Flows it owns,
+  and **Send reset link** (a one-hour link, emailed when email is set up and always shown).
 - **Site & email:** site name, public address (with a reachability check) and outgoing email
   (with a test send), the same forms as setup steps 2 and 3. Values set in `.env` are read-only.
-- **Updates & backups** and **Discord bot:** server-wide, so they need only the instance-admin flag; they work whichever Flow is open (and with none), whatever your role in it.
+- **Updates & backups** and **Discord bot:** server-wide, so they work whichever Flow is open (and with none), whatever your role in it. Updates & backups shows the update card to the Updates power and the **backup list** to the Backups power: the total used, every backup with its date, type (database, uploads, checkpoint) and size, Restore, and Delete after a confirm (never the newest database backup), and how many database backups (default 10) and upload archives (default 1) to keep.
+- **Delete this Flow for good** (a Flow's detail page, Server Owner only): removes it with every issue and file after its key is typed.
 - **How-tos & fixes:** step-by-step commands (LXC first, Windows where it differs); the ones
   matching the Overview's findings are listed first.
 
 ## API
 
-Instance admin only, no team needed (full list in [API.md](API.md#instance-admin-and-spaces)):
+Server admins only, each route behind its power, no team needed (full list in [API.md](API.md#instance-admin-and-spaces)):
 
 | Method | Path | |
 |---|---|---|

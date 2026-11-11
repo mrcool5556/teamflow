@@ -16,7 +16,7 @@ On a **Debian/Ubuntu machine or an existing container**:
 curl -fsSL https://github.com/mrcool5556/teamflow/releases/latest/download/install.sh | sudo bash
 ```
 
-Both end by printing the address and the one-time setup link (`http://<ip>:3000/setup?code=XXXX-XXXX`). Open it and create the instance admin account; there is no demo user. Lost it? The code is in `/opt/teamflow/data/setup-code` and the service log ([docs/SETUP.md](../../docs/SETUP.md)).
+Both end by printing the address and the one-time setup link (`http://<ip>:3000/setup?code=XXXX-XXXX`). Open it and create the Server Owner account; there is no demo user. Lost it? The code is in `/opt/teamflow/data/setup-code` and the service log ([docs/SETUP.md](../../docs/SETUP.md)).
 
 Options, dry runs and what each step does: [docs/SELF-HOSTING.md](../../docs/SELF-HOSTING.md#setup-b-linux-or-proxmox). Creating the container by hand instead of `proxmox.sh`: [create-lxc.md](create-lxc.md).
 
@@ -85,7 +85,7 @@ sudo -u teamflow sudo -n /usr/local/lib/teamflow/update.sh --help
 sudo -u teamflow sudo -n /usr/local/lib/teamflow/discord-bot.sh status
 ```
 
-In-app updates also need `TEAMFLOW_MAINTENANCE_ENABLED=true` in `.env` (the installer sets it) and the instance-admin flag on your account (the account made on `/setup`, someone made admin on Server admin → People, or `TEAMFLOW_INSTANCE_ADMINS`). Your role in the Flow that is open does not matter: Server admin → Updates & backups works from any Flow, or with none.
+In-app updates also need `TEAMFLOW_MAINTENANCE_ENABLED=true` in `.env` (the installer sets it) and, on your account, the **Updates** server power for updating or **Backups** for backups: the Server Owner (the account made on `/setup`) has every power; trusted admins get the ones the Owner ticks on Server admin → People, and accounts in `TEAMFLOW_INSTANCE_ADMINS` get all of them. Your role in the Flow that is open does not matter: Server admin → Updates & backups works from any Flow, or with none.
 
 ### KillMode
 
