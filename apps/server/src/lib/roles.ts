@@ -8,6 +8,7 @@ import {
   type UpdateTeamRoleInput,
   TEAM_PERMISSIONS,
   isTeamPermission,
+  RETIRED_TEAM_PERMISSIONS,
 } from "@teamflow/core";
 import type { Db, DbExecutor } from "@teamflow/db";
 import { schema } from "@teamflow/db";
@@ -42,7 +43,10 @@ async function assertCanGrantPermissions(
 ) {
   const actor = await getTeamPermissionsForUser(db, actorUserId, teamId);
   const held = new Set(actor?.permissions ?? []);
-  const missing = permissions.filter((permission) => !held.has(permission));
+  // Retired permissions grant nothing any more, so carrying them over is no escalation.
+  const missing = permissions.filter(
+    (permission) => !held.has(permission) && !RETIRED_TEAM_PERMISSIONS.includes(permission),
+  );
   if (missing.length > 0) {
     throw forbidden(`Cannot grant permissions you do not hold: ${missing.join(", ")}`);
   }
@@ -233,14 +237,6 @@ function validateRolePermissions(
   }
   if (role.slug === "admin" && !permissions.includes("team.roles.manage")) {
     throw badRequest("The Admin role must keep team.roles.manage permission");
-  }
-  if (role.slug === "owner") {
-    if (!permissions.includes("server.maintenance.view")) {
-      throw badRequest("The Owner role must keep server.maintenance.view permission");
-    }
-    if (!permissions.includes("server.maintenance.run")) {
-      throw badRequest("The Owner role must keep server.maintenance.run permission");
-    }
   }
 }
 

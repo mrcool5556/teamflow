@@ -33,9 +33,9 @@ function renderUpdates(
   const api = installFakeApi(db, {
     extraRoutes: [
       ...extra,
-      ["GET", /^\/teams\/([^/]+)\/server\/maintenance$/, () => ({ status: read() })],
-      ["POST", /^\/teams\/([^/]+)\/server\/maintenance\/check$/, () => ({ status: read() })],
-      ["POST", /^\/teams\/([^/]+)\/server\/maintenance\/update$/, () => ({ job: read().job })],
+      ["GET", /^\/server\/maintenance$/, () => ({ status: read() })],
+      ["POST", /^\/server\/maintenance\/check$/, () => ({ status: read() })],
+      ["POST", /^\/server\/maintenance\/update$/, () => ({ job: read().job })],
     ],
   });
   signIn(db);

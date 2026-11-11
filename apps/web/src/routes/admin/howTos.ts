@@ -116,7 +116,7 @@ export const HOW_TOS: HowTo[] = [
     id: "maintenance",
     title: "Turn on updates and backups from the app",
     fixIds: ["maintenance-off", "maintenance-sudo"],
-    when: "The Updates & backups buttons need the maintenance flag and a sudo rule for the teamflow user.",
+    when: "The Updates & backups buttons need the maintenance flag, a sudo rule for the teamflow user, and a server admin account (any Flow, any role in it).",
     steps: [
       { text: "Set TEAMFLOW_MAINTENANCE_ENABLED=true in .env (Linux only)." },
       {

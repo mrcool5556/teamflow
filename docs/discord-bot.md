@@ -36,11 +36,11 @@ Open **Settings → Integrations** for a team (`/t/<TEAM>/settings/integrations`
 
 | Section | Who sees it | What it does |
 |---------|-------------|--------------|
-| **Bot credentials** | Instance admin with `integrations.discord.secrets` | Discord client ID, bot token, Teamflow PAT, API URL, public web URL, Message Content Intent. Instance-wide, shared by every team |
-| **Discord bot on this server** | View: `integrations.discord.view`. Enable / restart / stop: instance admin with `integrations.discord.secrets` | Runs `teamflow-discord` (systemd) on Linux |
+| **Bot credentials** | Instance admin (any Flow, or none) | Discord client ID, bot token, Teamflow PAT, API URL, public web URL, Message Content Intent. Instance-wide, shared by every team |
+| **Discord bot on this server** | View: `integrations.discord.view`. Enable / restart / stop: instance admin (any Flow, or none) | Runs `teamflow-discord` (systemd) on Linux |
 | **Discord bot** (per team) | View: `integrations.discord.view`. Edit: `integrations.discord.manage` | Guild ID, allowed role IDs, ticket channels |
 
-Owner and Admin have the three `integrations.discord.*` permissions by default; the instance-admin flag is separate (see [AUTH.md](AUTH.md#instance-admin)).
+Owner and Admin have `integrations.discord.view` and `.manage` by default (`.secrets` is retired and grants nothing); the instance-admin flag is separate (see [AUTH.md](AUTH.md#instance-admin)).
 
 Saving credentials on the server also:
 

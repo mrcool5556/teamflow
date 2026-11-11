@@ -14,11 +14,21 @@ export const TEAM_PERMISSIONS = [
   "team.data.transfer",
   "integrations.discord.view",
   "integrations.discord.manage",
-  /** Future: store bot token / PAT in Settings instead of .env */
+  /**
+   * No effect any more, kept so stored roles still read: bot secrets, the bot service, updates
+   * and backups are server-wide and need the instance-admin flag (users.is_instance_admin) only.
+   */
   "integrations.discord.secrets",
   "server.maintenance.view",
   "server.maintenance.run",
 ] as const;
+
+/** Stored on roles but no longer checked or shown (see TEAM_PERMISSIONS). */
+export const RETIRED_TEAM_PERMISSIONS: readonly TeamPermission[] = [
+  "integrations.discord.secrets",
+  "server.maintenance.view",
+  "server.maintenance.run",
+];
 
 export type TeamPermission = (typeof TEAM_PERMISSIONS)[number];
 
@@ -33,9 +43,9 @@ export const TEAM_PERMISSION_LABELS: Record<TeamPermission, string> = {
   "team.data.transfer": "Export and import team board bundles",
   "integrations.discord.view": "View Discord integration",
   "integrations.discord.manage": "Edit Discord integration",
-  "integrations.discord.secrets": "Manage Discord bot secrets",
-  "server.maintenance.view": "View backups & update status",
-  "server.maintenance.run": "Run backups and install updates",
+  "integrations.discord.secrets": "Manage Discord bot secrets (server admins only; no effect)",
+  "server.maintenance.view": "View backups & update status (server admins only; no effect)",
+  "server.maintenance.run": "Run backups and install updates (server admins only; no effect)",
 };
 
 export const TEAM_PERMISSION_GROUPS: {
@@ -60,15 +70,7 @@ export const TEAM_PERMISSION_GROUPS: {
   },
   {
     label: "Integrations",
-    permissions: [
-      "integrations.discord.view",
-      "integrations.discord.manage",
-      "integrations.discord.secrets",
-    ],
-  },
-  {
-    label: "Server",
-    permissions: ["server.maintenance.view", "server.maintenance.run"],
+    permissions: ["integrations.discord.view", "integrations.discord.manage"],
   },
 ];
 

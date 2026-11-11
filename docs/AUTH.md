@@ -29,13 +29,13 @@ Login, register and forgot-password are rate limited per client IP (`TEAMFLOW_AU
 
 ### Instance admin
 
-Team roles are per team. Server-wide actions (Settings → Updates, Discord bot secrets, Discord bot service start/stop) additionally require the **instance admin** flag on the account (`users.is_instance_admin`):
+Team roles are per team. Server-wide actions (updates and backups, Discord bot secrets, Discord bot service start/stop) need the **instance admin** flag on the account (`users.is_instance_admin`) and nothing else: the open Flow, and the role in it, do not matter. They work from any Flow and with none.
 
 - On a fresh install the **first registered account** gets it.
 - On upgrade, the oldest existing account is promoted once when the column is added.
 - `TEAMFLOW_INSTANCE_ADMINS=alice@example.com,bob@example.com` grants it to those emails at their next login or registration.
 
-Without the flag those routes return `403 { "error": "Instance admin required", "code": "forbidden" }` even for team Owners, and the web app hides the panels.
+Without the flag those routes return `403 { "error": "Instance admin required", "code": "forbidden" }` even for Flow Owners, and the web app hides the panels. The routes are `/server/maintenance/*` and `/integrations/discord/{secrets,service}`; the old `/teams/:teamId/server/maintenance` and `…/job` reads still answer (team ignored) so a page loaded before an update keeps following it.
 
 Instance admins also get the **server admin page** (account menu → Server admin) and its API under `/instance/*`, which needs only the flag, no team: server, disk, bot, update and backup status, every space with its upload cap, and the space defaults. Teams they create are admin spaces with no upload cap. See [SPACES.md](SPACES.md).
 
@@ -51,10 +51,9 @@ Permissions are per team. Every team starts with four built-in roles; admins can
 | `team.roles.view`, `team.roles.manage` | yes | yes | | |
 | `team.delete` | yes | yes | | |
 | `team.data.transfer` (export / import bundle) | yes | | | |
-| `integrations.discord.view`, `.manage`, `.secrets` | yes | yes | | |
-| `server.maintenance.view`, `.run` | yes | | | |
+| `integrations.discord.view`, `.manage` | yes | yes | | |
 
-`integrations.discord.secrets` and `server.maintenance.*` also need the instance-admin flag. The source of truth is `packages/core/src/permissions.ts`; [API.md](API.md) lists the permission each route needs.
+`integrations.discord.secrets`, `server.maintenance.view` and `server.maintenance.run` are retired: they may still be stored on roles (so old roles read the same) but grant nothing and are no longer shown; the instance-admin flag alone covers those actions. The source of truth is `packages/core/src/permissions.ts`; [API.md](API.md) lists the permission each route needs.
 
 ### Editing the board (`board.edit`)
 

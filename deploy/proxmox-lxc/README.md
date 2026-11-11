@@ -77,7 +77,7 @@ sudo -u teamflow sudo -n /usr/local/lib/teamflow/update.sh --help
 sudo -u teamflow sudo -n /usr/local/lib/teamflow/discord-bot.sh status
 ```
 
-In-app updates also need `TEAMFLOW_MAINTENANCE_ENABLED=true` in `.env` (the installer sets it) and the instance-admin flag on your account (the account made on `/setup`, someone made admin on Server admin → People, or `TEAMFLOW_INSTANCE_ADMINS`).
+In-app updates also need `TEAMFLOW_MAINTENANCE_ENABLED=true` in `.env` (the installer sets it) and the instance-admin flag on your account (the account made on `/setup`, someone made admin on Server admin → People, or `TEAMFLOW_INSTANCE_ADMINS`). Your role in the Flow that is open does not matter: Server admin → Updates & backups works from any Flow, or with none.
 
 ### KillMode
 

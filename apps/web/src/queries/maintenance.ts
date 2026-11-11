@@ -6,11 +6,12 @@ import { queryKeys } from "./keys";
 /** While a job runs the status is polled; the server may drop out during an update. */
 export const MAINTENANCE_POLL_MS = 2000;
 
-export function useMaintenanceStatusQuery(teamId: string) {
+/** Server-wide update and backup status (instance admins, whichever Flow is open). */
+export function useMaintenanceStatusQuery() {
   return useQuery({
-    queryKey: queryKeys.maintenance(teamId),
+    queryKey: queryKeys.maintenance,
     queryFn: async ({ signal }): Promise<MaintenanceStatusPublic> =>
-      (await client.withSignal(signal).getServerMaintenanceStatus(teamId)).status,
+      (await client.withSignal(signal).getServerMaintenanceStatus()).status,
     retry: false,
     refetchInterval: (query) => {
       const running = query.state.data?.job?.status === "running";

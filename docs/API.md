@@ -37,7 +37,7 @@ Server code throws `ApiError` from `apps/server/src/lib/errors.ts` (`badRequest`
 
 <!-- BEGIN GENERATED ROUTES (scripts/gen-api-docs.mjs) -->
 
-## Routes (124)
+## Routes (127)
 
 Generated from `apps/server/src/routes/*.ts` by `pnpm docs:api`; do not edit by hand.
 
@@ -158,28 +158,29 @@ Discord integration settings, bot secrets, bot service and bot config.
 | GET | `/integrations/discord/bot-config` | bot key |  |  |  |  |
 | GET | `/teams/:teamId/discord-settings` | bearer |  | member | `integrations.discord.view` |  |
 | PATCH | `/teams/:teamId/discord-settings` | bearer | yes | member | `integrations.discord.manage` | body `updateTeamDiscordSettingsSchema` |
-| GET | `/teams/:teamId/integrations/discord/secrets` | bearer |  | member | `integrations.discord.secrets` + instance admin |  |
-| PATCH | `/teams/:teamId/integrations/discord/secrets` | bearer | yes | member | `integrations.discord.secrets` + instance admin | body `updateDiscordBotSecretsSchema` |
+| GET | `/integrations/discord/secrets` | bearer |  |  | instance admin |  |
+| PATCH | `/integrations/discord/secrets` | bearer | yes |  | instance admin | body `updateDiscordBotSecretsSchema` |
+| GET | `/integrations/discord/service` | bearer |  |  | instance admin |  |
 | GET | `/teams/:teamId/integrations/discord/service` | bearer |  | member | `integrations.discord.view` |  |
-| POST | `/teams/:teamId/integrations/discord/service/enable` | bearer | yes | member | `integrations.discord.secrets` + instance admin |  |
-| POST | `/teams/:teamId/integrations/discord/service/restart` | bearer | yes | member | `integrations.discord.secrets` + instance admin |  |
-| POST | `/teams/:teamId/integrations/discord/service/stop` | bearer | yes | member | `integrations.discord.secrets` + instance admin |  |
+| POST | `/integrations/discord/service/enable` | bearer | yes |  | instance admin |  |
+| POST | `/integrations/discord/service/restart` | bearer | yes |  | instance admin |  |
+| POST | `/integrations/discord/service/stop` | bearer | yes |  | instance admin |  |
 | GET | `/discord/guilds/:guildId/config` | bearer |  |  |  |  |
 
 ### Server maintenance
 
-Server maintenance: status, backups, updates (instance admin only).
-
 | Method | Path | Auth | Write | Team | Permission | Input |
 |--------|------|------|-------|------|------------|-------|
-| GET | `/teams/:teamId/server/maintenance` | bearer |  | member | `server.maintenance.view` + instance admin |  |
-| POST | `/teams/:teamId/server/maintenance/check` | bearer | yes | member | `server.maintenance.view` + instance admin |  |
-| GET | `/teams/:teamId/server/maintenance/job` | bearer |  | member | `server.maintenance.view` + instance admin |  |
-| POST | `/teams/:teamId/server/maintenance/backup` | bearer | yes | member | `server.maintenance.run` + instance admin | body `runMaintenanceBackupSchema` |
-| POST | `/teams/:teamId/server/maintenance/update` | bearer | yes | member | `server.maintenance.run` + instance admin | body `runMaintenanceUpdateSchema` |
-| POST | `/teams/:teamId/server/maintenance/job/dismiss` | bearer | yes | member | `server.maintenance.run` + instance admin |  |
-| POST | `/teams/:teamId/server/maintenance/restore` | bearer | yes | member | `server.maintenance.run` + instance admin | body `runMaintenanceRestoreSchema` |
-| PUT | `/teams/:teamId/server/maintenance/settings` | bearer | yes | member | `server.maintenance.run` + instance admin | body `maintenanceSettingsSchema` |
+| GET | `/server/maintenance` | bearer |  |  | instance admin |  |
+| POST | `/server/maintenance/check` | bearer | yes |  | instance admin |  |
+| GET | `/server/maintenance/job` | bearer |  |  | instance admin |  |
+| POST | `/server/maintenance/backup` | bearer | yes |  | instance admin | body `runMaintenanceBackupSchema` |
+| POST | `/server/maintenance/update` | bearer | yes |  | instance admin | body `runMaintenanceUpdateSchema` |
+| POST | `/server/maintenance/job/dismiss` | bearer | yes |  | instance admin |  |
+| POST | `/server/maintenance/restore` | bearer | yes |  | instance admin | body `runMaintenanceRestoreSchema` |
+| PUT | `/server/maintenance/settings` | bearer | yes |  | instance admin | body `maintenanceSettingsSchema` |
+| GET | `/teams/:teamId/server/maintenance` | bearer |  |  | instance admin |  |
+| GET | `/teams/:teamId/server/maintenance/job` | bearer |  |  | instance admin |  |
 
 ### Instance admin and spaces
 

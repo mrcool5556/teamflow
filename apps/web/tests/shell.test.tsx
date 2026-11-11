@@ -42,7 +42,7 @@ describe("settings panels", () => {
     expect(await screen.findByRole("alert")).toHaveTextContent("Token limit reached");
   });
 
-  it("leaves Updates for General when the permission goes away", async () => {
+  it("keeps Updates for the instance admin whatever their role in the open Flow", async () => {
     const db = seedDb();
     installFakeApi(db);
     signIn(db);
@@ -57,7 +57,17 @@ describe("settings panels", () => {
     };
     await act(() => queryClient.invalidateQueries({ queryKey: queryKeys.permissions(eng.id) }));
 
+    // Updates are server-wide: the instance-admin flag decides, not the role in ENG.
+    expect(path()).toBe("/t/ENG/settings/updates");
+    expect(screen.getByRole("heading", { name: "Updates & backups" })).toBeInTheDocument();
+  });
+
+  it("sends an Owner who is not the instance admin from Updates to General", async () => {
+    const db = seedDb();
+    db.user = { ...db.user, isInstanceAdmin: false };
+    installFakeApi(db);
+    signIn(db);
+    const { path } = renderApp("/t/ENG/settings/updates");
     await waitFor(() => expect(path()).toBe("/t/ENG/settings/general"));
-    expect(screen.getByRole("heading", { name: "General" })).toBeInTheDocument();
   });
 });

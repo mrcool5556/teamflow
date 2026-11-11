@@ -8,7 +8,8 @@ import { errorMessage } from "../lib/errorSink";
 import type { PanelMessage } from "../lib/panelStatus";
 
 type DiscordBotServiceSectionProps = {
-  teamId: string;
+  /** null on the server admin page (server-wide); a Flow id in that Flow's Settings. */
+  teamId: string | null;
   canManage: boolean;
   onMessage: PanelMessage;
   onSecretsRefresh?: () => void;
@@ -161,7 +162,7 @@ export function DiscordBotServiceSection({
             <button
               type="button"
               disabled={busy}
-              onClick={() => void runAction("enable", () => client.enableDiscordBotService(teamId))}
+              onClick={() => void runAction("enable", () => client.enableDiscordBotService())}
             >
               {busy ? "Working…" : "Enable Discord bot"}
             </button>
@@ -171,9 +172,7 @@ export function DiscordBotServiceSection({
               <button
                 type="button"
                 disabled={busy}
-                onClick={() =>
-                  void runAction("restart", () => client.restartDiscordBotService(teamId))
-                }
+                onClick={() => void runAction("restart", () => client.restartDiscordBotService())}
               >
                 {busy ? "Working…" : "Restart bot"}
               </button>
@@ -181,7 +180,7 @@ export function DiscordBotServiceSection({
                 type="button"
                 className="button-secondary"
                 disabled={busy}
-                onClick={() => void runAction("stop", () => client.stopDiscordBotService(teamId))}
+                onClick={() => void runAction("stop", () => client.stopDiscordBotService())}
               >
                 Stop bot
               </button>

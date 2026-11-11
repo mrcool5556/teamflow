@@ -419,109 +419,97 @@ export class TeamflowClient {
     );
   }
 
-  getDiscordBotSecrets(teamId: string) {
-    return this.request<{ secrets: DiscordBotSecretsPublic }>(
-      `/teams/${teamId}/integrations/discord/secrets`,
-    );
+  /* Server-wide: bot secrets and service, updates and backups (instance admins only). */
+
+  getDiscordBotSecrets() {
+    return this.request<{ secrets: DiscordBotSecretsPublic }>(`/integrations/discord/secrets`);
   }
 
-  updateDiscordBotSecrets(teamId: string, input: UpdateDiscordBotSecretsInput) {
-    return this.request<{ secrets: DiscordBotSecretsPublic }>(
-      `/teams/${teamId}/integrations/discord/secrets`,
-      {
-        method: "PATCH",
-        body: JSON.stringify(input),
-      },
-    );
+  updateDiscordBotSecrets(input: UpdateDiscordBotSecretsInput) {
+    return this.request<{ secrets: DiscordBotSecretsPublic }>(`/integrations/discord/secrets`, {
+      method: "PATCH",
+      body: JSON.stringify(input),
+    });
   }
 
-  getDiscordBotServiceStatus(teamId: string) {
+  /** Bot service status: server-wide (instance admins), or through a Flow's Settings → Integrations. */
+  getDiscordBotServiceStatus(teamId?: string | null) {
     return this.request<{ status: DiscordBotServiceStatusPublic }>(
-      `/teams/${teamId}/integrations/discord/service`,
+      teamId ? `/teams/${teamId}/integrations/discord/service` : "/integrations/discord/service",
     );
   }
 
-  enableDiscordBotService(teamId: string) {
+  enableDiscordBotService() {
     return this.request<{ status: DiscordBotServiceStatusPublic }>(
-      `/teams/${teamId}/integrations/discord/service/enable`,
+      `/integrations/discord/service/enable`,
       { method: "POST" },
     );
   }
 
-  restartDiscordBotService(teamId: string) {
+  restartDiscordBotService() {
     return this.request<{ status: DiscordBotServiceStatusPublic }>(
-      `/teams/${teamId}/integrations/discord/service/restart`,
+      `/integrations/discord/service/restart`,
       { method: "POST" },
     );
   }
 
-  stopDiscordBotService(teamId: string) {
+  stopDiscordBotService() {
     return this.request<{ status: DiscordBotServiceStatusPublic }>(
-      `/teams/${teamId}/integrations/discord/service/stop`,
+      `/integrations/discord/service/stop`,
       { method: "POST" },
     );
   }
 
-  getServerMaintenanceStatus(teamId: string) {
-    return this.request<{ status: MaintenanceStatusPublic }>(`/teams/${teamId}/server/maintenance`);
+  getServerMaintenanceStatus() {
+    return this.request<{ status: MaintenanceStatusPublic }>(`/server/maintenance`);
   }
 
   /** Probe sudo and ask GitHub for the newest release now (the GET only reads the cache). */
-  checkServerMaintenance(teamId: string) {
-    return this.request<{ status: MaintenanceStatusPublic }>(
-      `/teams/${teamId}/server/maintenance/check`,
-      { method: "POST" },
-    );
+  checkServerMaintenance() {
+    return this.request<{ status: MaintenanceStatusPublic }>(`/server/maintenance/check`, {
+      method: "POST",
+    });
   }
 
-  getServerMaintenanceJob(teamId: string) {
-    return this.request<{ job: MaintenanceJobPublic | null }>(
-      `/teams/${teamId}/server/maintenance/job`,
-    );
+  getServerMaintenanceJob() {
+    return this.request<{ job: MaintenanceJobPublic | null }>(`/server/maintenance/job`);
   }
 
-  runServerMaintenanceBackup(teamId: string, input: RunMaintenanceBackupInput = {}) {
-    return this.request<{ job: MaintenanceJobPublic }>(
-      `/teams/${teamId}/server/maintenance/backup`,
-      {
-        method: "POST",
-        body: JSON.stringify(input),
-      },
-    );
+  runServerMaintenanceBackup(input: RunMaintenanceBackupInput = {}) {
+    return this.request<{ job: MaintenanceJobPublic }>(`/server/maintenance/backup`, {
+      method: "POST",
+      body: JSON.stringify(input),
+    });
   }
 
-  runServerMaintenanceUpdate(teamId: string, input: RunMaintenanceUpdateInput = {}) {
-    return this.request<{ job: MaintenanceJobPublic }>(
-      `/teams/${teamId}/server/maintenance/update`,
-      {
-        method: "POST",
-        body: JSON.stringify(input),
-      },
-    );
+  runServerMaintenanceUpdate(input: RunMaintenanceUpdateInput = {}) {
+    return this.request<{ job: MaintenanceJobPublic }>(`/server/maintenance/update`, {
+      method: "POST",
+      body: JSON.stringify(input),
+    });
   }
 
   /** Put a database backup back. Stops the app for a few seconds, like an update. */
-  runServerMaintenanceRestore(teamId: string, input: RunMaintenanceRestoreInput) {
-    return this.request<{ job: MaintenanceJobPublic }>(
-      `/teams/${teamId}/server/maintenance/restore`,
-      { method: "POST", body: JSON.stringify(input) },
-    );
+  runServerMaintenanceRestore(input: RunMaintenanceRestoreInput) {
+    return this.request<{ job: MaintenanceJobPublic }>(`/server/maintenance/restore`, {
+      method: "POST",
+      body: JSON.stringify(input),
+    });
   }
 
   /** Clear a finished job (a failed update stops showing). */
-  dismissServerMaintenanceJob(teamId: string) {
-    return this.request<{ job: MaintenanceJobPublic | null }>(
-      `/teams/${teamId}/server/maintenance/job/dismiss`,
-      { method: "POST" },
-    );
+  dismissServerMaintenanceJob() {
+    return this.request<{ job: MaintenanceJobPublic | null }>(`/server/maintenance/job/dismiss`, {
+      method: "POST",
+    });
   }
 
   /** Advanced → Release channel. */
-  setServerMaintenanceSettings(teamId: string, input: MaintenanceSettingsInput) {
-    return this.request<{ status: MaintenanceStatusPublic }>(
-      `/teams/${teamId}/server/maintenance/settings`,
-      { method: "PUT", body: JSON.stringify(input) },
-    );
+  setServerMaintenanceSettings(input: MaintenanceSettingsInput) {
+    return this.request<{ status: MaintenanceStatusPublic }>(`/server/maintenance/settings`, {
+      method: "PUT",
+      body: JSON.stringify(input),
+    });
   }
 
   /** The liveness probe: `{ ok, version }`. Used to see when a restarted server is back. */

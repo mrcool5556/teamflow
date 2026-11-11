@@ -114,7 +114,7 @@ Instance admins open it from the account menu (**Server admin**) at `/t/<team>/a
   always shows it so the admin can pass it on.
 - **Site & email:** site name, public address (with a reachability check) and outgoing email
   (with a test send), the same forms as setup steps 2 and 3. Values set in `.env` are read-only.
-- **Updates & backups** and **Discord bot:** the Settings panels, through the current team.
+- **Updates & backups** and **Discord bot:** server-wide, so they need only the instance-admin flag; they work whichever Flow is open (and with none), whatever your role in it.
 - **How-tos & fixes:** step-by-step commands (LXC first, Windows where it differs); the ones
   matching the Overview's findings are listed first.
 

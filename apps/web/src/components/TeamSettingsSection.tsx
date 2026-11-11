@@ -279,12 +279,6 @@ export function TeamSettingsSection({
             {permissions.permissions.includes("integrations.discord.manage") ? (
               <li>Manage Discord integration settings</li>
             ) : null}
-            {permissions.permissions.includes("server.maintenance.view") ? (
-              <li>View backups and update status</li>
-            ) : null}
-            {permissions.permissions.includes("server.maintenance.run") ? (
-              <li>Run backups and install updates</li>
-            ) : null}
             {permissions.permissions.includes("team.data.transfer") ? (
               <li>Export and import Flow board bundles</li>
             ) : null}

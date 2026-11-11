@@ -17,6 +17,7 @@ export const API_PATH_PREFIXES = [
   "/statuses",
   "/rows",
   "/integrations",
+  "/server",
   "/discord",
   "/instance",
 ];

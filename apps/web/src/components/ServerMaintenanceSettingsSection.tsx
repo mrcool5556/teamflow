@@ -22,7 +22,8 @@ import { formatFileSize } from "../lib/format";
  */
 
 type Props = {
-  teamId: string;
+  /** Unused: updates and backups are server-wide. Kept so existing callers need no change. */
+  teamId?: string;
   canRun: boolean;
   onMessage: PanelMessage;
 };
@@ -200,10 +201,10 @@ function Steps({ current, failed }: { current: MaintenanceUpdateStep | null; fai
   );
 }
 
-export function ServerMaintenanceSettingsSection({ teamId, canRun, onMessage }: Props) {
+export function ServerMaintenanceSettingsSection({ canRun, onMessage }: Props) {
   const queryClient = useQueryClient();
   const confirm = useConfirm();
-  const statusQuery = useMaintenanceStatusQuery(teamId);
+  const statusQuery = useMaintenanceStatusQuery();
   const status = statusQuery.data ?? null;
   const [busy, setBusy] = useState<string | null>(null);
   const [backupFiles, setBackupFiles] = useState(false);
@@ -218,8 +219,8 @@ export function ServerMaintenanceSettingsSection({ teamId, canRun, onMessage }: 
 
   const setStatus = useCallback(
     (next: MaintenanceStatusPublic) =>
-      queryClient.setQueryData<MaintenanceStatusPublic>(queryKeys.maintenance(teamId), next),
-    [queryClient, teamId],
+      queryClient.setQueryData<MaintenanceStatusPublic>(queryKeys.maintenance, next),
+    [queryClient],
   );
 
   // The page was loaded by one version; when the server reports another, load the new web app.
@@ -237,7 +238,7 @@ export function ServerMaintenanceSettingsSection({ teamId, canRun, onMessage }: 
     }
   }, [statusQuery.error, restarting, onMessage]);
 
-  const refresh = () => queryClient.invalidateQueries({ queryKey: queryKeys.maintenance(teamId) });
+  const refresh = () => queryClient.invalidateQueries({ queryKey: queryKeys.maintenance });
 
   async function run<T>(label: string, action: () => Promise<T>, after?: (result: T) => void) {
     if (!canRun || busy) return;
@@ -257,7 +258,7 @@ export function ServerMaintenanceSettingsSection({ teamId, canRun, onMessage }: 
   const checkNow = () =>
     run(
       "Check",
-      () => client.checkServerMaintenance(teamId),
+      () => client.checkServerMaintenance(),
       ({ status: next }) => setStatus(next),
     );
 
@@ -272,11 +273,11 @@ export function ServerMaintenanceSettingsSection({ teamId, canRun, onMessage }: 
       if (!ok) return;
     }
     await run("Update", () =>
-      client.runServerMaintenanceUpdate(teamId, { version, backupFull: backupFiles }),
+      client.runServerMaintenanceUpdate({ version, backupFull: backupFiles }),
     );
   }
 
-  const dismiss = () => run("Dismiss", () => client.dismissServerMaintenanceJob(teamId));
+  const dismiss = () => run("Dismiss", () => client.dismissServerMaintenanceJob());
 
   async function restore(backup: MaintenanceBackupPublic) {
     const ok = await confirm({
@@ -286,7 +287,7 @@ export function ServerMaintenanceSettingsSection({ teamId, canRun, onMessage }: 
       danger: true,
     });
     if (!ok) return;
-    await run("Restore", () => client.runServerMaintenanceRestore(teamId, { file: backup.name }));
+    await run("Restore", () => client.runServerMaintenanceRestore({ file: backup.name }));
   }
 
   function showLog() {
@@ -558,7 +559,7 @@ export function ServerMaintenanceSettingsSection({ teamId, canRun, onMessage }: 
                     void run(
                       "Channel",
                       () =>
-                        client.setServerMaintenanceSettings(teamId, {
+                        client.setServerMaintenanceSettings({
                           channel: event.target.value as "stable" | "prerelease",
                         }),
                       ({ status: next }) => setStatus(next),
@@ -580,9 +581,7 @@ export function ServerMaintenanceSettingsSection({ teamId, canRun, onMessage }: 
                 className="ghost"
                 disabled={Boolean(busy) || job?.status === "running" || !status.backupScriptReady}
                 onClick={() =>
-                  void run("Backup", () =>
-                    client.runServerMaintenanceBackup(teamId, { full: false }),
-                  )
+                  void run("Backup", () => client.runServerMaintenanceBackup({ full: false }))
                 }
               >
                 Back up database now
@@ -592,9 +591,7 @@ export function ServerMaintenanceSettingsSection({ teamId, canRun, onMessage }: 
                 className="ghost"
                 disabled={Boolean(busy) || job?.status === "running" || !status.backupScriptReady}
                 onClick={() =>
-                  void run("Backup", () =>
-                    client.runServerMaintenanceBackup(teamId, { full: true }),
-                  )
+                  void run("Backup", () => client.runServerMaintenanceBackup({ full: true }))
                 }
               >
                 Full backup (with files)

@@ -135,7 +135,8 @@ export function BoardShell() {
           permissions: permissionsForSystemSlug(currentMember.roleSlug as SystemRoleSlug),
         }
       : null);
-  // Server-wide panels need the instance-admin flag (GET /auth/me) on top of the team permission.
+  // Server-wide panels (updates, backups, bot secrets and service) need only the instance-admin
+  // flag from GET /auth/me; the open Flow and the role in it do not matter.
   const isInstanceAdmin = user?.isInstanceAdmin === true;
   const can = (permission: Parameters<typeof hasTeamPermission>[1]) =>
     hasTeamPermission(effectiveTeamPermissions, permission);
@@ -144,9 +145,9 @@ export function BoardShell() {
     canManageRoles: can("team.roles.manage"),
     showIntegrations: can("integrations.discord.view"),
     canManageDiscord: can("integrations.discord.manage"),
-    canManageDiscordSecrets: isInstanceAdmin && can("integrations.discord.secrets"),
-    showMaintenance: isInstanceAdmin && can("server.maintenance.view"),
-    canRunMaintenance: isInstanceAdmin && can("server.maintenance.run"),
+    canManageDiscordSecrets: isInstanceAdmin,
+    showMaintenance: isInstanceAdmin,
+    canRunMaintenance: isInstanceAdmin,
   };
 
   const isRowHeadersVisible = useCallback(
