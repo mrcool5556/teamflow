@@ -30,6 +30,33 @@ set -euo pipefail
 
 REPO="mrcool5556/teamflow"
 
+# A heredoc, not the header above: under bash -c "$(curl ...)" there is no script file to read.
+usage() {
+  cat <<'EOF'
+Teamflow on Proxmox VE: create a Debian 12 container and install Teamflow in it.
+
+  bash -c "$(curl -fsSL https://github.com/mrcool5556/teamflow/releases/latest/download/proxmox.sh)"
+
+Options (also environment variables, e.g. TEAMFLOW_CTID=120):
+  --yes                 use the defaults without asking
+  --dry-run             check the host and print the commands; change nothing
+  --ctid N              container ID (default: the next free one)
+  --hostname NAME       default teamflow
+  --storage NAME        disk storage (default: the first that holds containers)
+  --disk GB             default 8
+  --memory MB           default 1024
+  --cores N             default 2
+  --bridge NAME         default vmbr0
+  --ip dhcp|CIDR        default dhcp; with a CIDR also pass --gateway
+  --gateway IP
+  --version X.Y.Z       Teamflow version (default: newest)
+  --port N              default 3000
+  --reuse               re-run the installer inside an existing Teamflow container
+
+Pass options after the script: bash -c "$(curl ...)" _ --yes --memory 2048
+EOF
+}
+
 say() { printf '%s\n' "$*"; }
 step() { printf '\n==> %s\n' "$*"; }
 die() {
@@ -45,10 +72,13 @@ run() {
   fi
 }
 
+# -r /dev/tty is true even with no controlling terminal (cron, ssh without -t); opening it is not.
+have_tty() { { : </dev/tty; } 2>/dev/null; }
+
 # ask VAR "Question" — keeps the current value on Enter, --yes or no terminal.
 ask() {
   local var=$1 question=$2 answer
-  if [[ "$ASSUME_YES" == 1 || "$DRY_RUN" == 1 || ! -r /dev/tty ]]; then return; fi
+  if [[ "$ASSUME_YES" == 1 || "$DRY_RUN" == 1 ]] || ! have_tty; then return; fi
   read -r -p "$question [${!var}]: " answer </dev/tty || answer=""
   if [[ -n "$answer" ]]; then printf -v "$var" '%s' "$answer"; fi
 }
@@ -56,8 +86,8 @@ ask() {
 confirm() {
   local answer
   if [[ "$ASSUME_YES" == 1 || "$DRY_RUN" == 1 ]]; then return 0; fi
-  [[ -r /dev/tty ]] || die "no terminal to confirm on. Re-run with --yes."
-  read -r -p "$1 [Y/n] " answer </dev/tty || answer=""
+  have_tty || die "no terminal to confirm on. Re-run with --yes."
+  read -r -p "$1 [Y/n] " answer </dev/tty || return 1
   [[ -z "$answer" || "$answer" =~ ^[Yy] ]]
 }
 
@@ -213,7 +243,7 @@ main() {
       --version) VERSION="${2:-}"; VERSION="${VERSION#v}"; shift 2 ;;
       --port) PORT="${2:-}"; shift 2 ;;
       --reuse) reuse=1; shift ;;
-      -h|--help) sed -n '2,29p' "$0" 2>/dev/null || true; exit 0 ;;
+      -h|--help) usage; exit 0 ;;
       *) die "unknown option $1 (try --help)" ;;
     esac
   done

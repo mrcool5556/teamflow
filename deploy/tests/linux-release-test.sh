@@ -316,6 +316,10 @@ tar -xzf "$REL/download/v0.2.0/teamflow-v0.2.0-linux-x64.tar.gz" -C "$tmprel"
   db.exec("CREATE TABLE canary(v TEXT)"); db.prepare("INSERT INTO canary VALUES (?)").run("legacy"); db.close();' "$tmprel/node_modules/better-sqlite3")
 chown -R teamflow:teamflow $APP_DIR
 set_latest 0.2.1
+# No terminal (as from cron or ssh without -t) and no --yes: it must ask, so it must stop.
+setsid bash "$SRC/deploy/install/install.sh" </dev/null >/tmp/convert-notty.log 2>&1 && bad "converted without a terminal or --yes" || ok "no terminal, no --yes: refuses to convert"
+check "...says to use --yes" grep -q "Re-run with --yes" /tmp/convert-notty.log
+check "...checkout untouched" test -d $APP_DIR/.git
 bash "$SRC/deploy/install/install.sh" --yes >/tmp/convert.log 2>&1 || { tail -30 /tmp/convert.log; bad "conversion exit"; }
 check "checkout kept aside" bash -c 'ls -d /opt/teamflow.git-* >/dev/null'
 check "current is a release" test "$(readlink $APP_DIR/current)" = releases/v0.2.1

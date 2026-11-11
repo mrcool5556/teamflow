@@ -25,6 +25,24 @@ APP_DIR="/opt/teamflow"
 APP_USER="teamflow"
 SERVICE="teamflow"
 
+# A heredoc, not the header above: under `curl | bash` there is no script file to read it from.
+usage() {
+  cat <<'EOF'
+Teamflow installer for Debian 12+ / Ubuntu 22.04+ (x64).
+
+  curl -fsSL https://github.com/mrcool5556/teamflow/releases/latest/download/install.sh | sudo bash
+
+Options (also as environment variables for `curl | bash`):
+  --yes            no questions (TEAMFLOW_YES=1)
+  --version X.Y.Z  install this version instead of the newest (TEAMFLOW_VERSION)
+  --port N         port for a new install, default 3000 (TEAMFLOW_PORT)
+  --update         on an existing install, also update to the newest version
+  --dry-run        check the machine and print what would be done; change nothing
+
+Pass options after `bash -s --`, e.g. ... | sudo bash -s -- --version 0.2.0
+EOF
+}
+
 say() { printf '%s\n' "$*"; }
 step() { printf '\n==> %s\n' "$*"; }
 die() {
@@ -44,10 +62,11 @@ act() {
 ask_yes() {
   local question=$1 answer
   if [[ "$ASSUME_YES" == 1 ]]; then return 0; fi
-  if [[ ! -r /dev/tty ]]; then
+  # -r /dev/tty is true even with no controlling terminal (cron, ssh without -t); opening it is not.
+  if ! { : </dev/tty; } 2>/dev/null; then
     die "$question Re-run with --yes (or TEAMFLOW_YES=1) to answer yes without a terminal."
   fi
-  read -r -p "$question [Y/n] " answer </dev/tty || answer=""
+  read -r -p "$question [Y/n] " answer </dev/tty || return 1
   [[ -z "$answer" || "$answer" =~ ^[Yy] ]]
 }
 
@@ -105,7 +124,10 @@ check_machine() {
   fi
 
   local glibc
-  glibc=$(ldd --version 2>/dev/null | head -n1 | grep -oE '[0-9]+\.[0-9]+$' || echo 0)
+  # sed reads all of ldd's output: `head -n1` here can SIGPIPE ldd, and with pipefail that added
+  # a stray "0" (glibc "2.36<newline>0"), failing the check at random.
+  glibc=$(ldd --version 2>/dev/null | sed -nE '1s/.* ([0-9]+\.[0-9]+)$/\1/p' || true)
+  glibc=${glibc:-0}
   if [[ "$(printf '%s\n%s\n' "2.35" "$glibc" | sort -V | head -n1)" != "2.35" ]]; then
     die "glibc $glibc is too old; Teamflow needs 2.35+ (Debian 12, Ubuntu 22.04 or newer)."
   fi
@@ -394,7 +416,7 @@ main() {
       --port) PORT="${2:-}"; shift 2 ;;
       --update) do_update=1; shift ;;
       --dry-run) DRY_RUN=1; shift ;;
-      -h|--help) sed -n '2,20p' "$0" 2>/dev/null || true; exit 0 ;;
+      -h|--help) usage; exit 0 ;;
       *) die "unknown option $1 (try --help)" ;;
     esac
   done
