@@ -41,6 +41,21 @@ node scripts/package-release.mjs --version 0.2.0
 node scripts/smoke-release.mjs out/stage --expect-version 0.2.0
 ```
 
+## Testing the installers
+
+These run the installers and update scripts against fake GitHub releases built from the source.
+Docker is only the test bench here; it is not a way to install Teamflow.
+
+| Test | Where it runs | What it covers |
+|------|---------------|----------------|
+| `deploy/tests/windows-release-test.ps1` | This Windows PC | Windows one-liner, update, rollback, backup, restore, setup code, in-app update |
+| `deploy/tests/linux-release-test.sh` | `node:20-bookworm` container (no systemd) | Linux installer and update edge cases, checkout conversion, shellcheck |
+| `deploy/tests/linux-systemd-test.sh` | Privileged Debian 12 container with systemd as PID 1 | The real `curl … \| bash` one-liner with apt and NodeSource, the service under systemd, setup code, sudo rule, in-app update, rollback, restore, `proxmox.sh --reuse`, restart |
+| `deploy/tests/proxmox-stub-test.sh` | Any Debian container | `proxmox.sh` logic with stub `pct`/`pveam`: options, prompts, defaults, errors. Not a real Proxmox host |
+
+How to start each one is at the top of the file. `linux-systemd-test.sh` runs from Git Bash on the
+host and removes its containers, network and image when done (`KEEP=1` keeps them).
+
 ## A bad release
 
 Edit the release on GitHub and tick **Set as a pre-release**. Stable servers stop offering it
