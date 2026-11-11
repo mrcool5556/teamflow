@@ -1,6 +1,6 @@
 [package]
 name = "teamflow-desktop"
-version = "0.2.1"
+version = "0.2.2"
 description = "Teamflow for Windows: runs the Teamflow server with a window and a tray icon"
 edition = "2021"
 publish = false
