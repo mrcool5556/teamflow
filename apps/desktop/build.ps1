@@ -10,7 +10,9 @@
 param(
   [Parameter(Mandatory = $true)][string]$Version,
   [Parameter(Mandatory = $true)][string]$ReleaseZip,
-  [string]$Out = ""
+  [string]$Out = "",
+  # Use npx @tauri-apps/cli even when cargo tauri exists (what CI runners do).
+  [switch]$UseNpx
 )
 
 $ErrorActionPreference = "Stop"
@@ -53,11 +55,16 @@ Copy-Item (Join-Path $unpack "node-$nv-win-x64\node.exe") (Join-Path $resources 
 Write-Host "node:    $nv (checksum ok)"
 
 # 3. Build the installer with the release's version.
-$config = "{`"version`":`"$Version`"}"
+# As a file: an inline JSON string loses its quotes when PowerShell passes it to npx.cmd.
+$tmp = if ($env:RUNNER_TEMP) { $env:RUNNER_TEMP } else { [IO.Path]::GetTempPath() }
+$config = Join-Path $tmp "teamflow-tauri-version.json"
+[IO.File]::WriteAllText($config, "{`"version`":`"$Version`"}")
 Push-Location $tauriDir
 try {
   $cargoTauri = $false
-  try { & cargo tauri --version *> $null; $cargoTauri = ($LASTEXITCODE -eq 0) } catch { }
+  if (-not $UseNpx) {
+    try { & cargo tauri --version *> $null; $cargoTauri = ($LASTEXITCODE -eq 0) } catch { }
+  }
   if ($cargoTauri) {
     & cargo tauri build --bundles nsis --config $config
   } else {
@@ -66,6 +73,7 @@ try {
   if ($LASTEXITCODE -ne 0) { throw "tauri build failed" }
 } finally {
   Pop-Location
+  Remove-Item $config -Force -ErrorAction SilentlyContinue
 }
 
 $built = Get-ChildItem (Join-Path $tauriDir "target\release\bundle\nsis") -Filter "Teamflow_$($Version)_x64-setup.exe" | Select-Object -First 1
