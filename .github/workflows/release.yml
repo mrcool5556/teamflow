@@ -30,7 +30,7 @@ jobs:
       version: ${{ steps.version.outputs.version }}
       prerelease: ${{ steps.version.outputs.prerelease }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - id: version
         name: Work out the version
         shell: bash
@@ -55,8 +55,8 @@ jobs:
           echo "version=$version" >> "$GITHUB_OUTPUT"
           echo "prerelease=$prerelease" >> "$GITHUB_OUTPUT"
           echo "Building v$version (prerelease=$prerelease)"
-      - uses: pnpm/action-setup@v4
-      - uses: actions/setup-node@v4
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v7
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: pnpm
@@ -80,9 +80,9 @@ jobs:
             archive: zip
     runs-on: ${{ matrix.os }}
     steps:
-      - uses: actions/checkout@v4
-      - uses: pnpm/action-setup@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v7
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v7
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: pnpm
@@ -101,7 +101,7 @@ jobs:
             tar -xzf "out/$name.tar.gz" -C "$RUNNER_TEMP/unpacked"
           fi
           node scripts/smoke-release.mjs "$RUNNER_TEMP/unpacked" --expect-version "${{ needs.check.outputs.version }}"
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: release-${{ matrix.platform }}
           path: |
@@ -114,19 +114,19 @@ jobs:
     needs: [check, build]
     runs-on: windows-2022
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - id: has
         name: Is there a desktop app to build?
         shell: bash
         run: |
           if [[ -f apps/desktop/src-tauri/Cargo.toml ]]; then echo "app=true" >> "$GITHUB_OUTPUT"; else echo "app=false" >> "$GITHUB_OUTPUT"; fi
       - if: steps.has.outputs.app == 'true'
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: release-win-x64
           path: out
       - if: steps.has.outputs.app == 'true'
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v7
         with:
           node-version: ${{ env.NODE_VERSION }}
       - if: steps.has.outputs.app == 'true'
@@ -140,7 +140,7 @@ jobs:
         shell: pwsh
         run: ./apps/desktop/build.ps1 -Version "${{ needs.check.outputs.version }}" -ReleaseZip "out/teamflow-v${{ needs.check.outputs.version }}-win-x64.zip"
       - if: steps.has.outputs.app == 'true'
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: release-windows-app
           path: |
@@ -158,10 +158,10 @@ jobs:
       id-token: write
       attestations: write
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v8
         with:
           pattern: release-*
           path: dist
@@ -180,7 +180,7 @@ jobs:
           rm ./*.sha256
           cat SHA256SUMS
       - name: Attest build provenance
-        uses: actions/attest-build-provenance@v2
+        uses: actions/attest-build-provenance@v3
         with:
           subject-path: |
             dist/teamflow-v*
