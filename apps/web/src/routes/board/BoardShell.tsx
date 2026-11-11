@@ -29,7 +29,6 @@ import {
   isSettingsPanel,
   issuePath,
   legacyLinkTarget,
-  planPath,
   settingsPath,
   useAppRoute,
 } from "../../lib/appRoute";
@@ -138,8 +137,6 @@ export function BoardShell() {
       : null);
   // Server-wide panels need the instance-admin flag (GET /auth/me) on top of the team permission.
   const isInstanceAdmin = user?.isInstanceAdmin === true;
-  // The Plan page is the internal dev backlog, so only instance admins see it.
-  const canSeePlan = isInstanceAdmin;
   const can = (permission: Parameters<typeof hasTeamPermission>[1]) =>
     hasTeamPermission(effectiveTeamPermissions, permission);
   const access = {
@@ -412,11 +409,10 @@ export function BoardShell() {
 
   // The admin page shares the settings workspace (and closes like it).
   const settingsOpen = route.settingsOpen || (route.adminOpen && isInstanceAdmin);
-  const roadmapOpen = route.planOpen && canSeePlan;
   if (settingsOpen && isSettingsPanel(route.settingsPanel)) {
     lastSettingsPanelRef.current = route.settingsPanel;
   }
-  const overlayOpen = settingsOpen || roadmapOpen;
+  const overlayOpen = settingsOpen;
 
   const closeSettings = useCallback(() => {
     navigate(boardPath(teamKey));
@@ -510,10 +506,7 @@ export function BoardShell() {
   }
 
   // Non-admins go to the board. Wait for GET /auth/me first so a stale cached user does not
-  // bounce an admin off the plan, and render nothing meanwhile so the plan never flashes.
-  if (route.planOpen && !canSeePlan) {
-    return sessionReady ? <Navigate to={boardPath(route.teamKey)} replace /> : null;
-  }
+  // bounce an admin off the admin page, and render nothing meanwhile so it never flashes.
   if (route.adminOpen && !isInstanceAdmin) {
     return sessionReady ? <Navigate to={boardPath(route.teamKey)} replace /> : null;
   }
@@ -601,20 +594,6 @@ export function BoardShell() {
                   <span className="topbar-btn-label">Files</span>
                 </button>
               ) : null}
-              {canSeePlan ? (
-                <button
-                  type="button"
-                  className={`ghost topbar-btn${roadmapOpen ? " active" : ""}`}
-                  aria-pressed={roadmapOpen}
-                  title={roadmapOpen ? "Back to the board" : "Plan & backlog"}
-                  onClick={() => navigate(roadmapOpen ? boardPath(teamKey) : planPath(teamKey))}
-                >
-                  <span className="topbar-btn-icon" aria-hidden="true">
-                    ◫
-                  </span>
-                  <span className="topbar-btn-label">Plan</span>
-                </button>
-              ) : null}
               <span className="topbar-divider" aria-hidden="true" />
               <UserMenu
                 name={user?.name ?? ""}
@@ -634,17 +613,6 @@ export function BoardShell() {
                           icon: "▤",
                           label: "Files",
                           onSelect: () => setTeamFilesOpen(true),
-                        },
-                      ]
-                    : []),
-                  ...(canSeePlan
-                    ? [
-                        {
-                          key: "plan",
-                          icon: "◫",
-                          label: roadmapOpen ? "Back to board" : "Plan",
-                          onSelect: () =>
-                            navigate(roadmapOpen ? boardPath(teamKey) : planPath(teamKey)),
                         },
                       ]
                     : []),
@@ -680,10 +648,6 @@ export function BoardShell() {
 
           {settingsOpen ? (
             <div className="app-workspace app-workspace--settings">
-              <Outlet />
-            </div>
-          ) : roadmapOpen ? (
-            <div className="app-workspace app-workspace--roadmap">
               <Outlet />
             </div>
           ) : (

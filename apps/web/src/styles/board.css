@@ -1011,12 +1011,6 @@ body.board-pan-active {
   );
 }
 
-.app-workspace--roadmap {
-  flex: 1;
-  min-height: 0;
-  overflow: hidden;
-}
-
 /* Row scroll affordance: when columns run past an edge, that edge fades and a slim step button
    sits in its own gutter beside the scroller, so it never covers a card. */
 .board-row-scroll-frame {
