@@ -118,7 +118,7 @@ In the Proxmox web UI open **your node → Shell** (or SSH to the host as root) 
 bash -c "$(curl -fsSL https://github.com/mrcool5556/teamflow/releases/latest/download/proxmox.sh)"
 ```
 
-It asks a few questions (Enter keeps each default: next free ID, hostname `teamflow`, the first storage that holds containers, 8 GB disk, 1 GB RAM, 2 cores, `vmbr0`, DHCP), downloads the Debian 12 template if needed, creates an unprivileged container with nesting, starts it, runs the Linux installer inside and prints the address and setup link. `--yes` takes all the defaults; `--dry-run` only prints what it would do. All options: the top of [proxmox.sh](../deploy/install/proxmox.sh). Doing it by hand instead: [create-lxc.md](../deploy/proxmox-lxc/create-lxc.md).
+It asks a few questions (Enter keeps each default: next free ID, hostname `teamflow`, the first storage that holds containers, 8 GB disk, 1 GB RAM, 2 cores, `vmbr0`, DHCP), downloads the Debian 12 template if needed, creates an unprivileged container with nesting, starts it, runs the Linux installer inside and prints the address and setup link. `--yes` takes all the defaults; `--dry-run` only prints what it would do. Options go after a `_` placeholder, for example `bash -c "$(curl -fsSL …/proxmox.sh)" _ --yes --memory 2048`, or as environment variables (`TEAMFLOW_MEMORY=2048`). All options: `--help`, or the top of [proxmox.sh](../deploy/install/proxmox.sh). Doing it by hand instead: [create-lxc.md](../deploy/proxmox-lxc/create-lxc.md).
 
 ### On Debian 12+ or Ubuntu 22.04+ (container, VM or bare metal)
 
