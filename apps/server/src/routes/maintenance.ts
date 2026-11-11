@@ -3,6 +3,7 @@ import type { AppEnv } from "../types.js";
 import { parseBody } from "../lib/validation.js";
 import { validateParams } from "../middleware/params.js";
 import {
+  backupRetentionSchema,
   maintenanceSettingsSchema,
   runMaintenanceBackupSchema,
   runMaintenanceRestoreSchema,
@@ -19,6 +20,7 @@ import {
   runMaintenanceUpdate,
   setMaintenanceChannel,
 } from "../lib/maintenance.js";
+import { deleteBackupFile, getBackupList, writeBackupRetention } from "../lib/backupFiles.js";
 
 /**
  * Server maintenance: status, backups, updates. Server-wide, so the instance-admin flag alone
@@ -98,6 +100,37 @@ routes.put(
   async (c) => {
     const body = await parseBody(c, maintenanceSettingsSchema);
     return c.json({ status: await setMaintenanceChannel(body.channel) });
+  },
+);
+
+/** Every file in the backup folder, the total and the keep-N settings. */
+routes.get("/server/maintenance/backups", requireAuth, requireInstanceAdmin, async (c) => {
+  return c.json(await getBackupList());
+});
+
+/** Delete one backup. The newest database backup is refused. Returns the new list. */
+routes.delete(
+  "/server/maintenance/backups/:backupName",
+  requireAuth,
+  requireWrite,
+  validateParams,
+  requireInstanceAdmin,
+  async (c) => c.json(await deleteBackupFile(c.req.param("backupName"))),
+);
+
+/** How many database backups and upload archives to keep (applied after each backup). */
+routes.get("/server/maintenance/backup-retention", requireAuth, requireInstanceAdmin, async (c) => {
+  return c.json({ retention: (await getBackupList()).retention });
+});
+
+routes.put(
+  "/server/maintenance/backup-retention",
+  requireAuth,
+  requireWrite,
+  requireInstanceAdmin,
+  async (c) => {
+    const body = await parseBody(c, backupRetentionSchema);
+    return c.json({ retention: await writeBackupRetention(body) });
   },
 );
 

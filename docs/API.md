@@ -37,7 +37,7 @@ Server code throws `ApiError` from `apps/server/src/lib/errors.ts` (`badRequest`
 
 <!-- BEGIN GENERATED ROUTES (scripts/gen-api-docs.mjs) -->
 
-## Routes (127)
+## Routes (131)
 
 Generated from `apps/server/src/routes/*.ts` by `pnpm docs:api`; do not edit by hand.
 
@@ -179,6 +179,10 @@ Discord integration settings, bot secrets, bot service and bot config.
 | POST | `/server/maintenance/job/dismiss` | bearer | yes |  | instance admin |  |
 | POST | `/server/maintenance/restore` | bearer | yes |  | instance admin | body `runMaintenanceRestoreSchema` |
 | PUT | `/server/maintenance/settings` | bearer | yes |  | instance admin | body `maintenanceSettingsSchema` |
+| GET | `/server/maintenance/backups` | bearer |  |  | instance admin |  |
+| DELETE | `/server/maintenance/backups/:backupName` | bearer | yes |  | instance admin |  |
+| GET | `/server/maintenance/backup-retention` | bearer |  |  | instance admin |  |
+| PUT | `/server/maintenance/backup-retention` | bearer | yes |  | instance admin | body `backupRetentionSchema` |
 | GET | `/teams/:teamId/server/maintenance` | bearer |  |  | instance admin |  |
 | GET | `/teams/:teamId/server/maintenance/job` | bearer |  |  | instance admin |  |
 
@@ -293,6 +297,54 @@ Chunked upload sessions for issue and row attachments.
 <!-- END GENERATED ROUTES -->
 
 Auth details: [AUTH.md](AUTH.md). Attachments and uploads: [ATTACHMENTS.md](ATTACHMENTS.md).
+
+## Server backups
+
+Server-wide: the instance-admin flag alone decides (no team in the path). Types are in
+`@teamflow/core` (`MaintenanceBackupListPublic`, `BackupRetention`); the api-client has
+`listServerBackups`, `deleteServerBackup`, `getServerBackupRetention`, `setServerBackupRetention`.
+
+`GET /server/maintenance/backups`, and the response of a delete:
+
+```json
+{
+  "backups": [
+    {
+      "name": "teamflow_2026-11-11_031500.db",
+      "kind": "database",
+      "sizeBytes": 2457600,
+      "createdAt": "2026-11-11T03:15:00.000Z",
+      "deletable": false,
+      "restorable": true
+    }
+  ],
+  "totalBytes": 2457600,
+  "backupDir": "/var/backups/teamflow",
+  "retention": { "keepDatabaseBackups": 10, "keepUploadArchives": 1 }
+}
+```
+
+- Newest first. Only files named `teamflow*` are listed; anything else in the folder is ignored.
+- `kind`: `database` is `teamflow_YYYY-MM-DD_HHMMSS[-N].db` and `uploads` is
+  `teamflow_uploads_YYYY-MM-DD_HHMMSS[-N].tar.gz` (`.zip` on Windows), the names the backup
+  scripts write. Every other `teamflow*` file is a `checkpoint` (`teamflow-pre-*`,
+  `teamflow_db_pre-*`, `*-before-releases.db`, `teamflow_env_pre-*`): never pruned, not counted
+  toward the keep settings, deleted only by hand.
+- `deletable` is false only for the newest `database` backup. `restorable` marks the files
+  `POST /server/maintenance/restore` accepts.
+- `backupDir` is null and `backups` empty when maintenance is disabled.
+
+`DELETE /server/maintenance/backups/:backupName` deletes one listed file and
+returns the new list. 400 for the newest database backup or a name that is not a Teamflow backup
+name (paths, `..`); 404 when no such file is in the folder (links count as missing). On Linux it
+runs the root-owned `backup-files.sh delete` through sudo.
+
+`GET` / `PUT /server/maintenance/backup-retention`:
+`{ "retention": { "keepDatabaseBackups": 10, "keepUploadArchives": 1 } }`. The PUT body is the
+`retention` object (`backupRetentionSchema`: integers 1-100, both required). The values are
+stored in `<app>/data/backup-settings.json`; after each successful backup (by hand, in the app or
+before an update) the backup script deletes the oldest of that kind beyond the number. Saving
+does not delete anything by itself.
 
 ## Issue response shape
 

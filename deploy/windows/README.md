@@ -33,7 +33,7 @@ Inside:
 ```text
 .env                    settings and secrets (kept on update)
 data\                   teamflow.db, uploads\, maintenance.log, logs\ (kept)
-backups\                database backups (the newest 10)
+backups\                backups (keep settings: Server admin; default 10 database, 1 uploads)
 node\node.exe           Teamflow's own Node 20
 releases\v0.2.0\        unpacked releases (the newest two are kept)
 current  ->             junction to releases\v0.2.0
@@ -56,7 +56,7 @@ All in `<install folder>\current\deploy\windows\`. Run them with `powershell -Ex
 | Script | What |
 |--------|------|
 | `update.ps1` | Download the newest release (or `--version X.Y.Z`), check its SHA-256, back up the database, migrate, switch `current`, restart, wait for `/health`; rolls back to the previous release and database if anything after the stop fails. `--channel prerelease`, `--backup-full`, `--reinstall`, `--allow-downgrade` |
-| `backup.ps1` | Online database backup to `backups\` (safe while Teamflow runs); without `--db-only` also zips `data\uploads\` |
+| `backup.ps1` | Online database backup to `backups\` (safe while Teamflow runs); without `--db-only` also zips `data\uploads\`. Then deletes the oldest automatic backups beyond the keep settings in `data\backup-settings.json` ([details](../../docs/SELF-HOSTING.md#backup-retention)); checkpoints are never deleted |
 | `restore.ps1 --file <name>` | Back up the current database, stop, put the backup back, start, check |
 | `start.ps1` / `stop.ps1` | Run the supervisor in a window (Ctrl+C stops it) / stop the service, app-started or `start.ps1` server |
 | `install-service.ps1` | Register the **Teamflow** service (elevated; NSSM from PATH or winget) |

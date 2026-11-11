@@ -617,12 +617,18 @@ export function ServerMaintenanceSettingsSection({ canRun, onMessage }: Props) {
                     <td>
                       <code>{backup.name}</code>
                     </td>
-                    <td>{backup.kind === "uploads" ? "Files" : "Database"}</td>
+                    <td>
+                      {backup.kind === "uploads"
+                        ? "Files"
+                        : backup.kind === "checkpoint"
+                          ? "Checkpoint"
+                          : "Database"}
+                    </td>
                     <td>{formatFileSize(backup.sizeBytes, 2)}</td>
                     <td>{formatWhen(backup.createdAt)}</td>
                     {canRun ? (
                       <td>
-                        {backup.kind === "database" && status.enabled ? (
+                        {backup.restorable && status.enabled ? (
                           <button
                             type="button"
                             className="admin-link"

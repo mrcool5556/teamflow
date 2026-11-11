@@ -1,6 +1,6 @@
 import { createMiddleware } from "hono/factory";
 import { z } from "zod";
-import { idParamSchema } from "@teamflow/core";
+import { backupFileParamSchema, idParamSchema } from "@teamflow/core";
 import { validationError } from "../lib/errors.js";
 
 /**
@@ -12,6 +12,7 @@ const SPECIAL_PARAMS: Record<string, { schema: z.ZodTypeAny; message: string }> 
   token: { schema: z.string().min(1).max(256), message: "Invalid invite token" },
   guildId: { schema: z.string().regex(/^\d{17,20}$/), message: "Invalid Discord server ID" },
   index: { schema: z.string().regex(/^\d{1,9}$/), message: "Invalid chunk index" },
+  backupName: { schema: backupFileParamSchema.shape.name, message: "Invalid backup name" },
 };
 
 /**

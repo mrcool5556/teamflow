@@ -34,6 +34,8 @@ import type {
   DiscordGuildConfigPublic,
   DiscordBotSecretsPublic,
   DiscordBotServiceStatusPublic,
+  BackupRetention,
+  MaintenanceBackupListPublic,
   MaintenanceJobPublic,
   MaintenanceStatusPublic,
   MaintenanceSettingsInput,
@@ -507,6 +509,31 @@ export class TeamflowClient {
   /** Advanced → Release channel. */
   setServerMaintenanceSettings(input: MaintenanceSettingsInput) {
     return this.request<{ status: MaintenanceStatusPublic }>(`/server/maintenance/settings`, {
+      method: "PUT",
+      body: JSON.stringify(input),
+    });
+  }
+
+  /** Every file in the backup folder with its type, size and whether it may be deleted. */
+  listServerBackups() {
+    return this.request<MaintenanceBackupListPublic>(`/server/maintenance/backups`);
+  }
+
+  /** Delete one backup (the newest database backup is refused). Returns the new list. */
+  deleteServerBackup(name: string) {
+    return this.request<MaintenanceBackupListPublic>(
+      `/server/maintenance/backups/${encodeURIComponent(name)}`,
+      { method: "DELETE" },
+    );
+  }
+
+  getServerBackupRetention() {
+    return this.request<{ retention: BackupRetention }>(`/server/maintenance/backup-retention`);
+  }
+
+  /** How many database backups and upload archives to keep (1-100 each). */
+  setServerBackupRetention(input: BackupRetention) {
+    return this.request<{ retention: BackupRetention }>(`/server/maintenance/backup-retention`, {
       method: "PUT",
       body: JSON.stringify(input),
     });
