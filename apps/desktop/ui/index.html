@@ -1,0 +1,118 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Teamflow</title>
+    <style>
+      :root {
+        --bg: #07090c;
+        --surface: #11161c;
+        --border: #434b52;
+        --text: #f2efe8;
+        --muted: #aab3bc;
+        --primary: #e6b84a;
+        --accent: #00cfea;
+        --danger: #e5484d;
+      }
+      @media (prefers-color-scheme: light) {
+        :root {
+          --bg: #f2efe8;
+          --surface: #ffffff;
+          --border: #b6b9bb;
+          --text: #15120c;
+          --muted: #4d5258;
+          --primary: #9a6f15;
+          --accent: #016f80;
+          --danger: #c8303a;
+        }
+      }
+      html,
+      body {
+        height: 100%;
+        margin: 0;
+      }
+      body {
+        display: grid;
+        place-items: center;
+        background: var(--bg);
+        color: var(--text);
+        font: 15px/1.5 "Segoe UI", system-ui, sans-serif;
+      }
+      .box {
+        width: min(26rem, calc(100% - 2rem));
+        padding: 1.75rem;
+        border: 1px solid var(--border);
+        border-radius: 12px;
+        background: var(--surface);
+        text-align: center;
+      }
+      .logo {
+        font-weight: 700;
+        letter-spacing: 0.16em;
+        color: var(--primary);
+        font-size: 0.8rem;
+      }
+      .spin {
+        width: 2rem;
+        height: 2rem;
+        margin: 1.25rem auto 0.75rem;
+        border-radius: 50%;
+        border: 3px solid var(--border);
+        border-top-color: var(--accent);
+        animation: spin 0.9s linear infinite;
+      }
+      @keyframes spin {
+        to {
+          transform: rotate(360deg);
+        }
+      }
+      @media (prefers-reduced-motion: reduce) {
+        .spin {
+          animation: none;
+        }
+      }
+      h1 {
+        font-size: 1.15rem;
+        margin: 0 0 0.35rem;
+      }
+      p {
+        margin: 0;
+        color: var(--muted);
+      }
+      .error .spin {
+        display: none;
+      }
+      .error h1 {
+        color: var(--danger);
+      }
+      pre {
+        text-align: left;
+        white-space: pre-wrap;
+        font-size: 0.8rem;
+        color: var(--muted);
+        margin: 1rem 0 0;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="box" id="box">
+      <div class="logo">TEAMFLOW</div>
+      <div class="spin" aria-hidden="true"></div>
+      <h1 id="title">Starting Teamflow…</h1>
+      <p id="detail">This takes a few seconds.</p>
+      <pre id="more" hidden></pre>
+    </div>
+    <script>
+      // The app calls this through eval while it prepares and starts the server.
+      window.setStatus = function (title, detail, error, more) {
+        document.getElementById("title").textContent = title;
+        document.getElementById("detail").textContent = detail || "";
+        document.getElementById("box").classList.toggle("error", Boolean(error));
+        var pre = document.getElementById("more");
+        pre.hidden = !more;
+        pre.textContent = more || "";
+      };
+    </script>
+  </body>
+</html>

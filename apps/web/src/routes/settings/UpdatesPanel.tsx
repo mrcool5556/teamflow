@@ -16,8 +16,8 @@ export function UpdatesPanel() {
           <header className="settings-panel-header">
             <h2>Updates & backups</h2>
             <p className="settings-copy settings-lead">
-              Run the same maintenance commands as <code>sudo teamflow-backup</code> and{" "}
-              <code>sudo update</code> from the UI — no SSH required.
+              Teamflow checks for new releases on its own. Updating backs up the database first and
+              takes about 30 seconds.
             </p>
           </header>
           <p className="settings-hint">

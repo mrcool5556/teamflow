@@ -1,0 +1,452 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Teamflow simple update v1</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link href="https://fonts.googleapis.com/css2?family=Encode+Sans+Semi+Condensed:wght@600;700&family=Manrope:wght@400;600;800&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet" />
+<style>
+  /* Machined dark tokens, copied from apps/web/src/styles/themes.css + aspects.css + fonts.css */
+  :root {
+    --bg: #07090c; --surface: #11161c; --panel: #0e1318; --cell: #0c1014;
+    --border: #434b52; --border-strong: #6e7984; --hair: rgba(236,233,225,.07);
+    --text: #f2efe8; --text-soft: #caced0; --muted: #aab3bc;
+    --primary: #e6b84a; --accent: #00cfea; --danger: #e5484d; --done: #55bd9c; --warn: #f59e0b;
+    --chrome-btn-text: #14100a;
+    --shadow-bevel: inset 0 0 0 .5px rgba(255,255,255,.14);
+    --font-display: "Encode Sans Semi Condensed", "Segoe UI", sans-serif;
+    --font-body: Manrope, "Segoe UI", sans-serif;
+    --font-mono: "IBM Plex Mono", Consolas, monospace;
+    --r-sm: 4px; --r-md: 8px;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text); font: 14px/1.5 var(--font-body); }
+  h1, h2, h3, h4 { font-family: var(--font-display); margin: 0 0 8px; }
+  a { color: var(--accent); }
+  code { font-family: var(--font-mono); font-size: .9em; }
+
+  /* ---------- document chrome ---------- */
+  .doc-head { position: sticky; top: 0; z-index: 50; display: flex; gap: 16px; align-items: center; flex-wrap: wrap; padding: 12px 24px; background: var(--surface); border-bottom: 1px solid var(--border); }
+  .doc-head nav { display: flex; gap: 6px; flex-wrap: wrap; font-size: 12px; }
+  .doc-head nav a { text-decoration: none; padding: 2px 8px; border: 1px solid var(--border); border-radius: var(--r-sm); }
+  main { max-width: 1400px; margin: 0 auto; padding: 24px; }
+  section.item { border-top: 1px solid var(--border); padding: 28px 0; }
+  .eyebrow { color: var(--accent); letter-spacing: .18em; font: 11px var(--font-mono); text-transform: uppercase; margin: 0 0 4px; }
+  .lead { color: var(--text-soft); max-width: 90ch; }
+  table.list { border-collapse: collapse; width: 100%; font-size: 13px; }
+  table.list td, table.list th { border-bottom: 1px solid var(--hair); padding: 6px 8px; text-align: left; vertical-align: top; }
+  table.list th { color: var(--muted); font: 11px var(--font-mono); text-transform: uppercase; letter-spacing: .1em; }
+  .keep { color: var(--done); } .move { color: var(--accent); } .drop { color: var(--danger); } .new { color: var(--primary); }
+  .row { display: flex; flex-wrap: wrap; gap: 24px; align-items: flex-start; }
+  .cap { font-size: 12px; color: var(--muted); margin-top: 6px; max-width: 64ch; }
+  .frame { --s: .62; width: calc(var(--w) * var(--s) * 1px); height: calc(var(--h) * var(--s) * 1px); overflow: hidden; border: 1px solid var(--border-strong); border-radius: var(--r-sm); position: relative; flex: none; }
+  .frame > .vp { width: calc(var(--w) * 1px); height: calc(var(--h) * 1px); transform: scale(var(--s)); transform-origin: 0 0; background: var(--bg); position: relative; overflow: hidden; }
+  .frame.phone { --s: .8; border-radius: 18px; }
+  @media (max-width: 700px) { main { padding: 16px; } .frame { --s: .4; } .frame.phone { --s: .7; } }
+
+  /* ---------- app chrome inside the frames ---------- */
+  .tf-top { display: flex; align-items: center; gap: 10px; height: 52px; padding: 0 18px; border-bottom: 1px solid var(--border); background: var(--surface); }
+  .tf-logo { font: 700 12px var(--font-display); color: var(--primary); letter-spacing: .14em; }
+  .tf-crumb { color: var(--muted); font-size: 13px; }
+  .tf-sp { flex: 1; }
+  .tf-avatar { width: 28px; height: 28px; border-radius: 50%; background: var(--primary); color: #111; display: grid; place-items: center; font: 600 12px var(--font-body); }
+  .tf-body { display: grid; grid-template-columns: 220px 1fr; height: calc(100% - 52px); }
+  .tf-nav { border-right: 1px solid var(--border); background: var(--panel); padding: 14px 10px; font-size: 13px; }
+  .tf-nav h6 { margin: 12px 8px 6px; font: 11px var(--font-mono); letter-spacing: .14em; text-transform: uppercase; color: var(--muted); }
+  .tf-nav a { display: block; padding: 6px 8px; border-radius: var(--r-sm); color: var(--text-soft); text-decoration: none; }
+  .tf-nav a.on { background: var(--surface); color: var(--text); box-shadow: var(--shadow-bevel); border-left: 3px solid var(--primary); }
+  .tf-panel { padding: 22px 28px; overflow: hidden; }
+  .tf-panel > h2 { font-size: 22px; margin-bottom: 2px; }
+  .tf-panel > .sub { color: var(--muted); font-size: 13px; margin: 0 0 18px; }
+
+  .tf-card { border: 1px solid var(--border); border-radius: var(--r-md); background: var(--surface); box-shadow: var(--shadow-bevel); padding: 18px 20px; margin-bottom: 14px; max-width: 720px; }
+  .tf-headline { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+  .tf-headline h3 { font-size: 20px; margin: 0; }
+  .tf-dot { width: 10px; height: 10px; border-radius: 50%; flex: none; }
+  .tf-dot.ok { background: var(--done); } .tf-dot.new { background: var(--primary); } .tf-dot.run { background: var(--accent); box-shadow: 0 0 0 4px rgba(0,207,234,.18); } .tf-dot.bad { background: var(--danger); } .tf-dot.off { background: var(--muted); }
+  .tf-meta { color: var(--muted); font: 12px var(--font-mono); margin: 4px 0 0 22px; }
+  .tf-btn { display: inline-flex; align-items: center; gap: 6px; font: 600 13px var(--font-body); padding: 7px 14px; border: 1px solid var(--border-strong); border-radius: var(--r-sm); background: transparent; color: var(--text); white-space: nowrap; }
+  .tf-btn.primary { background: var(--primary); color: var(--chrome-btn-text); border-color: var(--primary); font-weight: 800; }
+  .tf-btn.big { font-size: 15px; padding: 10px 18px; }
+  .tf-btn[disabled] { opacity: .45; }
+  .tf-actions { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin-top: 16px; }
+  .tf-note { font-size: 12px; color: var(--muted); }
+  .tf-log { font: 12px/1.6 var(--font-mono); color: var(--text-soft); background: var(--cell); border: 1px solid var(--hair); border-radius: var(--r-sm); padding: 8px 10px; margin-top: 10px; white-space: pre; overflow: hidden; }
+  .tf-changes { margin: 14px 0 0; padding: 12px 14px; background: var(--cell); border: 1px solid var(--hair); border-radius: var(--r-sm); font-size: 13px; }
+  .tf-changes b { font-family: var(--font-display); }
+  .tf-changes ul { margin: 6px 0 4px; padding-left: 18px; color: var(--text-soft); }
+  .tf-bar { height: 8px; border-radius: 99px; background: var(--cell); border: 1px solid var(--hair); overflow: hidden; margin-top: 16px; }
+  .tf-bar i { display: block; height: 100%; background: var(--accent); }
+  .tf-steps { display: flex; gap: 6px; flex-wrap: wrap; list-style: none; padding: 0; margin: 10px 0 0; font-size: 12px; }
+  .tf-steps li { padding: 3px 9px; border-radius: 99px; border: 1px solid var(--border); color: var(--muted); }
+  .tf-steps li.done { color: var(--done); border-color: var(--done); }
+  .tf-steps li.now { color: var(--text); border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
+  .tf-steps li.fail { color: var(--danger); border-color: var(--danger); }
+  .tf-bad { margin-top: 14px; padding: 10px 12px; border: 1px solid var(--danger); border-left-width: 4px; border-radius: var(--r-sm); background: rgba(229,72,77,.08); font-size: 13px; }
+  .tf-bad b { color: var(--danger); }
+  .tf-ok { margin-top: 14px; padding: 10px 12px; border: 1px solid var(--done); border-left-width: 4px; border-radius: var(--r-sm); background: rgba(85,189,156,.08); font-size: 13px; }
+  .tf-info { margin-top: 14px; padding: 10px 12px; border: 1px solid var(--warn); border-left-width: 4px; border-radius: var(--r-sm); background: rgba(245,158,11,.08); font-size: 13px; }
+  .tf-info pre { margin: 8px 0 0; font: 12px var(--font-mono); color: var(--text); background: var(--cell); padding: 6px 8px; border-radius: var(--r-sm); white-space: pre-wrap; }
+
+  .tf-adv { border: 1px solid var(--border); border-radius: var(--r-md); background: var(--panel); max-width: 720px; }
+  .tf-adv > summary, .tf-adv > .sum { list-style: none; display: flex; justify-content: space-between; align-items: center; padding: 12px 18px; font: 600 14px var(--font-display); color: var(--text-soft); cursor: pointer; }
+  .tf-adv > .sum::after { content: "▸"; color: var(--muted); }
+  .tf-adv.open > .sum::after { content: "▾"; }
+  .tf-adv .in { padding: 0 18px 16px; border-top: 1px solid var(--hair); }
+  .tf-adv h5 { font: 11px var(--font-mono); letter-spacing: .14em; text-transform: uppercase; color: var(--muted); margin: 14px 0 6px; }
+  .tf-kv { display: grid; grid-template-columns: 150px 1fr; gap: 4px 12px; font-size: 13px; }
+  .tf-kv span:nth-child(odd) { color: var(--muted); }
+  .tf-field { font: 13px var(--font-mono); padding: 6px 8px; border: 1px solid var(--border-strong); border-radius: var(--r-sm); background: var(--cell); color: var(--muted); width: 180px; }
+  .tf-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+  .tf-table td { padding: 4px 6px; border-bottom: 1px solid var(--hair); }
+  .tf-table td:first-child { font-family: var(--font-mono); }
+
+  /* reconnect overlay */
+  .tf-scrim { position: absolute; inset: 52px 0 0 0; background: rgba(7,9,12,.78); display: grid; place-items: center; }
+  .tf-back { text-align: center; padding: 26px 30px; border: 1px solid var(--border-strong); border-radius: var(--r-md); background: var(--surface); box-shadow: var(--shadow-bevel); width: 360px; }
+  .tf-spin { width: 34px; height: 34px; border-radius: 50%; border: 3px solid var(--border); border-top-color: var(--accent); margin: 0 auto 12px; }
+
+  /* phone */
+  .ph .tf-top { padding: 0 12px; }
+  .ph .tf-body { display: block; }
+  .ph .tf-nav { display: none; }
+  .ph .tf-panel { padding: 14px; }
+  .ph .tf-card { padding: 14px; }
+  .ph .tf-btn.big { width: 100%; justify-content: center; }
+  .ph .tf-kv { grid-template-columns: 1fr; }
+</style>
+</head>
+<body>
+<header class="doc-head">
+  <strong style="font-family:var(--font-display)">Simple Updates · mock-up v1</strong>
+  <nav>
+    <a href="#inventory">Inventory</a>
+    <a href="#states">Desktop states</a>
+    <a href="#reconnect">Reconnect</a>
+    <a href="#advanced">Advanced open</a>
+    <a href="#phone">Phone</a>
+    <a href="#api">What changes underneath</a>
+  </nav>
+</header>
+<main>
+  <p class="eyebrow">Install lane · 2026-11-09 · design only, nothing built</p>
+  <h1>Settings → Updates, made simple</h1>
+  <p class="lead">One card, one sentence, one button. The page answers “am I up to date?” and offers “Update to vX.Y.Z”. A database backup always runs first, so there is no backup choice on the main card. Everything else moves into a collapsed <b>Advanced</b> section. This assumes the prebuilt releases in <code>docs/INSTALL-PLAN.md</code>. Versions replace commit hashes, and the branch field goes away.</p>
+
+  <!-- ===================================================== -->
+  <section class="item" id="inventory">
+    <p class="eyebrow">01 · What is on the page today and where it goes</p>
+    <h2>Inventory</h2>
+    <p class="lead">Source: <code>apps/web/src/components/ServerMaintenanceSettingsSection.tsx</code>, used by <code>/settings/updates</code> (<code>UpdatesPanel.tsx</code>) and <code>/admin/updates</code> (<code>ServerSections.tsx</code>). Server: <code>apps/server/src/routes/maintenance.ts</code> and <code>lib/maintenance.ts</code>, <code>lib/versionInfo.ts</code>.</p>
+    <table class="list">
+      <tr><th>Today</th><th>New place</th><th>Why</th></tr>
+      <tr><td>Version tag + branch + commit sha + “Deployed …”</td><td class="keep">Main card: “v0.4.1 · installed 3 Nov”</td><td>A version number is what people recognise. The sha moves to Advanced.</td></tr>
+      <tr><td>“Origin has abc123 · 4 commits behind”</td><td class="keep">Main card: “v0.5.0 is available” + changelog</td><td>The release notes say what changed; a commit count does not.</td></tr>
+      <tr><td>Pills: Up to date / Sudo ready / Scripts incomplete</td><td class="move">One status dot. Sudo and scripts go to Advanced → Host</td><td>Sudo only matters when it is broken, and then the “Not set up” state says so.</td></tr>
+      <tr><td>Host status section (enabled text, backup folder)</td><td class="move">Advanced → Host</td><td></td></tr>
+      <tr><td>Backup database button</td><td class="move">Advanced → Backups</td><td>Every update takes one automatically.</td></tr>
+      <tr><td>Full backup button</td><td class="move">Advanced → Backups</td><td></td></tr>
+      <tr><td>Update app / Update + full backup</td><td class="keep">One “Update to vX.Y.Z” button. “Also back up uploaded files” is a checkbox in Advanced</td><td>Two update buttons made people stop and choose.</td></tr>
+      <tr><td>Optional git branch field + “Update from branch”</td><td class="drop">Removed from the UI. Channel (stable / pre-release) goes in Advanced; branch stays a CLI-only flag</td><td>Releases are built from tags, so there is no branch on the server to pull.</td></tr>
+      <tr><td>8-step stepper (Prepare…Health)</td><td class="keep">Progress bar + 5 short steps: Backup · Download · Install · Restart · Check</td><td>Pull and Build disappear with prebuilt releases.</td></tr>
+      <tr><td>“Server is restarting” banner</td><td class="keep">Full-panel “Back in a moment” overlay that reloads itself</td><td>The old banner was easy to miss and left stale JS loaded.</td></tr>
+      <tr><td>Current job + raw log</td><td class="move">Last 3 log lines while updating; full log in Advanced → Logs</td><td></td></tr>
+      <tr><td>Backups on disk table</td><td class="move">Advanced → Backups</td><td></td></tr>
+      <tr><td>Refresh status / Refresh list</td><td class="keep">One small “Check now” link</td><td>The page checks on open and every 6 h.</td></tr>
+      <tr><td>—</td><td class="new">New: “Restore last backup” in Advanced and in the Failed state</td><td>The rollback is automatic. This button covers a database you want back after the update succeeded.</td></tr>
+    </table>
+  </section>
+
+  <!-- ===================================================== -->
+  <section class="item" id="states">
+    <p class="eyebrow">02 · Desktop (1280 × 760)</p>
+    <h2>The five states</h2>
+    <div class="row">
+
+      <!-- Up to date -->
+      <div>
+        <div class="frame" style="--w:1280;--h:760"><div class="vp">
+          <div class="tf-top"><span class="tf-logo">TEAMFLOW</span><span class="tf-crumb">/ Server admin / Updates</span><span class="tf-sp"></span><span class="tf-avatar">G</span></div>
+          <div class="tf-body">
+            <nav class="tf-nav"><h6>Server</h6><a>Overview</a><a>Spaces</a><a class="on">Updates</a><a>Discord bot</a></nav>
+            <div class="tf-panel">
+              <h2>Updates</h2><p class="sub">Teamflow checks for new releases on its own.</p>
+              <div class="tf-card">
+                <div class="tf-headline"><span class="tf-dot ok"></span><h3>You're up to date</h3></div>
+                <p class="tf-meta">v0.5.0 · installed 9 Nov 2026 · checked 2 min ago · <a href="#">Check now</a></p>
+                <div class="tf-changes"><b>What came in v0.5.0</b><ul><li>One-click updates</li><li>Spaces show their upload cap</li></ul><a href="#">All release notes ↗</a></div>
+              </div>
+              <div class="tf-adv"><div class="sum">Advanced</div></div>
+            </div>
+          </div>
+        </div></div>
+        <p class="cap"><b>Up to date.</b> A green dot, a sentence and when it last checked. Advanced is closed.</p>
+      </div>
+
+      <!-- Update available -->
+      <div>
+        <div class="frame" style="--w:1280;--h:760"><div class="vp">
+          <div class="tf-top"><span class="tf-logo">TEAMFLOW</span><span class="tf-crumb">/ Server admin / Updates</span><span class="tf-sp"></span><span class="tf-avatar">G</span></div>
+          <div class="tf-body">
+            <nav class="tf-nav"><h6>Server</h6><a>Overview</a><a>Spaces</a><a class="on">Updates</a><a>Discord bot</a></nav>
+            <div class="tf-panel">
+              <h2>Updates</h2><p class="sub">Teamflow checks for new releases on its own.</p>
+              <div class="tf-card">
+                <div class="tf-headline"><span class="tf-dot new"></span><h3>v0.5.1 is available</h3></div>
+                <p class="tf-meta">You have v0.5.0 · released 12 Nov 2026 · 18 MB download</p>
+                <div class="tf-changes"><b>What's new</b><ul><li>Fix: due dates in the past showed as today on phones</li><li>Board loads faster with 500+ issues</li><li>Discord bot reconnects after network drops</li></ul><a href="#">Full release notes ↗</a></div>
+                <div class="tf-actions"><button class="tf-btn primary big">Update to v0.5.1</button><span class="tf-note">Backs up the database first. Teamflow is offline for about 30 seconds.</span></div>
+              </div>
+              <div class="tf-adv"><div class="sum">Advanced</div></div>
+            </div>
+          </div>
+        </div></div>
+        <p class="cap"><b>Update available.</b> The amber dot and the version are the whole message. The button opens no dialog because the line under it already says what happens. If the release notes contain “breaking”, the line becomes a confirm dialog.</p>
+      </div>
+
+      <!-- Updating -->
+      <div>
+        <div class="frame" style="--w:1280;--h:760"><div class="vp">
+          <div class="tf-top"><span class="tf-logo">TEAMFLOW</span><span class="tf-crumb">/ Server admin / Updates</span><span class="tf-sp"></span><span class="tf-avatar">G</span></div>
+          <div class="tf-body">
+            <nav class="tf-nav"><h6>Server</h6><a>Overview</a><a>Spaces</a><a class="on">Updates</a><a>Discord bot</a></nav>
+            <div class="tf-panel">
+              <h2>Updates</h2><p class="sub">Teamflow checks for new releases on its own.</p>
+              <div class="tf-card">
+                <div class="tf-headline"><span class="tf-dot run"></span><h3>Updating to v0.5.1…</h3></div>
+                <p class="tf-meta">Started 14:02 by George · don't close the server, closing this tab is fine</p>
+                <div class="tf-bar"><i style="width:46%"></i></div>
+                <ol class="tf-steps"><li class="done">✓ Backup</li><li class="done">✓ Download</li><li class="now">Install</li><li>Restart</li><li>Check</li></ol>
+                <div class="tf-log">==&gt; Verified teamflow-v0.5.1-linux-x64.tar.gz (sha256 ok)
+==&gt; Unpacking to /opt/teamflow/releases/v0.5.1
+==&gt; Running database migrations (2 new)</div>
+              </div>
+              <div class="tf-adv"><div class="sum">Advanced</div></div>
+            </div>
+          </div>
+        </div></div>
+        <p class="cap"><b>Updating.</b> Five steps, a bar and the last three log lines. Nothing to click. Other admins who open the page see the same view.</p>
+      </div>
+
+      <!-- Failed -->
+      <div>
+        <div class="frame" style="--w:1280;--h:760"><div class="vp">
+          <div class="tf-top"><span class="tf-logo">TEAMFLOW</span><span class="tf-crumb">/ Server admin / Updates</span><span class="tf-sp"></span><span class="tf-avatar">G</span></div>
+          <div class="tf-body">
+            <nav class="tf-nav"><h6>Server</h6><a>Overview</a><a>Spaces</a><a class="on">Updates</a><a>Discord bot</a></nav>
+            <div class="tf-panel">
+              <h2>Updates</h2><p class="sub">Teamflow checks for new releases on its own.</p>
+              <div class="tf-card">
+                <div class="tf-headline"><span class="tf-dot bad"></span><h3>Update to v0.5.1 didn't finish</h3></div>
+                <p class="tf-meta">You're still on v0.5.0 — it was rolled back automatically. Nothing was lost.</p>
+                <ol class="tf-steps"><li class="done">✓ Backup</li><li class="fail">! Download</li><li>Install</li><li>Restart</li><li>Check</li></ol>
+                <div class="tf-bad"><b>Couldn't reach github.com.</b> Check the server's internet connection, then try again.</div>
+                <div class="tf-actions"><button class="tf-btn primary">Try again</button><a href="#advanced">Show log</a></div>
+              </div>
+              <div class="tf-adv"><div class="sum">Advanced</div></div>
+            </div>
+          </div>
+        </div></div>
+        <p class="cap"><b>Failed.</b> One line says what went wrong and one says what to do, picked from a short table of known failures: no network, checksum mismatch, disk full, migration failed, health check failed. The rollback status appears first because it is what people worry about. “Show log” opens Advanced → Logs.</p>
+      </div>
+
+      <!-- Not set up -->
+      <div>
+        <div class="frame" style="--w:1280;--h:760"><div class="vp">
+          <div class="tf-top"><span class="tf-logo">TEAMFLOW</span><span class="tf-crumb">/ Server admin / Updates</span><span class="tf-sp"></span><span class="tf-avatar">G</span></div>
+          <div class="tf-body">
+            <nav class="tf-nav"><h6>Server</h6><a>Overview</a><a>Spaces</a><a class="on">Updates</a><a>Discord bot</a></nav>
+            <div class="tf-panel">
+              <h2>Updates</h2><p class="sub">Teamflow checks for new releases on its own.</p>
+              <div class="tf-card">
+                <div class="tf-headline"><span class="tf-dot off"></span><h3>One-click updates aren't set up on this server</h3></div>
+                <p class="tf-meta">v0.5.0 · v0.5.1 is available</p>
+                <div class="tf-info">Run this once on the server as root, then press Check now:
+<pre>curl -fsSL https://github.com/mrcool5556/teamflow/releases/latest/download/install.sh | sudo bash</pre>
+                It's safe to re-run: it keeps your data and settings and only adds what's missing.</div>
+                <div class="tf-actions"><button class="tf-btn" disabled>Update to v0.5.1</button><a href="#">Check now</a></div>
+              </div>
+              <div class="tf-adv"><div class="sum">Advanced</div></div>
+            </div>
+          </div>
+        </div></div>
+        <p class="cap"><b>Not set up.</b> Shown when the maintenance sudo is missing or the install is an old git checkout. The fix is the installer one-liner, because it is safe to re-run. On Windows it shows the <code>irm … | iex</code> line, and the standalone app never shows this state because it updates itself.</p>
+      </div>
+
+    </div>
+  </section>
+
+  <!-- ===================================================== -->
+  <section class="item" id="reconnect">
+    <p class="eyebrow">03 · During the restart</p>
+    <h2>“Back in a moment”</h2>
+    <div class="row">
+      <div>
+        <div class="frame" style="--w:1280;--h:760"><div class="vp">
+          <div class="tf-top"><span class="tf-logo">TEAMFLOW</span><span class="tf-crumb">/ Server admin / Updates</span><span class="tf-sp"></span><span class="tf-avatar">G</span></div>
+          <div class="tf-body">
+            <nav class="tf-nav"><h6>Server</h6><a>Overview</a><a>Spaces</a><a class="on">Updates</a><a>Discord bot</a></nav>
+            <div class="tf-panel"><h2>Updates</h2></div>
+          </div>
+          <div class="tf-scrim"><div class="tf-back"><div class="tf-spin"></div><h3>Back in a moment</h3><p class="tf-note">Teamflow is restarting on v0.5.1.<br />This page reloads by itself when it's ready.</p><p class="tf-meta" style="margin:8px 0 0">waiting 12 s · tries /health every 2 s</p></div></div>
+        </div></div>
+        <p class="cap">The overlay covers the panel once polls fail during the Restart step. When <code>/health</code> reports the new version, the page does a hard reload so the new web bundle loads. After 3 minutes it says “Still not back. Here's how to check” and links to the logs and the <code>systemctl status teamflow</code> command.</p>
+      </div>
+      <div>
+        <div class="frame" style="--w:1280;--h:760"><div class="vp">
+          <div class="tf-top"><span class="tf-logo">TEAMFLOW</span><span class="tf-crumb">/ Server admin / Updates</span><span class="tf-sp"></span><span class="tf-avatar">G</span></div>
+          <div class="tf-body">
+            <nav class="tf-nav"><h6>Server</h6><a>Overview</a><a>Spaces</a><a class="on">Updates</a><a>Discord bot</a></nav>
+            <div class="tf-panel">
+              <h2>Updates</h2><p class="sub">Teamflow checks for new releases on its own.</p>
+              <div class="tf-card">
+                <div class="tf-headline"><span class="tf-dot ok"></span><h3>Updated to v0.5.1</h3></div>
+                <p class="tf-meta">took 41 s · database backed up to teamflow-2026-11-12-1402.db.gz</p>
+                <div class="tf-ok">Everything's running. Members will pick up the new version next time they load a page.</div>
+              </div>
+              <div class="tf-adv"><div class="sum">Advanced</div></div>
+            </div>
+          </div>
+        </div></div>
+        <p class="cap">After the reload, a success card shows for this session and then turns back into the normal “You're up to date” card.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===================================================== -->
+  <section class="item" id="advanced">
+    <p class="eyebrow">04 · Advanced, opened</p>
+    <h2>Everything that left the main card</h2>
+    <div class="row">
+      <div>
+        <div class="frame" style="--w:1280;--h:1180"><div class="vp">
+          <div class="tf-top"><span class="tf-logo">TEAMFLOW</span><span class="tf-crumb">/ Server admin / Updates</span><span class="tf-sp"></span><span class="tf-avatar">G</span></div>
+          <div class="tf-body">
+            <nav class="tf-nav"><h6>Server</h6><a>Overview</a><a>Spaces</a><a class="on">Updates</a><a>Discord bot</a></nav>
+            <div class="tf-panel">
+              <h2>Updates</h2><p class="sub">Teamflow checks for new releases on its own.</p>
+              <div class="tf-card">
+                <div class="tf-headline"><span class="tf-dot ok"></span><h3>You're up to date</h3></div>
+                <p class="tf-meta">v0.5.1 · installed 12 Nov 2026 · checked just now</p>
+              </div>
+              <div class="tf-adv open"><div class="sum">Advanced</div><div class="in">
+                <h5>Update options</h5>
+                <label class="tf-note" style="display:flex;gap:8px;align-items:center"><input type="checkbox" /> Also back up uploaded files before updating (slow with many files)</label>
+                <div class="tf-kv" style="margin-top:8px"><span>Release channel</span><span><select class="tf-field"><option>Stable</option><option>Pre-release</option></select></span></div>
+                <h5>Backups</h5>
+                <div class="tf-actions" style="margin-top:0"><button class="tf-btn">Back up database now</button><button class="tf-btn">Full backup (with files)</button><button class="tf-btn">Restore last backup…</button></div>
+                <table class="tf-table" style="margin-top:8px">
+                  <tr><td>teamflow-2026-11-12-1402.db.gz</td><td>Database</td><td>2.41 MB</td><td>12 Nov 14:02</td></tr>
+                  <tr><td>teamflow-2026-11-09-0930.db.gz</td><td>Database</td><td>2.38 MB</td><td>9 Nov 09:30</td></tr>
+                  <tr><td>uploads-2026-11-01.tar.gz</td><td>Files</td><td>1.12 GB</td><td>1 Nov 22:10</td></tr>
+                </table>
+                <p class="tf-note">Folder: <code>/opt/teamflow/data/backups</code> · keeps the last 10 database backups</p>
+                <h5>Host</h5>
+                <div class="tf-kv">
+                  <span>Install type</span><span>Linux · systemd · release v0.5.1 (linux-x64)</span>
+                  <span>Install folder</span><span><code>/opt/teamflow/current → releases/v0.5.1</code></span>
+                  <span>Previous release</span><span><code>releases/v0.5.0</code> (kept for rollback)</span>
+                  <span>Maintenance sudo</span><span style="color:var(--done)">✓ ready (/usr/local/lib/teamflow)</span>
+                  <span>Node</span><span>v20.19.2</span>
+                  <span>Build</span><span><code>a1b2c3d</code> · built 12 Nov 2026 by GitHub Actions</span>
+                </div>
+                <h5>Logs</h5>
+                <div class="tf-log">[14:02:01] ==&gt; Teamflow update v0.5.0 → v0.5.1
+[14:02:01] ==&gt; Database backup… teamflow-2026-11-12-1402.db.gz (2.41 MB)
+[14:02:04] ==&gt; Download teamflow-v0.5.1-linux-x64.tar.gz (18.2 MB)
+[14:02:09] ==&gt; sha256 ok
+[14:02:12] ==&gt; Migrate: 2 applied
+[14:02:13] ==&gt; Switch current → v0.5.1, restart
+[14:02:42] ==&gt; Health ok (v0.5.1)</div>
+                <p class="tf-note"><a href="#">Download full log</a> · CLI: <code>sudo teamflow-update --help</code></p>
+              </div></div>
+            </div>
+          </div>
+        </div></div>
+        <p class="cap">Advanced holds the backup buttons, the backup list, host facts (including sudo and the sha), the channel choice and the full log. The git branch field is gone.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===================================================== -->
+  <section class="item" id="phone">
+    <p class="eyebrow">05 · Phone (390 × 760)</p>
+    <h2>Same card, stacked</h2>
+    <div class="row">
+      <div>
+        <div class="frame phone" style="--w:390;--h:760"><div class="vp ph">
+          <div class="tf-top"><span class="tf-logo">TEAMFLOW</span><span class="tf-sp"></span><span class="tf-avatar">G</span></div>
+          <div class="tf-body"><div class="tf-panel">
+            <h2>Updates</h2>
+            <div class="tf-card">
+              <div class="tf-headline"><span class="tf-dot new"></span><h3>v0.5.1 is available</h3></div>
+              <p class="tf-meta">You have v0.5.0 · 18 MB</p>
+              <div class="tf-changes"><b>What's new</b><ul><li>Due-date fix on phones</li><li>Faster big boards</li><li>Bot reconnects</li></ul><a href="#">Release notes ↗</a></div>
+              <div class="tf-actions"><button class="tf-btn primary big">Update to v0.5.1</button><span class="tf-note">Backs up the database first. Offline ~30 s.</span></div>
+            </div>
+            <div class="tf-adv"><div class="sum">Advanced</div></div>
+          </div></div>
+        </div></div>
+        <p class="cap">Update available</p>
+      </div>
+      <div>
+        <div class="frame phone" style="--w:390;--h:760"><div class="vp ph">
+          <div class="tf-top"><span class="tf-logo">TEAMFLOW</span><span class="tf-sp"></span><span class="tf-avatar">G</span></div>
+          <div class="tf-body"><div class="tf-panel">
+            <h2>Updates</h2>
+            <div class="tf-card">
+              <div class="tf-headline"><span class="tf-dot run"></span><h3>Updating…</h3></div>
+              <p class="tf-meta">to v0.5.1 · started 14:02</p>
+              <div class="tf-bar"><i style="width:46%"></i></div>
+              <ol class="tf-steps"><li class="done">✓ Backup</li><li class="done">✓ Download</li><li class="now">Install</li><li>Restart</li><li>Check</li></ol>
+            </div>
+          </div></div>
+        </div></div>
+        <p class="cap">Updating (log lines hidden on phone)</p>
+      </div>
+      <div>
+        <div class="frame phone" style="--w:390;--h:760"><div class="vp ph">
+          <div class="tf-top"><span class="tf-logo">TEAMFLOW</span><span class="tf-sp"></span><span class="tf-avatar">G</span></div>
+          <div class="tf-body"><div class="tf-panel">
+            <h2>Updates</h2>
+            <div class="tf-card">
+              <div class="tf-headline"><span class="tf-dot bad"></span><h3>Update didn't finish</h3></div>
+              <p class="tf-meta">Still on v0.5.0 — rolled back. Nothing lost.</p>
+              <div class="tf-bad"><b>Disk is full</b> (210 MB free, needs 400 MB). Empty a space's trash or delete old backups, then try again.</div>
+              <div class="tf-actions"><button class="tf-btn primary big">Try again</button><a href="#">Show log</a></div>
+            </div>
+          </div></div>
+        </div></div>
+        <p class="cap">Failed</p>
+      </div>
+      <div>
+        <div class="frame phone" style="--w:390;--h:760"><div class="vp ph">
+          <div class="tf-top"><span class="tf-logo">TEAMFLOW</span><span class="tf-sp"></span><span class="tf-avatar">G</span></div>
+          <div class="tf-body"><div class="tf-panel" style="position:relative;height:100%">
+            <h2>Updates</h2>
+            <div class="tf-back" style="width:auto;margin-top:60px"><div class="tf-spin"></div><h3>Back in a moment</h3><p class="tf-note">Restarting on v0.5.1. This page reloads by itself.</p></div>
+          </div></div>
+        </div></div>
+        <p class="cap">Reconnect</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===================================================== -->
+  <section class="item" id="api">
+    <p class="eyebrow">06 · What changes underneath (for the build plan)</p>
+    <h2>Status shape</h2>
+    <table class="list">
+      <tr><th>Field</th><th>Today</th><th>New</th></tr>
+      <tr><td>state</td><td>derived in the web from 6 fields</td><td class="new"><code>"up-to-date" | "available" | "updating" | "failed" | "not-set-up"</code> computed on the server</td></tr>
+      <tr><td>version</td><td>package.json + git sha + branch</td><td><code>current: "0.5.0"</code>, <code>latest: { version, notes, publishedAt, sizeBytes }</code></td></tr>
+      <tr><td>update check</td><td><code>git ls-remote</code> on demand</td><td class="new">GitHub Releases API, cached 6 h, plus “Check now”</td></tr>
+      <tr><td>job</td><td>type, status, logTail</td><td>+ <code>step</code> (backup|download|install|restart|check) written by update.sh, + <code>failure: { code, message, fix }</code></td></tr>
+      <tr><td>POST /update</td><td><code>{ branch?, backupFull?, skipBackup? }</code></td><td><code>{ version, backupFiles? }</code>. <code>skipBackup</code> leaves the UI; the CLI keeps it</td></tr>
+      <tr><td>/health</td><td><code>{ ok }</code></td><td class="new">+ <code>version</code>, so the reconnect overlay knows when the new release is up</td></tr>
+    </table>
+  </section>
+</main>
+</body>
+</html>

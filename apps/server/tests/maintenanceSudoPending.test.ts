@@ -24,21 +24,6 @@ vi.mock("../src/lib/hostScripts.js", async (importOriginal) => {
   };
 });
 
-vi.mock("../src/lib/versionInfo.js", () => ({
-  getMaintenanceVersionInfo: async () => ({
-    version: "0.1.0",
-    branch: "main",
-    commit: "abc",
-    commitShort: "abc",
-    commitDate: null,
-    latestCommit: null,
-    latestCommitShort: null,
-    updateAvailable: false,
-    commitsBehind: null,
-    gitError: null,
-  }),
-}));
-
 let appDir: string;
 const realPlatform = process.platform;
 type Maintenance = typeof import("../src/lib/maintenance.js");

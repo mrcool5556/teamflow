@@ -42,19 +42,20 @@ ssh teamflow bash /opt/teamflow/deploy/proxmox-lxc/diagnose.sh
 |---------|----------|
 | Site 502 | `ssh teamflow "systemctl status teamflow; tail -30 /opt/teamflow/data/maintenance.log"` |
 | Update stuck / log stops at `App dir:` | `ssh teamflow "grep KillMode /etc/systemd/system/teamflow.service"` — must be `KillMode=process` |
-| Build failed | `ssh teamflow "journalctl -u teamflow -n 50 --no-pager; ls -la /opt/teamflow/apps/web/dist"` |
-| Git behind origin | `ssh teamflow "sudo -u teamflow git -C /opt/teamflow fetch origin && sudo -u teamflow git -C /opt/teamflow log -1 --oneline origin/main"` |
+| Won't start | `ssh teamflow "journalctl -u teamflow -n 50 --no-pager"` |
+| Which release runs | `ssh teamflow "readlink /opt/teamflow/current; curl -s http://127.0.0.1:3000/health"` |
+| Last update result | `ssh teamflow "grep -E '^(STEP\|DONE\|FAIL)' /opt/teamflow/data/maintenance.log \| tail"` |
 | Test update manually | `ssh teamflow "tail -f /opt/teamflow/data/maintenance.log"` in one terminal, `ssh teamflow "sudo /usr/local/bin/teamflow-update"` in another |
 
 ## Safe vs destructive
 
 **Safe (agent may run without asking):**
 
-- `diagnose.sh`, `systemctl status`, `journalctl`, `tail` logs, `curl` health, read-only `git` as `teamflow`
+- `diagnose.sh`, `systemctl status`, `journalctl`, `tail` logs, `curl` health, `readlink /opt/teamflow/current`
 
 **Ask first:**
 
-- `systemctl restart teamflow`, `teamflow-update`, `git pull`, `pnpm build`, editing `/etc/systemd/system/teamflow.service`
+- `systemctl restart teamflow`, `teamflow-update`, `teamflow-restore`, re-running the installer, editing `/etc/systemd/system/teamflow.service`
 
 ## Paths
 

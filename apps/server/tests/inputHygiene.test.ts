@@ -11,7 +11,6 @@ import {
   type RegisteredUser,
   type TestApp,
 } from "./helpers";
-import { isValidBranchName } from "../src/lib/maintenance.js";
 import { formatEnvValue, readEnvFile, setEnvFileValue } from "../src/lib/envFile.js";
 
 let app: TestApp;
@@ -31,24 +30,49 @@ afterAll(() => {
   fs.rmSync(scratch, { recursive: true, force: true });
 });
 
-describe("maintenance branch validation", () => {
-  it("accepts plain ref names and rejects option-like or odd values", () => {
-    expect(isValidBranchName("main")).toBe(true);
-    expect(isValidBranchName("feature/foo-bar_1.2")).toBe(true);
-    expect(isValidBranchName("--upload-pack=evil")).toBe(false);
-    expect(isValidBranchName("-x")).toBe(false);
-    expect(isValidBranchName("a..b")).toBe(false);
-    expect(isValidBranchName("main; rm -rf /")).toBe(false);
-    expect(isValidBranchName("x".repeat(121))).toBe(false);
+describe("maintenance update input", () => {
+  it("refuses any git branch: servers install prebuilt releases", async () => {
+    for (const branch of ["main", "--upload-pack=evil"]) {
+      const res = await api(app, "POST", `/teams/${admin.teamId}/server/maintenance/update`, {
+        token: admin.token,
+        body: { branch },
+      });
+      expect(res.status).toBe(400);
+      expect((await json<{ error: string }>(res)).error).toMatch(/branch/);
+    }
   });
 
-  it("the update route rejects a bad branch before anything else", async () => {
+  it("only accepts a version number as the target", async () => {
     const res = await api(app, "POST", `/teams/${admin.teamId}/server/maintenance/update`, {
       token: admin.token,
-      body: { branch: "--upload-pack=evil" },
+      body: { version: "1.2.3; rm -rf /" },
     });
     expect(res.status).toBe(400);
-    expect((await json<{ error: string }>(res)).error).toMatch(/Invalid branch/);
+  });
+});
+
+describe("maintenance restore input", () => {
+  it("only takes a plain database backup file name", async () => {
+    for (const file of [
+      "../../etc/passwd",
+      "/var/backups/teamflow/teamflow_1.db",
+      "teamflow_1.tar.gz",
+      "x.db",
+    ]) {
+      const res = await api(app, "POST", `/teams/${admin.teamId}/server/maintenance/restore`, {
+        token: admin.token,
+        body: { file },
+      });
+      expect(res.status).toBe(400);
+    }
+  });
+
+  it("is instance-admin only", async () => {
+    const res = await api(app, "POST", `/teams/${member.teamId}/server/maintenance/restore`, {
+      token: member.token,
+      body: { file: "teamflow_2026-11-09_140201.db" },
+    });
+    expect(res.status).toBe(403);
   });
 });
 

@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024">
+  <!-- Placeholder Teamflow mark (Machined colours) until there is a real logo. -->
+  <defs>
+    <linearGradient id="face" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#1a2129"/>
+      <stop offset="1" stop-color="#0b0f13"/>
+    </linearGradient>
+  </defs>
+  <rect x="64" y="64" width="896" height="896" rx="200" fill="url(#face)" stroke="#6e7984" stroke-width="16"/>
+  <rect x="232" y="252" width="560" height="132" rx="40" fill="#e6b84a"/>
+  <rect x="446" y="252" width="132" height="520" rx="40" fill="#e6b84a"/>
+  <circle cx="742" cy="722" r="58" fill="#00cfea"/>
+</svg>

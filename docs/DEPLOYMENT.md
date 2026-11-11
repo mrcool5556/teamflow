@@ -1,11 +1,12 @@
 # Deployment index
 
-**Start here for production:** [SELF-HOSTING.md](SELF-HOSTING.md) (setups A and B, and the [production checklist](SELF-HOSTING.md#production-checklist)).
+**Start here for production:** [SELF-HOSTING.md](SELF-HOSTING.md) (setups A and B, and the [production checklist](SELF-HOSTING.md#production-checklist)). Every setup installs a prebuilt release from GitHub; how releases are built and published: [RELEASING.md](RELEASING.md).
 
 | Setup | Path | Guide section |
 |-------|------|---------------|
 | **A. Windows** | [deploy/windows/](../deploy/windows/README.md) | [Self-hosting → Windows](SELF-HOSTING.md#setup-a-windows) |
-| **B. Proxmox LXC** | [deploy/proxmox-lxc/](../deploy/proxmox-lxc/README.md) | [Self-hosting → LXC](SELF-HOSTING.md#setup-b-proxmox-lxc) |
+| **A. Windows app** | [apps/desktop/](../apps/desktop/build.ps1) (built by the release workflow) | [Self-hosting → Windows](SELF-HOSTING.md#option-1-the-teamflow-app-easiest) |
+| **B. Linux / Proxmox** | [deploy/install/](../deploy/install/install.sh), [deploy/proxmox-lxc/](../deploy/proxmox-lxc/README.md) | [Self-hosting → Linux or Proxmox](SELF-HOSTING.md#setup-b-linux-or-proxmox) |
 | Relay (remote HTTPS) | [deploy/relay/](../deploy/relay/README.md) | [Self-hosting → Remote access](SELF-HOSTING.md#remote-access) |
 | Docker (optional) | [deploy/docker/](../deploy/docker/README.md) | [Self-hosting → Appendix](SELF-HOSTING.md#appendix-docker-optional) |
 
@@ -15,6 +16,8 @@
 | [ATTACHMENTS.md](ATTACHMENTS.md) | Uploads, storage, team files and trash |
 | [SPACES.md](SPACES.md) | Upload caps per team, free spaces, the server admin page |
 | [SERVER-TESTING.md](SERVER-TESTING.md) | Diagnosing a production LXC |
+| [RELEASING.md](RELEASING.md) | Version tags, the release workflow, checksums and attestations |
+| [SETUP.md](SETUP.md) | First-time setup and the setup code the installers print |
 
 ## Local development
 
@@ -23,9 +26,9 @@ See the [README quick start](../README.md#quick-start-development). In short: No
 - Web dev: <http://localhost:5173> (Vite proxies `/api` to the API)
 - API: <http://localhost:3000>
 
-## Production (single port, by hand)
+## Production from a checkout (single port, by hand)
 
-Build web and server; the server serves `apps/web/dist` when `SERVE_WEB=true` (or when `NODE_ENV=production` and the build exists):
+Not needed with the installers. Build web and server; the server serves `apps/web/dist` when `SERVE_WEB=true` (or when `NODE_ENV=production` and the build exists):
 
 ```powershell
 pnpm install
@@ -52,10 +55,10 @@ Open <http://localhost:3000>. At startup the server loads `TEAMFLOW_ENV_FILE` if
   - re-grant `team.data.transfer` to Owner roles that lack it;
   - promote the earliest Admin in a team that has no Owner;
   - renumber duplicate issue numbers, then add `UNIQUE(team_id, number)`.
-- Run them by hand with `pnpm db:maintenance` (uses `DATABASE_URL` like `pnpm db:migrate`; on the LXC: `cd /opt/teamflow && sudo -u teamflow pnpm db:maintenance`), or set `TEAMFLOW_DB_MAINTENANCE_NIGHTLY=true` to run them in the server every night at 03:00 local time.
-- If the server logs "Duplicate issue number … UNIQUE(team_id, number) not created", run `pnpm db:maintenance` once.
+- Run them by hand with `pnpm db:maintenance` in a checkout (uses `DATABASE_URL` like `pnpm db:migrate`). On a release install, from the install folder: `cd /opt/teamflow && sudo -u teamflow node current/apps/server/dist/db-maintenance.js` (Windows, in the install folder: `& .\node\node.exe current\apps\server\dist\db-maintenance.js`). Or set `TEAMFLOW_DB_MAINTENANCE_NIGHTLY=true` to run them in the server every night at 03:00 local time.
+- If the server logs "Duplicate issue number … UNIQUE(team_id, number) not created", run the data maintenance above once.
 - Separately, the server purges trashed team files older than 7 days and expired chunked-upload sessions each time it starts.
 
 ## Postgres
 
-Not supported. Only SQLite (`better-sqlite3`) is implemented; Postgres support is deferred. The LXC installer still installs a PostgreSQL package and the unit still orders after `postgresql.service`, but nothing connects to it.
+Not supported. Only SQLite (`better-sqlite3`) is implemented. The unused PostgreSQL package and the systemd ordering on `postgresql.service` were removed in v0.2.0; an old install may still have PostgreSQL installed. Teamflow never used it, so it can be removed (`apt remove postgresql postgresql-contrib`) if nothing else on that machine uses it.

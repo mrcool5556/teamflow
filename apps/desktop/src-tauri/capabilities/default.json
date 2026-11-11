@@ -1,0 +1,7 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "default",
+  "description": "The loading page needs no commands; the Teamflow web app is a remote page with no Tauri access.",
+  "windows": ["main"],
+  "permissions": []
+}

@@ -47,7 +47,7 @@ describe("server admin page", () => {
       within(screen.getByRole("region", { name: "Discord bot" })).getByText("running"),
     ).toBeInTheDocument();
     expect(
-      within(screen.getByRole("region", { name: "Updates" })).getByText("2 behind"),
+      within(screen.getByRole("region", { name: "Updates" })).getByText("v0.9.3 available"),
     ).toBeInTheDocument();
     const disk = screen.getByRole("region", { name: "Disk" });
     expect(within(disk).getByText("19.00 GB free of 30.00 GB")).toBeInTheDocument();

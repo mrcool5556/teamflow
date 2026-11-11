@@ -6,20 +6,28 @@ import fs from "node:fs/promises";
 import path from "node:path";
 import type {
   MaintenanceBackupPublic,
+  MaintenanceChannel,
   MaintenanceJobPublic,
+  MaintenanceLogSummary,
+  MaintenanceReleaseCheckPublic,
   MaintenanceStatusPublic,
-  MaintenanceVersionPublic,
+  MaintenanceUpdateState,
   RunMaintenanceBackupInput,
+  RunMaintenanceRestoreInput,
   RunMaintenanceUpdateInput,
 } from "@teamflow/core";
-import { inferMaintenanceJobOutcome } from "@teamflow/core";
+import { inferMaintenanceJobOutcome, parseMaintenanceLog } from "@teamflow/core";
 import { config } from "../config.js";
-import { getMaintenanceVersionInfo } from "./versionInfo.js";
-import { buildSpawnArgs, formatCommand, INSTALLED_SCRIPT_DIR, probeSudo } from "./hostScripts.js";
+import { getReleaseCheck, isUpdateAvailable, writeChannel } from "./releaseCheck.js";
+import { buildJobSpawn, formatCommand, INSTALLED_SCRIPT_DIR, probeSudo } from "./hostScripts.js";
 import { badRequest, internalError } from "./errors.js";
 
 const JOB_FILE = "maintenance-job.json";
 const LOG_FILE = "maintenance.log";
+/** Windows: the PowerShell job writes its PID here (the spawned cmd.exe exits at once). */
+const JOB_PID_FILE = "maintenance-job.pid";
+/** How long a Windows job may take to start PowerShell and write its PID file. */
+const JOB_START_GRACE_MS = 60_000;
 const LOG_TAIL_BYTES = 12_000;
 
 function getDataDir() {
@@ -34,13 +42,22 @@ function getBackupDir() {
   return config.maintenance.backupDir;
 }
 
-/** Configured path (already absolute) > root-owned installed copy > checkout copy. */
+/**
+ * Linux: configured path (already absolute) > root-owned installed copy > checkout copy.
+ * Windows: configured path > the running release's deploy\windows script > checkout copy.
+ */
 function resolveScriptPath(
   configured: string | undefined,
   installedPath: string,
   repoRelative: string,
 ) {
   if (configured) return configured;
+  if (process.platform === "win32") {
+    const name = path.basename(repoRelative).replace(/\.sh$/, ".ps1");
+    const release = path.join(config.appDir, "current", "deploy", "windows", name);
+    if (existsSync(release)) return release;
+    return path.join(config.appDir, "deploy", "windows", name);
+  }
   if (existsSync(installedPath)) return installedPath;
   return path.join(config.appDir, repoRelative);
 }
@@ -63,12 +80,17 @@ function getUpdateScript() {
   );
 }
 
+function getRestoreScript() {
+  return resolveScriptPath(
+    undefined,
+    `${INSTALLED_SCRIPT_DIR}restore.sh`,
+    "deploy/proxmox-lxc/restore.sh",
+  );
+}
+
 function disabledReason(): string | null {
   if (!isMaintenanceEnabled()) {
     return "Server maintenance is disabled. Set TEAMFLOW_MAINTENANCE_ENABLED=true on the host.";
-  }
-  if (process.platform === "win32") {
-    return "In-app maintenance is only supported on Linux server installs.";
   }
   return null;
 }
@@ -104,16 +126,33 @@ function isProcessRunning(pid: number) {
   try {
     process.kill(pid, 0);
     return true;
-  } catch {
-    return false;
+  } catch (err) {
+    // The update runs as root through sudo: signalling it is refused (EPERM) but it is alive.
+    // Treating that as "gone" marked updates failed while they were still finishing.
+    return (err as NodeJS.ErrnoException).code === "EPERM";
   }
+}
+
+/** Is the job's process still alive? On Windows the PID comes from the script's PID file. */
+async function jobAlive(job: StoredJob) {
+  if (process.platform === "win32") {
+    try {
+      const raw = await fs.readFile(path.join(getDataDir(), JOB_PID_FILE), "utf8");
+      const pid = Number.parseInt(raw.trim(), 10);
+      if (Number.isFinite(pid) && pid > 0) return isProcessRunning(pid);
+    } catch {
+      // not written yet
+    }
+    return Date.now() - Date.parse(job.startedAt) < JOB_START_GRACE_MS;
+  }
+  return Boolean(job.pid && isProcessRunning(job.pid));
 }
 
 async function reconcileStaleJob() {
   const job = await readStoredJob();
   if (!job || job.status !== "running") return;
 
-  if (job.pid && isProcessRunning(job.pid)) return;
+  if (await jobAlive(job)) return;
 
   const logPath = path.join(getDataDir(), LOG_FILE);
   const log = await readLogTail();
@@ -177,7 +216,7 @@ async function listBackups(): Promise<MaintenanceBackupPublic[]> {
 
   const backups: MaintenanceBackupPublic[] = [];
   for (const name of entries) {
-    if (!/^teamflow_.+\.(db|sql|tar\.gz)$/.test(name)) continue;
+    if (!/^teamflow_.+\.(db|sql|tar\.gz|zip)$/.test(name)) continue;
     const fullPath = path.join(backupDir, name);
     try {
       const stat = await fs.stat(fullPath);
@@ -227,25 +266,40 @@ async function startJob(
   };
   await writeStoredJob(job);
 
-  const { command, args: spawnArgs } = buildSpawnArgs(script, args);
-  const env = {
+  const { command, args: spawnArgs, verbatim } = buildJobSpawn(script, args);
+  // A PID file left by an earlier job must not speak for this one (Windows, see jobPid).
+  await fs.rm(path.join(dataDir, JOB_PID_FILE), { force: true });
+  const env: NodeJS.ProcessEnv = {
     ...process.env,
     APP_DIR: config.appDir,
     BACKUP_DIR: getBackupDir(),
     MAINTENANCE_LOG: logPath,
+    // Windows: update.ps1 / restore.ps1 stop this process when no service manager does it.
+    TEAMFLOW_SERVER_PID: String(process.pid),
   };
+  // Set by update.ps1 / restore.ps1 for their own child backup; a server they restarted inherits it.
+  delete env.TEAMFLOW_NESTED_JOB;
+  // Windows PowerShell 5.1 cannot load its own modules (Get-FileHash...) with PowerShell 7's
+  // module path, which a server started from PowerShell 7 inherits. Unset, 5.1 uses its default.
+  if (process.platform === "win32") {
+    for (const key of Object.keys(env)) if (key.toLowerCase() === "psmodulepath") delete env[key];
+  }
 
   await fs.appendFile(logPath, `> ${formatCommand(command, spawnArgs)}\n`);
 
-  const isUpdate = type === "update";
+  // Update and restore stop teamflow: they must survive as detached root processes that write
+  // their own log (update.sh / restore.sh redirect themselves). On Windows every job writes its
+  // own log: output does not come back through the cmd.exe hop, and a log handle passed down
+  // would block the script's own writes to the same file.
+  const writesOwnLog = type === "update" || type === "restore" || process.platform === "win32";
 
-  if (isUpdate) {
-    // Update stops teamflow — must survive as a detached root process with its own log redirect in update.sh.
+  if (writesOwnLog) {
     const child = spawn(command, spawnArgs, {
       detached: true,
       stdio: "ignore",
       env,
       windowsHide: true,
+      windowsVerbatimArguments: verbatim,
     });
 
     child.on("error", (err) => {
@@ -277,6 +331,7 @@ async function startJob(
       stdio: ["ignore", logHandle.fd, logHandle.fd],
       env,
       windowsHide: true,
+      windowsVerbatimArguments: verbatim,
     });
 
     child.on("error", (err) => {
@@ -308,7 +363,6 @@ async function startJob(
 type HostCheck = {
   /** null: never probed (skipped because a job was running). */
   sudo: { ready: boolean; command: string; detail: string } | null;
-  version: MaintenanceVersionPublic;
   checkedAt: string;
   /**
    * The check ran while a backup or update job was running. update.sh re-runs
@@ -340,8 +394,9 @@ export async function checkMaintenanceHost(): Promise<MaintenanceStatusPublic> {
       : jobRunning
         ? (hostCheck?.sudo ?? null)
         : await probeSudo(getBackupScript());
-  const version = await getMaintenanceVersionInfo({ skipOriginCheck: jobRunning });
-  hostCheck = { sudo, version, checkedAt: new Date().toISOString(), duringJob: jobRunning };
+  hostCheck = { sudo, checkedAt: new Date().toISOString(), duringJob: jobRunning };
+  // "Check now": ask GitHub again even if the six-hour cache is fresh.
+  await getReleaseCheck({ force: !jobRunning });
   return getMaintenanceStatus();
 }
 
@@ -371,8 +426,17 @@ export async function getMaintenanceStatus(): Promise<MaintenanceStatusPublic> {
   const sudoProbe = enabled
     ? (hostCheck?.sudo ?? { ready: false, command: "", detail: HOST_NOT_CHECKED })
     : { ready: false, command: "", detail: reason };
-  const version =
-    hostCheck?.version ?? (await getMaintenanceVersionInfo({ skipOriginCheck: true }));
+  // Reads the cache only; the boot check, the six-hourly timer and "Check now" refresh it.
+  const release = await getReleaseCheck({ network: false });
+  const lastRun = job?.type === "update" ? parseMaintenanceLog(job.logTail) : null;
+  const notSetUpReason = describeNotSetUp({
+    disabledReason: reason,
+    release,
+    sudoReady: sudoProbe.ready,
+    sudoChecked: Boolean(hostCheck?.sudo),
+    sudoPending,
+    lastRun,
+  });
 
   return {
     enabled,
@@ -392,8 +456,58 @@ export async function getMaintenanceStatus(): Promise<MaintenanceStatusPublic> {
     backupDir: enabled ? getBackupDir() : null,
     backups,
     job,
-    version,
+    release,
+    state: computeUpdateState({ job, lastRun, notSetUpReason, release }),
+    lastRun,
+    notSetUpReason,
   };
+}
+
+/** Why the one-click update cannot run on this host, or null when it can. */
+export function describeNotSetUp(input: {
+  disabledReason: string | null;
+  release: MaintenanceReleaseCheckPublic;
+  sudoReady: boolean;
+  /** False until the sudo probe has run once (it runs at boot and on "Check now"). */
+  sudoChecked: boolean;
+  sudoPending: boolean;
+  lastRun: MaintenanceLogSummary | null;
+}): string | null {
+  if (input.disabledReason) return input.disabledReason;
+  if (!input.release.current.releaseInstall) {
+    return "This server runs from a git checkout. Run the installer once to switch it to prebuilt releases; it keeps your data and settings.";
+  }
+  if (input.sudoChecked && !input.sudoReady && !input.sudoPending) {
+    return "The maintenance permission (sudo rule) is missing. Re-run the installer to add it.";
+  }
+  if (input.lastRun?.failure?.code === "not-set-up") return input.lastRun.failure.message;
+  return null;
+}
+
+export function computeUpdateState(input: {
+  job: MaintenanceJobPublic | null;
+  lastRun: MaintenanceLogSummary | null;
+  notSetUpReason: string | null;
+  release: MaintenanceReleaseCheckPublic;
+}): MaintenanceUpdateState {
+  const { job } = input;
+  if (job?.type === "update" && job.status === "running") return "updating";
+  if (
+    job?.type === "update" &&
+    job.status === "failed" &&
+    input.lastRun?.failure?.code !== "not-set-up"
+  ) {
+    return "failed";
+  }
+  if (input.notSetUpReason) return "not-set-up";
+  return isUpdateAvailable(input.release) ? "available" : "up-to-date";
+}
+
+/** Settings → Updates → Advanced → Release channel. */
+export async function setMaintenanceChannel(channel: MaintenanceChannel) {
+  await writeChannel(channel);
+  await getReleaseCheck({ force: true });
+  return getMaintenanceStatus();
 }
 
 export async function runMaintenanceBackup(input: RunMaintenanceBackupInput) {
@@ -411,22 +525,7 @@ export async function runMaintenanceBackup(input: RunMaintenanceBackupInput) {
   return job;
 }
 
-/** Branch names reach `git checkout "$BRANCH"`; allow only plain ref characters, no options. */
-const BRANCH_PATTERN = /^[A-Za-z0-9._/-]{1,120}$/;
-
-export function isValidBranchName(value: string) {
-  return BRANCH_PATTERN.test(value) && !value.startsWith("-") && !value.includes("..");
-}
-
-export function assertValidBranchName(value: string | undefined) {
-  if (value !== undefined && !isValidBranchName(value)) {
-    throw badRequest("Invalid branch name");
-  }
-}
-
 export async function runMaintenanceUpdate(input: RunMaintenanceUpdateInput) {
-  assertValidBranchName(input.branch);
-
   const reason = disabledReason();
   if (reason) throw badRequest(reason);
 
@@ -435,19 +534,42 @@ export async function runMaintenanceUpdate(input: RunMaintenanceUpdateInput) {
     throw badRequest(`Update script not found at ${script}`);
   }
 
+  // Install the version the page showed, so a release published meanwhile is not picked up
+  // unannounced. Without one, use the newest the check knows of; the script falls back to
+  // asking GitHub itself.
+  const release = await getReleaseCheck({ network: false });
+  const version = input.version ?? release.latest?.version;
   const args: string[] = [];
+  if (version) args.push("--version", version);
+  if (release.channel === "prerelease") args.push("--channel", "prerelease");
   if (input.skipBackup) args.push("--skip-backup");
   if (input.backupFull) args.push("--backup-full");
-  if (input.branch) {
-    args.push("--branch", input.branch);
-  }
 
   const job = await startJob("update", script, args, {
     backupFull: input.backupFull,
     skipBackup: input.skipBackup,
-    branch: input.branch,
+    version,
   });
   if (!job) throw internalError("Failed to start update job");
+  return job;
+}
+
+/** Put a database backup back (Advanced → Backups → Restore). */
+export async function runMaintenanceRestore(input: RunMaintenanceRestoreInput) {
+  const reason = disabledReason();
+  if (reason) throw badRequest(reason);
+
+  const backups = await listBackups();
+  if (!backups.some((backup) => backup.name === input.file && backup.kind === "database")) {
+    throw badRequest(`No database backup named ${input.file}`);
+  }
+  const script = getRestoreScript();
+  if (!existsSync(script)) {
+    throw badRequest(`Restore script not found at ${script}. Re-run the installer to add it.`);
+  }
+
+  const job = await startJob("restore", script, ["--file", input.file], { file: input.file });
+  if (!job) throw internalError("Failed to start restore job");
   return job;
 }
 
@@ -461,8 +583,14 @@ export async function dismissMaintenanceJob() {
   const job = await readStoredJob();
   if (!job) return null;
 
+  // A finished job is cleared, so a failed update stops showing once read.
+  if (job.status !== "running") {
+    await fs.rm(path.join(getDataDir(), JOB_FILE), { force: true });
+    return null;
+  }
+
   if (job.status === "running") {
-    if (job.pid && isProcessRunning(job.pid)) {
+    if (await jobAlive(job)) {
       throw badRequest("Job is still running on the server.");
     }
     const log = await readLogTail();

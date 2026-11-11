@@ -160,6 +160,9 @@ const envSchema = z.object({
   TEAMFLOW_UPDATE_SCRIPT: optionalString,
   TEAMFLOW_DISCORD_BOT_SCRIPT: optionalString,
   TEAMFLOW_DB_MAINTENANCE_NIGHTLY: boolVar(false),
+  TEAMFLOW_UPDATE_CHECK: boolVar(true),
+  TEAMFLOW_RELEASE_REPO: optionalString,
+  TEAMFLOW_RELEASE_API: urlString,
   WEB_DIST: optionalString,
   SERVE_WEB: boolVar(false),
 });
@@ -236,6 +239,8 @@ export type AppConfig = {
     discordBotScript: string | undefined;
   };
   /** Run the data-maintenance pass (trash purge etc.) nightly in-process. */
+  /** Update check against GitHub releases (TEAMFLOW_UPDATE_CHECK=false turns it off). */
+  releases: { checkEnabled: boolean; repo: string; apiBase: string };
   dbMaintenanceNightly: boolean;
   /** Absolute path of the built web app. */
   webDist: string;
@@ -342,12 +347,19 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
     maintenance: {
       enabled: e.TEAMFLOW_MAINTENANCE_ENABLED,
       sudo: e.TEAMFLOW_MAINTENANCE_SUDO,
-      backupDir: resolveFrom(appDir, e.TEAMFLOW_BACKUP_DIR) ?? "/var/backups/teamflow",
+      backupDir:
+        resolveFrom(appDir, e.TEAMFLOW_BACKUP_DIR) ??
+        (process.platform === "win32" ? path.join(appDir, "backups") : "/var/backups/teamflow"),
       backupScript: resolveFrom(appDir, e.TEAMFLOW_BACKUP_SCRIPT),
       updateScript: resolveFrom(appDir, e.TEAMFLOW_UPDATE_SCRIPT),
       discordBotScript: resolveFrom(appDir, e.TEAMFLOW_DISCORD_BOT_SCRIPT),
     },
     dbMaintenanceNightly: e.TEAMFLOW_DB_MAINTENANCE_NIGHTLY,
+    releases: {
+      checkEnabled: e.TEAMFLOW_UPDATE_CHECK,
+      repo: e.TEAMFLOW_RELEASE_REPO ?? "mrcool5556/teamflow",
+      apiBase: (e.TEAMFLOW_RELEASE_API ?? "https://api.github.com").replace(/\/$/, ""),
+    },
     webDist,
     serveWeb: e.SERVE_WEB,
   };

@@ -48,8 +48,8 @@ export function AdminUpdatesPanel() {
       title="Updates & backups"
       lead={
         <>
-          The same commands as <code>sudo teamflow-backup</code> and <code>sudo update</code>, from
-          the browser.
+          Teamflow checks for new releases on its own. Updating backs up the database first and
+          takes about 30 seconds.
         </>
       }
       allowed={access.showMaintenance}

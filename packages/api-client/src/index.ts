@@ -36,7 +36,9 @@ import type {
   DiscordBotServiceStatusPublic,
   MaintenanceJobPublic,
   MaintenanceStatusPublic,
+  MaintenanceSettingsInput,
   RunMaintenanceBackupInput,
+  RunMaintenanceRestoreInput,
   RunMaintenanceUpdateInput,
   UpdateDiscordBotSecretsInput,
   TeamPermissionsPublic,
@@ -464,7 +466,7 @@ export class TeamflowClient {
     return this.request<{ status: MaintenanceStatusPublic }>(`/teams/${teamId}/server/maintenance`);
   }
 
-  /** Probe sudo and compare with origin now (the GET status only reads the cached result). */
+  /** Probe sudo and ask GitHub for the newest release now (the GET only reads the cache). */
   checkServerMaintenance(teamId: string) {
     return this.request<{ status: MaintenanceStatusPublic }>(
       `/teams/${teamId}/server/maintenance/check`,
@@ -496,6 +498,37 @@ export class TeamflowClient {
         body: JSON.stringify(input),
       },
     );
+  }
+
+  /** Put a database backup back. Stops the app for a few seconds, like an update. */
+  runServerMaintenanceRestore(teamId: string, input: RunMaintenanceRestoreInput) {
+    return this.request<{ job: MaintenanceJobPublic }>(
+      `/teams/${teamId}/server/maintenance/restore`,
+      { method: "POST", body: JSON.stringify(input) },
+    );
+  }
+
+  /** Clear a finished job (a failed update stops showing). */
+  dismissServerMaintenanceJob(teamId: string) {
+    return this.request<{ job: MaintenanceJobPublic | null }>(
+      `/teams/${teamId}/server/maintenance/job/dismiss`,
+      { method: "POST" },
+    );
+  }
+
+  /** Advanced → Release channel. */
+  setServerMaintenanceSettings(teamId: string, input: MaintenanceSettingsInput) {
+    return this.request<{ status: MaintenanceStatusPublic }>(
+      `/teams/${teamId}/server/maintenance/settings`,
+      { method: "PUT", body: JSON.stringify(input) },
+    );
+  }
+
+  /** The liveness probe: `{ ok, version }`. Used to see when a restarted server is back. */
+  async getHealth(signal?: AbortSignal) {
+    const response = await this.fetchImpl(`${this.baseUrl}/health`, { signal, cache: "no-store" });
+    if (!response.ok) throw new Error(`Health check failed (${response.status})`);
+    return (await response.json()) as { ok: boolean; version?: string };
   }
 
   createExportToken(teamId: string, includeFiles = false) {

@@ -2,7 +2,12 @@ import { Hono } from "hono";
 import type { AppEnv } from "../types.js";
 import { parseBody } from "../lib/validation.js";
 import { validateParams } from "../middleware/params.js";
-import { runMaintenanceBackupSchema, runMaintenanceUpdateSchema } from "@teamflow/core";
+import {
+  maintenanceSettingsSchema,
+  runMaintenanceBackupSchema,
+  runMaintenanceRestoreSchema,
+  runMaintenanceUpdateSchema,
+} from "@teamflow/core";
 import { requireAuth, requireInstanceAdmin, requireWrite } from "../middleware/auth.js";
 import { loadTeam, requirePermission } from "../middleware/team.js";
 import {
@@ -11,7 +16,9 @@ import {
   getMaintenanceJob,
   getMaintenanceStatus,
   runMaintenanceBackup,
+  runMaintenanceRestore,
   runMaintenanceUpdate,
+  setMaintenanceChannel,
 } from "../lib/maintenance.js";
 
 /** Server maintenance: status, backups, updates (instance admin only). */
@@ -101,6 +108,38 @@ routes.post(
   async (c) => {
     const job = await dismissMaintenanceJob();
     return c.json({ job });
+  },
+);
+
+/** Advanced → Backups → Restore: put a database backup back (stops the app briefly). */
+routes.post(
+  "/teams/:teamId/server/maintenance/restore",
+  requireAuth,
+  requireWrite,
+  validateParams,
+  loadTeam(),
+  requirePermission("server.maintenance.run"),
+  requireInstanceAdmin,
+  async (c) => {
+    const body = await parseBody(c, runMaintenanceRestoreSchema);
+    const job = await runMaintenanceRestore(body);
+    return c.json({ job }, 202);
+  },
+);
+
+/** Advanced → Release channel (stable or pre-release). */
+routes.put(
+  "/teams/:teamId/server/maintenance/settings",
+  requireAuth,
+  requireWrite,
+  validateParams,
+  loadTeam(),
+  requirePermission("server.maintenance.run"),
+  requireInstanceAdmin,
+  async (c) => {
+    const body = await parseBody(c, maintenanceSettingsSchema);
+    const status = await setMaintenanceChannel(body.channel);
+    return c.json({ status });
   },
 );
 

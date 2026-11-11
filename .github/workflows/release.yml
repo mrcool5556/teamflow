@@ -1,0 +1,210 @@
+# Prebuilt releases. Pushing a tag vX.Y.Z (or vX.Y.Z-rc.N for a pre-release) builds and
+# publishes them; "Run workflow" builds the same files without publishing (a dry run).
+# See docs/RELEASING.md.
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Version to build (dry run, nothing is published), e.g. 0.2.0"
+        required: true
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  NODE_VERSION: "20"
+
+jobs:
+  check:
+    name: Version and tests
+    runs-on: ubuntu-22.04
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+      prerelease: ${{ steps.version.outputs.prerelease }}
+    steps:
+      - uses: actions/checkout@v4
+      - id: version
+        name: Work out the version
+        shell: bash
+        run: |
+          if [[ "${GITHUB_REF_TYPE}" == "tag" ]]; then
+            version="${GITHUB_REF_NAME#v}"
+          else
+            version="${{ inputs.version }}"
+            version="${version#v}"
+          fi
+          if ! [[ "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.]+)?$ ]]; then
+            echo "::error::Not a SemVer version: $version"
+            exit 1
+          fi
+          pkg=$(node -p "require('./package.json').version")
+          if [[ "${GITHUB_REF_TYPE}" == "tag" && "${version%%-*}" != "$pkg" ]]; then
+            echo "::error::Tag v$version does not match package.json version $pkg. Bump package.json first."
+            exit 1
+          fi
+          prerelease=false
+          [[ "$version" == *-* ]] && prerelease=true
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "prerelease=$prerelease" >> "$GITHUB_OUTPUT"
+          echo "Building v$version (prerelease=$prerelease)"
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm -r build
+      - run: pnpm test
+
+  build:
+    name: Build ${{ matrix.platform }}
+    needs: check
+    strategy:
+      fail-fast: true
+      matrix:
+        include:
+          # Ubuntu 22.04 has glibc 2.35, so the better-sqlite3 binary also runs on Debian 12.
+          - os: ubuntu-22.04
+            platform: linux-x64
+            archive: tar.gz
+          - os: windows-2022
+            platform: win-x64
+            archive: zip
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Package
+        shell: bash
+        run: node scripts/package-release.mjs --version "${{ needs.check.outputs.version }}"
+      - name: Smoke test the packed release
+        shell: bash
+        run: |
+          name="teamflow-v${{ needs.check.outputs.version }}-${{ matrix.platform }}"
+          mkdir -p "$RUNNER_TEMP/unpacked"
+          if [[ "${{ matrix.archive }}" == "zip" ]]; then
+            "$SYSTEMROOT/System32/tar.exe" -x -f "out/$name.zip" -C "$(cygpath -w "$RUNNER_TEMP/unpacked")"
+          else
+            tar -xzf "out/$name.tar.gz" -C "$RUNNER_TEMP/unpacked"
+          fi
+          node scripts/smoke-release.mjs "$RUNNER_TEMP/unpacked" --expect-version "${{ needs.check.outputs.version }}"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: release-${{ matrix.platform }}
+          path: |
+            out/teamflow-v*.${{ matrix.archive }}
+            out/teamflow-v*.${{ matrix.archive }}.sha256
+          if-no-files-found: error
+
+  windows-app:
+    name: Windows app
+    needs: [check, build]
+    runs-on: windows-2022
+    steps:
+      - uses: actions/checkout@v4
+      - id: has
+        name: Is there a desktop app to build?
+        shell: bash
+        run: |
+          if [[ -f apps/desktop/src-tauri/Cargo.toml ]]; then echo "app=true" >> "$GITHUB_OUTPUT"; else echo "app=false" >> "$GITHUB_OUTPUT"; fi
+      - if: steps.has.outputs.app == 'true'
+        uses: actions/download-artifact@v4
+        with:
+          name: release-win-x64
+          path: out
+      - if: steps.has.outputs.app == 'true'
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+      - if: steps.has.outputs.app == 'true'
+        uses: dtolnay/rust-toolchain@stable
+      - if: steps.has.outputs.app == 'true'
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: apps/desktop/src-tauri
+      - if: steps.has.outputs.app == 'true'
+        name: Build the installer
+        shell: pwsh
+        run: ./apps/desktop/build.ps1 -Version "${{ needs.check.outputs.version }}" -ReleaseZip "out/teamflow-v${{ needs.check.outputs.version }}-win-x64.zip"
+      - if: steps.has.outputs.app == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-windows-app
+          path: |
+            out/TeamflowSetup-v*.exe
+            out/TeamflowSetup-v*.exe.sha256
+          if-no-files-found: error
+
+  publish:
+    name: Publish
+    needs: [check, build, windows-app]
+    if: github.ref_type == 'tag'
+    runs-on: ubuntu-22.04
+    permissions:
+      contents: write
+      id-token: write
+      attestations: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: release-*
+          path: dist
+          merge-multiple: true
+      - name: Add the one-line installers
+        shell: bash
+        run: |
+          for f in deploy/install/install.sh deploy/install/proxmox.sh deploy/install/install.ps1; do
+            if [[ -f "$f" ]]; then cp "$f" dist/; fi
+          done
+          cd dist
+          for f in install.sh proxmox.sh install.ps1; do
+            if [[ -f "$f" ]]; then sha256sum "$f" > "$f.sha256"; fi
+          done
+          cat ./*.sha256 | sort -k2 > SHA256SUMS
+          rm ./*.sha256
+          cat SHA256SUMS
+      - name: Attest build provenance
+        uses: actions/attest-build-provenance@v2
+        with:
+          subject-path: |
+            dist/teamflow-v*
+            dist/TeamflowSetup-v*
+            dist/install.*
+            dist/proxmox.sh
+      - name: Release notes
+        shell: bash
+        run: |
+          tag="${GITHUB_REF_NAME}"
+          notes=$(git tag -l --format='%(contents)' "$tag" | sed '/^-----BEGIN PGP SIGNATURE-----/,$d')
+          if [[ -z "${notes//[[:space:]]/}" ]]; then
+            prev=$(git describe --tags --abbrev=0 "${tag}^" 2>/dev/null || true)
+            range="${prev:+$prev..}$tag"
+            notes=$(git log --no-merges --pretty='- %s' "$range" | head -n 40)
+          fi
+          printf '%s\n' "$notes" > notes.md
+          cat notes.md
+      - name: Create the GitHub release
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          flags=()
+          if [[ "${{ needs.check.outputs.prerelease }}" == "true" ]]; then flags+=(--prerelease); fi
+          gh release create "${GITHUB_REF_NAME}" dist/* \
+            --title "Teamflow ${GITHUB_REF_NAME}" --notes-file notes.md --verify-tag "${flags[@]}"

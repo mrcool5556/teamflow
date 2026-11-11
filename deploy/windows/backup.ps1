@@ -1,22 +1,99 @@
-param(
-  [string]$BackupDir = ""
-)
+# Teamflow backup for Windows: the database (SQLite online backup, safe while Teamflow runs) and,
+# optionally, uploaded files. Prints "BACKUP database <file>" / "BACKUP uploads <file>" lines.
+#
+#   backup.ps1                 database + uploads
+#   backup.ps1 --db-only       database only (fast; used by update)
+#   backup.ps1 --uploads-only  uploaded files only
+#   backup.ps1 --root <folder> the install folder (found automatically otherwise)
+#
+# Backups go to <install folder>\backups (TEAMFLOW_BACKUP_DIR in .env changes it). The newest
+# 10 database backups are kept. In a git checkout (no releases folder) it copies data\teamflow.db
+# to data\backups as before.
 
-$ErrorActionPreference = "Stop"
-$RepoRoot = Resolve-Path (Join-Path $PSScriptRoot "..\..")
-$DbPath = Join-Path $RepoRoot "data\teamflow.db"
+. (Join-Path $PSScriptRoot "_release.ps1")
 
-if (-not (Test-Path $DbPath)) {
-  Write-Host "Database not found at $DbPath" -ForegroundColor Red
-  exit 1
+$opts = @{}
+try { $opts = ConvertFrom-GnuArgs $args } catch { Write-Output "Unknown option: $($_.Exception.Message)"; exit 2 }
+$mode = "full"
+if ($opts["db-only"]) { $mode = "db-only" }
+if ($opts["uploads-only"]) { $mode = "uploads-only" }
+
+$root = $null
+if ($opts["root"]) { $root = (Resolve-Path ([string]$opts["root"])).Path } else { $root = Find-TeamflowRoot $PSScriptRoot }
+
+if (-not $root) {
+  # Git checkout: the old plain copy.
+  $repo = (Resolve-Path (Join-Path $PSScriptRoot "..\..")).Path
+  $db = Join-Path $repo "data\teamflow.db"
+  if (-not (Test-Path $db)) { Write-Output "No database found at $db"; exit 1 }
+  $dir = Join-Path $repo "data\backups"
+  New-Item -ItemType Directory -Force -Path $dir | Out-Null
+  $dest = Join-Path $dir ("teamflow_{0}.db" -f (Get-Date -Format "yyyy-MM-dd_HHmmss"))
+  Copy-Item $db $dest
+  Write-Output "BACKUP database $dest"
+  exit 0
 }
 
-if (-not $BackupDir) {
-  $BackupDir = Join-Path $RepoRoot "data\backups"
+Register-JobPid $root
+# Started by the server (not by update.ps1 / restore.ps1, which log our output themselves): the
+# server cannot capture our output through its cmd.exe hop, so write the log ourselves too.
+$ownLog = ($env:TEAMFLOW_SERVER_PID -and -not $env:TEAMFLOW_NESTED_JOB)
+if ($ownLog) { Start-TeamflowLog $root }
+function Say([string]$Line) {
+  if ($ownLog) { Write-TeamflowLog $Line } else { Write-Output $Line }
+}
+$backupDir = Get-EnvValue $root "TEAMFLOW_BACKUP_DIR"
+if (-not $backupDir) { $backupDir = Join-Path $root "backups" }
+elseif (-not [IO.Path]::IsPathRooted($backupDir)) { $backupDir = Join-Path $root $backupDir }
+New-Item -ItemType Directory -Force -Path $backupDir | Out-Null
+$stamp = Get-Date -Format "yyyy-MM-dd_HHmmss"
+
+function Get-FreeName {
+  param([string]$Prefix, [string]$Ext)
+  $candidate = Join-Path $backupDir "$Prefix$stamp$Ext"
+  $n = 2
+  while (Test-Path $candidate) {
+    $candidate = Join-Path $backupDir "$Prefix$stamp-$n$Ext"
+    $n++
+  }
+  return $candidate
 }
 
-New-Item -ItemType Directory -Force -Path $BackupDir | Out-Null
-$Stamp = Get-Date -Format "yyyy-MM-dd_HHmmss"
-$Dest = Join-Path $BackupDir "teamflow_$Stamp.db"
-Copy-Item $DbPath $Dest
-Write-Host "Backed up to $Dest" -ForegroundColor Green
+if ($mode -ne "uploads-only") {
+  $db = Get-DatabasePath $root
+  if (-not (Test-Path $db)) { Say "No database found at $db"; exit 1 }
+  $dest = Get-FreeName "teamflow_" ".db"
+  Say "==> Database backup starting..."
+  $node = Find-TeamflowNode $root
+  $tool = Join-Path $root "current\apps\server\dist\backup-db.js"
+  Push-Location $root
+  $eap = $ErrorActionPreference
+  $ErrorActionPreference = "Continue"
+  try {
+    $out = & $node $tool $dest 2>&1
+    $code = $LASTEXITCODE
+  } finally {
+    $ErrorActionPreference = $eap
+    Pop-Location
+  }
+  if ($code -ne 0) { Say "Database backup failed: $out"; exit 1 }
+  Say "BACKUP database $dest"
+
+  Get-ChildItem $backupDir -Filter "teamflow_*.db" | Sort-Object LastWriteTime -Descending |
+    Select-Object -Skip 10 | Remove-Item -Force -ErrorAction SilentlyContinue
+}
+
+if ($mode -ne "db-only") {
+  $uploads = Get-EnvValue $root "UPLOAD_DIR"
+  if (-not $uploads) { $uploads = Join-Path $root "data\uploads" }
+  elseif (-not [IO.Path]::IsPathRooted($uploads)) { $uploads = Join-Path $root ($uploads -replace '^\./', '') }
+  if (Test-Path $uploads) {
+    $zip = Get-FreeName "teamflow_uploads_" ".zip"
+    Say "==> Uploads backup starting..."
+    & "$env:SystemRoot\System32\tar.exe" -a -c -f $zip -C (Split-Path $uploads -Parent) (Split-Path $uploads -Leaf)
+    if ($LASTEXITCODE -ne 0) { Say "Uploads backup failed."; exit 1 }
+    Say "BACKUP uploads $zip"
+  } else {
+    Say "No uploads folder at $uploads (skipped)."
+  }
+}

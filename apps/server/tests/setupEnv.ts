@@ -10,3 +10,5 @@ process.env.NODE_ENV ??= "test";
 process.env.TEAMFLOW_AUTH_RATE_LIMIT ??= "1000";
 // The free-disk floor reads the real disk; tests that need it turn it on (spaceQuota.test.ts).
 process.env.TEAMFLOW_MIN_FREE_DISK_BYTES ??= "0";
+// Never ask GitHub for releases from tests; maintenanceCheck.test.ts turns it on with a mocked fetch.
+process.env.TEAMFLOW_UPDATE_CHECK ??= "false";
