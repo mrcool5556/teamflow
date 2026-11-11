@@ -5,6 +5,9 @@ import type {
   InstanceSpaceDetailPublic,
   InstanceSpacePublic,
   InstanceUserPublic,
+  ServerAdminPublic,
+  ServerPower,
+  TransferOwnershipInput,
   SpaceSettingsPublic,
   SpaceStoragePublic,
   UpdateSpaceInput,
@@ -61,14 +64,62 @@ export function useInstanceUsersQuery(query: string, enabled = true, limit?: num
   });
 }
 
-/** People panel: make or unmake a server admin. */
-export function useSetInstanceAdminMutation() {
+/* ---------- Server Owner: trusted admins and ownership ---------- */
+
+export function useServerAdminsQuery(enabled = true) {
+  return useQuery({
+    queryKey: queryKeys.serverAdmins,
+    queryFn: async ({ signal }): Promise<ServerAdminPublic[]> =>
+      (await client.withSignal(signal).listServerAdmins()).admins,
+    enabled,
+  });
+}
+
+function useInvalidateAdmins() {
+  const queryClient = useQueryClient();
+  return () => {
+    void queryClient.invalidateQueries({ queryKey: queryKeys.serverAdmins });
+    void queryClient.invalidateQueries({ queryKey: ["instance", "users"] });
+  };
+}
+
+export function useSetServerAdminMutation() {
+  const invalidate = useInvalidateAdmins();
+  return useMutation({
+    mutationFn: async (input: { userId: string; powers: ServerPower[] }) =>
+      (await client.setServerAdmin(input.userId, { powers: input.powers })).admin,
+    onSuccess: invalidate,
+  });
+}
+
+export function useRemoveServerAdminMutation() {
+  const invalidate = useInvalidateAdmins();
+  return useMutation({
+    mutationFn: async (userId: string) => (await client.removeServerAdmin(userId)).admins,
+    onSuccess: invalidate,
+  });
+}
+
+export function useTransferOwnershipMutation() {
+  const invalidate = useInvalidateAdmins();
+  return useMutation({
+    mutationFn: async (input: TransferOwnershipInput) =>
+      (await client.transferServerOwnership(input)).admins,
+    onSuccess: invalidate,
+  });
+}
+
+/** Server Owner: delete a Flow for good (typed key confirms). */
+export function useDeleteSpaceMutation(teamId: string) {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async (input: { userId: string; isInstanceAdmin: boolean }) =>
-      (await client.updateInstanceUser(input.userId, { isInstanceAdmin: input.isInstanceAdmin }))
-        .user,
-    onSuccess: () => void queryClient.invalidateQueries({ queryKey: ["instance", "users"] }),
+    mutationFn: (confirmKey: string) => client.deleteSpace(teamId, { confirmKey }),
+    onSuccess: () => {
+      queryClient.removeQueries({ queryKey: queryKeys.instanceSpace(teamId) });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.instanceSpaces });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.instanceOverview });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.teams });
+    },
   });
 }
 

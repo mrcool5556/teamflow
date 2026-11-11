@@ -27,6 +27,8 @@ export type Session = {
   register: (name: string, email: string, password: string) => Promise<void>;
   /** Sign in with a token the server just issued (first-time setup creates the admin). */
   adoptSession: (result: { user: UserPublic; token: string }) => Promise<void>;
+  /** Re-read the signed-in user (after their server role changed). */
+  refreshSession: () => Promise<void>;
   logout: () => void;
 };
 

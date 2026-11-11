@@ -4,6 +4,7 @@ import { AboutDialog } from "../../components/AboutDialog";
 import type { AuthMode } from "../../lib/appRoute";
 import { useErrorSink } from "../../lib/errorSink";
 import type { NavState } from "../../lib/navState";
+import { isServerOwner } from "../../lib/serverAccess";
 import { useAuthConfigQuery } from "../../queries/auth";
 import { useSession, useTeams } from "../../session/session";
 import { LoginScreen } from "./LoginScreen";
@@ -30,10 +31,12 @@ export function AuthRoute({ mode }: { mode: AuthMode }) {
 
   if (user && teamsLoaded) {
     const from = navState?.from;
+    // The Server Owner starts on Server admin → Overview; everyone else on their Flow.
+    const start = isServerOwner(user) ? "/admin/overview" : "/";
     return from ? (
       <Navigate to={`${from.pathname}${from.search}`} replace state={from.state} />
     ) : (
-      <Navigate to="/" replace />
+      <Navigate to={start} replace />
     );
   }
 

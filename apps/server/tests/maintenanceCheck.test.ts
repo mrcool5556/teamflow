@@ -112,6 +112,9 @@ describe("maintenance status", () => {
       token: other.token,
     });
     expect(res.status).toBe(403);
-    expect(await json(res)).toEqual({ error: "Instance admin required", code: "forbidden" });
+    expect(await json(res)).toEqual({
+      error: "Needs the Updates or Backups server power",
+      code: "forbidden",
+    });
   });
 });

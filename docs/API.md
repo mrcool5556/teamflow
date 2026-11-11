@@ -37,7 +37,7 @@ Server code throws `ApiError` from `apps/server/src/lib/errors.ts` (`badRequest`
 
 <!-- BEGIN GENERATED ROUTES (scripts/gen-api-docs.mjs) -->
 
-## Routes (131)
+## Routes (135)
 
 Generated from `apps/server/src/routes/*.ts` by `pnpm docs:api`; do not edit by hand.
 
@@ -158,33 +158,33 @@ Discord integration settings, bot secrets, bot service and bot config.
 | GET | `/integrations/discord/bot-config` | bot key |  |  |  |  |
 | GET | `/teams/:teamId/discord-settings` | bearer |  | member | `integrations.discord.view` |  |
 | PATCH | `/teams/:teamId/discord-settings` | bearer | yes | member | `integrations.discord.manage` | body `updateTeamDiscordSettingsSchema` |
-| GET | `/integrations/discord/secrets` | bearer |  |  | instance admin |  |
-| PATCH | `/integrations/discord/secrets` | bearer | yes |  | instance admin | body `updateDiscordBotSecretsSchema` |
-| GET | `/integrations/discord/service` | bearer |  |  | instance admin |  |
+| GET | `/integrations/discord/secrets` | bearer |  |  |  |  |
+| PATCH | `/integrations/discord/secrets` | bearer | yes |  |  | body `updateDiscordBotSecretsSchema` |
+| GET | `/integrations/discord/service` | bearer |  |  |  |  |
 | GET | `/teams/:teamId/integrations/discord/service` | bearer |  | member | `integrations.discord.view` |  |
-| POST | `/integrations/discord/service/enable` | bearer | yes |  | instance admin |  |
-| POST | `/integrations/discord/service/restart` | bearer | yes |  | instance admin |  |
-| POST | `/integrations/discord/service/stop` | bearer | yes |  | instance admin |  |
+| POST | `/integrations/discord/service/enable` | bearer | yes |  |  |  |
+| POST | `/integrations/discord/service/restart` | bearer | yes |  |  |  |
+| POST | `/integrations/discord/service/stop` | bearer | yes |  |  |  |
 | GET | `/discord/guilds/:guildId/config` | bearer |  |  |  |  |
 
 ### Server maintenance
 
 | Method | Path | Auth | Write | Team | Permission | Input |
 |--------|------|------|-------|------|------------|-------|
-| GET | `/server/maintenance` | bearer |  |  | instance admin |  |
-| POST | `/server/maintenance/check` | bearer | yes |  | instance admin |  |
-| GET | `/server/maintenance/job` | bearer |  |  | instance admin |  |
-| POST | `/server/maintenance/backup` | bearer | yes |  | instance admin | body `runMaintenanceBackupSchema` |
-| POST | `/server/maintenance/update` | bearer | yes |  | instance admin | body `runMaintenanceUpdateSchema` |
-| POST | `/server/maintenance/job/dismiss` | bearer | yes |  | instance admin |  |
-| POST | `/server/maintenance/restore` | bearer | yes |  | instance admin | body `runMaintenanceRestoreSchema` |
-| PUT | `/server/maintenance/settings` | bearer | yes |  | instance admin | body `maintenanceSettingsSchema` |
-| GET | `/server/maintenance/backups` | bearer |  |  | instance admin |  |
-| DELETE | `/server/maintenance/backups/:backupName` | bearer | yes |  | instance admin |  |
-| GET | `/server/maintenance/backup-retention` | bearer |  |  | instance admin |  |
-| PUT | `/server/maintenance/backup-retention` | bearer | yes |  | instance admin | body `backupRetentionSchema` |
-| GET | `/teams/:teamId/server/maintenance` | bearer |  |  | instance admin |  |
-| GET | `/teams/:teamId/server/maintenance/job` | bearer |  |  | instance admin |  |
+| GET | `/server/maintenance` | bearer |  |  |  |  |
+| POST | `/server/maintenance/check` | bearer | yes |  |  |  |
+| GET | `/server/maintenance/job` | bearer |  |  |  |  |
+| POST | `/server/maintenance/backup` | bearer | yes |  |  | body `runMaintenanceBackupSchema` |
+| POST | `/server/maintenance/update` | bearer | yes |  |  | body `runMaintenanceUpdateSchema` |
+| POST | `/server/maintenance/job/dismiss` | bearer | yes |  |  |  |
+| POST | `/server/maintenance/restore` | bearer | yes |  |  | body `runMaintenanceRestoreSchema` |
+| PUT | `/server/maintenance/settings` | bearer | yes |  |  | body `maintenanceSettingsSchema` |
+| GET | `/server/maintenance/backups` | bearer |  |  |  |  |
+| DELETE | `/server/maintenance/backups/:backupName` | bearer | yes |  |  |  |
+| GET | `/server/maintenance/backup-retention` | bearer |  |  |  |  |
+| PUT | `/server/maintenance/backup-retention` | bearer | yes |  |  | body `backupRetentionSchema` |
+| GET | `/teams/:teamId/server/maintenance` | bearer |  |  |  |  |
+| GET | `/teams/:teamId/server/maintenance/job` | bearer |  |  |  |  |
 
 ### Instance admin and spaces
 
@@ -194,27 +194,31 @@ Instance admin page (web /admin): server status, spaces, caps and space settings
 |--------|------|------|-------|------|------------|-------|
 | GET | `/instance/overview` | bearer |  |  | instance admin |  |
 | GET | `/instance/checks/public-url` | bearer |  |  | instance admin | query `publicUrlCheckQuerySchema` |
-| GET | `/instance/site` | bearer |  |  | instance admin |  |
-| PATCH | `/instance/site` | bearer | yes |  | instance admin | body `updateSiteSettingsSchema` |
-| GET | `/instance/mail` | bearer |  |  | instance admin |  |
-| PUT | `/instance/mail` | bearer | yes |  | instance admin | body `updateMailSettingsSchema` |
-| DELETE | `/instance/mail` | bearer | yes |  | instance admin |  |
-| POST | `/instance/mail/test` | bearer | yes |  | instance admin | body `sendTestMailSchema` |
-| GET | `/instance/signup` | bearer |  |  | instance admin |  |
-| PATCH | `/instance/signup` | bearer | yes |  | instance admin | body `updateSignupSettingsSchema` |
+| GET | `/instance/site` | bearer |  |  |  |  |
+| PATCH | `/instance/site` | bearer | yes |  |  | body `updateSiteSettingsSchema` |
+| GET | `/instance/mail` | bearer |  |  |  |  |
+| PUT | `/instance/mail` | bearer | yes |  |  | body `updateMailSettingsSchema` |
+| DELETE | `/instance/mail` | bearer | yes |  |  |  |
+| POST | `/instance/mail/test` | bearer | yes |  |  | body `sendTestMailSchema` |
+| GET | `/instance/signup` | bearer |  |  |  |  |
+| PATCH | `/instance/signup` | bearer | yes |  |  | body `updateSignupSettingsSchema` |
 | GET | `/instance/setup-checklist` | bearer |  |  | instance admin |  |
 | PATCH | `/instance/setup-checklist` | bearer | yes |  | instance admin | body `updateSetupProgressSchema` |
-| GET | `/instance/settings` | bearer |  |  | instance admin |  |
-| PATCH | `/instance/settings` | bearer | yes |  | instance admin | body `updateSpaceSettingsSchema` |
-| GET | `/instance/users` | bearer |  |  | instance admin | query `listInstanceUsersQuerySchema` |
-| PATCH | `/instance/users/:userId` | bearer | yes |  | instance admin | body `updateInstanceUserSchema` |
-| POST | `/instance/users/:userId/reset-link` | bearer | yes |  | instance admin |  |
-| GET | `/instance/spaces` | bearer |  |  | instance admin |  |
-| POST | `/instance/spaces` | bearer | yes |  | instance admin | body `createSpaceSchema` |
-| GET | `/instance/spaces/:teamId` | bearer |  |  | instance admin |  |
-| PATCH | `/instance/spaces/:teamId` | bearer | yes |  | instance admin | body `updateSpaceSchema` |
-| POST | `/instance/spaces/:teamId/empty-trash` | bearer | yes |  | instance admin |  |
-| POST | `/instance/spaces/:teamId/cancel-uploads` | bearer | yes |  | instance admin |  |
+| GET | `/instance/settings` | bearer |  |  |  |  |
+| PATCH | `/instance/settings` | bearer | yes |  |  | body `updateSpaceSettingsSchema` |
+| GET | `/instance/users` | bearer |  |  |  | query `listInstanceUsersQuerySchema` |
+| GET | `/instance/admins` | bearer |  |  |  |  |
+| PUT | `/instance/admins/:userId` | bearer | yes |  |  | body `setServerAdminSchema` |
+| DELETE | `/instance/admins/:userId` | bearer | yes |  |  |  |
+| POST | `/instance/owner/transfer` | bearer | yes |  |  | body `transferOwnershipSchema` |
+| POST | `/instance/users/:userId/reset-link` | bearer | yes |  |  |  |
+| GET | `/instance/spaces` | bearer |  |  |  |  |
+| POST | `/instance/spaces` | bearer | yes |  |  | body `createSpaceSchema` |
+| GET | `/instance/spaces/:teamId` | bearer |  |  |  |  |
+| PATCH | `/instance/spaces/:teamId` | bearer | yes |  |  | body `updateSpaceSchema` |
+| DELETE | `/instance/spaces/:teamId` | bearer | yes |  |  | body `deleteSpaceSchema` |
+| POST | `/instance/spaces/:teamId/empty-trash` | bearer | yes |  |  |  |
+| POST | `/instance/spaces/:teamId/cancel-uploads` | bearer | yes |  |  |  |
 
 ### Team files
 

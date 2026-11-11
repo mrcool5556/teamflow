@@ -3,16 +3,29 @@ import userEvent from "@testing-library/user-event";
 import { permissionsForSystemSlug } from "@teamflow/core";
 import { describe, expect, it } from "vitest";
 import { queryKeys } from "../src/queries/keys";
+import { adminRoutes } from "./adminFixtures";
 import { installFakeApi, seedDb, signIn } from "./fakeApi";
 import { renderApp } from "./renderApp";
 
 describe("login form", () => {
-  it("submits with Enter", async () => {
+  it("submits with Enter and opens a member's Flow", async () => {
     const db = seedDb();
+    db.user = { ...db.user, isInstanceAdmin: false, serverRole: null, serverPowers: [] };
     installFakeApi(db);
     const { path } = renderApp("/login");
     await userEvent.type(screen.getByLabelText("Email"), "ada@example.com");
     await userEvent.type(screen.getByLabelText("Password"), "correct-horse{Enter}");
+    await waitFor(() => expect(path()).toBe("/t/ENG"));
+  });
+
+  it("opens Server admin → Overview for the Server Owner, with a way to the Flows", async () => {
+    const db = seedDb(); // the fake user is the Server Owner
+    installFakeApi(db, { extraRoutes: adminRoutes({}) });
+    const { path } = renderApp("/login");
+    await userEvent.type(screen.getByLabelText("Email"), "ada@example.com");
+    await userEvent.type(screen.getByLabelText("Password"), "correct-horse{Enter}");
+    await waitFor(() => expect(path()).toBe("/admin/overview"));
+    await userEvent.click(await screen.findByRole("button", { name: /Go to my Flows/ }));
     await waitFor(() => expect(path()).toBe("/t/ENG"));
   });
 });
@@ -64,7 +77,7 @@ describe("settings panels", () => {
 
   it("sends an Owner who is not the instance admin from Updates to General", async () => {
     const db = seedDb();
-    db.user = { ...db.user, isInstanceAdmin: false };
+    db.user = { ...db.user, isInstanceAdmin: false, serverRole: null, serverPowers: [] };
     installFakeApi(db);
     signIn(db);
     const { path } = renderApp("/t/ENG/settings/updates");

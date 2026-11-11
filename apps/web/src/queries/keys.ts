@@ -25,6 +25,8 @@ export const queryKeys = {
   instanceSpace: (teamId: string) => ["instance", "spaces", teamId] as const,
   instanceSettings: ["instance", "settings"] as const,
   instanceUsers: (query: string) => ["instance", "users", query] as const,
+  serverAdmins: ["instance", "admins"] as const,
+  backupList: ["maintenance", "backups"] as const,
   instanceSite: ["instance", "site"] as const,
   instanceMail: ["instance", "mail"] as const,
   instanceSignup: ["instance", "signup"] as const,

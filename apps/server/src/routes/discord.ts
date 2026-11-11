@@ -4,7 +4,7 @@ import { parseBody } from "../lib/validation.js";
 import { validateParams } from "../middleware/params.js";
 import { updateDiscordBotSecretsSchema, updateTeamDiscordSettingsSchema } from "@teamflow/core";
 import { db } from "../db.js";
-import { requireAuth, requireInstanceAdmin, requireWrite } from "../middleware/auth.js";
+import { requireAuth, requirePower, requireWrite } from "../middleware/auth.js";
 import { loadTeam, requirePermission } from "../middleware/team.js";
 import {
   getDiscordGuildConfig,
@@ -74,7 +74,7 @@ routes.patch(
 /* Bot credentials and the teamflow-discord service are server-wide: the instance-admin flag alone
    decides, whichever Flow is open (or none) and whatever the role in it. */
 
-routes.get("/integrations/discord/secrets", requireAuth, requireInstanceAdmin, async (c) => {
+routes.get("/integrations/discord/secrets", requireAuth, requirePower("discord"), async (c) => {
   return c.json({ secrets: await getDiscordBotSecretsPublic(db) });
 });
 
@@ -82,7 +82,7 @@ routes.patch(
   "/integrations/discord/secrets",
   requireAuth,
   requireWrite,
-  requireInstanceAdmin,
+  requirePower("discord"),
   async (c) => {
     const body = await parseBody(c, updateDiscordBotSecretsSchema);
     return c.json({ secrets: await updateDiscordBotSecrets(db, c.var.auth.userId, body) });
@@ -90,7 +90,7 @@ routes.patch(
 );
 
 /** Bot service status for the server admin page. */
-routes.get("/integrations/discord/service", requireAuth, requireInstanceAdmin, async (c) => {
+routes.get("/integrations/discord/service", requireAuth, requirePower("discord"), async (c) => {
   return c.json({ status: await getDiscordBotServiceStatus(db) });
 });
 
@@ -110,7 +110,7 @@ routes.post(
   "/integrations/discord/service/enable",
   requireAuth,
   requireWrite,
-  requireInstanceAdmin,
+  requirePower("discord"),
   async (c) => {
     return c.json({ status: await enableDiscordBotService(db) });
   },
@@ -120,7 +120,7 @@ routes.post(
   "/integrations/discord/service/restart",
   requireAuth,
   requireWrite,
-  requireInstanceAdmin,
+  requirePower("discord"),
   async (c) => {
     return c.json({ status: await restartDiscordBotService(db) });
   },
@@ -130,7 +130,7 @@ routes.post(
   "/integrations/discord/service/stop",
   requireAuth,
   requireWrite,
-  requireInstanceAdmin,
+  requirePower("discord"),
   async (c) => {
     return c.json({ status: await stopDiscordBotService(db) });
   },

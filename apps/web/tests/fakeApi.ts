@@ -10,7 +10,7 @@ import type {
   UserProfile,
   UserPublic,
 } from "@teamflow/core";
-import { createDefaultUserProfile, permissionsForSystemSlug } from "@teamflow/core";
+import { createDefaultUserProfile, permissionsForSystemSlug, SERVER_POWERS } from "@teamflow/core";
 import { vi } from "vitest";
 
 /** Small limits so tests can hit the "too large" path with a tiny file. */
@@ -114,6 +114,9 @@ export function seedDb(roleSlug: "owner" | "member" | "viewer" = "owner"): FakeD
     name: "Ada",
     createdAt: now,
     isInstanceAdmin: true,
+    // The Server Owner: every server power.
+    serverRole: "owner",
+    serverPowers: [...SERVER_POWERS],
   };
   const teams: TeamPublic[] = [
     {

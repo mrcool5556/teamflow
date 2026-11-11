@@ -282,8 +282,11 @@ export function OverviewPanel() {
 
   return (
     <div className="settings-panel">
-      <header className="settings-panel-header">
+      <header className="settings-panel-header admin-overview-header">
         <h2>Overview</h2>
+        <button type="button" className="admin-go-flows" onClick={() => navigate("/")}>
+          Go to my Flows →
+        </button>
         <p className="settings-copy settings-lead">
           Checked {formatTimestamp(overview.checkedAt)} ·{" "}
           <button

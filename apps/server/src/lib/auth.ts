@@ -7,6 +7,7 @@ import { schema } from "@teamflow/db";
 import type { TokenScope, UserPublic } from "@teamflow/core";
 import { config } from "../config.js";
 import { forbidden } from "./errors.js";
+import { getServerAccess, hasServerAdminAccess, serverAccessOfRow } from "./serverAccess.js";
 
 // Secret validation lives in config.ts (it runs at boot); re-exported here for existing callers.
 export {
@@ -33,12 +34,15 @@ export function getJwtSecret() {
 }
 
 export function toUserPublic(user: typeof schema.users.$inferSelect): UserPublic {
+  const access = serverAccessOfRow(user);
   return {
     id: user.id,
     email: user.email,
     name: user.name,
     createdAt: user.createdAt,
-    isInstanceAdmin: user.isInstanceAdmin === 1,
+    isInstanceAdmin: hasServerAdminAccess(access),
+    serverRole: access.role,
+    serverPowers: access.powers,
   };
 }
 
@@ -48,8 +52,8 @@ export function instanceAdminEmailsFromEnv(): Set<string> {
 }
 
 /**
- * Persist the instance-admin flag for a user if their email is listed in
- * TEAMFLOW_INSTANCE_ADMINS. Called at login and registration. Returns the current flag.
+ * Put a user listed in TEAMFLOW_INSTANCE_ADMINS on the trusted admin list (every power is
+ * implied by the listing, lib/serverAccess.ts). It never makes a Server Owner. Called at login.
  */
 export async function syncInstanceAdminFromEnv(db: Db, user: typeof schema.users.$inferSelect) {
   if (user.isInstanceAdmin === 1) return true;
@@ -59,13 +63,9 @@ export async function syncInstanceAdminFromEnv(db: Db, user: typeof schema.users
   return true;
 }
 
+/** Any Server admin access: the Server Owner, or a trusted admin with at least one power. */
 export async function userIsInstanceAdmin(db: Db, userId: string) {
-  const [row] = await db
-    .select({ isInstanceAdmin: schema.users.isInstanceAdmin })
-    .from(schema.users)
-    .where(eq(schema.users.id, userId))
-    .limit(1);
-  return row?.isInstanceAdmin === 1;
+  return hasServerAdminAccess(getServerAccess(db, userId));
 }
 
 export async function hashPassword(password: string) {

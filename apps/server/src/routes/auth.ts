@@ -21,7 +21,6 @@ import {
   signSessionToken,
   syncInstanceAdminFromEnv,
   toUserPublic,
-  userIsInstanceAdmin,
   verifyPassword,
 } from "../lib/auth.js";
 import {
@@ -36,6 +35,7 @@ import {
 } from "../lib/invites.js";
 import { ApiError } from "../lib/errors.js";
 import { getSpaceAllowance } from "../lib/teams.js";
+import { getServerAccess, hasServerPower } from "../lib/serverAccess.js";
 import { createSetupAdmin, getSetupStatus, isSetupNeeded } from "../lib/setup.js";
 import { getSiteName } from "../lib/siteSettings.js";
 import {
@@ -158,7 +158,7 @@ routes.post("/auth/reset-password", async (c) => {
 /** How many free spaces (Flows) the user owns and whether they may make another. */
 routes.get("/auth/space-allowance", requireAuth, async (c) => {
   const userId = c.var.auth.userId;
-  const isInstanceAdmin = await userIsInstanceAdmin(db, userId);
+  const isInstanceAdmin = hasServerPower(getServerAccess(db, userId), "flows");
   return c.json({ allowance: getSpaceAllowance(db, { userId, isInstanceAdmin }) });
 });
 

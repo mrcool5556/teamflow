@@ -19,7 +19,15 @@ export const users = sqliteTable("users", {
   email: text("email").notNull().unique(),
   name: text("name").notNull(),
   passwordHash: text("password_hash").notNull(),
+  /**
+   * On the server admin list: the Server Owner, or a trusted admin (powers in server_powers).
+   * Kept under its old name; see packages/core/src/serverRoles.ts.
+   */
   isInstanceAdmin: integer("is_instance_admin").notNull().default(0),
+  /** The one Server Owner (schema 5): every power; only it manages admins. */
+  isServerOwner: integer("is_server_owner").notNull().default(0),
+  /** Trusted admin powers as a JSON array of ServerPower; null = none. */
+  serverPowers: text("server_powers"),
   /** Bumped on password reset; sessions carry it so older JWTs stop validating. */
   tokenVersion: integer("token_version").notNull().default(0),
   createdAt: text("created_at")

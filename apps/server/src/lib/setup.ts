@@ -163,6 +163,8 @@ export async function createSetupAdmin(db: Db, input: SetupAdminInput) {
         name: input.name,
         passwordHash,
         isInstanceAdmin: 1,
+        // The setup account is the one Server Owner.
+        isServerOwner: 1,
       })
       .run();
   });

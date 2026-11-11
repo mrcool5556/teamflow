@@ -26,10 +26,11 @@ import { getUploadDir, hardDeleteStoredFile } from "./attachments.js";
 import { abortUploadSession } from "./chunkedUpload.js";
 import { readDiskSpace } from "./disk.js";
 import { getDiscordBotServiceStatus } from "./discordBotService.js";
-import { ApiError, badRequest, notFound } from "./errors.js";
+import { badRequest, notFound } from "./errors.js";
 import { getMaintenanceStatus } from "./maintenance.js";
 import { getSpaceSettings } from "./spaceSettings.js";
 import { getPublicUrl } from "./siteSettings.js";
+import { hasServerAdminAccess, serverAccessOfRow } from "./serverAccess.js";
 import {
   asSpaceType,
   getAllSpaceUsage,
@@ -587,20 +588,30 @@ export async function cancelSpaceUploads(db: Db, actorId: string, teamId: string
 
 /* ---------- users (owner picker) ---------- */
 
-type InstanceUserRow = Omit<InstanceUserPublic, "isInstanceAdmin" | "adminFromEnv"> & {
+type InstanceUserRow = Omit<
+  InstanceUserPublic,
+  "isInstanceAdmin" | "adminFromEnv" | "serverRole" | "serverPowers"
+> & {
   isInstanceAdmin: number;
+  isServerOwner: number;
+  serverPowers: string | null;
 };
 
 const INSTANCE_USER_COLUMNS = `u.id, u.name, u.email, u.created_at AS createdAt,
-  u.is_instance_admin AS isInstanceAdmin,
+  u.is_instance_admin AS isInstanceAdmin, u.is_server_owner AS isServerOwner,
+  u.server_powers AS serverPowers,
   (SELECT COUNT(*) FROM teams t WHERE t.space_owner_id = u.id AND t.space_type = 'free') AS freeSpaces,
   (SELECT COUNT(*) FROM team_members m WHERE m.user_id = u.id) AS teamCount`;
 
 function toInstanceUser(row: InstanceUserRow): InstanceUserPublic {
+  const access = serverAccessOfRow(row);
+  const { isServerOwner: _owner, serverPowers: _powers, ...rest } = row;
   return {
-    ...row,
-    isInstanceAdmin: row.isInstanceAdmin === 1,
-    adminFromEnv: config.instanceAdminEmails.includes(row.email.toLowerCase()),
+    ...rest,
+    isInstanceAdmin: hasServerAdminAccess(access),
+    adminFromEnv: access.fromEnv,
+    serverRole: access.role,
+    serverPowers: access.powers,
   };
 }
 
@@ -619,47 +630,4 @@ export function listInstanceUsers(
     )
     .all(like, like, limit) as InstanceUserRow[];
   return rows.map(toInstanceUser);
-}
-
-function getInstanceUser(db: Db, userId: string): InstanceUserPublic {
-  const row = db.$client
-    .prepare(`SELECT ${INSTANCE_USER_COLUMNS} FROM users u WHERE u.id = ?`)
-    .get(userId) as InstanceUserRow | undefined;
-  if (!row) throw notFound("User not found");
-  return toInstanceUser(row);
-}
-
-/**
- * Make someone a server admin or stop them being one. Refused for the last server admin (the
- * page would lock everyone out) and for accounts listed in TEAMFLOW_INSTANCE_ADMINS (login would
- * make them admin again).
- */
-export function setInstanceAdmin(db: Db, userId: string, isInstanceAdmin: boolean) {
-  const user = getInstanceUser(db, userId);
-  if (user.isInstanceAdmin === isInstanceAdmin) return user;
-  if (!isInstanceAdmin) {
-    if (user.adminFromEnv) {
-      throw new ApiError(
-        409,
-        `${user.email} is listed in TEAMFLOW_INSTANCE_ADMINS in .env, which makes them admin at every login. Remove it there first.`,
-        "setting_set_in_env",
-        { variable: "TEAMFLOW_INSTANCE_ADMINS" },
-      );
-    }
-    const admins = Number(
-      (
-        db.$client.prepare("SELECT COUNT(*) AS n FROM users WHERE is_instance_admin = 1").get() as {
-          n: number;
-        }
-      ).n,
-    );
-    if (admins <= 1) {
-      throw new ApiError(409, "This is the last server admin. Make someone else admin first.");
-    }
-  }
-  db.update(schema.users)
-    .set({ isInstanceAdmin: isInstanceAdmin ? 1 : 0 })
-    .where(eq(schema.users.id, userId))
-    .run();
-  return getInstanceUser(db, userId);
 }

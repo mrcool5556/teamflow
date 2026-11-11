@@ -73,7 +73,10 @@ import type {
   SiteSettingsAdminPublic,
   SpaceAllowancePublic,
   SpaceSettingsPublic,
-  UpdateInstanceUserInput,
+  ServerAdminPublic,
+  SetServerAdminInput,
+  TransferOwnershipInput,
+  DeleteSpaceInput,
   UpdateMailSettingsInput,
   UpdateSetupProgressInput,
   UpdateSignupSettingsInput,
@@ -1071,10 +1074,36 @@ export class TeamflowClient {
     return this.request<{ users: InstanceUserPublic[] }>(`/instance/users${q}`);
   }
 
-  /** Make someone a server admin, or stop them being one (never the last). */
-  updateInstanceUser(userId: string, input: UpdateInstanceUserInput) {
-    return this.request<{ user: InstanceUserPublic }>(`/instance/users/${userId}`, {
-      method: "PATCH",
+  /* Server Owner only: trusted admins, ownership, deleting a Flow for good. */
+
+  listServerAdmins() {
+    return this.request<{ admins: ServerAdminPublic[] }>("/instance/admins");
+  }
+
+  /** Add someone to the trusted list or change their powers ([] = listed, no access). */
+  setServerAdmin(userId: string, input: SetServerAdminInput) {
+    return this.request<{ admin: ServerAdminPublic }>(`/instance/admins/${userId}`, {
+      method: "PUT",
+      body: JSON.stringify(input),
+    });
+  }
+
+  removeServerAdmin(userId: string) {
+    return this.request<{ admins: ServerAdminPublic[] }>(`/instance/admins/${userId}`, {
+      method: "DELETE",
+    });
+  }
+
+  transferServerOwnership(input: TransferOwnershipInput) {
+    return this.request<{ admins: ServerAdminPublic[] }>("/instance/owner/transfer", {
+      method: "POST",
+      body: JSON.stringify(input),
+    });
+  }
+
+  deleteSpace(teamId: string, input: DeleteSpaceInput) {
+    return this.request<void>(`/instance/spaces/${teamId}`, {
+      method: "DELETE",
       body: JSON.stringify(input),
     });
   }

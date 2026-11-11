@@ -9,7 +9,7 @@ import {
   runMaintenanceRestoreSchema,
   runMaintenanceUpdateSchema,
 } from "@teamflow/core";
-import { requireAuth, requireInstanceAdmin, requireWrite } from "../middleware/auth.js";
+import { requireAuth, requirePower, requireWrite } from "../middleware/auth.js";
 import {
   checkMaintenanceHost,
   dismissMaintenanceJob,
@@ -28,7 +28,7 @@ import { deleteBackupFile, getBackupList, writeBackupRetention } from "../lib/ba
  */
 const routes = new Hono<AppEnv>();
 
-routes.get("/server/maintenance", requireAuth, requireInstanceAdmin, async (c) => {
+routes.get("/server/maintenance", requireAuth, requirePower("updates", "backups"), async (c) => {
   return c.json({ status: await getMaintenanceStatus() });
 });
 
@@ -37,21 +37,26 @@ routes.post(
   "/server/maintenance/check",
   requireAuth,
   requireWrite,
-  requireInstanceAdmin,
+  requirePower("updates", "backups"),
   async (c) => {
     return c.json({ status: await checkMaintenanceHost() });
   },
 );
 
-routes.get("/server/maintenance/job", requireAuth, requireInstanceAdmin, async (c) => {
-  return c.json({ job: await getMaintenanceJob() });
-});
+routes.get(
+  "/server/maintenance/job",
+  requireAuth,
+  requirePower("updates", "backups"),
+  async (c) => {
+    return c.json({ job: await getMaintenanceJob() });
+  },
+);
 
 routes.post(
   "/server/maintenance/backup",
   requireAuth,
   requireWrite,
-  requireInstanceAdmin,
+  requirePower("backups"),
   async (c) => {
     const body = await parseBody(c, runMaintenanceBackupSchema);
     return c.json({ job: await runMaintenanceBackup(body) }, 202);
@@ -62,7 +67,7 @@ routes.post(
   "/server/maintenance/update",
   requireAuth,
   requireWrite,
-  requireInstanceAdmin,
+  requirePower("updates"),
   async (c) => {
     const body = await parseBody(c, runMaintenanceUpdateSchema);
     return c.json({ job: await runMaintenanceUpdate(body) }, 202);
@@ -73,7 +78,7 @@ routes.post(
   "/server/maintenance/job/dismiss",
   requireAuth,
   requireWrite,
-  requireInstanceAdmin,
+  requirePower("updates", "backups"),
   async (c) => {
     return c.json({ job: await dismissMaintenanceJob() });
   },
@@ -84,7 +89,7 @@ routes.post(
   "/server/maintenance/restore",
   requireAuth,
   requireWrite,
-  requireInstanceAdmin,
+  requirePower("backups"),
   async (c) => {
     const body = await parseBody(c, runMaintenanceRestoreSchema);
     return c.json({ job: await runMaintenanceRestore(body) }, 202);
@@ -96,7 +101,7 @@ routes.put(
   "/server/maintenance/settings",
   requireAuth,
   requireWrite,
-  requireInstanceAdmin,
+  requirePower("updates"),
   async (c) => {
     const body = await parseBody(c, maintenanceSettingsSchema);
     return c.json({ status: await setMaintenanceChannel(body.channel) });
@@ -104,7 +109,7 @@ routes.put(
 );
 
 /** Every file in the backup folder, the total and the keep-N settings. */
-routes.get("/server/maintenance/backups", requireAuth, requireInstanceAdmin, async (c) => {
+routes.get("/server/maintenance/backups", requireAuth, requirePower("backups"), async (c) => {
   return c.json(await getBackupList());
 });
 
@@ -114,20 +119,25 @@ routes.delete(
   requireAuth,
   requireWrite,
   validateParams,
-  requireInstanceAdmin,
+  requirePower("backups"),
   async (c) => c.json(await deleteBackupFile(c.req.param("backupName"))),
 );
 
 /** How many database backups and upload archives to keep (applied after each backup). */
-routes.get("/server/maintenance/backup-retention", requireAuth, requireInstanceAdmin, async (c) => {
-  return c.json({ retention: (await getBackupList()).retention });
-});
+routes.get(
+  "/server/maintenance/backup-retention",
+  requireAuth,
+  requirePower("backups"),
+  async (c) => {
+    return c.json({ retention: (await getBackupList()).retention });
+  },
+);
 
 routes.put(
   "/server/maintenance/backup-retention",
   requireAuth,
   requireWrite,
-  requireInstanceAdmin,
+  requirePower("backups"),
   async (c) => {
     const body = await parseBody(c, backupRetentionSchema);
     return c.json({ retention: await writeBackupRetention(body) });
@@ -142,7 +152,7 @@ routes.get(
   "/teams/:teamId/server/maintenance",
   requireAuth,
   validateParams,
-  requireInstanceAdmin,
+  requirePower("updates", "backups"),
   async (c) => {
     return c.json({ status: await getMaintenanceStatus() });
   },
@@ -152,7 +162,7 @@ routes.get(
   "/teams/:teamId/server/maintenance/job",
   requireAuth,
   validateParams,
-  requireInstanceAdmin,
+  requirePower("updates", "backups"),
   async (c) => {
     return c.json({ job: await getMaintenanceJob() });
   },

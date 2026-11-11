@@ -224,6 +224,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       login,
       register,
       adoptSession,
+      refreshSession: bootstrap,
       logout,
     }),
     [
@@ -238,6 +239,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       login,
       register,
       adoptSession,
+      bootstrap,
       logout,
     ],
   );

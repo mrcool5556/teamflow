@@ -14,7 +14,7 @@ import { db } from "../db.js";
 import { requireAuth, requireWrite } from "../middleware/auth.js";
 import { loadTeam, requirePermission } from "../middleware/team.js";
 import { createTeamWithOwner, deleteTeam, spaceForUserCreatedTeam } from "../lib/teams.js";
-import { userIsInstanceAdmin } from "../lib/auth.js";
+import { getServerAccess, hasServerPower } from "../lib/serverAccess.js";
 import { resolveTeamRefDetailed } from "../lib/refs.js";
 import { importTeamBundle, streamTeamBundle } from "../lib/teamBundle.js";
 import { Readable } from "node:stream";
@@ -56,7 +56,8 @@ routes.post("/teams", requireAuth, requireWrite, async (c) => {
     .where(eq(schema.users.id, auth.userId))
     .limit(1);
 
-  const isInstanceAdmin = await userIsInstanceAdmin(db, auth.userId);
+  // Admin spaces (no cap) for server admins who hold the Flows power.
+  const isInstanceAdmin = hasServerPower(getServerAccess(db, auth.userId), "flows");
   const team = db.transaction((tx) =>
     createTeamWithOwner(tx, {
       userId: auth.userId,

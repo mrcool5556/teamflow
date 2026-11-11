@@ -1,18 +1,21 @@
 import { useState } from "react";
 import { useNavigate } from "react-router";
+import { isServerOwner } from "../../lib/serverAccess";
 import { formatStorageBytes, type InstanceSpaceDetailPublic, type SpaceType } from "@teamflow/core";
 import { PanelStatus } from "../../components/PanelStatus";
 import { adminPath, boardPath, useAppRoute } from "../../lib/appRoute";
+import { errorMessage } from "../../lib/errorSink";
 import { formatTimestamp } from "../../lib/format";
 import { usePanelStatus, type PanelMessage } from "../../lib/panelStatus";
 import {
   useCancelSpaceUploadsMutation,
+  useDeleteSpaceMutation,
   useEmptySpaceTrashMutation,
   useSpaceQuery,
   useSpaceSettingsQuery,
   useUpdateSpaceMutation,
 } from "../../queries/instance";
-import { useTeams } from "../../session/session";
+import { useSession, useTeams } from "../../session/session";
 import { useConfirm } from "../../ui/confirmContext";
 import { useShell } from "../board/shellContext";
 import { CapField } from "./CapField";
@@ -253,6 +256,7 @@ function CapTile({
 /** One Flow: usage breakdown, largest files, cap and type editing, history. */
 export function SpaceDetailPanel() {
   const navigate = useNavigate();
+  const owner = isServerOwner(useSession().user);
   const { adminSpaceId } = useAppRoute();
   const { teamKey } = useShell();
   const { teams } = useTeams();
@@ -339,7 +343,74 @@ export function SpaceDetailPanel() {
             </dl>
           )}
         </section>
+        {owner ? (
+          <DeleteFlowTile
+            teamId={space.id}
+            flowKey={space.key}
+            flowName={space.name}
+            onDeleted={() => navigate(adminPath(teamKey, "spaces"))}
+          />
+        ) : null}
       </div>
     </div>
+  );
+}
+
+/** Server Owner only: delete the Flow for good, with its files. The key typed confirms it. */
+function DeleteFlowTile({
+  teamId,
+  flowKey,
+  flowName,
+  onDeleted,
+}: {
+  teamId: string;
+  flowKey: string;
+  flowName: string;
+  onDeleted: () => void;
+}) {
+  const remove = useDeleteSpaceMutation(teamId);
+  const [typed, setTyped] = useState("");
+  const [error, setError] = useState<string | null>(null);
+  const matches = typed.trim().toUpperCase() === flowKey;
+  return (
+    <section className="admin-tile admin-tile--full admin-danger-zone" aria-label="Delete Flow">
+      <header className="admin-tile-head">
+        <h3>Delete this Flow for good</h3>
+      </header>
+      <p className="settings-copy">
+        Removes {flowName} with every issue, comment, row and file, for everyone in it. This can't
+        be undone; a backup is the only way back. Only the Server Owner can do this.
+      </p>
+      <form
+        className="admin-danger-form"
+        onSubmit={(e) => {
+          e.preventDefault();
+          if (!matches) return;
+          setError(null);
+          remove.mutate(typed.trim(), {
+            onSuccess: onDeleted,
+            onError: (err) => setError(errorMessage(err, "Could not delete the Flow")),
+          });
+        }}
+      >
+        <label className="settings-field">
+          <span className="settings-field-label">Type {flowKey} to confirm</span>
+          <input
+            value={typed}
+            autoComplete="off"
+            spellCheck={false}
+            onChange={(e) => setTyped(e.target.value)}
+          />
+        </label>
+        <button type="submit" className="danger" disabled={!matches || remove.isPending}>
+          {remove.isPending ? "Deleting…" : "Delete Flow for good"}
+        </button>
+      </form>
+      {error ? (
+        <p className="settings-hint settings-hint--warn" role="alert">
+          {error}
+        </p>
+      ) : null}
+    </section>
   );
 }
