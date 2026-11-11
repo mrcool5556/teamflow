@@ -24,8 +24,6 @@ export function useAppRoute() {
   // A panel may have a page of its own under it (settings/appearance/design).
   const teamSettings = useMatch("/t/:teamKey/settings/:panel/*");
   const settings = useMatch("/settings/:panel/*");
-  const teamPlan = useMatch("/t/:teamKey/plan");
-  const plan = useMatch("/plan");
   const invite = useMatch("/invite/:token");
   const index = useMatch("/");
   const teamAdmin = useMatch("/t/:teamKey/admin/*");
@@ -45,7 +43,6 @@ export function useAppRoute() {
     settingsOpen: panel !== undefined,
     /** Page under the panel ("design" under appearance), or "". */
     settingsSubpage: subpage,
-    planOpen: Boolean(teamPlan || plan),
     adminOpen: adminRest !== undefined,
     /** Raw section segment ("" for the index); unknown values fall back to the overview. */
     adminSection: adminRest === undefined ? null : adminSection || "overview",
@@ -71,10 +68,6 @@ export function settingsPath(teamKey: string | null, panel: SettingsPanel) {
 /** The Design page under Appearance. */
 export function designPath(teamKey: string | null) {
   return `${settingsPath(teamKey, "appearance")}/design`;
-}
-
-export function planPath(teamKey: string | null) {
-  return `${teamBasePath(teamKey)}/plan`;
 }
 
 export type AdminSection =

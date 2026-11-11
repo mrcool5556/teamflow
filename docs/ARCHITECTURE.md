@@ -97,7 +97,7 @@ Conventions:
 main.tsx        QueryClientProvider + RouterProvider; imports styles/* in cascade order
 router.tsx      URL map: /login /register /reset /setup /welcome /invite/:token, /t/:teamKey, /t/:teamKey/issue/:ref,
                 /t/:teamKey/settings/<panel>, /t/:teamKey/admin/<section> (server admin, instance admins),
-                /t/:teamKey/plan (legacy ?ref= ?invite= ?reset= are redirected)
+                (legacy ?ref= ?invite= ?reset= are redirected)
 session/        SessionProvider: token + user from localStorage, login/logout
 routes/         RootLayout, auth/ (LoginScreen, InviteRoute), board/ (BoardShell, actions), settings/ (one panel per section),
                 admin/ (server admin: Overview, Flows, Flow detail, People, Site & email, How-tos, Flow defaults)
@@ -106,10 +106,9 @@ queries/        TanStack Query hooks per area; keys.ts holds every cache key; bo
                 optimistic update + rollback path; the board refetches every 15 s
 ui/             primitives: Dialog/Drawer, Popover (@floating-ui/react), ConfirmDialog/useConfirm, BottomDock,
                 layerStack (one Escape stack, focus trap and restore)
-components/     feature components (KanbanBoard parts, IssueDrawer, pickers, settings sections, RoadmapPanel)
+components/     feature components (KanbanBoard parts, IssueDrawer, pickers, settings sections)
 hooks/ lib/     shared hooks and helpers (useAttachmentList, useInlineRename, errorSink, teamPermissions, format)
-styles/         tokens, base, topbar, board, card, drawer, dialog, popover, settings, admin, plan, auth (order matters)
-data/roadmap.ts hand-maintained content of the Plan view (instance admins only; others are redirected to the board)
+styles/         tokens, base, topbar, board, card, drawer, dialog, popover, settings, admin, auth (order matters)
 ```
 
 Rules for UI work:

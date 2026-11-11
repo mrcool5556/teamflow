@@ -64,13 +64,20 @@ describe("routing", () => {
   });
 
   it("asks for login and returns to the requested page", async () => {
-    const { path } = renderApp("/t/ENG/plan");
+    const { path } = renderApp("/t/ENG/settings/appearance");
     await waitFor(() => expect(path()).toBe("/login"));
     await userEvent.type(screen.getByLabelText("Email"), "ada@example.com");
     await userEvent.type(screen.getByLabelText("Password"), "correct-horse");
     // The tab and the submit button share the label; submit is last.
     await userEvent.click(screen.getAllByRole("button", { name: "Log in" }).at(-1)!);
-    await waitFor(() => expect(path()).toBe("/t/ENG/plan"));
+    await waitFor(() => expect(path()).toBe("/t/ENG/settings/appearance"));
+  });
+
+  it("treats the removed Plan page as an unknown address", async () => {
+    signIn(db);
+    const { path } = renderApp("/t/ENG/plan");
+    await waitFor(() => expect(path()).toBe("/t/ENG"));
+    expect(await screen.findByText("ENG issue 1")).toBeInTheDocument();
   });
 
   it("turns ?reset= into the reset route", async () => {

@@ -19,7 +19,6 @@ import "./styles/dialog.css";
 import "./styles/popover.css";
 import "./styles/settings.css";
 import "./styles/admin.css";
-import "./styles/plan.css";
 import "./styles/auth.css";
 import "./styles/setup.css";
 import "./styles/welcome.css";

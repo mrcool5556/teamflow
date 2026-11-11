@@ -1,5 +1,4 @@
 import { createBrowserRouter, Navigate, type RouteObject } from "react-router";
-import { RoadmapPanel } from "./components/RoadmapPanel";
 import { RouteMarker } from "./components/RouteMarker";
 import { RootLayout } from "./routes/RootLayout";
 import { AdminLayout } from "./routes/admin/AdminLayout";
@@ -91,13 +90,11 @@ export const routes: RouteObject[] = [
               { path: "issue/:issueRef", element: <RouteMarker /> },
               settingsRoute,
               adminRoute,
-              { path: "plan", element: <RoadmapPanel /> },
             ],
           },
-          // Without any team the shell still offers settings (create a team) and the plan.
+          // Without any team the shell still offers settings (create a team).
           settingsRoute,
           adminRoute,
-          { path: "plan", element: <RoadmapPanel /> },
         ],
       },
       { path: "*", element: <Navigate to="/" replace /> },
