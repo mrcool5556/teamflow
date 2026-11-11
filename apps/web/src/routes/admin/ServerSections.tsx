@@ -2,7 +2,11 @@ import type { ReactNode } from "react";
 import { DiscordBotServiceSection } from "../../components/DiscordBotServiceSection";
 import { PanelStatus } from "../../components/PanelStatus";
 import { ServerMaintenanceSettingsSection } from "../../components/ServerMaintenanceSettingsSection";
+import { BackupListSection } from "../../components/BackupListSection";
 import { usePanelStatus } from "../../lib/panelStatus";
+import { hasServerPower } from "../../lib/serverAccess";
+import { useMaintenanceStatusQuery } from "../../queries/maintenance";
+import { useSession } from "../../session/session";
 
 /**
  * Server-wide sections of the admin page. The page itself is for instance admins only (the shell
@@ -30,19 +34,34 @@ function ServerSection({
 }
 
 export function AdminUpdatesPanel() {
+  const { user } = useSession();
+  const canUpdate = hasServerPower(user, "updates");
+  const canBackup = hasServerPower(user, "backups");
   const { status, onMessage } = usePanelStatus();
+  const maintenance = useMaintenanceStatusQuery();
   return (
     <ServerSection
       title="Updates & backups"
       lead={
         <>
-          Teamflow checks for new releases on its own. Updating backs up the database first and
-          takes about 30 seconds.
+          {canUpdate
+            ? "Teamflow checks for new releases on its own. Updating backs up the database first and takes about 30 seconds."
+            : "Backups of the database and of uploaded files."}
         </>
       }
     >
       <PanelStatus status={status} />
-      <ServerMaintenanceSettingsSection canRun onMessage={onMessage} />
+      {canUpdate ? (
+        <ServerMaintenanceSettingsSection canRun onMessage={onMessage} showBackups={false} />
+      ) : null}
+      {canBackup ? (
+        <BackupListSection
+          maintenanceEnabled={maintenance.data?.enabled ?? false}
+          backupReady={maintenance.data?.backupScriptReady ?? false}
+          busy={maintenance.data?.job?.status === "running"}
+          onMessage={onMessage}
+        />
+      ) : null}
     </ServerSection>
   );
 }

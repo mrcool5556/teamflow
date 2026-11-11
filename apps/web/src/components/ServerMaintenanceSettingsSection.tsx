@@ -26,6 +26,11 @@ type Props = {
   teamId?: string;
   canRun: boolean;
   onMessage: PanelMessage;
+  /**
+   * The backups list under Advanced. The server admin page turns it off and shows its own
+   * backup list (components/BackupListSection.tsx) to people with the Backups power.
+   */
+  showBackups?: boolean;
 };
 
 const LINUX_INSTALL =
@@ -201,7 +206,7 @@ function Steps({ current, failed }: { current: MaintenanceUpdateStep | null; fai
   );
 }
 
-export function ServerMaintenanceSettingsSection({ canRun, onMessage }: Props) {
+export function ServerMaintenanceSettingsSection({ canRun, onMessage, showBackups = true }: Props) {
   const queryClient = useQueryClient();
   const confirm = useConfirm();
   const statusQuery = useMaintenanceStatusQuery();
@@ -573,82 +578,90 @@ export function ServerMaintenanceSettingsSection({ canRun, onMessage }: Props) {
             </>
           ) : null}
 
-          <h4>Backups</h4>
-          {canRun && status.enabled ? (
-            <div className="update-actions">
-              <button
-                type="button"
-                className="ghost"
-                disabled={Boolean(busy) || job?.status === "running" || !status.backupScriptReady}
-                onClick={() =>
-                  void run("Backup", () => client.runServerMaintenanceBackup({ full: false }))
-                }
-              >
-                Back up database now
-              </button>
-              <button
-                type="button"
-                className="ghost"
-                disabled={Boolean(busy) || job?.status === "running" || !status.backupScriptReady}
-                onClick={() =>
-                  void run("Backup", () => client.runServerMaintenanceBackup({ full: true }))
-                }
-              >
-                Full backup (with files)
-              </button>
-            </div>
-          ) : null}
-          {status.backups.length === 0 ? (
-            <p className="settings-hint">No backups yet.</p>
-          ) : (
-            <table className="maintenance-backup-table">
-              <thead>
-                <tr>
-                  <th>File</th>
-                  <th>Type</th>
-                  <th>Size</th>
-                  <th>Created</th>
-                  {canRun ? <th aria-label="Actions" /> : null}
-                </tr>
-              </thead>
-              <tbody>
-                {status.backups.map((backup) => (
-                  <tr key={backup.name}>
-                    <td>
-                      <code>{backup.name}</code>
-                    </td>
-                    <td>
-                      {backup.kind === "uploads"
-                        ? "Files"
-                        : backup.kind === "checkpoint"
-                          ? "Checkpoint"
-                          : "Database"}
-                    </td>
-                    <td>{formatFileSize(backup.sizeBytes, 2)}</td>
-                    <td>{formatWhen(backup.createdAt)}</td>
-                    {canRun ? (
-                      <td>
-                        {backup.restorable && status.enabled ? (
-                          <button
-                            type="button"
-                            className="admin-link"
-                            disabled={Boolean(busy) || job?.status === "running"}
-                            onClick={() => void restore(backup)}
-                          >
-                            Restore…
-                          </button>
+          {showBackups ? (
+            <>
+              <h4>Backups</h4>
+              {canRun && status.enabled ? (
+                <div className="update-actions">
+                  <button
+                    type="button"
+                    className="ghost"
+                    disabled={
+                      Boolean(busy) || job?.status === "running" || !status.backupScriptReady
+                    }
+                    onClick={() =>
+                      void run("Backup", () => client.runServerMaintenanceBackup({ full: false }))
+                    }
+                  >
+                    Back up database now
+                  </button>
+                  <button
+                    type="button"
+                    className="ghost"
+                    disabled={
+                      Boolean(busy) || job?.status === "running" || !status.backupScriptReady
+                    }
+                    onClick={() =>
+                      void run("Backup", () => client.runServerMaintenanceBackup({ full: true }))
+                    }
+                  >
+                    Full backup (with files)
+                  </button>
+                </div>
+              ) : null}
+              {status.backups.length === 0 ? (
+                <p className="settings-hint">No backups yet.</p>
+              ) : (
+                <table className="maintenance-backup-table">
+                  <thead>
+                    <tr>
+                      <th>File</th>
+                      <th>Type</th>
+                      <th>Size</th>
+                      <th>Created</th>
+                      {canRun ? <th aria-label="Actions" /> : null}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {status.backups.map((backup) => (
+                      <tr key={backup.name}>
+                        <td>
+                          <code>{backup.name}</code>
+                        </td>
+                        <td>
+                          {backup.kind === "uploads"
+                            ? "Files"
+                            : backup.kind === "checkpoint"
+                              ? "Checkpoint"
+                              : "Database"}
+                        </td>
+                        <td>{formatFileSize(backup.sizeBytes, 2)}</td>
+                        <td>{formatWhen(backup.createdAt)}</td>
+                        {canRun ? (
+                          <td>
+                            {backup.restorable && status.enabled ? (
+                              <button
+                                type="button"
+                                className="admin-link"
+                                disabled={Boolean(busy) || job?.status === "running"}
+                                onClick={() => void restore(backup)}
+                              >
+                                Restore…
+                              </button>
+                            ) : null}
+                          </td>
                         ) : null}
-                      </td>
-                    ) : null}
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          )}
-          {status.backupDir ? (
-            <p className="settings-hint">
-              Folder: <code>{status.backupDir}</code> · keeps the newest 10 database backups
-            </p>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              )}
+              {status.backupDir ? (
+                <p className="settings-hint">
+                  Folder: <code>{status.backupDir}</code> · keeps the newest 10 database backups
+                </p>
+              ) : null}
+            </>
           ) : null}
 
           <h4>Host</h4>
