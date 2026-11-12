@@ -1,4 +1,4 @@
-import { z } from "zod";
+import type { ServerPower, ServerRole } from "./serverRoles.js";
 import type { DiscordBotServiceStatusPublic } from "./discordBotService.js";
 import type { MaintenanceStatusPublic } from "./maintenance.js";
 import type {
@@ -129,16 +129,16 @@ export type InstanceUserPublic = {
   name: string;
   email: string;
   isInstanceAdmin: boolean;
-  /** Listed in TEAMFLOW_INSTANCE_ADMINS: admin again at every login, so the page cannot remove it. */
+  /** Listed in TEAMFLOW_INSTANCE_ADMINS: a trusted admin with every power the page cannot change. */
   adminFromEnv: boolean;
+  /** "owner", "admin" (trusted) or null. */
+  serverRole: ServerRole | null;
+  serverPowers: ServerPower[];
   freeSpaces: number;
   /** Flows (teams) the person is a member of. */
   teamCount: number;
   createdAt: string;
 };
-
-export const updateInstanceUserSchema = z.object({ isInstanceAdmin: z.boolean() }).strict();
-export type UpdateInstanceUserInput = z.infer<typeof updateInstanceUserSchema>;
 
 export type PasswordResetIssuedPublic = {
   /** The one-hour link; show it so the admin can pass it on. */

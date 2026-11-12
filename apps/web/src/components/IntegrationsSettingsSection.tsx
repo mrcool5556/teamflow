@@ -25,7 +25,6 @@ export function IntegrationsSettingsSection({
     <>
       {canManageSecrets ? (
         <DiscordBotSecretsSection
-          teamId={teamId}
           canManage={canManageSecrets}
           onMessage={onMessage}
           onSaved={() => setServiceRefreshKey((value) => value + 1)}

@@ -33,7 +33,13 @@ function preview(extra: Partial<TeamInvitePreview> = {}): TeamInvitePreview {
 /** A signed-in user with no Flow yet. */
 function newcomer(options: { allowance?: SpaceAllowancePublic; invite?: TeamInvitePreview } = {}) {
   const db = seedDb();
-  db.user = { ...db.user, name: "Sam Rivers", isInstanceAdmin: false };
+  db.user = {
+    ...db.user,
+    name: "Sam Rivers",
+    isInstanceAdmin: false,
+    serverRole: null,
+    serverPowers: [],
+  };
   db.teams = [];
   const addTeam = (name: string, key: string): TeamPublic => {
     const team: TeamPublic = {

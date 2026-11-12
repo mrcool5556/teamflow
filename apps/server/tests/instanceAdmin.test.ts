@@ -34,16 +34,16 @@ describe("instance admin", () => {
 
   it("team Owner without instance admin cannot reach server-wide routes", async () => {
     const paths: [string, string][] = [
-      ["GET", `/teams/${second.teamId}/server/maintenance`],
-      ["GET", `/teams/${second.teamId}/server/maintenance/job`],
-      ["POST", `/teams/${second.teamId}/server/maintenance/backup`],
-      ["POST", `/teams/${second.teamId}/server/maintenance/update`],
-      ["POST", `/teams/${second.teamId}/server/maintenance/job/dismiss`],
-      ["GET", `/teams/${second.teamId}/integrations/discord/secrets`],
-      ["PATCH", `/teams/${second.teamId}/integrations/discord/secrets`],
-      ["POST", `/teams/${second.teamId}/integrations/discord/service/enable`],
-      ["POST", `/teams/${second.teamId}/integrations/discord/service/restart`],
-      ["POST", `/teams/${second.teamId}/integrations/discord/service/stop`],
+      ["GET", `/server/maintenance`],
+      ["GET", `/server/maintenance/job`],
+      ["POST", `/server/maintenance/backup`],
+      ["POST", `/server/maintenance/update`],
+      ["POST", `/server/maintenance/job/dismiss`],
+      ["GET", `/integrations/discord/secrets`],
+      ["PATCH", `/integrations/discord/secrets`],
+      ["POST", `/integrations/discord/service/enable`],
+      ["POST", `/integrations/discord/service/restart`],
+      ["POST", `/integrations/discord/service/stop`],
     ];
     for (const [method, path] of paths) {
       const res = await api(app, method, path, {
@@ -56,7 +56,7 @@ describe("instance admin", () => {
   });
 
   it("instance admin who is team Owner can read maintenance status", async () => {
-    const res = await api(app, "GET", `/teams/${first.teamId}/server/maintenance`, {
+    const res = await api(app, "GET", `/server/maintenance`, {
       token: first.token,
     });
     expect(res.status).toBe(200);
@@ -67,7 +67,7 @@ describe("instance admin", () => {
     reloadConfig();
     const session = await login(app, second.email, second.password);
     expect(session.user.isInstanceAdmin).toBe(true);
-    const res = await api(app, "GET", `/teams/${second.teamId}/server/maintenance`, {
+    const res = await api(app, "GET", `/server/maintenance`, {
       token: session.token,
     });
     expect(res.status).toBe(200);

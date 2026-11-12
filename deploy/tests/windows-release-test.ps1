@@ -148,13 +148,13 @@ try {
   $hdr = @{ Authorization = "Bearer $($reg.token)" }
   $team = (Invoke-RestMethod -Method Post -Uri "http://127.0.0.1:$Port/teams" -Headers $hdr -ContentType "application/json" -Body '{"name":"Test","key":"TST"}').team.id
   Check "setup code is gone once the admin exists" { -not (Test-Path "$root\data\setup-code") }
-  $st = (Invoke-RestMethod -Uri "http://127.0.0.1:$Port/teams/$team/server/maintenance" -Headers $hdr).status
+  $st = (Invoke-RestMethod -Uri "http://127.0.0.1:$Port/server/maintenance" -Headers $hdr).status
   Check "maintenance is on for Windows (no 'Linux only')" { $st.enabled -eq $true }
   Check "the update script is the release's update.ps1" { $st.updateScript -like "*current\deploy\windows\update.ps1" }
-  $null = Invoke-RestMethod -Method Post -Uri "http://127.0.0.1:$Port/teams/$team/server/maintenance/backup" -Headers $hdr -ContentType "application/json" -Body '{"full":false}'
+  $null = Invoke-RestMethod -Method Post -Uri "http://127.0.0.1:$Port/server/maintenance/backup" -Headers $hdr -ContentType "application/json" -Body '{"full":false}'
   $bj = $null
   for ($i = 0; $i -lt 60; $i++) {
-    $bj = (Invoke-RestMethod -Uri "http://127.0.0.1:$Port/teams/$team/server/maintenance" -Headers $hdr).status.job
+    $bj = (Invoke-RestMethod -Uri "http://127.0.0.1:$Port/server/maintenance" -Headers $hdr).status.job
     if ($bj.status -ne "running") { break }
     Start-Sleep 1
   }
@@ -162,16 +162,57 @@ try {
   Check "in-app backup log has the BACKUP line" { $bj.logTail -match "BACKUP database " }
   if ($bj.status -ne "success") { Write-Host "    job log:"; $bj.logTail -split "`n" | Select-Object -Last 8 | ForEach-Object { Write-Host "      $_" } }
   Set-Latest "0.2.5"
-  $null = Invoke-RestMethod -Method Post -Uri "http://127.0.0.1:$Port/teams/$team/server/maintenance/update" -Headers $hdr -ContentType "application/json" -Body '{"version":"0.2.5"}'
+  $null = Invoke-RestMethod -Method Post -Uri "http://127.0.0.1:$Port/server/maintenance/update" -Headers $hdr -ContentType "application/json" -Body '{"version":"0.2.5"}'
   Check "the server updated itself to v0.2.5" { WaitVersion "0.2.5" 120 }
   $st2 = $null
   for ($i = 0; $i -lt 20; $i++) {
-    try { $st2 = (Invoke-RestMethod -Uri "http://127.0.0.1:$Port/teams/$team/server/maintenance" -Headers $hdr).status } catch { }
+    try { $st2 = (Invoke-RestMethod -Uri "http://127.0.0.1:$Port/server/maintenance" -Headers $hdr).status } catch { }
     if ($st2 -and $st2.job.status -ne "running") { break }
     Start-Sleep 1
   }
   Check "the job finished as success" { $st2.job.status -eq "success" }
   Check "lastRun.done is 0.2.5" { $st2.lastRun.done -eq "0.2.5" }
+
+  Section "Backup retention (keep N, never checkpoints)"
+  $bk = "$root\backups"
+  $mb = "http://127.0.0.1:$Port/server/maintenance"
+  Get-ChildItem $bk -File | Remove-Item -Force
+  $keepers = @("teamflow-pre-0.2.0.db", "teamflow_db_pre-0.2.1.db", "teamflow_2026-06-01_120000-before-releases.db", "teamflow_env_pre-0.2.0", "notes.txt")
+  foreach ($f in $keepers) { Set-Content "$bk\$f" "keep"; (Get-Item "$bk\$f").LastWriteTime = [datetime]"2026-01-01" }
+  foreach ($d in 1..5) {
+    foreach ($n in @("teamflow_2026-06-0$($d)_120000.db", "teamflow_uploads_2026-06-0$($d)_120000.zip")) {
+      Set-Content "$bk\$n" "old"; (Get-Item "$bk\$n").LastWriteTime = [datetime]"2026-06-0$d"
+    }
+  }
+  $ret = Invoke-RestMethod -Method Put -Uri "$mb/backup-retention" -Headers $hdr -ContentType "application/json" -Body '{"keepDatabaseBackups":3,"keepUploadArchives":2}'
+  Check "keep settings saved" { $ret.retention.keepDatabaseBackups -eq 3 -and $ret.retention.keepUploadArchives -eq 2 }
+  Check "settings file written" { (Get-Content "$root\data\backup-settings.json" -Raw | ConvertFrom-Json).keepUploadArchives -eq 2 }
+  New-Item -ItemType Directory -Force "$root\data\uploads" | Out-Null
+  Set-Content "$root\data\uploads\a.txt" "hi"
+  $b2 = PS51 "$root\current\deploy\windows\backup.ps1"
+  $dbs = @(Get-ChildItem $bk -File | Where-Object { $_.Name -match '^teamflow_\d{4}-\d{2}-\d{2}_\d{6}(-\d+)?\.db$' })
+  $ups = @(Get-ChildItem $bk -File | Where-Object { $_.Name -match '^teamflow_uploads_\d{4}-\d{2}-\d{2}_\d{6}(-\d+)?\.zip$' })
+  Check "keeps 3 database backups" { $dbs.Count -eq 3 }
+  Check "keeps 2 upload archives" { $ups.Count -eq 2 }
+  Check "the oldest were pruned" { -not (Test-Path "$bk\teamflow_2026-06-01_120000.db") }
+  Check "PRUNED lines printed" { ($b2 -join "`n") -match "PRUNED database teamflow_2026-06-01_120000.db" }
+  foreach ($f in $keepers) { Check "untouched: $f" { (Get-Content "$bk\$f" -Raw).Trim() -eq "keep" } }
+  $list = Invoke-RestMethod -Uri "$mb/backups" -Headers $hdr
+  $newest = ($list.backups | Where-Object { $_.kind -eq "database" } | Select-Object -First 1)
+  Check "API lists checkpoints and a total" { ($list.backups | Where-Object { $_.name -eq "teamflow-pre-0.2.0.db" }).kind -eq "checkpoint" -and $list.totalBytes -gt 0 }
+  Check "API leaves other files out" { -not ($list.backups | Where-Object { $_.name -eq "notes.txt" }) }
+  Check "newest database backup is not deletable" { $newest.deletable -eq $false }
+  $refused = $false
+  try { Invoke-RestMethod -Method Delete -Uri "$mb/backups/$($newest.name)" -Headers $hdr | Out-Null } catch { $refused = $true }
+  Check "deleting the newest is refused" { $refused -and (Test-Path "$bk\$($newest.name)") }
+  $older = ($list.backups | Where-Object { $_.kind -eq "database" } | Select-Object -Last 1).name
+  $after = Invoke-RestMethod -Method Delete -Uri "$mb/backups/$older" -Headers $hdr
+  Check "an older database backup is deleted" { -not (Test-Path "$bk\$older") -and -not ($after.backups | Where-Object { $_.name -eq $older }) }
+  $null = Invoke-RestMethod -Method Delete -Uri "$mb/backups/teamflow_env_pre-0.2.0" -Headers $hdr
+  Check "a checkpoint is deleted by name" { -not (Test-Path "$bk\teamflow_env_pre-0.2.0") }
+  $refused = $false
+  try { Invoke-RestMethod -Method Delete -Uri "$mb/backups/notes.txt" -Headers $hdr | Out-Null } catch { $refused = $true }
+  Check "a non-Teamflow file is refused" { $refused -and (Test-Path "$bk\notes.txt") }
 } finally {
   Section "Cleanup"
   PS51 "$root\current\deploy\windows\stop.ps1" | Out-Null

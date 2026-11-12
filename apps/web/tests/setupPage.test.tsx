@@ -131,7 +131,7 @@ describe("/setup once the server has accounts", () => {
 
   it("is not for members who are not instance admins", async () => {
     const db = seedDb();
-    db.user = { ...db.user, isInstanceAdmin: false };
+    db.user = { ...db.user, isInstanceAdmin: false, serverRole: null, serverPowers: [] };
     setupServer({ setupNeeded: false, db });
     signIn(db);
     const app = renderApp("/setup/site");

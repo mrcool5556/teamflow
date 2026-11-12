@@ -1,4 +1,5 @@
 import { z } from "zod";
+import type { ServerPower, ServerRole } from "./serverRoles.js";
 import type { AttachmentKind } from "./attachments.js";
 import { TEAM_PERMISSIONS } from "./permissions.js";
 import type { SpaceType } from "./spaces.js";
@@ -316,8 +317,12 @@ export type UserPublic = {
   email: string;
   name: string;
   createdAt: string;
-  /** Server-wide admin (maintenance, bot secrets). Separate from team roles. */
+  /** Has Server admin access: the Server Owner, or a trusted admin with at least one power. */
   isInstanceAdmin?: boolean;
+  /** "owner" (one per server), "admin" (trusted admin) or null. Separate from Flow roles. */
+  serverRole?: ServerRole | null;
+  /** The powers in force (every power for the Owner). */
+  serverPowers?: ServerPower[];
 };
 
 export type TeamPublic = {
@@ -556,3 +561,4 @@ export type ApiError = {
   code?: string;
 };
 export * from "./site.js";
+export * from "./serverRoles.js";

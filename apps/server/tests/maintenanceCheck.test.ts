@@ -52,7 +52,7 @@ afterAll(async () => {
 });
 
 async function status(method: "GET" | "POST", suffix = "") {
-  const res = await api(app, method, `/teams/${admin.teamId}/server/maintenance${suffix}`, {
+  const res = await api(app, method, `/server/maintenance${suffix}`, {
     token: admin.token,
   });
   expect(res.status).toBe(200);
@@ -83,7 +83,7 @@ describe("maintenance status", () => {
   });
 
   it("switching to the pre-release channel offers release candidates", async () => {
-    const res = await api(app, "PUT", `/teams/${admin.teamId}/server/maintenance/settings`, {
+    const res = await api(app, "PUT", `/server/maintenance/settings`, {
       token: admin.token,
       body: { channel: "prerelease" },
     });
@@ -92,14 +92,14 @@ describe("maintenance status", () => {
     expect(next.release.channel).toBe("prerelease");
     // 99.0.0 is newer than its own release candidate.
     expect(next.release.latest?.version).toBe("99.0.0");
-    await api(app, "PUT", `/teams/${admin.teamId}/server/maintenance/settings`, {
+    await api(app, "PUT", `/server/maintenance/settings`, {
       token: admin.token,
       body: { channel: "stable" },
     });
   });
 
   it("refuses branch updates", async () => {
-    const res = await api(app, "POST", `/teams/${admin.teamId}/server/maintenance/update`, {
+    const res = await api(app, "POST", `/server/maintenance/update`, {
       token: admin.token,
       body: { branch: "main" },
     });
@@ -108,10 +108,13 @@ describe("maintenance status", () => {
 
   it("guards the check like the other maintenance actions", async () => {
     const other = await registerUser(app); // not instance admin
-    const res = await api(app, "POST", `/teams/${other.teamId}/server/maintenance/check`, {
+    const res = await api(app, "POST", `/server/maintenance/check`, {
       token: other.token,
     });
     expect(res.status).toBe(403);
-    expect(await json(res)).toEqual({ error: "Instance admin required", code: "forbidden" });
+    expect(await json(res)).toEqual({
+      error: "Needs the Updates or Backups server power",
+      code: "forbidden",
+    });
   });
 });

@@ -36,6 +36,8 @@ describe("maintenance sudo layout", () => {
     expect(sudoersLine).toContain("$BACKUP_BIN *");
     expect(sudoersLine).toContain("$UPDATE_BIN *");
     expect(sudoersLine).toContain("$DISCORD_BIN *");
+    expect(sudoersLine).toContain("$FILES_BIN *");
+    expect(sudoScript).toMatch(/install_atomic "\$FILES_REPO" "\$FILES_BIN"/);
     expect(sudoersLine).not.toMatch(/\$APP_DIR|BASH_BIN|_REPO/);
     expect(sudoScript).not.toMatch(/env_keep/);
     expect(sudoScript).not.toMatch(/\/usr\/local\/bin\/[^ ]+ \*/);

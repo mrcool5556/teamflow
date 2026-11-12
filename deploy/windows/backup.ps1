@@ -6,8 +6,9 @@
 #   backup.ps1 --uploads-only  uploaded files only
 #   backup.ps1 --root <folder> the install folder (found automatically otherwise)
 #
-# Backups go to <install folder>\backups (TEAMFLOW_BACKUP_DIR in .env changes it). The newest
-# 10 database backups are kept. In a git checkout (no releases folder) it copies data\teamflow.db
+# Backups go to <install folder>\backups (TEAMFLOW_BACKUP_DIR in .env changes it). After each
+# backup the oldest beyond the keep settings in data\backup-settings.json are deleted (default:
+# 10 database backups, 1 upload archive); named checkpoints are never deleted. In a git checkout (no releases folder) it copies data\teamflow.db
 # to data\backups as before.
 
 . (Join-Path $PSScriptRoot "_release.ps1")
@@ -59,6 +60,33 @@ function Get-FreeName {
   return $candidate
 }
 
+# Keep settings from data\backup-settings.json (Server admin): each an integer 1-100, else default.
+function Get-KeepSetting([string]$Key, [int]$Default) {
+  $file = Join-Path $root "data\backup-settings.json"
+  try {
+    $v = (Get-Content $file -Raw -ErrorAction Stop | ConvertFrom-Json).$Key
+    if ($v -is [int] -or $v -is [long]) { if ($v -ge 1 -and $v -le 100) { return [int]$v } }
+  } catch { }
+  return $Default
+}
+
+# Delete the oldest automatic backups of one type beyond the keep setting. Only backup.ps1's own
+# names are matched; checkpoints (teamflow-pre-*, *-before-releases.db, ...) are never touched.
+function Remove-OldBackups([string]$Type) {
+  if ($Type -eq "database") {
+    $keep = Get-KeepSetting "keepDatabaseBackups" 10
+    $pattern = '^teamflow_\d{4}-\d{2}-\d{2}_\d{6}(-\d+)?\.db$'
+  } else {
+    $keep = Get-KeepSetting "keepUploadArchives" 1
+    $pattern = '^teamflow_uploads_\d{4}-\d{2}-\d{2}_\d{6}(-\d+)?\.(tar\.gz|zip)$'
+  }
+  Get-ChildItem $backupDir -File | Where-Object { $_.Name -match $pattern } |
+    Sort-Object LastWriteTime -Descending | Select-Object -Skip $keep | ForEach-Object {
+      Remove-Item $_.FullName -Force -ErrorAction SilentlyContinue
+      Say "PRUNED $Type $($_.Name)"
+    }
+}
+
 if ($mode -ne "uploads-only") {
   $db = Get-DatabasePath $root
   if (-not (Test-Path $db)) { Say "No database found at $db"; exit 1 }
@@ -78,9 +106,7 @@ if ($mode -ne "uploads-only") {
   }
   if ($code -ne 0) { Say "Database backup failed: $out"; exit 1 }
   Say "BACKUP database $dest"
-
-  Get-ChildItem $backupDir -Filter "teamflow_*.db" | Sort-Object LastWriteTime -Descending |
-    Select-Object -Skip 10 | Remove-Item -Force -ErrorAction SilentlyContinue
+  Remove-OldBackups "database"
 }
 
 if ($mode -ne "db-only") {
@@ -93,6 +119,7 @@ if ($mode -ne "db-only") {
     & "$env:SystemRoot\System32\tar.exe" -a -c -f $zip -C (Split-Path $uploads -Parent) (Split-Path $uploads -Leaf)
     if ($LASTEXITCODE -ne 0) { Say "Uploads backup failed."; exit 1 }
     Say "BACKUP uploads $zip"
+    Remove-OldBackups "uploads"
   } else {
     Say "No uploads folder at $uploads (skipped)."
   }

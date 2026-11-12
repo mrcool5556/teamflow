@@ -37,7 +37,7 @@ Server code throws `ApiError` from `apps/server/src/lib/errors.ts` (`badRequest`
 
 <!-- BEGIN GENERATED ROUTES (scripts/gen-api-docs.mjs) -->
 
-## Routes (124)
+## Routes (135)
 
 Generated from `apps/server/src/routes/*.ts` by `pnpm docs:api`; do not edit by hand.
 
@@ -158,28 +158,33 @@ Discord integration settings, bot secrets, bot service and bot config.
 | GET | `/integrations/discord/bot-config` | bot key |  |  |  |  |
 | GET | `/teams/:teamId/discord-settings` | bearer |  | member | `integrations.discord.view` |  |
 | PATCH | `/teams/:teamId/discord-settings` | bearer | yes | member | `integrations.discord.manage` | body `updateTeamDiscordSettingsSchema` |
-| GET | `/teams/:teamId/integrations/discord/secrets` | bearer |  | member | `integrations.discord.secrets` + instance admin |  |
-| PATCH | `/teams/:teamId/integrations/discord/secrets` | bearer | yes | member | `integrations.discord.secrets` + instance admin | body `updateDiscordBotSecretsSchema` |
+| GET | `/integrations/discord/secrets` | bearer |  |  |  |  |
+| PATCH | `/integrations/discord/secrets` | bearer | yes |  |  | body `updateDiscordBotSecretsSchema` |
+| GET | `/integrations/discord/service` | bearer |  |  |  |  |
 | GET | `/teams/:teamId/integrations/discord/service` | bearer |  | member | `integrations.discord.view` |  |
-| POST | `/teams/:teamId/integrations/discord/service/enable` | bearer | yes | member | `integrations.discord.secrets` + instance admin |  |
-| POST | `/teams/:teamId/integrations/discord/service/restart` | bearer | yes | member | `integrations.discord.secrets` + instance admin |  |
-| POST | `/teams/:teamId/integrations/discord/service/stop` | bearer | yes | member | `integrations.discord.secrets` + instance admin |  |
+| POST | `/integrations/discord/service/enable` | bearer | yes |  |  |  |
+| POST | `/integrations/discord/service/restart` | bearer | yes |  |  |  |
+| POST | `/integrations/discord/service/stop` | bearer | yes |  |  |  |
 | GET | `/discord/guilds/:guildId/config` | bearer |  |  |  |  |
 
 ### Server maintenance
 
-Server maintenance: status, backups, updates (instance admin only).
-
 | Method | Path | Auth | Write | Team | Permission | Input |
 |--------|------|------|-------|------|------------|-------|
-| GET | `/teams/:teamId/server/maintenance` | bearer |  | member | `server.maintenance.view` + instance admin |  |
-| POST | `/teams/:teamId/server/maintenance/check` | bearer | yes | member | `server.maintenance.view` + instance admin |  |
-| GET | `/teams/:teamId/server/maintenance/job` | bearer |  | member | `server.maintenance.view` + instance admin |  |
-| POST | `/teams/:teamId/server/maintenance/backup` | bearer | yes | member | `server.maintenance.run` + instance admin | body `runMaintenanceBackupSchema` |
-| POST | `/teams/:teamId/server/maintenance/update` | bearer | yes | member | `server.maintenance.run` + instance admin | body `runMaintenanceUpdateSchema` |
-| POST | `/teams/:teamId/server/maintenance/job/dismiss` | bearer | yes | member | `server.maintenance.run` + instance admin |  |
-| POST | `/teams/:teamId/server/maintenance/restore` | bearer | yes | member | `server.maintenance.run` + instance admin | body `runMaintenanceRestoreSchema` |
-| PUT | `/teams/:teamId/server/maintenance/settings` | bearer | yes | member | `server.maintenance.run` + instance admin | body `maintenanceSettingsSchema` |
+| GET | `/server/maintenance` | bearer |  |  |  |  |
+| POST | `/server/maintenance/check` | bearer | yes |  |  |  |
+| GET | `/server/maintenance/job` | bearer |  |  |  |  |
+| POST | `/server/maintenance/backup` | bearer | yes |  |  | body `runMaintenanceBackupSchema` |
+| POST | `/server/maintenance/update` | bearer | yes |  |  | body `runMaintenanceUpdateSchema` |
+| POST | `/server/maintenance/job/dismiss` | bearer | yes |  |  |  |
+| POST | `/server/maintenance/restore` | bearer | yes |  |  | body `runMaintenanceRestoreSchema` |
+| PUT | `/server/maintenance/settings` | bearer | yes |  |  | body `maintenanceSettingsSchema` |
+| GET | `/server/maintenance/backups` | bearer |  |  |  |  |
+| DELETE | `/server/maintenance/backups/:backupName` | bearer | yes |  |  |  |
+| GET | `/server/maintenance/backup-retention` | bearer |  |  |  |  |
+| PUT | `/server/maintenance/backup-retention` | bearer | yes |  |  | body `backupRetentionSchema` |
+| GET | `/teams/:teamId/server/maintenance` | bearer |  |  |  |  |
+| GET | `/teams/:teamId/server/maintenance/job` | bearer |  |  |  |  |
 
 ### Instance admin and spaces
 
@@ -189,27 +194,31 @@ Instance admin page (web /admin): server status, spaces, caps and space settings
 |--------|------|------|-------|------|------------|-------|
 | GET | `/instance/overview` | bearer |  |  | instance admin |  |
 | GET | `/instance/checks/public-url` | bearer |  |  | instance admin | query `publicUrlCheckQuerySchema` |
-| GET | `/instance/site` | bearer |  |  | instance admin |  |
-| PATCH | `/instance/site` | bearer | yes |  | instance admin | body `updateSiteSettingsSchema` |
-| GET | `/instance/mail` | bearer |  |  | instance admin |  |
-| PUT | `/instance/mail` | bearer | yes |  | instance admin | body `updateMailSettingsSchema` |
-| DELETE | `/instance/mail` | bearer | yes |  | instance admin |  |
-| POST | `/instance/mail/test` | bearer | yes |  | instance admin | body `sendTestMailSchema` |
-| GET | `/instance/signup` | bearer |  |  | instance admin |  |
-| PATCH | `/instance/signup` | bearer | yes |  | instance admin | body `updateSignupSettingsSchema` |
+| GET | `/instance/site` | bearer |  |  |  |  |
+| PATCH | `/instance/site` | bearer | yes |  |  | body `updateSiteSettingsSchema` |
+| GET | `/instance/mail` | bearer |  |  |  |  |
+| PUT | `/instance/mail` | bearer | yes |  |  | body `updateMailSettingsSchema` |
+| DELETE | `/instance/mail` | bearer | yes |  |  |  |
+| POST | `/instance/mail/test` | bearer | yes |  |  | body `sendTestMailSchema` |
+| GET | `/instance/signup` | bearer |  |  |  |  |
+| PATCH | `/instance/signup` | bearer | yes |  |  | body `updateSignupSettingsSchema` |
 | GET | `/instance/setup-checklist` | bearer |  |  | instance admin |  |
 | PATCH | `/instance/setup-checklist` | bearer | yes |  | instance admin | body `updateSetupProgressSchema` |
-| GET | `/instance/settings` | bearer |  |  | instance admin |  |
-| PATCH | `/instance/settings` | bearer | yes |  | instance admin | body `updateSpaceSettingsSchema` |
-| GET | `/instance/users` | bearer |  |  | instance admin | query `listInstanceUsersQuerySchema` |
-| PATCH | `/instance/users/:userId` | bearer | yes |  | instance admin | body `updateInstanceUserSchema` |
-| POST | `/instance/users/:userId/reset-link` | bearer | yes |  | instance admin |  |
-| GET | `/instance/spaces` | bearer |  |  | instance admin |  |
-| POST | `/instance/spaces` | bearer | yes |  | instance admin | body `createSpaceSchema` |
-| GET | `/instance/spaces/:teamId` | bearer |  |  | instance admin |  |
-| PATCH | `/instance/spaces/:teamId` | bearer | yes |  | instance admin | body `updateSpaceSchema` |
-| POST | `/instance/spaces/:teamId/empty-trash` | bearer | yes |  | instance admin |  |
-| POST | `/instance/spaces/:teamId/cancel-uploads` | bearer | yes |  | instance admin |  |
+| GET | `/instance/settings` | bearer |  |  |  |  |
+| PATCH | `/instance/settings` | bearer | yes |  |  | body `updateSpaceSettingsSchema` |
+| GET | `/instance/users` | bearer |  |  |  | query `listInstanceUsersQuerySchema` |
+| GET | `/instance/admins` | bearer |  |  |  |  |
+| PUT | `/instance/admins/:userId` | bearer | yes |  |  | body `setServerAdminSchema` |
+| DELETE | `/instance/admins/:userId` | bearer | yes |  |  |  |
+| POST | `/instance/owner/transfer` | bearer | yes |  |  | body `transferOwnershipSchema` |
+| POST | `/instance/users/:userId/reset-link` | bearer | yes |  |  |  |
+| GET | `/instance/spaces` | bearer |  |  |  |  |
+| POST | `/instance/spaces` | bearer | yes |  |  | body `createSpaceSchema` |
+| GET | `/instance/spaces/:teamId` | bearer |  |  |  |  |
+| PATCH | `/instance/spaces/:teamId` | bearer | yes |  |  | body `updateSpaceSchema` |
+| DELETE | `/instance/spaces/:teamId` | bearer | yes |  |  | body `deleteSpaceSchema` |
+| POST | `/instance/spaces/:teamId/empty-trash` | bearer | yes |  |  |  |
+| POST | `/instance/spaces/:teamId/cancel-uploads` | bearer | yes |  |  |  |
 
 ### Team files
 
@@ -292,6 +301,54 @@ Chunked upload sessions for issue and row attachments.
 <!-- END GENERATED ROUTES -->
 
 Auth details: [AUTH.md](AUTH.md). Attachments and uploads: [ATTACHMENTS.md](ATTACHMENTS.md).
+
+## Server backups
+
+Server-wide: the instance-admin flag alone decides (no team in the path). Types are in
+`@teamflow/core` (`MaintenanceBackupListPublic`, `BackupRetention`); the api-client has
+`listServerBackups`, `deleteServerBackup`, `getServerBackupRetention`, `setServerBackupRetention`.
+
+`GET /server/maintenance/backups`, and the response of a delete:
+
+```json
+{
+  "backups": [
+    {
+      "name": "teamflow_2026-11-11_031500.db",
+      "kind": "database",
+      "sizeBytes": 2457600,
+      "createdAt": "2026-11-11T03:15:00.000Z",
+      "deletable": false,
+      "restorable": true
+    }
+  ],
+  "totalBytes": 2457600,
+  "backupDir": "/var/backups/teamflow",
+  "retention": { "keepDatabaseBackups": 10, "keepUploadArchives": 1 }
+}
+```
+
+- Newest first. Only files named `teamflow*` are listed; anything else in the folder is ignored.
+- `kind`: `database` is `teamflow_YYYY-MM-DD_HHMMSS[-N].db` and `uploads` is
+  `teamflow_uploads_YYYY-MM-DD_HHMMSS[-N].tar.gz` (`.zip` on Windows), the names the backup
+  scripts write. Every other `teamflow*` file is a `checkpoint` (`teamflow-pre-*`,
+  `teamflow_db_pre-*`, `*-before-releases.db`, `teamflow_env_pre-*`): never pruned, not counted
+  toward the keep settings, deleted only by hand.
+- `deletable` is false only for the newest `database` backup. `restorable` marks the files
+  `POST /server/maintenance/restore` accepts.
+- `backupDir` is null and `backups` empty when maintenance is disabled.
+
+`DELETE /server/maintenance/backups/:backupName` deletes one listed file and
+returns the new list. 400 for the newest database backup or a name that is not a Teamflow backup
+name (paths, `..`); 404 when no such file is in the folder (links count as missing). On Linux it
+runs the root-owned `backup-files.sh delete` through sudo.
+
+`GET` / `PUT /server/maintenance/backup-retention`:
+`{ "retention": { "keepDatabaseBackups": 10, "keepUploadArchives": 1 } }`. The PUT body is the
+`retention` object (`backupRetentionSchema`: integers 1-100, both required). The values are
+stored in `<app>/data/backup-settings.json`; after each successful backup (by hand, in the app or
+before an update) the backup script deletes the oldest of that kind beyond the number. Saving
+does not delete anything by itself.
 
 ## Issue response shape
 

@@ -6,8 +6,8 @@ set -euo pipefail
 APP_DIR="${APP_DIR:-/opt/teamflow}"
 APP_USER="${APP_USER:-teamflow}"
 BACKUP_DIR="${BACKUP_DIR:-/var/backups/teamflow}"
-KEEP_DB_BACKUPS="${KEEP_DB_BACKUPS:-10}"
 MODE="full"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 usage() {
   cat <<'EOF'
@@ -19,7 +19,9 @@ Usage:
   teamflow-backup --db-only       # database only (fast; used by update)
   teamflow-backup --uploads-only  # uploaded files only
 
-Backups go to /var/backups/teamflow. The newest 10 database backups are kept.
+Backups go to /var/backups/teamflow. After each backup the oldest automatic backups beyond the
+keep settings (Server admin; default 10 database backups, 1 upload archive) are deleted.
+Named checkpoints (teamflow-pre-*, *-before-releases.db, ...) are never deleted.
 EOF
 }
 
@@ -40,7 +42,19 @@ fi
 
 STAMP=$(date +%Y-%m-%d_%H%M%S)
 mkdir -p "$BACKUP_DIR"
-chmod 700 "$BACKUP_DIR"
+# The app user may list the folder (names and sizes for Server admin) but not read the files
+# (each is 600) or change it; deleting goes through backup-files.sh as root.
+chown "root:$APP_USER" "$BACKUP_DIR" 2>/dev/null || true
+chmod 750 "$BACKUP_DIR"
+
+prune() {
+  local tool="$SCRIPT_DIR/backup-files.sh"
+  if [[ ! -f "$tool" ]]; then
+    echo "Old backups not pruned: $tool is missing."
+    return 0
+  fi
+  APP_DIR="$APP_DIR" BACKUP_DIR="$BACKUP_DIR" bash "$tool" prune "$1"
+}
 
 env_value() {
   grep -E "^$1=" "$APP_DIR/.env" 2>/dev/null | tail -n1 | cut -d= -f2- | tr -d '"'"'" | xargs || true
@@ -85,13 +99,7 @@ backup_database() {
   fi
   chmod 600 "$dest"
   echo "BACKUP database $dest"
-
-  # Keep the newest database backups only.
-  local old
-  while IFS= read -r old; do
-    rm -f "$old"
-  done < <(find "$BACKUP_DIR" -maxdepth 1 -name 'teamflow_*.db' -printf '%T@ %p\n' | sort -rn |
-    tail -n +"$((KEEP_DB_BACKUPS + 1))" | cut -d' ' -f2-)
+  prune database
 }
 
 backup_uploads() {
@@ -111,6 +119,7 @@ backup_uploads() {
   tar -czf "$archive" -C "$(dirname "$upload_dir")" "$(basename "$upload_dir")"
   chmod 600 "$archive"
   echo "BACKUP uploads $archive"
+  prune uploads
 }
 
 case "$MODE" in

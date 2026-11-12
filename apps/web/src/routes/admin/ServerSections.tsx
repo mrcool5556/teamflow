@@ -1,92 +1,80 @@
 import type { ReactNode } from "react";
-import type { TeamPublic } from "@teamflow/core";
 import { DiscordBotServiceSection } from "../../components/DiscordBotServiceSection";
 import { PanelStatus } from "../../components/PanelStatus";
 import { ServerMaintenanceSettingsSection } from "../../components/ServerMaintenanceSettingsSection";
+import { BackupListSection } from "../../components/BackupListSection";
 import { usePanelStatus } from "../../lib/panelStatus";
-import { useShell } from "../board/shellContext";
+import { hasServerPower } from "../../lib/serverAccess";
+import { useMaintenanceStatusQuery } from "../../queries/maintenance";
+import { useSession } from "../../session/session";
 
 /**
- * The update and bot service APIs are still team-scoped (they also check a team permission),
- * so these sections run through the team the admin page was opened from.
+ * Server-wide sections of the admin page. The page itself is for instance admins only (the shell
+ * redirects everyone else), and these APIs check only that flag, so they work from any Flow and
+ * with none open.
  */
-function WithServerTeam({
+function ServerSection({
   title,
   lead,
-  allowed,
   children,
 }: {
   title: string;
   lead: ReactNode;
-  allowed: boolean;
-  children: (team: TeamPublic) => ReactNode;
+  children: ReactNode;
 }) {
-  const { team } = useShell();
   return (
     <div className="settings-panel">
       <header className="settings-panel-header">
         <h2>{title}</h2>
         <p className="settings-copy settings-lead">{lead}</p>
       </header>
-      {team && allowed ? (
-        children(team)
-      ) : (
-        <p className="settings-hint settings-hint--warn">
-          Open the server admin page from a Flow where you are the Owner to use this section. The
-          Overview still shows its status.
-        </p>
-      )}
+      {children}
     </div>
   );
 }
 
 export function AdminUpdatesPanel() {
-  const { access } = useShell();
+  const { user } = useSession();
+  const canUpdate = hasServerPower(user, "updates");
+  const canBackup = hasServerPower(user, "backups");
   const { status, onMessage } = usePanelStatus();
+  const maintenance = useMaintenanceStatusQuery();
   return (
-    <WithServerTeam
+    <ServerSection
       title="Updates & backups"
       lead={
         <>
-          Teamflow checks for new releases on its own. Updating backs up the database first and
-          takes about 30 seconds.
+          {canUpdate
+            ? "Teamflow checks for new releases on its own. Updating backs up the database first and takes about 30 seconds."
+            : "Backups of the database and of uploaded files."}
         </>
       }
-      allowed={access.showMaintenance}
     >
-      {(team) => (
-        <>
-          <PanelStatus status={status} />
-          <ServerMaintenanceSettingsSection
-            teamId={team.id}
-            canRun={access.canRunMaintenance}
-            onMessage={onMessage}
-          />
-        </>
-      )}
-    </WithServerTeam>
+      <PanelStatus status={status} />
+      {canUpdate ? (
+        <ServerMaintenanceSettingsSection canRun onMessage={onMessage} showBackups={false} />
+      ) : null}
+      {canBackup ? (
+        <BackupListSection
+          maintenanceEnabled={maintenance.data?.enabled ?? false}
+          backupReady={maintenance.data?.backupScriptReady ?? false}
+          busy={maintenance.data?.job?.status === "running"}
+          onMessage={onMessage}
+        />
+      ) : null}
+    </ServerSection>
   );
 }
 
 export function AdminBotPanel() {
-  const { access } = useShell();
   const { status, onMessage } = usePanelStatus();
   return (
-    <WithServerTeam
+    <ServerSection
       title="Discord bot"
       lead="The teamflow-discord service on this server. Bot credentials and per-Flow guild settings live in Settings → Integrations."
-      allowed={access.showIntegrations}
     >
-      {(team) => (
-        <>
-          <PanelStatus status={status} />
-          <DiscordBotServiceSection
-            teamId={team.id}
-            canManage={access.canManageDiscordSecrets}
-            onMessage={onMessage}
-          />
-        </>
-      )}
-    </WithServerTeam>
+      <PanelStatus status={status} />
+      <DiscordBotServiceSection teamId={null} canManage onMessage={onMessage} />
+    </ServerSection>
   );
 }

@@ -1,13 +1,16 @@
 import { configure, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import type {
-  MailSettingsPublic,
-  SetupChecklistPublic,
-  SiteSettingsAdminPublic,
+import {
+  SERVER_POWERS,
+  type MailSettingsPublic,
+  type ServerAdminPublic,
+  type ServerPower,
+  type SetupChecklistPublic,
+  type SiteSettingsAdminPublic,
 } from "@teamflow/core";
 import { describe, expect, it } from "vitest";
 import { adminRoutes } from "./adminFixtures";
-import { installFakeApi, seedDb, signIn, type FakeRoute } from "./fakeApi";
+import { installFakeApi, seedDb, signIn, type FakeDb, type FakeRoute } from "./fakeApi";
 import { renderApp } from "./renderApp";
 
 configure({ asyncUtilTimeout: 3000 });
@@ -44,8 +47,40 @@ const MAIL: MailSettingsPublic = {
   from: null,
 };
 
-function setup(path: string) {
+const state: { admins?: ServerAdminPublic[] } = {};
+function admins() {
+  return (state.admins ??= [
+    {
+      id: "user-1",
+      name: "Ada",
+      email: "ada@example.com",
+      role: "owner",
+      powers: [...SERVER_POWERS],
+      fromEnv: false,
+    },
+    {
+      id: "user-3",
+      name: "Sam",
+      email: "sam@example.test",
+      role: "admin",
+      powers: ["backups"],
+      fromEnv: false,
+    },
+    {
+      id: "user-4",
+      name: "Ops",
+      email: "ops@example.test",
+      role: "admin",
+      powers: [...SERVER_POWERS],
+      fromEnv: true,
+    },
+  ]);
+}
+
+function setup(path: string, configure?: (db: FakeDb) => void) {
+  state.admins = undefined;
   const db = seedDb();
+  configure?.(db);
   const extra: FakeRoute[] = [
     ["GET", /^\/instance\/setup-checklist$/, () => ({ checklist: CHECKLIST })],
     [
@@ -55,22 +90,27 @@ function setup(path: string) {
     ],
     ["GET", /^\/instance\/site$/, () => ({ site: SITE })],
     ["GET", /^\/instance\/mail$/, () => ({ mail: MAIL })],
+    ["GET", /^\/instance\/admins$/, () => ({ admins: admins() })],
     [
-      "PATCH",
-      /^\/instance\/users\/([^/]+)$/,
-      ({ params, body }) => ({
-        user: {
-          id: params[0],
-          name: "Jules",
-          email: "jules@example.test",
-          adminFromEnv: false,
-          freeSpaces: 2,
-          teamCount: 2,
-          createdAt: "2026-10-02T10:00:00.000Z",
-          ...(body as object),
-        },
-      }),
+      "PUT",
+      /^\/instance\/admins\/([^/]+)$/,
+      ({ params, body }) => {
+        const powers = (body as { powers: ServerPower[] }).powers;
+        const existing = admins().find((a) => a.id === params[0]);
+        if (existing) existing.powers = powers;
+        else
+          state.admins!.push({
+            id: params[0]!,
+            name: "Jules",
+            email: "jules@example.test",
+            role: "admin",
+            powers,
+            fromEnv: false,
+          });
+        return { admin: admins().find((a) => a.id === params[0]) };
+      },
     ],
+    ["POST", /^\/instance\/owner\/transfer$/, () => ({ admins: admins() })],
     [
       "POST",
       /^\/instance\/users\/([^/]+)\/reset-link$/,
@@ -92,23 +132,54 @@ function setup(path: string) {
 }
 
 describe("server admin: People", () => {
-  it("lists everyone and makes someone a server admin after a confirm", async () => {
+  it("shows the Owner the trusted list; a tick saves that person's powers", async () => {
     const user = userEvent.setup();
     const { calls } = setup("/t/ENG/admin/people");
-    const list = await screen.findByRole("list", { name: "People" });
-    const ada = within(list).getByText("Ada").closest("li")!;
-    expect(within(ada).getByText("(you)")).toBeInTheDocument();
-    expect(within(ada).getByText("Server admin")).toBeInTheDocument();
-
-    const jules = within(list).getByText("Jules").closest("li")!;
-    await user.click(within(jules).getByRole("button", { name: "Make admin" }));
-    const dialog = await screen.findByRole("dialog", { name: /Make Jules a server admin/ });
-    await user.click(within(dialog).getByRole("button", { name: "Make admin" }));
+    const owner = await screen.findByRole("region", { name: "Server Owner" });
+    expect(within(owner).getByText("Ada")).toBeInTheDocument();
+    const trusted = await screen.findByRole("list", { name: "Trusted admins" });
+    const sam = within(trusted).getByText("Sam").closest("li")!;
+    expect(within(sam).getByRole("checkbox", { name: "Backups" })).toBeChecked();
+    await user.click(within(sam).getByRole("checkbox", { name: "Updates" }));
     await waitFor(() =>
       expect(
-        calls.find((c) => c.method === "PATCH" && c.path === "/instance/users/user-2")?.body,
-      ).toEqual({ isInstanceAdmin: true }),
+        calls.find((c) => c.method === "PUT" && c.path === "/instance/admins/user-3")?.body,
+      ).toEqual({
+        powers: ["backups", "updates"],
+      }),
     );
+    // Someone in TEAMFLOW_INSTANCE_ADMINS is locked: every power, no Remove.
+    const ops = within(trusted).getByText("Ops").closest("li")!;
+    expect(within(ops).getByText("Set in .env")).toBeInTheDocument();
+    expect(within(ops).getByRole("checkbox", { name: "People" })).toBeDisabled();
+    expect(within(ops).queryByRole("button", { name: "Remove" })).not.toBeInTheDocument();
+  });
+
+  it("transfers ownership only once the new Owner's email is typed", async () => {
+    const user = userEvent.setup();
+    const { calls } = setup("/t/ENG/admin/people");
+    await user.click(await screen.findByRole("button", { name: /Transfer ownership/ }));
+    const dialog = await screen.findByRole("dialog", { name: "Transfer ownership" });
+    const go = within(dialog).getByRole("button", { name: "Transfer ownership" });
+    expect(go).toBeDisabled();
+    await user.type(within(dialog).getByLabelText(/Type sam@example.test/), "SAM@example.test");
+    expect(go).toBeEnabled();
+    await user.click(go);
+    await waitFor(() =>
+      expect(calls.find((c) => c.path === "/instance/owner/transfer")?.body).toEqual({
+        userId: "user-3",
+        confirmEmail: "SAM@example.test",
+      }),
+    );
+  });
+
+  it("shows a trusted admin with the People power everyone, but not the trusted list", async () => {
+    setup("/t/ENG/admin/people", (db) => {
+      db.user = { ...db.user, serverRole: "admin", serverPowers: ["people"] };
+    });
+    expect(await screen.findByRole("list", { name: "People" })).toBeInTheDocument();
+    expect(screen.queryByRole("region", { name: "Server Owner" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("list", { name: "Trusted admins" })).not.toBeInTheDocument();
   });
 
   it("shows a reset link to pass on when email is not set up", async () => {

@@ -16,7 +16,7 @@ On a **Debian/Ubuntu machine or an existing container**:
 curl -fsSL https://github.com/mrcool5556/teamflow/releases/latest/download/install.sh | sudo bash
 ```
 
-Both end by printing the address and the one-time setup link (`http://<ip>:3000/setup?code=XXXX-XXXX`). Open it and create the instance admin account; there is no demo user. Lost it? The code is in `/opt/teamflow/data/setup-code` and the service log ([docs/SETUP.md](../../docs/SETUP.md)).
+Both end by printing the address and the one-time setup link (`http://<ip>:3000/setup?code=XXXX-XXXX`). Open it and create the Server Owner account; there is no demo user. Lost it? The code is in `/opt/teamflow/data/setup-code` and the service log ([docs/SETUP.md](../../docs/SETUP.md)).
 
 Options, dry runs and what each step does: [docs/SELF-HOSTING.md](../../docs/SELF-HOSTING.md#setup-b-linux-or-proxmox). Creating the container by hand instead of `proxmox.sh`: [create-lxc.md](create-lxc.md).
 
@@ -51,7 +51,14 @@ sudo teamflow-backup --db-only
 sudo teamflow-restore --file teamflow_2026-11-12_140201.db
 ```
 
-Backups go to `/var/backups/teamflow` (the newest 10 database backups are kept). A restore backs up the current database first, so it can be undone the same way. Both are also on Settings → Updates → Advanced.
+Backups go to `/var/backups/teamflow`. After each backup the oldest automatic ones beyond the keep settings are deleted (Server admin; default 10 database backups and 1 upload archive, stored in `/opt/teamflow/data/backup-settings.json`). Named checkpoints such as `teamflow-pre-*.db`, `*-before-releases.db` or `teamflow_env_pre-*` are never pruned or counted, and the newest database backup can't be deleted. See [SELF-HOSTING.md](../../docs/SELF-HOSTING.md#backup-retention).
+
+```bash
+sudo /usr/local/lib/teamflow/backup-files.sh keep database      # the keep setting in use
+sudo /usr/local/lib/teamflow/backup-files.sh delete <file name>  # what Server admin's Delete runs
+```
+
+A restore backs up the current database first, so it can be undone the same way. Both are also on Settings → Updates → Advanced.
 
 ## Coming from a git checkout
 
@@ -63,9 +70,10 @@ Servers installed before v0.2.0 ran from a clone in `/opt/teamflow`. Run the ins
 
 Settings → Updates and the Discord bot service buttons run host scripts as root through `sudo -n`. The installer runs `setup-maintenance-sudo.sh`, which:
 
-- copies `backup.sh`, `update.sh`, `restore.sh` and `discord-bot.sh` to root-owned `/usr/local/lib/teamflow/`;
+- copies `backup.sh`, `backup-files.sh`, `update.sh`, `restore.sh` and `discord-bot.sh` to root-owned `/usr/local/lib/teamflow/`;
+- makes `/var/backups/teamflow` `root:teamflow` 750, so the app can list backups but not read or change them;
 - links `/usr/local/bin/teamflow-update`, `teamflow-backup`, `teamflow-restore`, `teamflow-discord` and `update` to those copies;
-- writes `/etc/sudoers.d/teamflow-maintenance`, which lets `teamflow` run only those four copies, and validates it with `visudo`.
+- writes `/etc/sudoers.d/teamflow-maintenance`, which lets `teamflow` run only those five copies, and validates it with `visudo`.
 
 Each file is written to a temp name, checked and renamed into place, so a script or the rule is never missing; a sudoers file that fails validation leaves the working one alone. Updates re-run it from the new release.
 
@@ -77,7 +85,7 @@ sudo -u teamflow sudo -n /usr/local/lib/teamflow/update.sh --help
 sudo -u teamflow sudo -n /usr/local/lib/teamflow/discord-bot.sh status
 ```
 
-In-app updates also need `TEAMFLOW_MAINTENANCE_ENABLED=true` in `.env` (the installer sets it) and the instance-admin flag on your account (the account made on `/setup`, someone made admin on Server admin → People, or `TEAMFLOW_INSTANCE_ADMINS`).
+In-app updates also need `TEAMFLOW_MAINTENANCE_ENABLED=true` in `.env` (the installer sets it) and, on your account, the **Updates** server power for updating or **Backups** for backups: the Server Owner (the account made on `/setup`) has every power; trusted admins get the ones the Owner ticks on Server admin → People, and accounts in `TEAMFLOW_INSTANCE_ADMINS` get all of them. Your role in the Flow that is open does not matter: Server admin → Updates & backups works from any Flow, or with none.
 
 ### KillMode
 
@@ -133,6 +141,7 @@ The prompts save `SMTP_*` to `.env` and restart Teamflow. Without email, an admi
 | `install.sh` | Runs `../install/install.sh` (for old instructions and checkouts) |
 | `update.sh` | Release update with rollback (`update`, `teamflow-update`) |
 | `backup.sh` / `restore.sh` | Database (+ uploads) backups (`teamflow-backup`) / put one back (`teamflow-restore`) |
+| `backup-files.sh` | Prune old backups to the keep settings; delete one backup (Server admin) |
 | `setup-maintenance-sudo.sh` | Root-owned script copies and the sudoers rule |
 | `configure-smtp.sh` | SMTP wizard (`teamflow-smtp`) |
 | `discord-bot.sh` | Install/enable/restart/stop/status of `teamflow-discord` |

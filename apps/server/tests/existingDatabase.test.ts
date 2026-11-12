@@ -19,6 +19,8 @@ let app: TestApp;
 
 const ADMIN = { id: "u-admin", email: "admin@old.example", name: "Old Admin" };
 const MEMBER = { id: "u-member", email: "member@old.example", name: "Old Member" };
+/** Like CT998: the oldest account is a retired demo account that once held the admin flag. */
+const DEMO = { id: "u-demo", email: "demo-retired@invalid.invalid", name: "Demo User (retired)" };
 const PASSWORD = "old-password-123";
 
 beforeAll(async () => {
@@ -32,8 +34,9 @@ beforeAll(async () => {
   old.transaction((tx) => {
     tx.insert(schema.users)
       .values([
-        { ...ADMIN, passwordHash, isInstanceAdmin: 1 },
-        { ...MEMBER, passwordHash, isInstanceAdmin: 0 },
+        { ...DEMO, passwordHash, isInstanceAdmin: 0, createdAt: "2026-10-01 09:00:00" },
+        { ...ADMIN, passwordHash, isInstanceAdmin: 1, createdAt: "2026-10-02 09:00:00" },
+        { ...MEMBER, passwordHash, isInstanceAdmin: 0, createdAt: "2026-10-03 09:00:00" },
       ])
       .run();
     createTeamWithOwner(tx, {
@@ -53,7 +56,11 @@ beforeAll(async () => {
       space: { spaceType: "free", storageCapBytes: GIB, spaceOwnerId: MEMBER.id },
     });
   });
-  (old as unknown as { $client: { close(): void } }).$client.close();
+  // Wind it back to schema 4 (before the Server Owner), as the previous release left it.
+  const raw = (old as unknown as { $client: import("better-sqlite3").Database }).$client;
+  raw.prepare("UPDATE users SET is_server_owner = 0, server_powers = NULL").run();
+  raw.prepare("UPDATE schema_version SET version = 4").run();
+  raw.close();
 
   // 2. The new release boots on that file, with PUBLIC_URL in .env as production has.
   process.env.DATABASE_URL = `file:${dbFile}`;
@@ -96,6 +103,9 @@ describe("an existing database after the update", () => {
   it("lets everyone log in with their teams, roles and admin flag unchanged", async () => {
     const admin = await login(app, ADMIN.email, PASSWORD);
     expect(admin.user.isInstanceAdmin).toBe(true);
+    // Schema 5 made the instance admin the Server Owner, not the older retired account.
+    expect(admin.user).toMatchObject({ serverRole: "owner" });
+    expect((admin.user as { serverPowers?: string[] }).serverPowers).toHaveLength(7);
     const member = await login(app, MEMBER.email, PASSWORD);
     expect(member.user.isInstanceAdmin).toBe(false);
 

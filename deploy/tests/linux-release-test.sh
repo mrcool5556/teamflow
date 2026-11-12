@@ -249,6 +249,58 @@ check "server answers after restore" test "$(running_version)" = 0.2.1
 bash $APP_DIR/deploy/proxmox-lxc/restore.sh --file ../../etc/passwd >/tmp/r2.log 2>&1 && bad "path should be refused" || ok "path refused"
 check "app user may run restore through sudo" runuser -u teamflow -- sudo -n /usr/local/lib/teamflow/restore.sh --help
 
+section "Backup retention (keep N, never checkpoints)"
+BK=/var/backups/teamflow
+rm -f $BK/teamflow_* $BK/teamflow-*
+# What CT998 has besides automatic backups: named checkpoints, .env copies and a stray file.
+keepers=(teamflow-pre-0.2.0.db teamflow_db_pre-0.2.1.db teamflow_2026-06-01_120000-before-releases.db
+  teamflow_env_pre-0.2.0 notes.txt)
+for f in "${keepers[@]}"; do echo keep >"$BK/$f"; touch -d '2026-01-01' "$BK/$f"; done
+for d in 01 02 03 04 05; do
+  echo old >"$BK/teamflow_2026-06-${d}_120000.db"; touch -d "2026-06-$d" "$BK/teamflow_2026-06-${d}_120000.db"
+  echo old >"$BK/teamflow_uploads_2026-06-${d}_120000.tar.gz"; touch -d "2026-06-$d" "$BK/teamflow_uploads_2026-06-${d}_120000.tar.gz"
+done
+count() { find $BK -maxdepth 1 -type f -regextype posix-extended -regex "$1" | wc -l; }
+DBS='.*/teamflow_[0-9-]{10}_[0-9]{6}(-[0-9]+)?\.db'
+UPS='.*/teamflow_uploads_[0-9-]{10}_[0-9]{6}(-[0-9]+)?\.tar\.gz'
+mkdir -p $APP_DIR/data/uploads && echo hi >$APP_DIR/data/uploads/a.txt
+printf '{\n  "keepDatabaseBackups": 3,\n  "keepUploadArchives": 2\n}\n' >$APP_DIR/data/backup-settings.json
+chown teamflow:teamflow $APP_DIR/data/backup-settings.json
+bash $APP_DIR/deploy/proxmox-lxc/backup.sh --full >/tmp/bk1.log 2>&1 || { cat /tmp/bk1.log; bad "full backup exit"; }
+check "keeps 3 database backups (setting)" test "$(count "$DBS")" = 3
+check "keeps 2 upload archives (setting)" test "$(count "$UPS")" = 2
+check "the new backups are among those kept" bash -c "test -f \"\$(sed -n 's/^BACKUP database //p' /tmp/bk1.log)\" && test -f \"\$(sed -n 's/^BACKUP uploads //p' /tmp/bk1.log)\""
+check "the oldest were pruned" test ! -e $BK/teamflow_2026-06-01_120000.db
+check "PRUNED lines logged" grep -q "^PRUNED database teamflow_2026-06-01_120000.db" /tmp/bk1.log
+for f in "${keepers[@]}"; do check "untouched: $f" test "$(cat "$BK/$f")" = keep; done
+check "folder is root:teamflow 750" test "$(stat -c '%U:%G %a' $BK)" = "root:teamflow 750"
+check "backup files stay 600" test "$(stat -c %a "$(sed -n 's/^BACKUP database //p' /tmp/bk1.log)")" = 600
+check "app user can list the folder" runuser -u teamflow -- ls $BK >/dev/null
+echo '{"keepDatabaseBackups": 500, "keepUploadArchives": "x"}' >$APP_DIR/data/backup-settings.json
+check "out-of-range setting means the default (10)" test "$(bash $APP_DIR/deploy/proxmox-lxc/backup-files.sh keep database)" = 10
+check "bad value means the default (1)" test "$(bash $APP_DIR/deploy/proxmox-lxc/backup-files.sh keep uploads)" = 1
+ln -sf /etc/hostname $APP_DIR/data/backup-settings.json
+check "a linked settings file is ignored" test "$(bash $APP_DIR/deploy/proxmox-lxc/backup-files.sh keep database)" = 10
+rm -f $APP_DIR/data/backup-settings.json
+check "no settings file: default 10" test "$(bash $APP_DIR/deploy/proxmox-lxc/backup-files.sh keep database)" = 10
+
+newest=$(basename "$(sed -n 's/^BACKUP database //p' /tmp/bk1.log)")
+older=$(cd $BK && ls -t teamflow_2026-06-0*_120000.db | tail -n1)
+files_sudo() { runuser -u teamflow -- sudo -n /usr/local/lib/teamflow/backup-files.sh "$@"; }
+files_sudo delete "$newest" >/tmp/del1.log 2>&1 && bad "newest database backup deleted" || ok "newest database backup refused"
+check "...says why" grep -q "^FAIL newest" /tmp/del1.log
+check "...still there" test -f "$BK/$newest"
+check "app user deletes an older one through sudo" files_sudo delete "$older"
+check "...gone" test ! -e "$BK/$older"
+check "app user deletes a checkpoint by name" files_sudo delete teamflow_env_pre-0.2.0
+files_sudo delete ../../etc/passwd >/dev/null 2>&1 && bad "path deleted" || ok "path refused"
+files_sudo delete notes.txt >/dev/null 2>&1 && bad "non-Teamflow file deleted" || ok "non-Teamflow file refused"
+check "...notes.txt still there" test -f $BK/notes.txt
+ln -s /etc/passwd $BK/teamflow_link.db
+files_sudo delete teamflow_link.db >/dev/null 2>&1 && bad "link deleted" || ok "link refused"
+check "...link target intact" test -s /etc/passwd
+rm -f $BK/teamflow_link.db
+
 section "Releases kept"
 check "at most two releases on disk" bash -c "test \$(ls -d $APP_DIR/releases/v* | wc -l) -le 2"
 

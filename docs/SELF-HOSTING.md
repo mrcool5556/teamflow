@@ -152,8 +152,27 @@ Options (after `sudo bash -s --` when piped, or as environment variables): `--ye
   releases/v0.2.0/      unpacked releases (the newest two are kept)
   current -> releases/v0.2.0
   apps, deploy -> current/…   so older paths and the systemd unit stay valid
-/var/backups/teamflow/  database backups (the newest 10)
+/var/backups/teamflow/  backups (keep settings: Server admin; default 10 database, 1 uploads)
 ```
+
+### Backup retention
+
+How many backups to keep is set on Server admin → Updates & backups (Backups power), where the backup list also deletes single backups:
+**database backups** (default 10) and **upload archives** (default 1), each 1–100. After every
+successful backup (by hand, from the app or before an update) the oldest of that kind beyond the
+number are deleted. The settings live in `data/backup-settings.json`
+(`{"keepDatabaseBackups": 10, "keepUploadArchives": 1}`); the backup scripts read it and use the
+defaults for anything missing or out of range.
+
+Only the scripts' own names are pruned: `teamflow_YYYY-MM-DD_HHMMSS.db` and
+`teamflow_uploads_YYYY-MM-DD_HHMMSS.tar.gz` (`.zip` on Windows). Anything else named
+`teamflow*` (for example `teamflow-pre-0.2.0.db`, `*-before-releases.db` from the checkout
+switch, `teamflow_env_pre-*`) is a **checkpoint**: kept until you delete it, and not counted.
+Other files in the folder are never touched. The newest database backup can't be deleted, by
+pruning or by hand.
+
+On Linux the folder is `root:teamflow`, mode 750: the app can list names and sizes, the files
+stay root-only (600), and deleting goes through the root-owned `backup-files.sh`.
 
 ### SMTP (password reset emails)
 
@@ -228,9 +247,9 @@ Full list with comments: root [`.env.example`](../.env.example). The ones a prod
 | `CORS_ORIGINS` | no | Extra allowed browser origins |
 | `TEAMFLOW_TRUST_PROXY` | behind a proxy | Use `X-Forwarded-For` for rate limiting |
 | `TEAMFLOW_AUTH_RATE_LIMIT` | no | Login/register/forgot attempts per minute per IP (default 10) |
-| `TEAMFLOW_INSTANCE_ADMINS` | no | Emails that get the instance-admin flag at login |
+| `TEAMFLOW_INSTANCE_ADMINS` | no | Emails that become trusted server admins with every power at login (never the Server Owner; locked in the app) |
 | `TEAMFLOW_INVITE_ONLY` | no | `true` = registration only through an invite. Can be set on the admin page instead |
-| `TEAMFLOW_BACKUP_DIR` | no | Backup folder (Linux `/var/backups/teamflow`, Windows `<install folder>\backups`) |
+| `TEAMFLOW_BACKUP_DIR` | no (Linux: leave unset; the root scripts always use `/var/backups/teamflow`) | Backup folder (Linux `/var/backups/teamflow`, Windows `<install folder>\backups`) |
 | `TEAMFLOW_BACKUP_SCRIPT`, `TEAMFLOW_UPDATE_SCRIPT`, `TEAMFLOW_DISCORD_BOT_SCRIPT` | leave unset | Defaults are the root-owned copies sudoers allows (Linux) or the release's own scripts (Windows) |
 | `TEAMFLOW_BUNDLE_MAX_ENTRIES`, `TEAMFLOW_BUNDLE_MAX_BYTES` | no | Team bundle import caps (5000 entries, 2 GB) |
 | `TEAMFLOW_DB_MAINTENANCE_NIGHTLY` | no | Nightly trash purge and data upkeep |

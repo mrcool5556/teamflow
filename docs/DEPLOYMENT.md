@@ -50,6 +50,7 @@ Open <http://localhost:3000>. At startup the server loads `TEAMFLOW_ENV_FILE` if
   | 2 | First tracked version: the `schema_version` table plus every earlier idempotent patch (roles, invites, stored files, instance admin, token version, ...); older databases show as 0 |
   | 3 | `board.edit` granted once to every existing role except the built-in Viewer ([AUTH.md](AUTH.md#editing-the-board-boardedit)) |
   | 4 | Spaces: every existing team becomes an admin space with no upload cap; new user teams are free spaces ([SPACES.md](SPACES.md)) |
+  | 5 | Server Owner and trusted admins: `users.is_server_owner` and `server_powers`. Once, the oldest account holding the instance-admin flag becomes the Owner (never a retired `@invalid.invalid` or "(retired)" account) and other flagged accounts become trusted admins with every power ([AUTH.md](AUTH.md#server-owner-and-trusted-admins)) |
 - Boot no longer changes user data. These jobs run only on demand:
   - purge issues that have been in the trash for more than 7 days;
   - re-grant `team.data.transfer` to Owner roles that lack it;

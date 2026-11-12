@@ -26,7 +26,7 @@ flowchart LR
   Web -.-> Static
   API --> DB
   API --> Files
-  API -->|instance admin only| Scripts
+  API -->|server power only| Scripts
 ```
 
 One Node 20 process serves the API and, in production, the built web UI on the same port (default 3000). The database is SQLite through `better-sqlite3` and Drizzle. **Postgres is not supported**: an earlier version of these docs claimed it, and the LXC installer still installs a Postgres package, but nothing uses it. Postgres support is deferred.
@@ -68,7 +68,7 @@ middleware/
   error.ts      handleError: ApiError → { error, code }; anything else → 500 internal_error
 routes/         one Hono sub-app per area (auth, tokens, teams, board, members, invites, roles,
                 discord, maintenance, instance, files, projects, issues, comments, attachments, uploads,
-                health, spa); instance = /instance/* for the server admin page (instance admins only)
+                health, spa); instance = /instance/* for the server admin page (each route behind its server power)
 lib/            domain helpers (issues, board, attachments, chunkedUpload, teamBundle, roles, invites,
                 passwordReset, mail, secretsCrypto, hostScripts, maintenance, discordBotService,
                 spaceStorage (usage, cap and disk-floor checks), spaceSettings, instanceAdmin, disk, ...)
@@ -96,7 +96,7 @@ Conventions:
 ```text
 main.tsx        QueryClientProvider + RouterProvider; imports styles/* in cascade order
 router.tsx      URL map: /login /register /reset /setup /welcome /invite/:token, /t/:teamKey, /t/:teamKey/issue/:ref,
-                /t/:teamKey/settings/<panel>, /t/:teamKey/admin/<section> (server admin, instance admins),
+                /t/:teamKey/settings/<panel>, /t/:teamKey/admin/<section> (server admin, by server power),
                 (legacy ?ref= ?invite= ?reset= are redirected)
 session/        SessionProvider: token + user from localStorage, login/logout
 routes/         RootLayout, auth/ (LoginScreen, InviteRoute), board/ (BoardShell, actions), settings/ (one panel per section),
@@ -140,7 +140,7 @@ flowchart TD
 - **Sessions.** Login returns a JWT that the web app keeps in `localStorage` (`teamflow_token`) and sends as `Authorization: Bearer`. There are no cookies. The JWT carries `ver`; a password reset bumps `users.token_version`, which signs out every session.
 - **PATs.** `pat_` + 48 hex chars, stored as a SHA-256 hash. Scopes `read` and/or `write`; mutating routes need `write`. A PAT created with a `teamId` only works on that team, on every team-scoped route. PATs act as their user and never expire; revoke them in Settings → API tokens (`DELETE /auth/tokens/:id`).
 - **Team roles.** Each team has Owner, Admin, Member, Viewer and optional custom roles, each a set of permissions from `packages/core/src/permissions.ts`. `board.edit` gates every board write (issues, rows, columns, comments, attachments, uploads, team files); Viewer lacks it. A role can only grant permissions its creator holds.
-- **Instance admin.** `users.is_instance_admin` marks server-wide admins. Maintenance (backup, update) and Discord bot secrets and service routes need it on top of the team permission. The first registered account gets it; `TEAMFLOW_INSTANCE_ADMINS=a@x,b@y` grants it at login.
+- **Server Owner and trusted admins.** One Server Owner (`users.is_server_owner`, the setup account) has every server power; trusted admins (`is_instance_admin` plus `server_powers`) have the ones the Owner ticks. Each server route checks its power (`requirePower` in `middleware/auth.ts`; `lib/serverAccess.ts`), never the open Flow's role. `TEAMFLOW_INSTANCE_ADMINS=a@x,b@y` adds trusted admins with every power. See [AUTH.md](AUTH.md#server-owner-and-trusted-admins).
 
 ## Data flow: MCP, CLI and Discord bot
 

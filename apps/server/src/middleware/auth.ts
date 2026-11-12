@@ -2,6 +2,8 @@ import { createMiddleware } from "hono/factory";
 import { db } from "../db.js";
 import { resolveAuth, userIsInstanceAdmin, type AuthContext } from "../lib/auth.js";
 import { forbidden, unauthorized } from "../lib/errors.js";
+import { getServerAccess, hasServerPower } from "../lib/serverAccess.js";
+import { SERVER_POWER_LABELS, type ServerPower } from "@teamflow/core";
 import type { AppEnv } from "../types.js";
 
 export type AuthVariables = {
@@ -35,10 +37,30 @@ export const requireWrite = createMiddleware<AppEnv>(async (c, next) => {
   await next();
 });
 
-/** Server-wide actions (maintenance, bot secrets) need the instance-admin flag on the user. */
+/** Any Server admin access (Owner, or a trusted admin with at least one power): Overview. */
 export const requireInstanceAdmin = createMiddleware<AppEnv>(async (c, next) => {
   if (!(await userIsInstanceAdmin(db, c.var.auth.userId))) {
     throw forbidden("Instance admin required");
+  }
+  await next();
+});
+
+/** One of these server powers (the Server Owner has them all). Must follow requireAuth. */
+export function requirePower(...powers: ServerPower[]) {
+  return createMiddleware<AppEnv>(async (c, next) => {
+    if (!hasServerPower(getServerAccess(db, c.var.auth.userId), ...powers)) {
+      throw forbidden(
+        `Needs the ${powers.map((p) => SERVER_POWER_LABELS[p]).join(" or ")} server power`,
+      );
+    }
+    await next();
+  });
+}
+
+/** Only the Server Owner: managing trusted admins, transferring ownership, deleting a Flow. */
+export const requireServerOwner = createMiddleware<AppEnv>(async (c, next) => {
+  if (getServerAccess(db, c.var.auth.userId).role !== "owner") {
+    throw forbidden("Only the Server Owner can do this");
   }
   await next();
 });

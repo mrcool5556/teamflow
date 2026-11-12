@@ -10,15 +10,16 @@ export function useDiscordSettingsQuery(teamId: string) {
   });
 }
 
-export function useDiscordSecretsQuery(teamId: string) {
+/** Server-wide bot credentials (instance admins). */
+export function useDiscordSecretsQuery() {
   return useQuery({
-    queryKey: queryKeys.discordSecrets(teamId),
-    queryFn: async ({ signal }) =>
-      (await client.withSignal(signal).getDiscordBotSecrets(teamId)).secrets,
+    queryKey: queryKeys.discordSecrets,
+    queryFn: async ({ signal }) => (await client.withSignal(signal).getDiscordBotSecrets()).secrets,
   });
 }
 
-export function useDiscordServiceQuery(teamId: string) {
+/** `teamId` null: the server admin page (instance admins); else through that Flow. */
+export function useDiscordServiceQuery(teamId: string | null) {
   return useQuery({
     queryKey: queryKeys.discordService(teamId),
     queryFn: async ({ signal }) =>

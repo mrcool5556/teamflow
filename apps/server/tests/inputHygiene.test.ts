@@ -33,7 +33,7 @@ afterAll(() => {
 describe("maintenance update input", () => {
   it("refuses any git branch: servers install prebuilt releases", async () => {
     for (const branch of ["main", "--upload-pack=evil"]) {
-      const res = await api(app, "POST", `/teams/${admin.teamId}/server/maintenance/update`, {
+      const res = await api(app, "POST", `/server/maintenance/update`, {
         token: admin.token,
         body: { branch },
       });
@@ -43,7 +43,7 @@ describe("maintenance update input", () => {
   });
 
   it("only accepts a version number as the target", async () => {
-    const res = await api(app, "POST", `/teams/${admin.teamId}/server/maintenance/update`, {
+    const res = await api(app, "POST", `/server/maintenance/update`, {
       token: admin.token,
       body: { version: "1.2.3; rm -rf /" },
     });
@@ -59,7 +59,7 @@ describe("maintenance restore input", () => {
       "teamflow_1.tar.gz",
       "x.db",
     ]) {
-      const res = await api(app, "POST", `/teams/${admin.teamId}/server/maintenance/restore`, {
+      const res = await api(app, "POST", `/server/maintenance/restore`, {
         token: admin.token,
         body: { file },
       });
@@ -68,7 +68,7 @@ describe("maintenance restore input", () => {
   });
 
   it("is instance-admin only", async () => {
-    const res = await api(app, "POST", `/teams/${member.teamId}/server/maintenance/restore`, {
+    const res = await api(app, "POST", `/server/maintenance/restore`, {
       token: member.token,
       body: { file: "teamflow_2026-11-09_140201.db" },
     });

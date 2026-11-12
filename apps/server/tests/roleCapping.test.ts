@@ -37,7 +37,7 @@ describe("role grant capping", () => {
   it("admin cannot create a role granting permissions they do not hold", async () => {
     const res = await api(app, "POST", `/teams/${teamId}/roles`, {
       token: admin.token,
-      body: { name: "Sneaky", permissions: ["team.members.view", "server.maintenance.run"] },
+      body: { name: "Sneaky", permissions: ["team.members.view", "team.data.transfer"] },
     });
     expect(res.status).toBe(403);
     expect((await json<{ error: string }>(res)).error).toMatch(/do not hold/);

@@ -14,10 +14,13 @@ BACKUP_REPO="$SCRIPT_DIR/backup.sh"
 UPDATE_REPO="$SCRIPT_DIR/update.sh"
 DISCORD_REPO="$SCRIPT_DIR/discord-bot.sh"
 RESTORE_REPO="$SCRIPT_DIR/restore.sh"
+FILES_REPO="$SCRIPT_DIR/backup-files.sh"
 BACKUP_BIN="$LIB_DIR/backup.sh"
 UPDATE_BIN="$LIB_DIR/update.sh"
 DISCORD_BIN="$LIB_DIR/discord-bot.sh"
 RESTORE_BIN="$LIB_DIR/restore.sh"
+FILES_BIN="$LIB_DIR/backup-files.sh"
+BACKUP_DIR="/var/backups/teamflow"
 SUDOERS_FILE="/etc/sudoers.d/teamflow-maintenance"
 
 if [[ $EUID -ne 0 ]]; then
@@ -25,7 +28,7 @@ if [[ $EUID -ne 0 ]]; then
   exit 1
 fi
 
-if [[ ! -f "$BACKUP_REPO" ]] || [[ ! -f "$UPDATE_REPO" ]] || [[ ! -f "$DISCORD_REPO" ]] || [[ ! -f "$RESTORE_REPO" ]]; then
+if [[ ! -f "$BACKUP_REPO" ]] || [[ ! -f "$UPDATE_REPO" ]] || [[ ! -f "$DISCORD_REPO" ]] || [[ ! -f "$RESTORE_REPO" ]] || [[ ! -f "$FILES_REPO" ]]; then
   echo "Scripts not found under $SCRIPT_DIR/"
   exit 1
 fi
@@ -40,6 +43,7 @@ fix_script "$BACKUP_REPO"
 fix_script "$UPDATE_REPO"
 fix_script "$DISCORD_REPO"
 fix_script "$RESTORE_REPO"
+fix_script "$FILES_REPO"
 
 # Root-owned copies: directory 755, files 755, owner root. The app user can execute but not edit.
 install -d -m 755 -o root -g root "$LIB_DIR"
@@ -65,6 +69,11 @@ install_atomic "$BACKUP_REPO" "$BACKUP_BIN"
 install_atomic "$UPDATE_REPO" "$UPDATE_BIN"
 install_atomic "$DISCORD_REPO" "$DISCORD_BIN"
 install_atomic "$RESTORE_REPO" "$RESTORE_BIN"
+install_atomic "$FILES_REPO" "$FILES_BIN"
+
+# The app lists backups (names and sizes) but cannot read or change them: root-owned, group
+# $APP_USER, 750. Each backup file stays 600 root.
+install -d -m 750 -o root -g "$APP_USER" "$BACKUP_DIR"
 
 # Convenience names for humans on the box; sudoers does not reference these.
 ln -sf "$UPDATE_BIN" /usr/local/bin/teamflow-update
@@ -82,7 +91,7 @@ cat >"$SUDOERS_TMP" <<EOF
 # Teamflow in-app maintenance (Settings → Updates) and Discord bot service (Settings → Integrations)
 # Only the root-owned copies under $LIB_DIR are allowed. Re-run setup-maintenance-sudo.sh after
 # changing the scripts in the repo; update.sh does this automatically.
-$APP_USER ALL=(root) NOPASSWD: $BACKUP_BIN *, $UPDATE_BIN *, $DISCORD_BIN *, $RESTORE_BIN *
+$APP_USER ALL=(root) NOPASSWD: $BACKUP_BIN *, $UPDATE_BIN *, $DISCORD_BIN *, $RESTORE_BIN *, $FILES_BIN *
 EOF
 
 chown root:root "$SUDOERS_TMP"
@@ -101,5 +110,6 @@ echo "Test:"
 echo "  sudo -u $APP_USER sudo -n $BACKUP_BIN --db-only"
 echo "  sudo -u $APP_USER sudo -n $UPDATE_BIN --help"
 echo "  sudo -u $APP_USER sudo -n $DISCORD_BIN status"
+echo "  sudo -u $APP_USER sudo -n $FILES_BIN keep database"
 echo ""
 echo "Restart Teamflow: systemctl restart teamflow"

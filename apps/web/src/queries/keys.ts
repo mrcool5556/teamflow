@@ -13,16 +13,20 @@ export const queryKeys = {
   rowAttachments: (rowId: string) => ["attachments", "row", rowId] as const,
   teamFiles: (teamId: string, trash: boolean) =>
     ["files", teamId, trash ? "trash" : "active"] as const,
-  maintenance: (teamId: string) => ["maintenance", teamId] as const,
+  /** Server-wide (instance admins), so not per Flow. */
+  maintenance: ["maintenance"] as const,
   discordSettings: (teamId: string) => ["discord", teamId, "settings"] as const,
-  discordSecrets: (teamId: string) => ["discord", teamId, "secrets"] as const,
-  discordService: (teamId: string) => ["discord", teamId, "service"] as const,
+  discordSecrets: ["discord", "secrets"] as const,
+  /** Per Flow in Settings → Integrations; `null` = the server admin page. */
+  discordService: (teamId: string | null) => ["discord", teamId ?? "server", "service"] as const,
   teamStorage: (teamId: string) => ["storage", teamId] as const,
   instanceOverview: ["instance", "overview"] as const,
   instanceSpaces: ["instance", "spaces"] as const,
   instanceSpace: (teamId: string) => ["instance", "spaces", teamId] as const,
   instanceSettings: ["instance", "settings"] as const,
   instanceUsers: (query: string) => ["instance", "users", query] as const,
+  serverAdmins: ["instance", "admins"] as const,
+  backupList: ["maintenance", "backups"] as const,
   instanceSite: ["instance", "site"] as const,
   instanceMail: ["instance", "mail"] as const,
   instanceSignup: ["instance", "signup"] as const,

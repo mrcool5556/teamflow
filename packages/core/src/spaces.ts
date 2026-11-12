@@ -147,3 +147,9 @@ export type SpaceAllowancePublic = {
   /** Whether POST /teams would be allowed now (the first free space always is). */
   canCreate: boolean;
 };
+
+/** Server admin → a Flow → Delete for good (Server Owner only): the Flow's key confirms it. */
+export const deleteSpaceSchema = z
+  .object({ confirmKey: z.string().trim().min(1).max(12) })
+  .strict();
+export type DeleteSpaceInput = z.infer<typeof deleteSpaceSchema>;

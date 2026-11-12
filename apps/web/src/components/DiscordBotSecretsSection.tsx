@@ -6,19 +6,17 @@ import { errorMessage } from "../lib/errorSink";
 import type { PanelMessage } from "../lib/panelStatus";
 
 type DiscordBotSecretsSectionProps = {
-  teamId: string;
   canManage: boolean;
   onMessage: PanelMessage;
   onSaved?: () => void;
 };
 
 export function DiscordBotSecretsSection({
-  teamId,
   canManage,
   onMessage,
   onSaved,
 }: DiscordBotSecretsSectionProps) {
-  const secretsQuery = useDiscordSecretsQuery(teamId);
+  const secretsQuery = useDiscordSecretsQuery();
   const loading = secretsQuery.isPending;
   const [saving, setSaving] = useState(false);
   const [secrets, setSecrets] = useState<DiscordBotSecretsPublic | null>(null);
@@ -71,7 +69,7 @@ export function DiscordBotSecretsSection({
       if (botToken.trim()) payload.botToken = botToken.trim();
       if (pat.trim()) payload.pat = pat.trim();
 
-      const { secrets: next } = await client.updateDiscordBotSecrets(teamId, payload);
+      const { secrets: next } = await client.updateDiscordBotSecrets(payload);
       applySecrets(next);
       onMessage(
         next.configured

@@ -7,10 +7,9 @@ import type {
 import type { Db } from "@teamflow/db";
 import { schema } from "@teamflow/db";
 import { botConfigKeyConfigured, decryptSecret, encryptSecret } from "./secretsCrypto.js";
-import { userHasTeamPermission } from "./permissions.js";
 import { defaultPublicUrl, syncDiscordBotEnv } from "./botConfigKey.js";
 import { config } from "../config.js";
-import { badRequest, forbidden } from "./errors.js";
+import { badRequest } from "./errors.js";
 
 const ROW_ID = "default";
 
@@ -62,16 +61,12 @@ export async function getDiscordBotSecretsPublic(db: Db) {
   return mapSecretsPublic(row);
 }
 
+/** Server-wide bot credentials; the route checks the instance-admin flag. */
 export async function updateDiscordBotSecrets(
   db: Db,
-  teamId: string,
   actorUserId: string,
   input: UpdateDiscordBotSecretsInput,
 ) {
-  if (!(await userHasTeamPermission(db, actorUserId, teamId, "integrations.discord.secrets"))) {
-    throw forbidden("Permission denied");
-  }
-
   const current = await getSecretsRow(db);
   const now = new Date().toISOString();
   const nextBotTokenEnc =

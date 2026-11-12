@@ -14,7 +14,7 @@ const DEFAULT_STATUSES = [
  * an older one runs every (idempotent) patch once, inside a single transaction, then records
  * the new version in schema_version.
  */
-export const SCHEMA_VERSION = 4;
+export const SCHEMA_VERSION = 5;
 
 export function getSchemaVersion(sqlite: Database.Database) {
   sqlite.exec(`
@@ -48,6 +48,7 @@ export function applySchemaPatches(sqlite: Database.Database) {
     runPatches(sqlite);
     // One-time data steps tied to a version; unlike patches they must not repeat later.
     if (current < 3) grantBoardEditToExistingRoles(sqlite);
+    if (current < 5) assignServerOwner(sqlite);
     sqlite
       .prepare(
         `INSERT INTO schema_version (id, version, applied_at) VALUES (1, ?, datetime('now'))
@@ -169,6 +170,7 @@ function runPatches(sqlite: Database.Database) {
   ensureIssueNumberUnique(sqlite);
   ensureQueryIndexes(sqlite);
   ensureSpaceColumns(sqlite);
+  ensureServerOwnerColumns(sqlite);
 }
 
 function ensureTeamBundleTables(sqlite: Database.Database) {
@@ -1083,4 +1085,56 @@ function ensureSpaceColumns(sqlite: Database.Database) {
       updated_at TEXT NOT NULL DEFAULT (datetime('now'))
     );
   `);
+}
+
+/** Every server power, as stored for a trusted admin who had the old all-or-nothing flag. */
+const ALL_SERVER_POWERS = JSON.stringify([
+  "updates",
+  "backups",
+  "people",
+  "flows",
+  "site",
+  "discord",
+  "signup",
+]);
+
+/** Version 5: one Server Owner, trusted admins with powers (packages/core/src/serverRoles.ts). */
+function ensureServerOwnerColumns(sqlite: Database.Database) {
+  const userCols = sqlite.prepare("PRAGMA table_info(users)").all() as { name: string }[];
+  if (!userCols.some((col) => col.name === "is_server_owner")) {
+    sqlite.exec(`ALTER TABLE users ADD COLUMN is_server_owner INTEGER NOT NULL DEFAULT 0`);
+    sqlite.exec(`ALTER TABLE users ADD COLUMN server_powers TEXT`);
+    console.log("Added users is_server_owner and server_powers columns");
+  }
+}
+
+/**
+ * Once, on reaching version 5: the oldest account that holds the instance-admin flag becomes the
+ * Server Owner (never a retired account: an @invalid.invalid email or "(retired)" in the name),
+ * and every other flagged account becomes a trusted admin with every power, so nobody loses
+ * access. A server with no flagged account gets no Owner here; its first setup account will be.
+ */
+export function assignServerOwner(sqlite: Database.Database) {
+  const hasOwner = sqlite.prepare("SELECT 1 FROM users WHERE is_server_owner = 1 LIMIT 1").get();
+  if (!hasOwner) {
+    const owner = sqlite
+      .prepare(
+        `SELECT id, email FROM users
+         WHERE is_instance_admin = 1
+           AND lower(email) NOT LIKE '%@invalid.invalid'
+           AND name NOT LIKE '%(retired)%'
+         ORDER BY created_at ASC, rowid ASC LIMIT 1`,
+      )
+      .get() as { id: string; email: string } | undefined;
+    if (owner) {
+      sqlite.prepare("UPDATE users SET is_server_owner = 1 WHERE id = ?").run(owner.id);
+      console.log(`Server Owner: ${owner.email}`);
+    }
+  }
+  sqlite
+    .prepare(
+      `UPDATE users SET server_powers = ?
+       WHERE is_instance_admin = 1 AND is_server_owner = 0 AND server_powers IS NULL`,
+    )
+    .run(ALL_SERVER_POWERS);
 }

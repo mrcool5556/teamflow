@@ -407,3 +407,149 @@
 .setup-checklist--card {
   margin-bottom: var(--space-4);
 }
+
+/* ---------- server admin: Server Owner and trusted admins ---------- */
+
+.admin-pill--owner {
+  color: var(--primary);
+}
+
+.admin-powers {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1) var(--space-4);
+  margin: var(--space-2) 0 0;
+  padding: 0;
+  border: none;
+}
+
+.admin-powers .settings-checkbox {
+  margin: 0;
+}
+
+.admin-add-trusted {
+  margin-top: var(--space-4);
+}
+
+.admin-add-candidates {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.admin-add-candidates li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding: var(--space-2) 0;
+  border-bottom: 1px solid var(--border);
+}
+
+/* ---------- server admin: backup list ---------- */
+
+.backup-list-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--space-2) var(--space-4);
+  margin-bottom: var(--space-3);
+}
+
+.backup-list-total {
+  font-family: var(--font-display);
+  font-size: 1.3rem;
+}
+
+.backup-list-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin-left: auto;
+}
+
+.backup-list-row-actions {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: var(--space-2);
+  white-space: nowrap;
+}
+
+.backup-kind {
+  font-family: var(--font-mono);
+  font-size: var(--font-size-xs);
+  padding: 0 var(--space-2);
+  border-radius: 99px;
+  border: 1px solid var(--border-strong);
+  color: var(--text-soft);
+}
+
+.backup-kind--database {
+  color: var(--accent-text);
+  border-color: var(--accent);
+}
+
+.backup-kind--uploads {
+  color: var(--done);
+  border-color: var(--done);
+}
+
+.backup-list-kept {
+  font-size: var(--font-size-xs);
+}
+
+.backup-keep {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: var(--space-2) var(--space-4);
+  margin-top: var(--space-4);
+}
+
+.backup-keep .settings-field {
+  margin: 0;
+  width: 11rem;
+}
+
+@media (max-width: 760px) {
+  .backup-list-name {
+    display: none;
+  }
+
+  .backup-list-actions {
+    margin-left: 0;
+  }
+}
+
+/* Overview: "Go to my Flows" beside the heading (the Owner starts here after signing in). */
+.admin-overview-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2) var(--space-4);
+}
+
+.admin-overview-header .settings-lead {
+  flex-basis: 100%;
+}
+
+.admin-go-flows {
+  margin-left: auto;
+}
+
+.admin-danger-zone {
+  border-color: var(--danger);
+}
+
+.admin-danger-form {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: var(--space-3);
+}
+
+.admin-danger-form .settings-field {
+  margin: 0;
+  min-width: 12rem;
+}

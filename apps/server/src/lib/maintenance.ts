@@ -5,7 +5,6 @@ import { open } from "node:fs/promises";
 import fs from "node:fs/promises";
 import path from "node:path";
 import type {
-  MaintenanceBackupPublic,
   MaintenanceChannel,
   MaintenanceJobPublic,
   MaintenanceLogSummary,
@@ -21,6 +20,7 @@ import { config } from "../config.js";
 import { getReleaseCheck, isUpdateAvailable, writeChannel } from "./releaseCheck.js";
 import { buildJobSpawn, formatCommand, INSTALLED_SCRIPT_DIR, probeSudo } from "./hostScripts.js";
 import { badRequest, internalError } from "./errors.js";
+import { getBackupDir, listBackupFiles } from "./backupFiles.js";
 
 const JOB_FILE = "maintenance-job.json";
 const LOG_FILE = "maintenance.log";
@@ -36,10 +36,6 @@ function getDataDir() {
 
 function isMaintenanceEnabled() {
   return config.maintenance.enabled;
-}
-
-function getBackupDir() {
-  return config.maintenance.backupDir;
 }
 
 /**
@@ -93,11 +89,6 @@ function disabledReason(): string | null {
     return "Server maintenance is disabled. Set TEAMFLOW_MAINTENANCE_ENABLED=true on the host.";
   }
   return null;
-}
-
-function backupKindFromName(name: string): MaintenanceBackupPublic["kind"] {
-  if (name.includes("uploads")) return "uploads";
-  return "database";
 }
 
 async function readLogTail(): Promise<string> {
@@ -203,36 +194,6 @@ async function mapJob(job: StoredJob | null): Promise<MaintenanceJobPublic | nul
     ...job,
     logTail: await readLogTail(),
   };
-}
-
-async function listBackups(): Promise<MaintenanceBackupPublic[]> {
-  const backupDir = getBackupDir();
-  let entries: string[];
-  try {
-    entries = await fs.readdir(backupDir);
-  } catch {
-    return [];
-  }
-
-  const backups: MaintenanceBackupPublic[] = [];
-  for (const name of entries) {
-    if (!/^teamflow_.+\.(db|sql|tar\.gz|zip)$/.test(name)) continue;
-    const fullPath = path.join(backupDir, name);
-    try {
-      const stat = await fs.stat(fullPath);
-      if (!stat.isFile()) continue;
-      backups.push({
-        name,
-        kind: backupKindFromName(name),
-        sizeBytes: stat.size,
-        createdAt: stat.mtime.toISOString(),
-      });
-    } catch {
-      continue;
-    }
-  }
-
-  return backups.sort((a, b) => Date.parse(b.createdAt) - Date.parse(a.createdAt));
 }
 
 async function assertJobIdle() {
@@ -415,7 +376,7 @@ export async function getMaintenanceStatus(): Promise<MaintenanceStatusPublic> {
   const backupScript = getBackupScript();
   const updateScript = getUpdateScript();
   const enabled = reason === null;
-  const backups = enabled ? await listBackups() : [];
+  const backups = enabled ? await listBackupFiles() : [];
   const job = await mapJob(await readStoredJob());
   const jobRunning = job?.status === "running";
   if (enabled && !jobRunning && hostCheck?.duringJob) {
@@ -559,8 +520,8 @@ export async function runMaintenanceRestore(input: RunMaintenanceRestoreInput) {
   const reason = disabledReason();
   if (reason) throw badRequest(reason);
 
-  const backups = await listBackups();
-  if (!backups.some((backup) => backup.name === input.file && backup.kind === "database")) {
+  const backups = await listBackupFiles();
+  if (!backups.some((backup) => backup.name === input.file && backup.restorable)) {
     throw badRequest(`No database backup named ${input.file}`);
   }
   const script = getRestoreScript();

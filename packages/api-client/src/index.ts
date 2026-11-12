@@ -34,6 +34,8 @@ import type {
   DiscordGuildConfigPublic,
   DiscordBotSecretsPublic,
   DiscordBotServiceStatusPublic,
+  BackupRetention,
+  MaintenanceBackupListPublic,
   MaintenanceJobPublic,
   MaintenanceStatusPublic,
   MaintenanceSettingsInput,
@@ -71,7 +73,10 @@ import type {
   SiteSettingsAdminPublic,
   SpaceAllowancePublic,
   SpaceSettingsPublic,
-  UpdateInstanceUserInput,
+  ServerAdminPublic,
+  SetServerAdminInput,
+  TransferOwnershipInput,
+  DeleteSpaceInput,
   UpdateMailSettingsInput,
   UpdateSetupProgressInput,
   UpdateSignupSettingsInput,
@@ -419,109 +424,122 @@ export class TeamflowClient {
     );
   }
 
-  getDiscordBotSecrets(teamId: string) {
-    return this.request<{ secrets: DiscordBotSecretsPublic }>(
-      `/teams/${teamId}/integrations/discord/secrets`,
-    );
+  /* Server-wide: bot secrets and service, updates and backups (instance admins only). */
+
+  getDiscordBotSecrets() {
+    return this.request<{ secrets: DiscordBotSecretsPublic }>(`/integrations/discord/secrets`);
   }
 
-  updateDiscordBotSecrets(teamId: string, input: UpdateDiscordBotSecretsInput) {
-    return this.request<{ secrets: DiscordBotSecretsPublic }>(
-      `/teams/${teamId}/integrations/discord/secrets`,
-      {
-        method: "PATCH",
-        body: JSON.stringify(input),
-      },
-    );
+  updateDiscordBotSecrets(input: UpdateDiscordBotSecretsInput) {
+    return this.request<{ secrets: DiscordBotSecretsPublic }>(`/integrations/discord/secrets`, {
+      method: "PATCH",
+      body: JSON.stringify(input),
+    });
   }
 
-  getDiscordBotServiceStatus(teamId: string) {
+  /** Bot service status: server-wide (instance admins), or through a Flow's Settings → Integrations. */
+  getDiscordBotServiceStatus(teamId?: string | null) {
     return this.request<{ status: DiscordBotServiceStatusPublic }>(
-      `/teams/${teamId}/integrations/discord/service`,
+      teamId ? `/teams/${teamId}/integrations/discord/service` : "/integrations/discord/service",
     );
   }
 
-  enableDiscordBotService(teamId: string) {
+  enableDiscordBotService() {
     return this.request<{ status: DiscordBotServiceStatusPublic }>(
-      `/teams/${teamId}/integrations/discord/service/enable`,
+      `/integrations/discord/service/enable`,
       { method: "POST" },
     );
   }
 
-  restartDiscordBotService(teamId: string) {
+  restartDiscordBotService() {
     return this.request<{ status: DiscordBotServiceStatusPublic }>(
-      `/teams/${teamId}/integrations/discord/service/restart`,
+      `/integrations/discord/service/restart`,
       { method: "POST" },
     );
   }
 
-  stopDiscordBotService(teamId: string) {
+  stopDiscordBotService() {
     return this.request<{ status: DiscordBotServiceStatusPublic }>(
-      `/teams/${teamId}/integrations/discord/service/stop`,
+      `/integrations/discord/service/stop`,
       { method: "POST" },
     );
   }
 
-  getServerMaintenanceStatus(teamId: string) {
-    return this.request<{ status: MaintenanceStatusPublic }>(`/teams/${teamId}/server/maintenance`);
+  getServerMaintenanceStatus() {
+    return this.request<{ status: MaintenanceStatusPublic }>(`/server/maintenance`);
   }
 
   /** Probe sudo and ask GitHub for the newest release now (the GET only reads the cache). */
-  checkServerMaintenance(teamId: string) {
-    return this.request<{ status: MaintenanceStatusPublic }>(
-      `/teams/${teamId}/server/maintenance/check`,
-      { method: "POST" },
-    );
+  checkServerMaintenance() {
+    return this.request<{ status: MaintenanceStatusPublic }>(`/server/maintenance/check`, {
+      method: "POST",
+    });
   }
 
-  getServerMaintenanceJob(teamId: string) {
-    return this.request<{ job: MaintenanceJobPublic | null }>(
-      `/teams/${teamId}/server/maintenance/job`,
-    );
+  getServerMaintenanceJob() {
+    return this.request<{ job: MaintenanceJobPublic | null }>(`/server/maintenance/job`);
   }
 
-  runServerMaintenanceBackup(teamId: string, input: RunMaintenanceBackupInput = {}) {
-    return this.request<{ job: MaintenanceJobPublic }>(
-      `/teams/${teamId}/server/maintenance/backup`,
-      {
-        method: "POST",
-        body: JSON.stringify(input),
-      },
-    );
+  runServerMaintenanceBackup(input: RunMaintenanceBackupInput = {}) {
+    return this.request<{ job: MaintenanceJobPublic }>(`/server/maintenance/backup`, {
+      method: "POST",
+      body: JSON.stringify(input),
+    });
   }
 
-  runServerMaintenanceUpdate(teamId: string, input: RunMaintenanceUpdateInput = {}) {
-    return this.request<{ job: MaintenanceJobPublic }>(
-      `/teams/${teamId}/server/maintenance/update`,
-      {
-        method: "POST",
-        body: JSON.stringify(input),
-      },
-    );
+  runServerMaintenanceUpdate(input: RunMaintenanceUpdateInput = {}) {
+    return this.request<{ job: MaintenanceJobPublic }>(`/server/maintenance/update`, {
+      method: "POST",
+      body: JSON.stringify(input),
+    });
   }
 
   /** Put a database backup back. Stops the app for a few seconds, like an update. */
-  runServerMaintenanceRestore(teamId: string, input: RunMaintenanceRestoreInput) {
-    return this.request<{ job: MaintenanceJobPublic }>(
-      `/teams/${teamId}/server/maintenance/restore`,
-      { method: "POST", body: JSON.stringify(input) },
-    );
+  runServerMaintenanceRestore(input: RunMaintenanceRestoreInput) {
+    return this.request<{ job: MaintenanceJobPublic }>(`/server/maintenance/restore`, {
+      method: "POST",
+      body: JSON.stringify(input),
+    });
   }
 
   /** Clear a finished job (a failed update stops showing). */
-  dismissServerMaintenanceJob(teamId: string) {
-    return this.request<{ job: MaintenanceJobPublic | null }>(
-      `/teams/${teamId}/server/maintenance/job/dismiss`,
-      { method: "POST" },
-    );
+  dismissServerMaintenanceJob() {
+    return this.request<{ job: MaintenanceJobPublic | null }>(`/server/maintenance/job/dismiss`, {
+      method: "POST",
+    });
   }
 
   /** Advanced → Release channel. */
-  setServerMaintenanceSettings(teamId: string, input: MaintenanceSettingsInput) {
-    return this.request<{ status: MaintenanceStatusPublic }>(
-      `/teams/${teamId}/server/maintenance/settings`,
-      { method: "PUT", body: JSON.stringify(input) },
+  setServerMaintenanceSettings(input: MaintenanceSettingsInput) {
+    return this.request<{ status: MaintenanceStatusPublic }>(`/server/maintenance/settings`, {
+      method: "PUT",
+      body: JSON.stringify(input),
+    });
+  }
+
+  /** Every file in the backup folder with its type, size and whether it may be deleted. */
+  listServerBackups() {
+    return this.request<MaintenanceBackupListPublic>(`/server/maintenance/backups`);
+  }
+
+  /** Delete one backup (the newest database backup is refused). Returns the new list. */
+  deleteServerBackup(name: string) {
+    return this.request<MaintenanceBackupListPublic>(
+      `/server/maintenance/backups/${encodeURIComponent(name)}`,
+      { method: "DELETE" },
     );
+  }
+
+  getServerBackupRetention() {
+    return this.request<{ retention: BackupRetention }>(`/server/maintenance/backup-retention`);
+  }
+
+  /** How many database backups and upload archives to keep (1-100 each). */
+  setServerBackupRetention(input: BackupRetention) {
+    return this.request<{ retention: BackupRetention }>(`/server/maintenance/backup-retention`, {
+      method: "PUT",
+      body: JSON.stringify(input),
+    });
   }
 
   /** The liveness probe: `{ ok, version }`. Used to see when a restarted server is back. */
@@ -1056,10 +1074,36 @@ export class TeamflowClient {
     return this.request<{ users: InstanceUserPublic[] }>(`/instance/users${q}`);
   }
 
-  /** Make someone a server admin, or stop them being one (never the last). */
-  updateInstanceUser(userId: string, input: UpdateInstanceUserInput) {
-    return this.request<{ user: InstanceUserPublic }>(`/instance/users/${userId}`, {
-      method: "PATCH",
+  /* Server Owner only: trusted admins, ownership, deleting a Flow for good. */
+
+  listServerAdmins() {
+    return this.request<{ admins: ServerAdminPublic[] }>("/instance/admins");
+  }
+
+  /** Add someone to the trusted list or change their powers ([] = listed, no access). */
+  setServerAdmin(userId: string, input: SetServerAdminInput) {
+    return this.request<{ admin: ServerAdminPublic }>(`/instance/admins/${userId}`, {
+      method: "PUT",
+      body: JSON.stringify(input),
+    });
+  }
+
+  removeServerAdmin(userId: string) {
+    return this.request<{ admins: ServerAdminPublic[] }>(`/instance/admins/${userId}`, {
+      method: "DELETE",
+    });
+  }
+
+  transferServerOwnership(input: TransferOwnershipInput) {
+    return this.request<{ admins: ServerAdminPublic[] }>("/instance/owner/transfer", {
+      method: "POST",
+      body: JSON.stringify(input),
+    });
+  }
+
+  deleteSpace(teamId: string, input: DeleteSpaceInput) {
+    return this.request<void>(`/instance/spaces/${teamId}`, {
+      method: "DELETE",
       body: JSON.stringify(input),
     });
   }

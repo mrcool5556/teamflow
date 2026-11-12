@@ -4,7 +4,7 @@ import { parseBody } from "../lib/validation.js";
 import { validateParams } from "../middleware/params.js";
 import { updateDiscordBotSecretsSchema, updateTeamDiscordSettingsSchema } from "@teamflow/core";
 import { db } from "../db.js";
-import { requireAuth, requireInstanceAdmin, requireWrite } from "../middleware/auth.js";
+import { requireAuth, requirePower, requireWrite } from "../middleware/auth.js";
 import { loadTeam, requirePermission } from "../middleware/team.js";
 import {
   getDiscordGuildConfig,
@@ -71,39 +71,30 @@ routes.patch(
   },
 );
 
-routes.get(
-  "/teams/:teamId/integrations/discord/secrets",
-  requireAuth,
-  validateParams,
-  loadTeam(),
-  requirePermission("integrations.discord.secrets"),
-  requireInstanceAdmin,
-  async (c) => {
-    const secrets = await getDiscordBotSecretsPublic(db);
-    return c.json({ secrets });
-  },
-);
+/* Bot credentials and the teamflow-discord service are server-wide: the instance-admin flag alone
+   decides, whichever Flow is open (or none) and whatever the role in it. */
+
+routes.get("/integrations/discord/secrets", requireAuth, requirePower("discord"), async (c) => {
+  return c.json({ secrets: await getDiscordBotSecretsPublic(db) });
+});
 
 routes.patch(
-  "/teams/:teamId/integrations/discord/secrets",
+  "/integrations/discord/secrets",
   requireAuth,
   requireWrite,
-  validateParams,
-  loadTeam(),
-  requireInstanceAdmin,
-  requirePermission("integrations.discord.secrets"),
+  requirePower("discord"),
   async (c) => {
-    const auth = c.var.auth;
-
-    const teamId = c.var.teamId;
-
     const body = await parseBody(c, updateDiscordBotSecretsSchema);
-
-    const secrets = await updateDiscordBotSecrets(db, teamId, auth.userId, body);
-    return c.json({ secrets });
+    return c.json({ secrets: await updateDiscordBotSecrets(db, c.var.auth.userId, body) });
   },
 );
 
+/** Bot service status for the server admin page. */
+routes.get("/integrations/discord/service", requireAuth, requirePower("discord"), async (c) => {
+  return c.json({ status: await getDiscordBotServiceStatus(db) });
+});
+
+/** The same status in a Flow's Settings → Integrations, for anyone who may view it there. */
 routes.get(
   "/teams/:teamId/integrations/discord/service",
   requireAuth,
@@ -111,50 +102,37 @@ routes.get(
   loadTeam(),
   requirePermission("integrations.discord.view"),
   async (c) => {
-    const status = await getDiscordBotServiceStatus(db);
-    return c.json({ status });
+    return c.json({ status: await getDiscordBotServiceStatus(db) });
   },
 );
 
 routes.post(
-  "/teams/:teamId/integrations/discord/service/enable",
+  "/integrations/discord/service/enable",
   requireAuth,
   requireWrite,
-  validateParams,
-  loadTeam(),
-  requirePermission("integrations.discord.secrets"),
-  requireInstanceAdmin,
+  requirePower("discord"),
   async (c) => {
-    const status = await enableDiscordBotService(db);
-    return c.json({ status });
+    return c.json({ status: await enableDiscordBotService(db) });
   },
 );
 
 routes.post(
-  "/teams/:teamId/integrations/discord/service/restart",
+  "/integrations/discord/service/restart",
   requireAuth,
   requireWrite,
-  validateParams,
-  loadTeam(),
-  requirePermission("integrations.discord.secrets"),
-  requireInstanceAdmin,
+  requirePower("discord"),
   async (c) => {
-    const status = await restartDiscordBotService(db);
-    return c.json({ status });
+    return c.json({ status: await restartDiscordBotService(db) });
   },
 );
 
 routes.post(
-  "/teams/:teamId/integrations/discord/service/stop",
+  "/integrations/discord/service/stop",
   requireAuth,
   requireWrite,
-  validateParams,
-  loadTeam(),
-  requirePermission("integrations.discord.secrets"),
-  requireInstanceAdmin,
+  requirePower("discord"),
   async (c) => {
-    const status = await stopDiscordBotService(db);
-    return c.json({ status });
+    return c.json({ status: await stopDiscordBotService(db) });
   },
 );
 

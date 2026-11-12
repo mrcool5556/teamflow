@@ -8,7 +8,7 @@ Talk to your Teamflow board from Discord: slash commands, ticket threads → iss
 
 The bot (`apps/discord-bot`) is a separate Node process. It needs a Discord bot token and a Teamflow PAT. Two ways to give it those:
 
-1. **Settings mode (recommended).** An instance admin saves the Discord token, client ID and PAT in the web app; they are stored encrypted (`TEAMFLOW_SECRETS_KEY`, or `JWT_SECRET` when unset). The bot starts with only `TEAMFLOW_URL` and `TEAMFLOW_BOT_CONFIG_KEY`, calls `GET /integrations/discord/bot-config` with header `X-Teamflow-Bot-Key`, and receives the secrets. The server answers `503` while `TEAMFLOW_BOT_CONFIG_KEY` is unset on the server.
+1. **Settings mode (recommended).** A server admin with the Discord bot power saves the Discord token, client ID and PAT in the web app; they are stored encrypted (`TEAMFLOW_SECRETS_KEY`, or `JWT_SECRET` when unset). The bot starts with only `TEAMFLOW_URL` and `TEAMFLOW_BOT_CONFIG_KEY`, calls `GET /integrations/discord/bot-config` with header `X-Teamflow-Bot-Key`, and receives the secrets. The server answers `503` while `TEAMFLOW_BOT_CONFIG_KEY` is unset on the server.
 2. **`.env` mode.** Put `DISCORD_BOT_TOKEN`, `DISCORD_CLIENT_ID` and `TEAMFLOW_TOKEN` in `apps/discord-bot/.env`. Settings mode also falls back to this file when the bot-config call fails.
 
 The bot always loads `apps/discord-bot/.env` if it exists, also under systemd. It never overrides variables that are already set, so the systemd `EnvironmentFile` (`data/discord-bot.env`) wins where both define a value.
@@ -36,11 +36,11 @@ Open **Settings → Integrations** for a team (`/t/<TEAM>/settings/integrations`
 
 | Section | Who sees it | What it does |
 |---------|-------------|--------------|
-| **Bot credentials** | Instance admin with `integrations.discord.secrets` | Discord client ID, bot token, Teamflow PAT, API URL, public web URL, Message Content Intent. Instance-wide, shared by every team |
-| **Discord bot on this server** | View: `integrations.discord.view`. Enable / restart / stop: instance admin with `integrations.discord.secrets` | Runs `teamflow-discord` (systemd) on Linux |
+| **Bot credentials** | Discord bot server power (any Flow, or none) | Discord client ID, bot token, Teamflow PAT, API URL, public web URL, Message Content Intent. Instance-wide, shared by every team |
+| **Discord bot on this server** | View: `integrations.discord.view`. Enable / restart / stop: Discord bot server power (any Flow, or none) | Runs `teamflow-discord` (systemd) on Linux |
 | **Discord bot** (per team) | View: `integrations.discord.view`. Edit: `integrations.discord.manage` | Guild ID, allowed role IDs, ticket channels |
 
-Owner and Admin have the three `integrations.discord.*` permissions by default; the instance-admin flag is separate (see [AUTH.md](AUTH.md#instance-admin)).
+Owner and Admin have `integrations.discord.view` and `.manage` by default (`.secrets` is retired and grants nothing); the Discord bot server power is separate (see [AUTH.md](AUTH.md#server-owner-and-trusted-admins)).
 
 Saving credentials on the server also:
 

@@ -147,8 +147,20 @@ export async function countUserTeams(db: Db, userId: string) {
   return Number(row?.count ?? 0);
 }
 
-export async function deleteTeam(db: Db, teamId: string, actorUserId: string) {
-  if (!(await userHasTeamPermission(db, actorUserId, teamId, "team.delete"))) {
+/**
+ * Delete a team (Flow) for good with its files. `byServerOwner`: the Server Owner deleting it
+ * from Server admin, who need not be a member (the route checks the Owner).
+ */
+export async function deleteTeam(
+  db: Db,
+  teamId: string,
+  actorUserId: string,
+  options: { byServerOwner?: boolean } = {},
+) {
+  if (
+    !options.byServerOwner &&
+    !(await userHasTeamPermission(db, actorUserId, teamId, "team.delete"))
+  ) {
     throw forbidden("Permission denied");
   }
 

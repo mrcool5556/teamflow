@@ -42,6 +42,7 @@ import {
   scrollToIssueRef,
   scrollToRowRef,
 } from "../../lib/refLinks";
+import { hasServerPower } from "../../lib/serverAccess";
 import { hasTeamPermission, TeamPermissionsContext } from "../../lib/teamPermissions";
 import { usePanScroll } from "../../lib/usePanScroll";
 import { updateBoard, useBoardQuery } from "../../queries/board";
@@ -135,7 +136,8 @@ export function BoardShell() {
           permissions: permissionsForSystemSlug(currentMember.roleSlug as SystemRoleSlug),
         }
       : null);
-  // Server-wide panels need the instance-admin flag (GET /auth/me) on top of the team permission.
+  // Server-wide panels follow the user's server powers from GET /auth/me (lib/serverAccess.ts);
+  // the open Flow and the role in it do not matter.
   const isInstanceAdmin = user?.isInstanceAdmin === true;
   const can = (permission: Parameters<typeof hasTeamPermission>[1]) =>
     hasTeamPermission(effectiveTeamPermissions, permission);
@@ -144,9 +146,9 @@ export function BoardShell() {
     canManageRoles: can("team.roles.manage"),
     showIntegrations: can("integrations.discord.view"),
     canManageDiscord: can("integrations.discord.manage"),
-    canManageDiscordSecrets: isInstanceAdmin && can("integrations.discord.secrets"),
-    showMaintenance: isInstanceAdmin && can("server.maintenance.view"),
-    canRunMaintenance: isInstanceAdmin && can("server.maintenance.run"),
+    canManageDiscordSecrets: hasServerPower(user, "discord"),
+    showMaintenance: hasServerPower(user, "updates", "backups"),
+    canRunMaintenance: hasServerPower(user, "updates"),
   };
 
   const isRowHeadersVisible = useCallback(

@@ -422,8 +422,10 @@ export function StorageSignupForm({
   onSaved,
   secondary,
 }: {
-  settings: SpaceSettingsPublic;
-  signup: SignupSettingsPublic;
+  /** null hides the storage fields (no Flows power). */
+  settings: SpaceSettingsPublic | null;
+  /** null hides who can sign up (no Sign-up rules power). */
+  signup: SignupSettingsPublic | null;
   /** Free and total bytes on the upload disk, when known. */
   disk?: { freeBytes: number | null; totalBytes: number | null } | null;
   submitLabel: string;
@@ -434,32 +436,36 @@ export function StorageSignupForm({
   const floorId = useId();
   const saveSpaces = useUpdateSpaceSettingsMutation();
   const saveSignup = useUpdateSignupSettingsMutation();
-  const [cap, setCap] = useState<CapDraft>(() => capDraftFrom(settings.freeSpaceCapBytes));
-  const [perUser, setPerUser] = useState(String(settings.freeSpacesPerUser));
-  const [floor, setFloor] = useState(
-    settings.minFreeDiskBytes > 0 ? bytesToGbText(settings.minFreeDiskBytes) : "0",
+  const [cap, setCap] = useState<CapDraft>(() =>
+    capDraftFrom(settings?.freeSpaceCapBytes ?? 1024 ** 3),
   );
-  const [inviteOnly, setInviteOnly] = useState(signup.inviteOnly);
+  const [perUser, setPerUser] = useState(String(settings?.freeSpacesPerUser ?? 3));
+  const [floor, setFloor] = useState(
+    settings && settings.minFreeDiskBytes > 0 ? bytesToGbText(settings.minFreeDiskBytes) : "0",
+  );
+  const [inviteOnly, setInviteOnly] = useState(signup?.inviteOnly ?? false);
   const [error, setError] = useState<string | null>(null);
-  const signupLocked = signup.source === "env";
+  const signupLocked = signup?.source === "env";
 
   const capBytes = capFromDraft(cap);
   const perUserValue = Number(perUser);
   const perUserValid = Number.isInteger(perUserValue) && perUserValue >= 0 && perUserValue <= 1000;
   const floorBytes = floor.trim() === "0" ? 0 : gbToBytes(floor);
-  const valid = typeof capBytes === "number" && perUserValid && floorBytes !== null;
+  const valid = !settings || (typeof capBytes === "number" && perUserValid && floorBytes !== null);
   const pending = saveSpaces.isPending || saveSignup.isPending;
 
   const submit = async () => {
-    if (!valid || typeof capBytes !== "number" || floorBytes === null) return;
+    if (!valid) return;
     setError(null);
     try {
-      await saveSpaces.mutateAsync({
-        freeSpaceCapBytes: capBytes,
-        freeSpacesPerUser: perUserValue,
-        minFreeDiskBytes: floorBytes,
-      });
-      if (!signupLocked && inviteOnly !== signup.inviteOnly) {
+      if (settings && typeof capBytes === "number" && floorBytes !== null) {
+        await saveSpaces.mutateAsync({
+          freeSpaceCapBytes: capBytes,
+          freeSpacesPerUser: perUserValue,
+          minFreeDiskBytes: floorBytes,
+        });
+      }
+      if (signup && !signupLocked && inviteOnly !== signup.inviteOnly) {
         await saveSignup.mutateAsync({ inviteOnly });
       }
       onSaved?.();
@@ -480,76 +486,82 @@ export function StorageSignupForm({
         void submit();
       }}
     >
-      <CapField
-        label="Upload cap per Flow"
-        value={cap}
-        onChange={setCap}
-        allowNoLimit={false}
-        hint="Each Flow someone makes for themselves starts with this. Admin Flows have no limit."
-      />
-      <div className="settings-field">
-        <label className="settings-field-label" htmlFor={perUserId}>
-          Flows per person
-        </label>
-        <input
-          id={perUserId}
-          inputMode="numeric"
-          value={perUser}
-          aria-invalid={!perUserValid || undefined}
-          onChange={(e) => setPerUser(e.target.value)}
-        />
-        <span className="settings-field-hint">
-          How many free Flows each person may own. Their first one is never refused.
-        </span>
-      </div>
-      <div className="settings-field">
-        <label className="settings-field-label" htmlFor={floorId}>
-          Stop uploads below (GB free)
-        </label>
-        <input
-          id={floorId}
-          inputMode="decimal"
-          value={floor}
-          aria-invalid={floorBytes === null || undefined}
-          onChange={(e) => setFloor(e.target.value)}
-        />
-        <span className="settings-field-hint">
-          Uploads pause for every Flow while free disk is under this. 0 turns it off.
-          {freeBytes !== null
-            ? ` This server: ${formatStorageBytes(freeBytes)} free${
-                totalBytes ? ` of ${formatStorageBytes(totalBytes)}` : ""
-              }.`
-            : ""}
-        </span>
-      </div>
-      <div className="settings-field">
-        <span className="settings-field-label">
-          Who can sign up {signupLocked ? <EnvBadge /> : null}
-        </span>
-        <span className="admin-seg" role="group" aria-label="Who can sign up">
-          <button
-            type="button"
-            className={!inviteOnly ? "active" : undefined}
-            aria-pressed={!inviteOnly}
-            disabled={signupLocked}
-            onClick={() => setInviteOnly(false)}
-          >
-            Anyone with the address
-          </button>
-          <button
-            type="button"
-            className={inviteOnly ? "active" : undefined}
-            aria-pressed={inviteOnly}
-            disabled={signupLocked}
-            onClick={() => setInviteOnly(true)}
-          >
-            Only people with an invite
-          </button>
-        </span>
-        <span className="settings-field-hint">
-          Invite-only is safer for a server on the internet.
-        </span>
-      </div>
+      {settings ? (
+        <>
+          <CapField
+            label="Upload cap per Flow"
+            value={cap}
+            onChange={setCap}
+            allowNoLimit={false}
+            hint="Each Flow someone makes for themselves starts with this. Admin Flows have no limit."
+          />
+          <div className="settings-field">
+            <label className="settings-field-label" htmlFor={perUserId}>
+              Flows per person
+            </label>
+            <input
+              id={perUserId}
+              inputMode="numeric"
+              value={perUser}
+              aria-invalid={!perUserValid || undefined}
+              onChange={(e) => setPerUser(e.target.value)}
+            />
+            <span className="settings-field-hint">
+              How many free Flows each person may own. Their first one is never refused.
+            </span>
+          </div>
+          <div className="settings-field">
+            <label className="settings-field-label" htmlFor={floorId}>
+              Stop uploads below (GB free)
+            </label>
+            <input
+              id={floorId}
+              inputMode="decimal"
+              value={floor}
+              aria-invalid={floorBytes === null || undefined}
+              onChange={(e) => setFloor(e.target.value)}
+            />
+            <span className="settings-field-hint">
+              Uploads pause for every Flow while free disk is under this. 0 turns it off.
+              {freeBytes !== null
+                ? ` This server: ${formatStorageBytes(freeBytes)} free${
+                    totalBytes ? ` of ${formatStorageBytes(totalBytes)}` : ""
+                  }.`
+                : ""}
+            </span>
+          </div>
+        </>
+      ) : null}
+      {signup ? (
+        <div className="settings-field">
+          <span className="settings-field-label">
+            Who can sign up {signupLocked ? <EnvBadge /> : null}
+          </span>
+          <span className="admin-seg" role="group" aria-label="Who can sign up">
+            <button
+              type="button"
+              className={!inviteOnly ? "active" : undefined}
+              aria-pressed={!inviteOnly}
+              disabled={signupLocked}
+              onClick={() => setInviteOnly(false)}
+            >
+              Anyone with the address
+            </button>
+            <button
+              type="button"
+              className={inviteOnly ? "active" : undefined}
+              aria-pressed={inviteOnly}
+              disabled={signupLocked}
+              onClick={() => setInviteOnly(true)}
+            >
+              Only people with an invite
+            </button>
+          </span>
+          <span className="settings-field-hint">
+            Invite-only is safer for a server on the internet.
+          </span>
+        </div>
+      ) : null}
       <FormError message={error} />
       <div className="setup-actions">
         {secondary}

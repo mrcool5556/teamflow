@@ -160,7 +160,7 @@ describe("schema version 4: spaces", () => {
     applySchemaPatches(sqlite);
     vi.restoreAllMocks();
 
-    expect(getSchemaVersion(sqlite)).toBe(4);
+    expect(getSchemaVersion(sqlite)).toBe(SCHEMA_VERSION);
     const team = sqlite
       .prepare("SELECT space_type, storage_cap_bytes, space_owner_id FROM teams WHERE id = 't1'")
       .get();
@@ -171,5 +171,72 @@ describe("schema version 4: spaces", () => {
       { id: "f-loose", team_id: null },
       { id: "f-row", team_id: "t1" },
     ]);
+  });
+});
+
+describe("schema version 5: Server Owner and trusted admins", () => {
+  type UserRow = { email: string; is_server_owner: number; server_powers: string | null };
+  const ALL = '["updates","backups","people","flows","site","discord","signup"]';
+
+  function migrateFrom4(users: [string, string, string, number][]) {
+    const sqlite = createDb(":memory:").$client;
+    const insert = sqlite.prepare(
+      `INSERT INTO users (id, email, name, password_hash, is_instance_admin, created_at)
+       VALUES (?, ?, ?, 'x', ?, ?)`,
+    );
+    users.forEach(([id, email, name, flag], i) =>
+      insert.run(id, email, name, flag, `2026-10-0${i + 1} 10:00:00`),
+    );
+    sqlite.prepare("UPDATE users SET is_server_owner = 0, server_powers = NULL").run();
+    sqlite.prepare("UPDATE schema_version SET version = 4").run();
+    vi.spyOn(console, "log").mockImplementation(() => {});
+    applySchemaPatches(sqlite);
+    vi.restoreAllMocks();
+    expect(getSchemaVersion(sqlite)).toBe(SCHEMA_VERSION);
+    return (
+      sqlite.prepare("SELECT email, is_server_owner, server_powers FROM users").all() as UserRow[]
+    ).reduce<Record<string, UserRow>>((byEmail, row) => ({ ...byEmail, [row.email]: row }), {});
+  }
+
+  it("makes the instance admin the Owner on a server like CT998 (retired demo account first)", () => {
+    const users = migrateFrom4([
+      ["u-demo", "demo-retired@invalid.invalid", "Demo User (retired)", 0],
+      ["u-george", "mr.cool5556@hotmail.com", "Toters", 1],
+      ["u-member", "member@example.org", "Member", 0],
+    ]);
+    expect(users["mr.cool5556@hotmail.com"]).toMatchObject({
+      is_server_owner: 1,
+      server_powers: null,
+    });
+    expect(users["demo-retired@invalid.invalid"]).toMatchObject({
+      is_server_owner: 0,
+      server_powers: null,
+    });
+    expect(users["member@example.org"]).toMatchObject({ is_server_owner: 0, server_powers: null });
+  });
+
+  it("never picks a retired account, even one that still has the flag", () => {
+    const users = migrateFrom4([
+      ["u-demo", "demo-retired@invalid.invalid", "Demo User (retired)", 1],
+      ["u-george", "mr.cool5556@hotmail.com", "Toters", 1],
+    ]);
+    expect(users["mr.cool5556@hotmail.com"]!.is_server_owner).toBe(1);
+    expect(users["demo-retired@invalid.invalid"]!.is_server_owner).toBe(0);
+  });
+
+  it("makes other instance admins trusted admins with every power", () => {
+    const users = migrateFrom4([
+      ["u-first", "first@example.org", "First", 1],
+      ["u-second", "second@example.org", "Second", 1],
+      ["u-plain", "plain@example.org", "Plain", 0],
+    ]);
+    expect(users["first@example.org"]!.is_server_owner).toBe(1);
+    expect(users["second@example.org"]).toMatchObject({ is_server_owner: 0, server_powers: ALL });
+    expect(users["plain@example.org"]!.server_powers).toBeNull();
+  });
+
+  it("names no Owner when nobody holds the flag", () => {
+    const users = migrateFrom4([["u-a", "a@example.org", "A", 0]]);
+    expect(users["a@example.org"]!.is_server_owner).toBe(0);
   });
 });

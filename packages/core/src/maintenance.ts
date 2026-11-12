@@ -1,13 +1,66 @@
 import { z } from "zod";
 
-export type MaintenanceBackupKind = "database" | "uploads";
+/**
+ * database / uploads: the files backup.sh and backup.ps1 name themselves; only these are pruned.
+ * checkpoint: any other teamflow-named file in the folder (teamflow-pre-*, *-before-releases.db,
+ * teamflow_env_pre-*...). Kept until deleted by hand; never counted or pruned.
+ */
+export type MaintenanceBackupKind = "database" | "uploads" | "checkpoint";
 
 export type MaintenanceBackupPublic = {
   name: string;
   kind: MaintenanceBackupKind;
   sizeBytes: number;
   createdAt: string;
+  /** False only for the newest database backup, which is never deleted. */
+  deletable: boolean;
+  /** A SQLite file the restore action accepts (database backups and teamflow_*.db checkpoints). */
+  restorable: boolean;
 };
+
+/** backup.sh / backup.ps1 names: teamflow_YYYY-MM-DD_HHMMSS[-N].db */
+export const AUTO_DATABASE_BACKUP_NAME = /^teamflow_\d{4}-\d{2}-\d{2}_\d{6}(-\d+)?\.db$/;
+/** teamflow_uploads_YYYY-MM-DD_HHMMSS[-N].tar.gz (Linux) or .zip (Windows) */
+export const AUTO_UPLOADS_BACKUP_NAME =
+  /^teamflow_uploads_\d{4}-\d{2}-\d{2}_\d{6}(-\d+)?\.(tar\.gz|zip)$/;
+/** Every file Teamflow lists in the backup folder; anything else there is left alone. */
+export const LISTED_BACKUP_NAME = /^teamflow[A-Za-z0-9_.-]*$/;
+
+export function backupKindFromName(name: string): MaintenanceBackupKind | null {
+  if (!LISTED_BACKUP_NAME.test(name) || name.includes("..")) return null;
+  if (AUTO_DATABASE_BACKUP_NAME.test(name)) return "database";
+  if (AUTO_UPLOADS_BACKUP_NAME.test(name)) return "uploads";
+  return "checkpoint";
+}
+
+export const BACKUP_KEEP_MIN = 1;
+export const BACKUP_KEEP_MAX = 100;
+export const DEFAULT_BACKUP_RETENTION = { keepDatabaseBackups: 10, keepUploadArchives: 1 } as const;
+
+/**
+ * How many automatic backups of each kind to keep. Stored in <app>/data/backup-settings.json,
+ * which backup.sh / backup.ps1 read after each backup to delete the oldest beyond these.
+ */
+export const backupRetentionSchema = z
+  .object({
+    keepDatabaseBackups: z.number().int().min(BACKUP_KEEP_MIN).max(BACKUP_KEEP_MAX),
+    keepUploadArchives: z.number().int().min(BACKUP_KEEP_MIN).max(BACKUP_KEEP_MAX),
+  })
+  .strict();
+
+export type BackupRetention = z.infer<typeof backupRetentionSchema>;
+
+export type MaintenanceBackupListPublic = {
+  backups: MaintenanceBackupPublic[];
+  totalBytes: number;
+  /** Absolute folder, or null when maintenance is disabled. */
+  backupDir: string | null;
+  retention: BackupRetention;
+};
+
+export const backupFileParamSchema = z.object({
+  name: z.string().regex(LISTED_BACKUP_NAME).max(200),
+});
 
 export type MaintenanceJobStatus = "running" | "success" | "failed";
 
